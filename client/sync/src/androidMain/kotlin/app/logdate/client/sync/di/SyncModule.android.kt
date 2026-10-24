@@ -16,6 +16,7 @@ import app.logdate.client.sync.SyncUpgradeResumption
 import app.logdate.client.sync.cloud.di.cloudAccountModule
 import app.logdate.client.sync.conflict.KeyValueSyncConflictStore
 import app.logdate.client.sync.conflict.SyncConflictStore
+import app.logdate.client.sync.metadata.IdentityRecoveryNeededStore
 import app.logdate.client.sync.metadata.KeyValueFirstSyncEnqueueStore
 import app.logdate.client.sync.metadata.KeyValueIdentityRecoveryNeededStore
 import app.logdate.client.sync.metadata.KeyValueLastSyncErrorStore
@@ -26,6 +27,7 @@ import app.logdate.client.sync.metadata.KeyValueUnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
+import app.logdate.client.sync.metadata.UnreadableCloudRecordStore
 import app.logdate.client.sync.migration.di.migrationCoreModule
 import app.logdate.client.sync.migration.di.migrationModule
 import app.logdate.client.sync.space.migration.JournalStorageMove
@@ -41,6 +43,8 @@ import org.koin.dsl.module
 actual val syncModule: Module =
     module {
         includes(diagnosticsModule)
+        single<IdentityRecoveryNeededStore> { KeyValueIdentityRecoveryNeededStore(get()) }
+        single<UnreadableCloudRecordStore> { KeyValueUnreadableCloudRecordStore(get()) }
         single { RecoverIdentityUseCase(get(), get(), get(), get(), get(), get(), get(), get()) }
         single<SyncConflictStore> { KeyValueSyncConflictStore(get()) }
         single<MediaSyncRefStore> {
@@ -99,8 +103,8 @@ actual val syncModule: Module =
                     ) ==
                         true
                 },
-                identityRecoveryNeededStore = KeyValueIdentityRecoveryNeededStore(get()),
-                unreadableCloudRecordStore = KeyValueUnreadableCloudRecordStore(get()),
+                identityRecoveryNeededStore = get(),
+                unreadableCloudRecordStore = get(),
                 locationHistorySyncEngine = get(),
                 createCollisionPolicy = getOrNull<CreateCollisionPolicy>() ?: CreateCollisionPolicy.None,
                 spaceSync = get(),

@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -23,6 +24,7 @@ import androidx.test.uiautomator.UiDevice
 import app.logdate.client.MainActivity
 import app.logdate.client.datastore.LogDateConfigDataSource
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.device.crypto.Bip39
 import app.logdate.client.device.crypto.CryptoManager
 import app.logdate.client.device.crypto.IdentityKeyFingerprint
 import app.logdate.client.device.crypto.IdentityKeyManager
@@ -54,6 +56,7 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_recovery_phrase_title
 import logdate.client.feature.core.generated.resources.account_title
 import logdate.client.feature.core.generated.resources.recovery_phrase_enter
+import logdate.client.feature.core.generated.resources.recovery_phrase_entry_settings_mismatch_error
 import logdate.client.feature.core.generated.resources.recovery_phrase_entry_settings_submit
 import logdate.client.feature.core.generated.resources.recovery_phrase_title
 import logdate.client.feature.core.generated.resources.settings
@@ -252,11 +255,25 @@ class ManualAccountRecoveryE2ETest {
         clickSettingsText(getString(Res.string.account_recovery_phrase_title))
         clickSettingsText(getString(Res.string.recovery_phrase_enter))
         compose.waitUntil(15_000) { compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size == 12 }
+        val wrongWords = Bip39.generateMnemonic(ByteArray(16) { 42.toByte() })
+        assertNotEquals(fixture.words, wrongWords, "The rejection probe must use a different checksum-valid phrase")
+        assertTrue(koin.get<CryptoManager>().validateRecoveryPhrase(wrongWords))
+        wrongWords.forEachIndexed { index, word ->
+            compose.onAllNodes(hasSetTextAction())[index].performScrollTo().performTextInput(word)
+        }
+        compose.onNodeWithText(getString(Res.string.recovery_phrase_entry_settings_submit)).performScrollTo().performClick()
+        val mismatchCopy = getString(Res.string.recovery_phrase_entry_settings_mismatch_error)
+        compose.waitUntil(30_000) { compose.onAllNodes(hasText(mismatchCopy)).fetchSemanticsNodes().size == 1 }
+        compose.onNodeWithText(mismatchCopy).assertIsDisplayed()
+        assertEquals(12, compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size)
+        assertKeysAbsent()
+        assertNull(notes.getNoteById(fixture.textId), "A rejected phrase must not expose encrypted content")
+        assertNull(notes.getNoteById(fixture.imageId), "A rejected phrase must not expose encrypted media")
         fixture.words.forEachIndexed {
             index,
             word,
             ->
-            compose.onAllNodes(hasSetTextAction())[index].performScrollTo().performTextInput(word)
+            compose.onAllNodes(hasSetTextAction())[index].performScrollTo().performTextReplacement(word)
         }
         compose.onNodeWithText(getString(Res.string.recovery_phrase_entry_settings_submit)).performScrollTo().performClick()
         // SettingsEntries wires successful recovery back to RecoveryPhraseRoute. The entry form

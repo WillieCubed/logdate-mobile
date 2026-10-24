@@ -7,6 +7,7 @@ import re
 import runpy
 import tempfile
 import hashlib
+import base64
 import unittest
 from unittest.mock import Mock
 import subprocess
@@ -15,6 +16,49 @@ MODULE = runpy.run_path(str(Path(__file__).with_name("managed-native-restore-acc
 
 
 class ManagedDriverControllerTest(unittest.TestCase):
+    def test_manual_account_uses_a_fresh_pair_and_focused_private_fixture(self):
+        command = MODULE["scenario_command"](
+            "manual-account", "emulator-5556", "emulator-5558", Path("/pinned/app.apk"),
+            Path("/pinned/probe.apk"), Path("/private/results"), [],
+            fixture_control=Path("/private/fixture/server-control"),
+        )
+        self.assertTrue(command[1].endswith("manual-account-recovery-acceptance.py"))
+        self.assertEqual("emulator-5556", command[command.index("--source") + 1])
+        self.assertEqual("emulator-5558", command[command.index("--destination") + 1])
+        self.assertEqual("/private/fixture/server-control", command[command.index("--fixture-control") + 1])
+        self.assertIn("--focused", command)
+        self.assertNotIn("--seed-empty-source", command)
+        receipt = MODULE["acceptance_receipt"]("manual-account", [], [])
+        self.assertFalse(receipt["crossDeviceTransferAccepted"])
+        self.assertFalse(receipt["managedNativeTransport"])
+
+    def test_manual_account_probe_build_receives_private_asset_directory(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            build = Mock(return_value=subprocess.CompletedProcess([], 0))
+            (root / "private/assets").mkdir(parents=True)
+            MODULE["assemble_candidate_apks"](
+                root / "evidence", "studio.hypertext.logdate.debug", root=root, run=build,
+                recovery_assets=root / "private/assets",
+            )
+            arguments = build.call_args.args[0]
+            self.assertIn("-Plogdate.recoveryAcceptanceAssetsDir=" + str(root / "private/assets"), arguments)
+
+    def test_android_origin_is_derived_from_the_pinned_apk_signer(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            signer = root / "build-tools/36.1.0/apksigner"
+            signer.parent.mkdir(parents=True)
+            signer.touch()
+            digest = bytes(range(32))
+            execute = Mock(return_value=subprocess.CompletedProcess(
+                [], 0, b"Signer #1 certificate SHA-256 digest: " + digest.hex().encode() + b"\n"))
+            origin = MODULE["android_signing_origin"](root, root / "app.apk", execute=execute)
+            self.assertEqual("android:apk-key-hash:" + base64.urlsafe_b64encode(digest).decode().rstrip("="), origin)
+            with self.assertRaisesRegex(RuntimeError, "exactly one signer"):
+                MODULE["android_signing_origin"](
+                    root, root / "app.apk", execute=Mock(return_value=subprocess.CompletedProcess([], 0, b"no signer")))
+
     def test_candidate_apks_are_assembled_before_the_managed_pair_starts(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

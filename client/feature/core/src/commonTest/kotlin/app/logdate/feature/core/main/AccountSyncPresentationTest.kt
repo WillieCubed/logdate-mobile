@@ -33,7 +33,10 @@ class AccountSyncPresentationTest {
             SyncPresentation.Recovering(2) to AccountSyncStatus.RECOVERING,
         )) {
             assertEquals(status.messageResource(), presentation.accountSummaryResource())
-            assertEquals(null, presentation.accountRecoveryAction())
+            assertEquals(
+                if (presentation == SyncPresentation.NeedsRecovery) SyncAction.EnterRecoveryPhrase else null,
+                presentation.accountRecoveryAction(),
+            )
         }
         assertEquals(SyncAction.SignIn, SyncPresentation.AuthError.accountRecoveryAction())
     }

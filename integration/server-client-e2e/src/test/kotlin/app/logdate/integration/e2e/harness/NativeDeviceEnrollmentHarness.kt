@@ -37,7 +37,10 @@ object NativeDeviceEnrollmentHarness {
     @JvmStatic
     fun main(args: Array<String>) =
         runBlocking {
-            require(args.size == 3) { "Supply a private control directory, owned loopback server port and bounded lifetime" }
+            require(args.size == 3 || (args.size == 4 && args[3] == "manual-account")) {
+                "Supply a private control directory, owned loopback server port and bounded lifetime"
+            }
+            val manualAccount = args.size == 4
             val acceptanceSeconds = args[2].toLong()
             require(acceptanceSeconds in 60..3600) { "Enrollment acceptance requires a bounded server lifetime" }
             val port = args[1].toInt()
@@ -90,7 +93,11 @@ object NativeDeviceEnrollmentHarness {
                 reauthentication.set(reauth)
                 privateFile(control.resolve("ready"), "ready")
                 try {
-                    awaitRegistryChecks(control, AccountDeviceApi(httpClient), apiClient, session, acceptanceSeconds, reauth)
+                    if (manualAccount) {
+                        awaitManualAccountCompletion(control, acceptanceSeconds)
+                    } else {
+                        awaitRegistryChecks(control, AccountDeviceApi(httpClient), apiClient, session, acceptanceSeconds, reauth)
+                    }
                 } finally {
                     Files.deleteIfExists(control.resolve("ready"))
                 }
@@ -116,6 +123,17 @@ object NativeDeviceEnrollmentHarness {
         reauthentication.requireCompleted()
         check(stages.all { Files.isRegularFile(control.resolve("verified-$it.json")) }) {
             "Native enrollment cannot complete without every verified registry stage"
+        }
+    }
+
+    private suspend fun awaitManualAccountCompletion(
+        control: Path,
+        acceptanceSeconds: Long,
+    ) {
+        val deadline = System.nanoTime() + acceptanceSeconds * 1_000_000_000
+        while (!Files.exists(control.resolve("complete"))) {
+            check(System.nanoTime() < deadline) { "Manual account recovery acceptance timed out" }
+            delay(100)
         }
     }
 

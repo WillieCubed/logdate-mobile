@@ -66,8 +66,9 @@ class HomeWorkspaceAccountActionTest {
             assertEquals(SyncAction.UseMobileData, action)
         }
 
-    @Test fun lockedEntriesWaitWithoutAnUnusableExplanation() =
+    @Test fun missingKeyHasAConcreteRecoveryActionInTheAccountMenu() =
         runDesktopComposeUiTest(width = 720, height = 900) {
+            var action: SyncAction? = null
             setContent {
                 LogDateTheme {
                     HomeWorkspaceAccountAction(
@@ -75,14 +76,15 @@ class HomeWorkspaceAccountActionTest {
                         null,
                         {},
                         {},
-                        {},
+                        { action = it },
                         accountStatus = AccountSyncStatus.DEVICE_ACCESS_REQUIRED,
                     )
                 }
             }
             onNodeWithTag("workspace_account").performClick()
             onNodeWithText("Some existing entries are not unlocked on this device yet.").assertDoesNotExist()
-            onNodeWithText("Sync could not finish. LogDate will try again automatically.").assertExists()
-            onNodeWithText("Enter phrase").assertDoesNotExist()
+            onNodeWithText("This device needs your recovery phrase to keep syncing.").assertExists()
+            onNodeWithText("Enter phrase").performClick()
+            assertEquals(SyncAction.EnterRecoveryPhrase, action)
         }
 }

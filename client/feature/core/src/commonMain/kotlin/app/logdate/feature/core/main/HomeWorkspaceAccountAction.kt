@@ -50,10 +50,17 @@ fun HomeWorkspaceAccountAction(
     val summary =
         if (hasMergeRecovery) {
             stringResource(Res.string.journal_merge_recovery_status)
+        } else if (sync == SyncPresentation.NeedsRecovery) {
+            stringResource(AccountSyncStatus.KEY_RECOVERY_REQUIRED.messageResource())
         } else {
             accountStatus?.let { stringResource(it.messageResource()) } ?: sync.accountSummaryResource()?.let { stringResource(it) }
         }
-    val indicator = if (hasMergeRecovery) WorkspaceAccountIndicator.Attention else accountStatus?.indicator() ?: sync.accountIndicator()
+    val indicator =
+        if (hasMergeRecovery || sync == SyncPresentation.NeedsRecovery) {
+            WorkspaceAccountIndicator.Attention
+        } else {
+            accountStatus?.indicator() ?: sync.accountIndicator()
+        }
     WorkspaceAccountAction(indicator, summary) { dismiss ->
         summary?.let {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -110,7 +117,7 @@ internal fun SyncPresentation.accountRecoveryAction(canUpdateApp: Boolean = fals
     when (this) {
         SyncPresentation.AuthError -> SyncAction.SignIn
         SyncPresentation.AccountStorageUnsupported -> SyncAction.UpdateApp.takeIf { canUpdateApp }
-        SyncPresentation.NeedsRecovery -> null
+        SyncPresentation.NeedsRecovery -> SyncAction.EnterRecoveryPhrase
         is SyncPresentation.StorageError -> null
         is SyncPresentation.ConflictError, is SyncPresentation.NetworkError -> null
         else -> null

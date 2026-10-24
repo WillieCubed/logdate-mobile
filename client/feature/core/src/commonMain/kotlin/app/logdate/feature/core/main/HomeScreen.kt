@@ -98,6 +98,7 @@ fun HomeScreen(
     onImportBackup: () -> Unit = {},
     onOpenMediaDetail: (Uuid) -> Unit = {},
     onOpenSyncSettings: () -> Unit = {},
+    onEnterRecoveryPhrase: () -> Unit = {},
     onOpenWatch: () -> Unit = {},
     onOpenDay: (LocalDate) -> Unit = {},
     onOpenTextNote: (Uuid) -> Unit = {},
@@ -149,7 +150,7 @@ fun HomeScreen(
             -> onOpenSettings()
             SyncAction.ReviewConflicts, SyncAction.ReviewIssues -> Unit
             SyncAction.OpenStatus -> onOpenSyncSettings()
-            SyncAction.EnterRecoveryPhrase -> onOpenSyncSettings()
+            SyncAction.EnterRecoveryPhrase -> onEnterRecoveryPhrase()
             SyncAction.UpdateApp -> updateScope.launch { appUpdates.checkForUpdates(AppUpdateCheckTrigger.Manual) }
         }
     }

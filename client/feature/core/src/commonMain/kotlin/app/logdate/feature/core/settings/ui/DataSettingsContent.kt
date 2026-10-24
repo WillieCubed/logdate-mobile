@@ -142,6 +142,7 @@ fun DataSettingsContent(
                     isAuthenticated = isAuthenticated,
                     onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
                     onNavigateToSignIn = onNavigateToSignIn,
+                    onEnterRecoveryPhrase = onNavigateToRecoveryPhrase,
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
             }
@@ -189,6 +190,7 @@ fun DataSettingsContent(
                         isAuthenticated = isAuthenticated,
                         onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
                         onNavigateToSignIn = onNavigateToSignIn,
+                        onEnterRecoveryPhrase = onNavigateToRecoveryPhrase,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }

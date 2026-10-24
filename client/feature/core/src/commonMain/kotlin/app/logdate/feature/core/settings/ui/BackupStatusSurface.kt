@@ -37,6 +37,7 @@ import app.logdate.ui.common.MaterialCard
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.backup_cloud_title
+import logdate.client.feature.core.generated.resources.journal_storage_enter_recovery_phrase
 import logdate.client.feature.core.generated.resources.sync_account_mobile_data
 import logdate.client.feature.core.generated.resources.sync_account_storage_unsupported_detail
 import logdate.client.feature.core.generated.resources.sync_account_update_app
@@ -56,6 +57,7 @@ internal fun BackupStatusItem(
     onSyncUsingMobileData: () -> Unit = {},
     modifier: Modifier = Modifier,
     onUpdateApp: (() -> Unit)? = null,
+    onEnterRecoveryPhrase: (() -> Unit)? = null,
 ) {
     val status = backupStatus(syncStatus, cloudArchiveStatus)
     val title =
@@ -127,6 +129,13 @@ internal fun BackupStatusItem(
                     shape = MaterialTheme.shapes.large,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 ) { Text(stringResource(Res.string.sync_account_mobile_data)) }
+            }
+            if (status == AccountSyncStatus.KEY_RECOVERY_REQUIRED && onEnterRecoveryPhrase != null) {
+                Button(
+                    onClick = onEnterRecoveryPhrase,
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) { Text(stringResource(Res.string.journal_storage_enter_recovery_phrase)) }
             }
             if (status == AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED && onUpdateApp != null) {
                 Button(

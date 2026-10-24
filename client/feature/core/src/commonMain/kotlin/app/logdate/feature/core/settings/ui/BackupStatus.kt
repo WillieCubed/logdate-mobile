@@ -11,6 +11,7 @@ internal fun backupStatus(
     archive: CloudArchiveStatus?,
     reasons: Set<SyncDeadLetterReason> = emptySet(),
 ): AccountSyncStatus {
+    if (archive?.phase == CloudArchivePhase.NEEDS_RECOVERY) return AccountSyncStatus.KEY_RECOVERY_REQUIRED
     val entries = status?.let { accountSyncStatus(it, reasons) } ?: AccountSyncStatus.CHECKING
     if (entries != AccountSyncStatus.UP_TO_DATE && entries != AccountSyncStatus.WAITING && entries != AccountSyncStatus.CHECKING) {
         return entries
@@ -19,7 +20,7 @@ internal fun backupStatus(
     return when (archive.phase) {
         CloudArchivePhase.RUNNING -> AccountSyncStatus.SYNCING
         CloudArchivePhase.SIGNED_OUT -> AccountSyncStatus.SIGN_IN_REQUIRED
-        CloudArchivePhase.NEEDS_RECOVERY -> AccountSyncStatus.DEVICE_ACCESS_REQUIRED
+        CloudArchivePhase.NEEDS_RECOVERY -> AccountSyncStatus.KEY_RECOVERY_REQUIRED
         CloudArchivePhase.RETRYING -> AccountSyncStatus.RETRYING
         CloudArchivePhase.FAILED, CloudArchivePhase.UNAVAILABLE -> AccountSyncStatus.UNKNOWN
         CloudArchivePhase.CHECKING -> if (entries == AccountSyncStatus.UP_TO_DATE) AccountSyncStatus.CHECKING else entries

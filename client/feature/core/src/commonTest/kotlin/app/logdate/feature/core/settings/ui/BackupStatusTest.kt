@@ -33,7 +33,7 @@ class BackupStatusTest {
         for (phase in listOf(CloudArchivePhase.FAILED, CloudArchivePhase.UNAVAILABLE)) {
             assertEquals(AccountSyncStatus.UNKNOWN, backupStatus(synced, CloudArchiveStatus(phase)))
         }
-        assertEquals(AccountSyncStatus.DEVICE_ACCESS_REQUIRED, backupStatus(synced, CloudArchiveStatus(CloudArchivePhase.NEEDS_RECOVERY)))
+        assertEquals(AccountSyncStatus.KEY_RECOVERY_REQUIRED, backupStatus(synced, CloudArchiveStatus(CloudArchivePhase.NEEDS_RECOVERY)))
     }
 
     @Test
@@ -49,5 +49,15 @@ class BackupStatusTest {
         val offline = synced.copy(pausedReason = SyncPausedReason.OFFLINE)
         assertEquals(AccountSyncStatus.OFFLINE, backupStatus(offline, CloudArchiveStatus(CloudArchivePhase.RETRYING)))
         assertEquals(AccountSyncStatus.SYNCING, backupStatus(synced.copy(isSyncing = true), CloudArchiveStatus(CloudArchivePhase.FAILED)))
+    }
+
+    @Test
+    fun `missing identity key wins over an older connection pause`() {
+        val offline = synced.copy(pausedReason = SyncPausedReason.OFFLINE)
+
+        assertEquals(
+            AccountSyncStatus.KEY_RECOVERY_REQUIRED,
+            backupStatus(offline, CloudArchiveStatus(CloudArchivePhase.NEEDS_RECOVERY)),
+        )
     }
 }
