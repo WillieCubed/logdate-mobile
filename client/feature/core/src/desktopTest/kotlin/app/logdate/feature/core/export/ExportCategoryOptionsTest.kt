@@ -17,6 +17,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -52,7 +53,7 @@ class ExportCategoryOptionsTest {
         }
 
     @Test
-    fun wideExportSheetKeepsContextVisibleAndFooterReachable() =
+    fun wideExportDialogKeepsFooterReachable() =
         runDesktopComposeUiTest(width = 1280, height = 800) {
             setContent {
                 LogDateTheme {
@@ -66,8 +67,8 @@ class ExportCategoryOptionsTest {
                     )
                 }
             }
-            val title = onNodeWithText("Export your data").fetchSemanticsNode().boundsInRoot
-            assertTrue(title.top >= 200f, "The wide sheet should leave the destination visible above it")
+            onAllNodes(isDialog()).assertCountEquals(1)
+            onNodeWithText("Export your data").assertIsDisplayed()
             val cancel = onNodeWithText("Cancel").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
             val export = onNodeWithText("Export").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
             assertTrue(cancel.bottom <= 784f && export.bottom <= 784f, "Actions should clear the bottom edge without scrolling")

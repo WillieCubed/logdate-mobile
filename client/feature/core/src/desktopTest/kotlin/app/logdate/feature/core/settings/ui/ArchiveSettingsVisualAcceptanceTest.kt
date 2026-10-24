@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
@@ -20,15 +21,91 @@ import androidx.compose.ui.unit.Density
 import app.logdate.client.device.restore.NativeBackupQuotaFailure
 import app.logdate.client.device.restore.NativeBackupStatus
 import app.logdate.client.device.restore.NativeRestoreCustodyStatus
+import app.logdate.client.domain.export.ExportCounts
+import app.logdate.client.domain.export.ExportSchemaVersion
+import app.logdate.client.domain.export.ExportStats
+import app.logdate.client.domain.restore.ArchivePreview
+import app.logdate.feature.core.export.ExportState
+import app.logdate.feature.core.restore.ImportOptions
+import app.logdate.feature.core.restore.RestoreState
 import app.logdate.ui.theme.LogDateTheme
 import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Instant
 
 @OptIn(ExperimentalTestApi::class)
 class ArchiveSettingsVisualAcceptanceTest {
+    @Test
+    fun exportAndImportAdaptAcrossPhoneTabletShortLandscapeAndLargeText() {
+        listOf(
+            Variant("phone", 411, 891),
+            Variant("tablet", 1280, 800),
+            Variant("short-landscape", 1280, 500),
+            Variant("tablet-200", 1280, 800, 2f),
+        ).forEach { variant ->
+            listOf(false, true).forEach { importing ->
+                runDesktopComposeUiTest(width = variant.width, height = variant.height) {
+                    setContent {
+                        val density = LocalDensity.current
+                        CompositionLocalProvider(
+                            LocalDensity provides Density(density.density, variant.fontScale),
+                            LocalInspectionMode provides true,
+                        ) {
+                            LogDateTheme(dynamicColor = false) {
+                                ExportSettingsContent(
+                                    onBack = {},
+                                    exportState =
+                                        if (importing) {
+                                            ExportState.Idle
+                                        } else {
+                                            ExportState.Configuring(
+                                                counts = ExportCounts(5, 42, 3, 18),
+                                            )
+                                        },
+                                    onShowExportOptions = {},
+                                    onUpdateExportOptions = {},
+                                    onConfirmExport = {},
+                                    onCancelExport = {},
+                                    onRetryExport = {},
+                                    onDismissExport = {},
+                                    restoreState =
+                                        if (importing) {
+                                            RestoreState.Previewing(
+                                                preview =
+                                                    ArchivePreview(
+                                                        ExportSchemaVersion.CURRENT,
+                                                        Instant.parse("2026-10-15T12:00:00Z"),
+                                                        "1.0",
+                                                        ExportStats(5, 42, 3, 18),
+                                                    ),
+                                                fileName = "logdate-journal-2026.zip",
+                                                options = ImportOptions(),
+                                            )
+                                        } else {
+                                            RestoreState.Idle
+                                        },
+                                    onShowRestoreSheet = {},
+                                    onSelectRestoreFile = {},
+                                    onUpdateImportOptions = {},
+                                    onConfirmImport = {},
+                                    onCancelRestore = {},
+                                    onRetryRestore = {},
+                                    onDismissRestore = {},
+                                    snackbarHostState = SnackbarHostState(),
+                                )
+                            }
+                        }
+                    }
+                    onNodeWithText(if (importing) "Review what's in this archive." else "Export your data").assertIsDisplayed()
+                    save("${if (importing) "import" else "export"}-${variant.name}", onRoot().captureToImage())
+                }
+            }
+        }
+    }
+
     @Test
     fun backupRecoveryStatesUseTheSameSettingsCompositionAtPhoneTabletAndLargeText() {
         listOf(

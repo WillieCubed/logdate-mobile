@@ -14,15 +14,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,13 +26,13 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.restore.ArchivePreview
 import app.logdate.feature.core.common.DataTransferArchiveSummary
 import app.logdate.feature.core.common.DataTransferIntroduction
+import app.logdate.feature.core.common.DataTransferModal
 import app.logdate.feature.core.common.DataTransferSheetScrollContent
 import app.logdate.feature.core.common.archiveDetails
 import app.logdate.feature.core.common.dataTransferCountsSummary
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.platform.PlatformIcons
-import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
 import logdate.client.feature.core.generated.resources.Res
@@ -65,7 +61,6 @@ import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun RestoreBottomSheet(
     restoreState: RestoreState,
@@ -76,13 +71,7 @@ internal fun RestoreBottomSheet(
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    PlatformSheet(
-        onDismissRequest = onDismiss,
-        modifier = Modifier.widthIn(max = BottomSheetDefaults.SheetMaxWidth),
-        sheetState = sheetState,
-    ) {
+    DataTransferModal(onDismiss = onDismiss) {
         DataTransferSheetScrollContent(
             footer =
                 if (restoreState is RestoreState.Previewing) {

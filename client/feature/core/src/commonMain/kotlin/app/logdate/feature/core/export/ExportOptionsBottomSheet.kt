@@ -15,17 +15,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonGroupDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,11 +30,11 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.export.ExportCounts
 import app.logdate.client.text.asString
 import app.logdate.feature.core.common.DataTransferIntroduction
+import app.logdate.feature.core.common.DataTransferModal
 import app.logdate.feature.core.common.DataTransferSheetScrollContent
 import app.logdate.ui.common.SettingsChoiceItem
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
-import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.export
@@ -63,13 +59,12 @@ import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
- * Bottom sheet that contains the entire export session lifecycle:
+ * Modal that contains the entire export session lifecycle:
  * configuration, progress, success, and failure states.
  *
- * The sheet stays open from the moment the user taps Export until they
+ * The modal stays open from the moment the user taps Export until they
  * dismiss the result or cancel the operation.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ExportBottomSheet(
     exportState: ExportState,
@@ -79,13 +74,7 @@ internal fun ExportBottomSheet(
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    PlatformSheet(
-        onDismissRequest = onDismiss,
-        modifier = Modifier.widthIn(max = BottomSheetDefaults.SheetMaxWidth),
-        sheetState = sheetState,
-    ) {
+    DataTransferModal(onDismiss = onDismiss) {
         DataTransferSheetScrollContent(
             footer =
                 when (exportState) {
