@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import app.logdate.client.media.ManagedMediaPublicationCustody
 import app.logdate.client.media.MediaManager
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
@@ -32,6 +33,7 @@ actual fun Modifier.entryPasteTarget(onMediaImported: (EntryMediaImport) -> Unit
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val mediaManager: MediaManager = koinInject()
+    val publicationCustody: ManagedMediaPublicationCustody = koinInject()
     val scope = rememberCoroutineScope()
     val pasteLabel = stringResource(android.R.string.paste)
     val pasteAsAttachmentLabel = resourceString(Res.string.paste_as_attachment)
@@ -39,7 +41,7 @@ actual fun Modifier.entryPasteTarget(onMediaImported: (EntryMediaImport) -> Unit
     // pastes text, so it stays quiet when there is no media.
     val pasteMedia: (fromMenu: Boolean) -> Unit = { fromMenu ->
         scope.launch {
-            val result = pastedMedia(context, clipboard, mediaManager, reportNoMedia = fromMenu)
+            val result = pastedMedia(context, clipboard, mediaManager, publicationCustody, reportNoMedia = fromMenu)
             if (result.uris.isNotEmpty() || result.problems.isNotEmpty()) onMediaImported(result)
         }
     }
@@ -74,11 +76,12 @@ private suspend fun pastedMedia(
     context: Context,
     clipboard: Clipboard,
     mediaManager: MediaManager,
+    publicationCustody: ManagedMediaPublicationCustody,
     reportNoMedia: Boolean,
 ): EntryMediaImport {
     val nothing = EntryMediaImport(emptyList(), if (reportNoMedia) listOf(MediaImportProblem.Unsupported) else emptyList())
     val clip = clipboard.getClipEntry()?.clipData ?: return nothing
     val media = routeDroppedItems(clip.droppedItems(context)).mediaUris
     if (media.isEmpty()) return nothing
-    return importIntoEntry(context, mediaManager, media)
+    return importIntoEntry(context, mediaManager, publicationCustody, media)
 }

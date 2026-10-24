@@ -2,6 +2,7 @@ package app.logdate.feature.stickers.ui
 
 import app.logdate.client.database.dao.StickerDao
 import app.logdate.client.database.entities.StickerEntity
+import app.logdate.client.media.storage.MediaClaimFence
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -11,6 +12,7 @@ import kotlin.uuid.Uuid
  */
 class StickerRepository(
     private val stickerDao: StickerDao,
+    private val mediaClaimFence: MediaClaimFence = MediaClaimFence.Disabled,
 ) {
     fun getAllStickers(): Flow<List<StickerEntity>> = stickerDao.getAllStickers()
 
@@ -25,20 +27,22 @@ class StickerRepository(
         label: String? = null,
     ): Uuid {
         val id = Uuid.random()
-        stickerDao.insert(
-            StickerEntity(
-                id = id,
-                sourcePhotoUri = sourcePhotoUri,
-                sourceMomentRef = sourceMomentRef,
-                imageUri = imageUri,
-                createdAt = Clock.System.now(),
-                label = label,
-            ),
-        )
+        mediaClaimFence.withClaim {
+            stickerDao.insert(
+                StickerEntity(
+                    id = id,
+                    sourcePhotoUri = sourcePhotoUri,
+                    sourceMomentRef = sourceMomentRef,
+                    imageUri = imageUri,
+                    createdAt = Clock.System.now(),
+                    label = label,
+                ),
+            )
+        }
         return id
     }
 
     suspend fun deleteSticker(id: Uuid) {
-        stickerDao.delete(id)
+        mediaClaimFence.withClaim { stickerDao.delete(id) }
     }
 }

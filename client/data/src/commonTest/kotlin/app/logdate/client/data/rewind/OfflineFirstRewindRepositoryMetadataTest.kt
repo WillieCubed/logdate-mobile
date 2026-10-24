@@ -2,6 +2,7 @@
 
 package app.logdate.client.data.rewind
 
+import app.logdate.client.data.fakes.RecordingMediaClaimFence
 import app.logdate.client.database.dao.rewind.CachedRewindDao
 import app.logdate.client.database.entities.rewind.RewindEntity
 import app.logdate.client.database.entities.rewind.RewindImageContentEntity
@@ -37,6 +38,28 @@ import kotlin.uuid.Uuid
  * [RewindMetadata] when saving and retrieving rewinds.
  */
 class OfflineFirstRewindRepositoryMetadataTest {
+    @Test
+    fun `rewind media owner writes execute inside the media claim fence`() =
+        runTest {
+            val fence = RecordingMediaClaimFence()
+            val repository = OfflineFirstRewindRepository(FakeCachedRewindDao(), UnconfinedTestDispatcher(testScheduler), fence)
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val rewind =
+                Rewind(
+                    uid = Uuid.random(),
+                    startDate = now,
+                    endDate = now,
+                    generationDate = now,
+                    label = "2025#01",
+                    title = "Media owners",
+                    content = emptyList(),
+                )
+
+            repository.saveRewind(rewind)
+
+            assertEquals(1, fence.claims)
+        }
+
     @Test
     fun `metadata round-trips through save and retrieve`() =
         runTest {

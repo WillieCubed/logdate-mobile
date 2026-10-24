@@ -6,6 +6,7 @@ import android.content.Context
 import app.logdate.client.media.AndroidManagedMediaDiscarder
 import app.logdate.client.media.AndroidManagedMediaImportSource
 import app.logdate.client.media.ManagedMediaImporter
+import app.logdate.client.media.ManagedMediaPublicationCustody
 import app.logdate.client.media.MediaManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
@@ -29,6 +30,7 @@ internal fun ClipData.droppedItems(context: Context): List<DroppedItem> =
 internal suspend fun importIntoEntry(
     context: Context,
     mediaManager: MediaManager,
+    publicationCustody: ManagedMediaPublicationCustody,
     uris: List<String>,
 ): EntryMediaImport {
     val importer =
@@ -36,6 +38,7 @@ internal suspend fun importIntoEntry(
             mediaManager = mediaManager,
             source = AndroidManagedMediaImportSource(context),
             discardManagedMedia = AndroidManagedMediaDiscarder(context, mediaManager)::discard,
+            publicationCustody = publicationCustody,
         )
     val imported = mutableListOf<String>()
     val problems = mutableListOf<MediaImportProblem>()

@@ -2,6 +2,7 @@ package app.logdate.client.data.events
 
 import app.logdate.client.data.fakes.FakeEventDao
 import app.logdate.client.data.fakes.FakeEventNoteLinkDao
+import app.logdate.client.data.fakes.RecordingMediaClaimFence
 import app.logdate.client.database.entities.EventEntity
 import app.logdate.shared.model.Event
 import kotlinx.coroutines.flow.first
@@ -22,6 +23,26 @@ import kotlin.uuid.Uuid
  * behavior under test instead of plumbing.
  */
 class OfflineFirstEventRepositoryTest {
+    @Test
+    fun `event media owner writes execute inside the media claim fence`() =
+        runTest {
+            val eventDao = FakeEventDao()
+            val fence = RecordingMediaClaimFence()
+            val repository = OfflineFirstEventRepository(eventDao, FakeEventNoteLinkDao(), mediaClaimFence = fence)
+
+            val result =
+                repository.createEvent(
+                    Event(
+                        title = "Trip",
+                        startTime = Instant.fromEpochSeconds(1_000_000),
+                        coverImageUri = "logdate-media://library/objects/cover.jpg",
+                    ),
+                )
+
+            assertTrue(result.isSuccess)
+            assertEquals(1, fence.claims)
+        }
+
     /**
      * Constructs a fresh [OfflineFirstEventRepository] backed by new [FakeEventDao] and
      * [FakeEventNoteLinkDao] instances. Returned as a triple so individual tests can mutate

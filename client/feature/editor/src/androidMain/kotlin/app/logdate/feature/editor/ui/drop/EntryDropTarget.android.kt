@@ -12,6 +12,7 @@ import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.DragAndDropTarget
 import androidx.compose.ui.draganddrop.toAndroidDragEvent
 import androidx.compose.ui.platform.LocalContext
+import app.logdate.client.media.ManagedMediaPublicationCustody
 import app.logdate.client.media.MediaManager
 import app.logdate.feature.editor.ui.common.findActivity
 import kotlinx.coroutines.launch
@@ -26,13 +27,14 @@ actual fun Modifier.entryDropTarget(
 ): Modifier {
     val context = LocalContext.current
     val mediaManager: MediaManager = koinInject()
+    val publicationCustody: ManagedMediaPublicationCustody = koinInject()
     val scope = rememberCoroutineScope()
     // The target outlives recompositions, so it reads the latest callbacks rather than the first ones.
     val currentOnText by rememberUpdatedState(onText)
     val currentOnMediaImported by rememberUpdatedState(onMediaImported)
     val currentOnActiveChanged by rememberUpdatedState(onActiveChanged)
     val target =
-        remember(context, mediaManager) {
+        remember(context, mediaManager, publicationCustody) {
             object : DragAndDropTarget {
                 override fun onEntered(event: DragAndDropEvent) = currentOnActiveChanged(true)
 
@@ -56,7 +58,7 @@ actual fun Modifier.entryDropTarget(
                     }
                     scope.launch {
                         try {
-                            currentOnMediaImported(importIntoEntry(context, mediaManager, drop.mediaUris))
+                            currentOnMediaImported(importIntoEntry(context, mediaManager, publicationCustody, drop.mediaUris))
                         } finally {
                             permissions?.release()
                         }
