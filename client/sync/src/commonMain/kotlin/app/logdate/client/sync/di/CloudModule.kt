@@ -21,6 +21,8 @@ import app.logdate.client.repository.location.HistoryOwnerAdoptionRepair
 import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.moments.SyncableMarkedMomentRepository
 import app.logdate.client.sync.AutomaticMediaRecovery
+import app.logdate.client.sync.CloudRecoveryPhraseAccountProof
+import app.logdate.client.sync.RecoveryPhraseAccountProof
 import app.logdate.client.sync.cloud.CloudApiClient
 import app.logdate.client.sync.cloud.CloudAssociationDataSource
 import app.logdate.client.sync.cloud.CloudBackupDataSource
@@ -207,6 +209,19 @@ val spaceSyncModule =
  */
 val cloudModule =
     module {
+        single<RecoveryPhraseAccountProof> {
+            val accounts = get<CloudAccountRepository>()
+            CloudRecoveryPhraseAccountProof(
+                get(),
+                get(),
+                get(),
+                spaceRoute = get<SpaceTransportGate>()::route,
+                spaceDataHomes = get(),
+                accountDid = { accountId ->
+                    accounts.getCurrentAccount()?.takeIf { it.id.toString() == accountId }?.did
+                },
+            )
+        }
         // API Client
         single<CloudApiClient> {
             val recorder = get<app.logdate.client.sync.diagnostics.SyncDiagnosticRecorder>()

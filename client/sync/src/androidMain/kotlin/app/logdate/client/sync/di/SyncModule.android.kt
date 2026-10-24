@@ -41,7 +41,7 @@ import org.koin.dsl.module
 actual val syncModule: Module =
     module {
         includes(diagnosticsModule)
-        single { RecoverIdentityUseCase(get(), get(), get(), get(), get(), get()) }
+        single { RecoverIdentityUseCase(get(), get(), get(), get(), get(), get(), get(), get()) }
         single<SyncConflictStore> { KeyValueSyncConflictStore(get()) }
         single<MediaSyncRefStore> {
             val configRepository = get<LogDateConfigRepository>()
