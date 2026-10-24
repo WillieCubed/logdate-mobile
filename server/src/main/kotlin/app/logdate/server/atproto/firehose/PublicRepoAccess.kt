@@ -1,6 +1,8 @@
 package app.logdate.server.atproto.firehose
 
 import app.logdate.server.auth.AccountRepository
+import app.logdate.server.logging.RepoEventNotices
+import io.github.aakira.napier.Napier
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -34,15 +36,76 @@ data class PublicRepoPage(
 )
 
 /**
+ * A repository the directory found, as stored: the account's DID and the head of its record tree. They
+ * stay text until [PublicRepoAccess] parses them, so one malformed row is skipped and never stops a page.
+ */
+data class PublicRepoCandidate(
+    val did: String,
+    val rootCid: String,
+    val commitCid: String,
+    val revision: Long,
+)
+
+/**
+ * Finds the repositories of accounts that may be shown, in one query, ordered by DID.
+ *
+ * An implementation applies the account rules of [PublicRepoGate] itself, so that paging through
+ * accounts costs one query per page and not several per account: active, in good standing, in a
+ * personal space, with an identity other apps can look up, and with a repository.
+ */
+interface PublicRepoDirectory {
+    /** Up to [limit] candidates whose DID sorts after [afterDid], or from the start when it is `null`. */
+    suspend fun after(
+        afterDid: String?,
+        limit: Int,
+    ): List<PublicRepoCandidate>
+}
+
+/**
+ * A directory over any [AccountRepository], for servers without a database. It reads every account, so
+ * a database-backed directory is used wherever there are many.
+ */
+class AccountsPublicRepoDirectory(
+    private val accounts: AccountRepository,
+    private val gate: AccountPublicRepoGate,
+    private val blocks: RepoBlockStore,
+) : PublicRepoDirectory {
+    override suspend fun after(
+        afterDid: String?,
+        limit: Int,
+    ): List<PublicRepoCandidate> {
+        val dids =
+            accounts
+                .getAllAccounts()
+                .filter(gate::mayShow)
+                .mapNotNull { it.did }
+                .filter { afterDid == null || it > afterDid }
+                .sorted()
+        val found = mutableListOf<PublicRepoCandidate>()
+        for (did in dids) {
+            val parsed = AtprotoDid.parse(did).getOrNull() ?: continue
+            val head = blocks.readHead(parsed).getOrThrow() ?: continue
+            found += PublicRepoCandidate(did, head.root.toString(), head.commitCid.toString(), head.revision)
+            if (found.size == limit) break
+        }
+        return found
+    }
+}
+
+/**
  * Everything the server shows to people who are not an account's owner, and the only place it
  * decides what that is.
  *
- * Reading a repository's records and blobs and asking for its latest commit need only that the
- * account's repository is one the server shows ([PublicRepoGate]). The record methods further limit
- * the answer to public collections: a record in any other collection is reported as missing and a
- * listing of one is empty, so a caller cannot tell a private collection from one that does not
- * exist. Exporting the whole repository needs more: the record tree must hold nothing private,
- * because a tree names every record's collection and key.
+ * Reading a repository's records and blobs needs only that the account's repository is one the
+ * server shows ([PublicRepoGate]). The record methods further limit the answer to public
+ * collections: a record in any other collection is reported as missing and a listing of one is
+ * empty, so a caller cannot tell a private collection from one that does not exist.
+ *
+ * Anything that reveals the repository itself needs more: the record tree must hold nothing
+ * private. That covers the export, and also the head, the revision and the listing, because a tree
+ * names every record's collection and key, and a revision is the time of a write. An account that
+ * moved into its personal space keeps its old journal records in the tree for a while, and until they
+ * are erased none of this is shown.
  *
  * Reads go straight to the block store through a read-only engine. They never pass through the
  * adapters that present a person's journal as records, so no private record can be reached from here.
@@ -51,7 +114,7 @@ class PublicRepoAccess(
     private val gate: PublicRepoGate,
     private val policy: PublicRepoPolicy,
     private val blocks: RepoBlockStore,
-    private val accounts: AccountRepository,
+    private val directory: PublicRepoDirectory,
 ) {
     private val reader = DefaultRepoEngine(blocks)
     private val treeChecks = ConcurrentHashMap<AtprotoDid, Pair<Cid, Boolean>>()
@@ -60,11 +123,20 @@ class PublicRepoAccess(
     /** The standing of [did]'s account, or `null` when the server shows nothing about it. */
     suspend fun standing(did: AtprotoDid): RepoStanding? = gate.standing(did)
 
-    /** The head of [did]'s repository whatever the account's standing, for the status of an account that is not shown. */
-    suspend fun headOf(did: AtprotoDid): RepoHead? = reader.loadHead(did).getOrThrow()
+    /**
+     * The head of [did]'s repository whatever the account's standing, unless its record tree holds
+     * something private. For the status of an account that is not shown anymore.
+     */
+    suspend fun publicHeadOf(did: AtprotoDid): RepoHead? = reader.loadHead(did).getOrThrow()?.takeIf { treeIsPublic(did, it) }
 
-    /** The head of [did]'s repository when the server may show it, otherwise `null`. */
-    suspend fun headIfShown(did: AtprotoDid): RepoHead? = if (gate.mayShow(did)) reader.loadHead(did).getOrThrow() else null
+    /** The head of [did]'s repository when the server may show it and its tree holds nothing private, otherwise `null`. */
+    suspend fun headIfShown(did: AtprotoDid): RepoHead? = if (gate.mayShow(did)) publicHeadOf(did) else null
+
+    /**
+     * The head of [did]'s repository when the server may show its public records, otherwise `null`. Unlike
+     * [headIfShown] this does not look at the tree, because a record read names only the record it returns.
+     */
+    suspend fun readableHead(did: AtprotoDid): RepoHead? = if (gate.mayShow(did)) reader.loadHead(did).getOrThrow() else null
 
     /**
      * The record at [collection] and [recordKey], or `null` when it does not exist, is in a
@@ -77,7 +149,7 @@ class PublicRepoAccess(
         recordKey: RecordKey,
         cid: String?,
     ): RepoRecord? {
-        if (!policy.isPublic(collection) || headIfShown(did) == null) return null
+        if (!policy.isPublic(collection) || readableHead(did) == null) return null
         val record = reader.getRecord(RepoRecordId(did, collection, recordKey)).getOrThrow()
         return record?.takeIf { cid == null || it.cid == cid }
     }
@@ -90,7 +162,7 @@ class PublicRepoAccess(
         cursor: String?,
         reverse: Boolean,
     ): RepoListPage {
-        if (!policy.isPublic(collection) || headIfShown(did) == null) return RepoListPage(emptyList())
+        if (!policy.isPublic(collection) || readableHead(did) == null) return RepoListPage(emptyList())
         return reader.listRecords(did, collection, limit, cursor, reverse).getOrThrow()
     }
 
@@ -102,7 +174,7 @@ class PublicRepoAccess(
         did: AtprotoDid,
         since: Tid?,
     ): RepoExport? {
-        val head = headIfShown(did) ?: return null
+        val head = readableHead(did) ?: return null
         if (!treeIsPublic(did, head)) return null
         return reader.export(did, since).getOrThrow()
     }
@@ -116,7 +188,7 @@ class PublicRepoAccess(
         did: AtprotoDid,
         cid: Cid,
     ): Boolean {
-        val head = headIfShown(did) ?: return false
+        val head = readableHead(did) ?: return false
         val cached = blobIndexes[did]?.takeIf { it.first == head.commitCid }?.second
         val referenced = cached ?: loadBlobReferences(did, head).also { blobIndexes[did] = head.commitCid to it }
         return cid in referenced
@@ -124,7 +196,13 @@ class PublicRepoAccess(
 
     /**
      * One page of the repositories the server shows, ordered by DID, starting after [cursor]. An
-     * account that has not written anything yet has no repository and is left out.
+     * account that has not written anything yet has no repository and is left out, and so is one whose
+     * tree still holds private records.
+     *
+     * The work for one call is bounded: the directory is asked for at most [MAX_ROUNDS] pages of [limit]
+     * candidates. A page that fills up returns its last DID as the cursor, and so does one that used up its
+     * rounds with fewer repositories, so the caller continues from where the search stopped. The cursor
+     * moves with every candidate looked at, whether or not it is shown.
      */
     suspend fun listRepos(
         cursor: String?,
@@ -132,27 +210,36 @@ class PublicRepoAccess(
     ): PublicRepoPage {
         val repos = mutableListOf<PublicRepoSummary>()
         var after = cursor
-        while (repos.size < limit) {
-            val page = accounts.listPersonalSpaceAccountsAfter(after, limit)
-            if (page.isEmpty()) return PublicRepoPage(repos, cursor = null)
-            for (account in page) {
-                val did = AtprotoDid.parse(checkNotNull(account.did)).getOrNull() ?: continue
-                after = did.toString()
-                val head = headIfShown(did) ?: continue
+        repeat(MAX_ROUNDS) {
+            val candidates = directory.after(after, limit)
+            for (candidate in candidates) {
+                after = candidate.did
+                val did = AtprotoDid.parse(candidate.did).getOrNull() ?: continue
+                val head = candidate.toHead(did) ?: continue
+                if (!treeIsPublic(did, head)) continue
                 repos += PublicRepoSummary(did, head)
                 if (repos.size == limit) return PublicRepoPage(repos, cursor = after)
             }
-            if (page.size < limit) return PublicRepoPage(repos, cursor = null)
+            if (candidates.size < limit) return PublicRepoPage(repos, cursor = null)
         }
         return PublicRepoPage(repos, cursor = after)
     }
+
+    private fun PublicRepoCandidate.toHead(did: AtprotoDid): RepoHead? =
+        runCatching { RepoHead(did, Cid.require(rootCid), Cid.require(commitCid), revision) }.getOrNull()
 
     private suspend fun treeIsPublic(
         did: AtprotoDid,
         head: RepoHead,
     ): Boolean {
         treeChecks[did]?.takeIf { it.first == head.commitCid }?.let { return it.second }
-        val pure = policy.arePublic(RepoCommitChanges.collectionsAt(blocks, head.root).getOrThrow())
+        // A tree that cannot be read is not shown, and the failure is not remembered: it may pass.
+        val collections =
+            RepoCommitChanges.collectionsAt(blocks, head.root).getOrElse { failure ->
+                Napier.w(RepoEventNotices.TREE_UNREADABLE, failure)
+                return false
+            }
+        val pure = policy.arePublic(collections)
         treeChecks[did] = head.commitCid to pure
         return pure
     }
@@ -193,5 +280,6 @@ class PublicRepoAccess(
 
     private companion object {
         const val PAGE_SIZE = 100
+        const val MAX_ROUNDS = 3
     }
 }

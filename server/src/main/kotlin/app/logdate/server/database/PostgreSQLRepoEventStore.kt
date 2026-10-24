@@ -50,6 +50,10 @@ class PostgreSQLRepoEventStore : RepoEventStore {
                 val seq = last + 1
                 val frame = draft.encode(seq)
                 AtprotoRepoEventSequenceTable.update({ AtprotoRepoEventSequenceTable.id eq SEQUENCE_ROW }) { it[lastSeq] = seq }
+                AtprotoRepoAnnouncedTable.insertIgnore {
+                    it[repoDid] = draft.repo.toString()
+                    it[firstAnnouncedAt] = draft.time
+                }
                 AtprotoRepoEventsTable.insert {
                     it[AtprotoRepoEventsTable.seq] = seq
                     it[repoDid] = draft.repo.toString()
@@ -119,9 +123,9 @@ class PostgreSQLRepoEventStore : RepoEventStore {
     override suspend fun hasEvents(repo: AtprotoDid): Boolean =
         withContext(Dispatchers.IO) {
             transaction {
-                !AtprotoRepoEventsTable
-                    .select(AtprotoRepoEventsTable.seq)
-                    .where { AtprotoRepoEventsTable.repoDid eq repo.toString() }
+                !AtprotoRepoAnnouncedTable
+                    .select(AtprotoRepoAnnouncedTable.repoDid)
+                    .where { AtprotoRepoAnnouncedTable.repoDid eq repo.toString() }
                     .limit(1)
                     .empty()
             }

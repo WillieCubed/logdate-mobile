@@ -85,7 +85,7 @@ internal class PublicRepoReads(
         since: Tid?,
     ): Boolean {
         if (respondIfInactive(call, did)) return true
-        if (access.headIfShown(did) == null) return false
+        if (access.readableHead(did) == null) return false
         val export = access.export(did, since)
         if (export == null) {
             call.respond(HttpStatusCode.NotFound, PdsErrorResponse("RepoNotFound", "Unknown repo: $did"))
@@ -111,11 +111,13 @@ internal class PublicRepoReads(
     ): Boolean {
         when (val standing = access.standing(did) ?: return false) {
             RepoStanding.Active -> {
-                val head = access.headIfShown(did) ?: return false
-                call.respond(HttpStatusCode.OK, GetRepoStatusResponse(did = did, active = true, rev = Tid.fromLong(head.revision)))
+                // An account announced before it wrote anything has no head, and one whose tree still holds
+                // private records shows none: both are active, without a revision.
+                val rev = access.headIfShown(did)?.let { Tid.fromLong(it.revision) }
+                call.respond(HttpStatusCode.OK, GetRepoStatusResponse(did = did, active = true, rev = rev))
             }
             is RepoStanding.Inactive -> {
-                val rev = if (standing.deleted) null else access.headOf(did)?.let { Tid.fromLong(it.revision) }
+                val rev = if (standing.deleted) null else access.publicHeadOf(did)?.let { Tid.fromLong(it.revision) }
                 call.respond(HttpStatusCode.OK, GetRepoStatusResponse(did = did, active = false, status = standing.status, rev = rev))
             }
         }
@@ -131,7 +133,7 @@ internal class PublicRepoReads(
         did: AtprotoDid,
         cid: Cid,
     ): Boolean {
-        if (access.headIfShown(did) == null) return false
+        if (access.readableHead(did) == null) return false
         val download: BlobDownload? =
             if (access.referencesBlob(did, cid)) blobService?.getBlob(GetBlobRequest(did, cid))?.getOrThrow() else null
         if (download == null) {
@@ -185,7 +187,7 @@ internal class PublicRepoReads(
                     ?.let(AtprotoDid::parse)
                     ?.getOrNull()
                 ?: return null
-        return did.takeIf { access.headIfShown(it) != null }
+        return did.takeIf { access.readableHead(it) != null }
     }
 
     private companion object {

@@ -20,12 +20,18 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import studio.hypertext.atproto.repo.DefaultRepoEngine
 import studio.hypertext.atproto.repo.RepoAccountEvent
+import studio.hypertext.atproto.repo.RepoRecordId
+import studio.hypertext.atproto.syntax.Nsid
+import studio.hypertext.atproto.syntax.RecordKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.ExperimentalUuidApi
 
 /**
@@ -121,6 +127,120 @@ class PublicRepoStandingTest {
 
             assertEquals("false", body.getValue("active").jsonPrimitive.content)
             assertEquals("deleted", body.getValue("status").jsonPrimitive.content)
+            assertTrue("rev" !in body)
+        }
+
+    @Test
+    fun `a takedown more than a week after the announcement still reaches followers`() =
+        testApplication {
+            val h = FirehoseHarness().also { it.install(this) }
+            val alice = published(h)
+            h.announcer.identityChanged(alice)
+            h.eventStore.deleteBefore(Clock.System.now() + 1.hours)
+            val before = h.eventStore.read(0, 100).size
+
+            h.moderation.moderate(alice.id, AccountModeration.TAKENDOWN)
+
+            val event =
+                assertIs<RepoAccountEvent>(
+                    h.eventStore
+                        .read(0, 100)
+                        .drop(before)
+                        .single()
+                        .decode(),
+                )
+            assertEquals("takendown", event.status)
+        }
+
+    @Test
+    fun `a deletion more than a week after the announcement reaches followers and reports deleted`() =
+        testApplication {
+            val h = FirehoseHarness().also { it.install(this) }
+            val alice = published(h)
+            h.announcer.identityChanged(alice)
+            h.eventStore.deleteBefore(Clock.System.now() + 1.hours)
+            AccountDeletionService(
+                accountRepository = h.accounts,
+                mediaBlobRepository =
+                    CompositeLogDateMediaBlobRepository(
+                        InMemoryLogDateMediaRepository(),
+                        InMemoryLogDateAtprotoBlobRepository(),
+                    ),
+                backupRepository = InMemoryLogDateBackupRepository(),
+                blobStorage = h.blobStorage,
+                statusEvents = h.announcer,
+            ).deleteAccount(alice.id)
+
+            val event =
+                assertIs<RepoAccountEvent>(
+                    h.eventStore
+                        .read(0, 100)
+                        .single()
+                        .decode(),
+                )
+            val body = status(alice).parsed()
+
+            assertEquals("deleted", event.status)
+            assertEquals("deleted", body.getValue("status").jsonPrimitive.content)
+            assertEquals("false", body.getValue("active").jsonPrimitive.content)
+        }
+
+    @Test
+    fun `an account announced before it wrote anything reports active without a revision`() =
+        testApplication {
+            val h = FirehoseHarness().also { it.install(this) }
+            val alice = h.createAccount("alice")
+            h.announcer.identityChanged(alice)
+
+            val response = status(alice)
+            val body = response.parsed()
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("true", body.getValue("active").jsonPrimitive.content)
+            assertTrue("rev" !in body)
+        }
+
+    @Test
+    fun `a repository still holding private records reveals no head or revision`() =
+        testApplication {
+            val h = FirehoseHarness().also { it.install(this) }
+            val alice = h.createAccount("alice")
+            val other = h.createAccount("other")
+            h.put(client, other, profile, "self", profileRecord())
+            DefaultRepoEngine(h.rawBlocks)
+                .putRecord(
+                    RepoRecordId(h.did(alice), Nsid.require("studio.hypertext.logdate.content"), RecordKey.require("entry-1")),
+                    buildJsonObject { put("content", "diary") },
+                ).getOrThrow()
+            val head = h.rawBlocks.readHead(h.did(alice)).getOrThrow()!!
+
+            val latest = client.get("/xrpc/com.atproto.sync.getLatestCommit?did=${alice.did}")
+            val status = status(alice)
+            val repos = client.get("/xrpc/com.atproto.sync.listRepos").bodyAsText()
+
+            assertEquals(HttpStatusCode.Unauthorized, latest.status)
+            assertEquals(HttpStatusCode.OK, status.status)
+            assertTrue("rev" !in status.parsed(), "the revision is a write timestamp")
+            assertFalse(head.commitCid.toString() in repos + latest.bodyAsText() + status.bodyAsText())
+            assertFalse(alice.did!! in repos, "an account whose tree holds private records is not listed")
+            assertTrue(other.did!! in repos)
+        }
+
+    @Test
+    fun `a moderated account whose tree holds private records reports no revision either`() =
+        testApplication {
+            val h = FirehoseHarness().also { it.install(this) }
+            val alice = h.createAccount("alice")
+            DefaultRepoEngine(h.rawBlocks)
+                .putRecord(
+                    RepoRecordId(h.did(alice), Nsid.require("studio.hypertext.logdate.content"), RecordKey.require("entry-1")),
+                    buildJsonObject { put("content", "diary") },
+                ).getOrThrow()
+            h.moderation.moderate(alice.id, AccountModeration.SUSPENDED)
+
+            val body = status(alice).parsed()
+
+            assertEquals("suspended", body.getValue("status").jsonPrimitive.content)
             assertTrue("rev" !in body)
         }
 

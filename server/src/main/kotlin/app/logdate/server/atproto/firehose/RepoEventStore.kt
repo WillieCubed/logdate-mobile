@@ -71,7 +71,11 @@ interface RepoEventStore {
     /** The revision of the newest commit or sync event for [repo], or `null` when it has none. */
     suspend fun lastRevision(repo: AtprotoDid): Long?
 
-    /** True when [repo] has any event, whatever its kind. */
+    /**
+     * True when followers were ever told about [repo]: any event for it was stored, even if the retention
+     * sweep has deleted every one since. A takedown or deletion months after the announcement still has to
+     * reach relays that heard about the account, so this outlives the events.
+     */
     suspend fun hasEvents(repo: AtprotoDid): Boolean
 
     /** Deletes events announced before [time] and returns how many went. */
@@ -83,6 +87,7 @@ class InMemoryRepoEventStore : RepoEventStore {
     private val lock = Mutex()
     private val events = mutableListOf<Pair<Instant, StoredRepoEvent>>()
     private val revisions = mutableMapOf<AtprotoDid, Long>()
+    private val announced = mutableSetOf<AtprotoDid>()
     private var last = 0L
 
     override suspend fun append(draft: RepoEventDraft): StoredRepoEvent =
@@ -91,6 +96,7 @@ class InMemoryRepoEventStore : RepoEventStore {
             val stored = StoredRepoEvent(seq, draft.repo, draft.kind, draft.encode(seq))
             last = seq
             events += draft.time to stored
+            announced += draft.repo
             if (draft.kind.carriesRevision) draft.revision?.let { revisions[draft.repo] = it }
             stored
         }
@@ -114,7 +120,7 @@ class InMemoryRepoEventStore : RepoEventStore {
 
     override suspend fun lastRevision(repo: AtprotoDid): Long? = lock.withLock { revisions[repo] }
 
-    override suspend fun hasEvents(repo: AtprotoDid): Boolean = lock.withLock { events.any { it.second.repo == repo } }
+    override suspend fun hasEvents(repo: AtprotoDid): Boolean = lock.withLock { repo in announced }
 
     override suspend fun deleteBefore(time: Instant): Int =
         lock.withLock {

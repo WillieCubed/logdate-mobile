@@ -14,7 +14,11 @@ import kotlin.test.Test
  */
 class PostgreSQLRepoEventStoreTest {
     private fun onH2(test: (PostgreSQLRepoEventStore) -> Unit) =
-        withH2Database(AtprotoRepoEventsTable, AtprotoRepoEventSequenceTable) { test(PostgreSQLRepoEventStore()) }
+        withH2Database(
+            AtprotoRepoEventsTable,
+            AtprotoRepoEventSequenceTable,
+            AtprotoRepoAnnouncedTable,
+        ) { test(PostgreSQLRepoEventStore()) }
 
     private fun onPostgres(test: (PostgreSQLRepoEventStore) -> Unit) =
         withOwnPostgresDatabase("repo_events_") { url ->
@@ -52,6 +56,14 @@ class PostgreSQLRepoEventStoreTest {
 
     @Test
     fun `h2 keeps the latest number after deleting every event`() = onH2(RepoEventStoreContract::deletingEverythingKeepsTheLatestNumber)
+
+    @Test
+    fun `h2 remembers a repository after all its events are deleted`() =
+        onH2(RepoEventStoreContract::remembersARepositoryAfterAllItsEventsAreDeleted)
+
+    @Test
+    fun `postgres remembers a repository after all its events are deleted`() =
+        onPostgres(RepoEventStoreContract::remembersARepositoryAfterAllItsEventsAreDeleted)
 
     @Test
     fun `h2 gives concurrent appends distinct numbers without gaps`() =

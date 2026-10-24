@@ -71,13 +71,12 @@ class RepoEventStream(
                     return@flow
                 }
                 val earliest = store.earliestSeq()
-                if (earliest != null && cursor < earliest - 1) {
+                // With every event pruned there is no earliest one, yet a cursor behind the newest number missed some.
+                val lastUnavailable = if (earliest == null) latest else earliest - 1
+                if (cursor < lastUnavailable) {
                     emit(
                         RepoEventFrames.encode(
-                            RepoInfoMessage(
-                                "OutdatedCursor",
-                                "The oldest event kept is $earliest; events before it are no longer available",
-                            ),
+                            RepoInfoMessage("OutdatedCursor", "Events up to $lastUnavailable are no longer available"),
                         ),
                     )
                 }
