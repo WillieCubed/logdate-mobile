@@ -97,7 +97,11 @@ class EntrySummarizer(
                     generativeAICache.putEntry(cacheRequest, response.value.content)
                     AIResult.Success(response.value.content, fromCache = false)
                 }
-                is AIResult.Unavailable -> response
+
+                is AIResult.Unavailable -> {
+                    response
+                }
+
                 is AIResult.Error -> {
                     Napier.e(
                         tag = "EntrySummarizer",
