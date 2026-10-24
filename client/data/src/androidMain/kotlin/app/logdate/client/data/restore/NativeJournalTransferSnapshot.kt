@@ -142,19 +142,41 @@ internal class NativeJournalTransferSnapshot(
             val inventory = verifyNativeJournalMediaInventory(mediaInventory, nativeSnapshotChecksum(mediaInventory))
             selectedPaths.forEach { path ->
                 val source = File(context.filesDir, path.removePrefix("files/"))
+                if (path.startsWith("files/camera-captures/")) {
+                    check(Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                        "Referenced camera original is missing from the native source"
+                    }
+                }
                 if (Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS)) {
                     check(inventory.entry(path) != null) { "Referenced native original could not be captured" }
+                    if (path.startsWith("files/camera-captures/")) {
+                        val pinned = File(staging, path)
+                        check(pinned.parentFile?.mkdirs() == true || pinned.parentFile?.isDirectory == true)
+                        Files.copy(source.toPath(), pinned.toPath(), LinkOption.NOFOLLOW_LINKS)
+                        val entry = checkNotNull(inventory.entry(path))
+                        check(pinned.length() == entry.size && nativeSnapshotChecksum(pinned) == entry.sha256) {
+                            "Referenced camera original changed while native source was pinned"
+                        }
+                    }
                 }
             }
             val receipt = File(staging, NATIVE_SOURCE_RECEIPT_PATH)
             val pinnedPreferences = File(staging, "files/logdate.preferences_pb")
+            val pinnedEntryDrafts =
+                entryDraftFile.takeIf(File::isFile)?.let { source ->
+                    val destination = File(staging, "files/datastore/entry_drafts.preferences_pb")
+                    check(destination.parentFile?.mkdirs() == true || destination.parentFile?.isDirectory == true)
+                    Files.copy(source.toPath(), destination.toPath(), LinkOption.NOFOLLOW_LINKS)
+                    requirePinnedNativeTransferFile(destination, checkNotNull(beforeDrafts))
+                    destination
+                }
             writeNativeJournalSourceReceipt(
                 receipt,
                 preferences,
                 pinnedPreferences,
                 mapOf("database/logdate" to target),
                 mediaInventory = mediaInventory,
-                entryDraftsFile = entryDraftFile,
+                entryDraftsFile = pinnedEntryDrafts,
             )
             val selectedPreferencesChecksum = nativeSnapshotChecksum(pinnedPreferences)
             requirePinnedNativeTransferFile(pinnedPreferences, selectedPreferencesChecksum)
@@ -194,14 +216,16 @@ internal class NativeJournalTransferSnapshot(
             return
         }
         checkPinnedPreferencesUnchanged()
-        checkEntryDraftFileUnchanged()
         selectedMedia.forEach { entry ->
+            if (entry.path.startsWith("files/camera-captures/")) {
+                verifySelectedMediaFile(File(current, entry.path), entry)
+                return@forEach
+            }
             val file = File(context.filesDir, entry.path.removePrefix("files/"))
             verifySelectedMediaFile(file, entry)
             emit(file)
             verifySelectedMediaFile(file, entry)
         }
-        checkEntryDraftFileUnchanged()
         checkPinnedPreferencesUnchanged()
     }
 
@@ -449,6 +473,11 @@ internal fun validateNativeJournalTransfer(context: Context): Map<String, File>?
     val receipt = checkNotNull(files[NATIVE_SOURCE_RECEIPT_PATH])
     val preferences = checkNotNull(files["files/logdate.preferences_pb"])
     verifyNativeJournalSourceReceipt(receipt, preferences, mapOf("database/logdate" to database))
+    val sourceReceipt = Json.decodeFromString<NativeJournalSourceReceipt>(receipt.readText())
+    sourceReceipt.entryDraftsSha256?.let { expected ->
+        val drafts = checkNotNull(files["files/datastore/entry_drafts.preferences_pb"])
+        requirePinnedNativeTransferFile(drafts, expected)
+    }
     val scratch = File(context.noBackupFilesDir, "native-journal-scope-validation").apply { check(mkdirs() || isDirectory) }
     val scope =
         runBlocking {

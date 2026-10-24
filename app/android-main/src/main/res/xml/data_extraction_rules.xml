@@ -12,9 +12,10 @@
      LogDate Cloud, or a user-created archive.
 
    Device-to-device transfer:
-     The explicit include list omits media roots from default traversal. The
-     backup agent separately emits only originals referenced by its pinned
-     journal and draft snapshot. Keystore-bound ciphertext, installation
+     The explicit include list omits live media roots from default traversal.
+     The backup agent pins only selected camera originals and their pending
+     draft bytes under native_journal_transfer/current/. Other selected media
+     originals are emitted separately. Keystore-bound ciphertext, installation
      state, and cloned background jobs remain excluded.
 -->
 <data-extraction-rules>

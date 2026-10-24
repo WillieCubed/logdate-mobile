@@ -111,7 +111,7 @@ internal suspend fun readRetainedJournalSourceScope(
                 ?.intOrNull
         ) {
             1 -> Json.decodeFromString<RetainedSourceScopeAnchor>(encoded)
-            2, 3 ->
+            2, 3, 4 ->
                 verifyNativeJournalSourceReceipt(anchorFile, file, databaseFiles).let {
                     RetainedSourceScopeAnchor(
                         version = 1,

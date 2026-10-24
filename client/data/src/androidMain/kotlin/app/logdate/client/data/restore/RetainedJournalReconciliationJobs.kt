@@ -456,7 +456,7 @@ class RetainedJournalReconciliationJobService : JobService() {
                     .jsonObject["version"]
                     ?.jsonPrimitive
                     ?.intOrNull
-            } in setOf(2, 3)
+            } in setOf(2, 3, 4)
         ) {
             check(
                 app.logdate.client.database
