@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run native transport oracles while a separate GMD driver survives LogDate restarts."""
 import argparse
+import base64
 import hashlib
 import json
 import math
@@ -47,9 +48,10 @@ def retain_terminal_results(process, results, output, started_ns):
 
 def acceptance_receipt(mode, native_arguments, followups):
     return {"managedDeviceLifecycleAccepted": True, "outerDrivers": 2, "mode": mode,
-            "managedNativeTransport": mode not in {"work-restart", "network-policy", "late-media"},
+            "managedNativeTransport": mode not in {"work-restart", "network-policy", "late-media", "manual-account"},
             "crossDeviceTransferAccepted": mode in {"transfer", "publication", "enrollment", "upgrade", "widget"},
             "nativeArguments": native_arguments, "followups": followups,
+            "manualAccountRecoveryAccepted": mode == "manual-account",
             "googleRestoreProviderAccepted": False}
 
 
@@ -75,10 +77,16 @@ def followup_command(name, destination, app, probe, output):
             "--app-apk", str(app), "--test-apk", str(probe), "--output", str(output), "--synthetic-data"]
 
 
-def scenario_command(mode, source, destination, app, probe, output, arguments, *, classpath=None, fixture_environment=None):
+def scenario_command(mode, source, destination, app, probe, output, arguments, *, classpath=None, fixture_environment=None, fixture_control=None):
     validate_native_arguments(arguments)
-    if mode not in {"transfer", "publication", "work-restart", "d2d", "enrollment", "upgrade", "network-policy", "widget", "late-media"} or (mode != "transfer" and arguments):
+    if mode not in {"transfer", "publication", "work-restart", "d2d", "enrollment", "upgrade", "network-policy", "widget", "late-media", "manual-account"} or (mode != "transfer" and arguments):
         raise ValueError("Only transfer mode accepts native scenario arguments")
+    if mode == "manual-account":
+        if fixture_control is None:
+            raise ValueError("Manual account recovery requires its owned local fixture")
+        return [sys.executable, str(ROOT / "tests/e2e/manual-account-recovery-acceptance.py"),
+                "--source", source, "--destination", destination, "--output", str(output),
+                "--fixture-control", str(fixture_control), "--synthetic-data", "--focused"]
     filenames = {"transfer": "native-backup-acceptance.py", "publication": "native-publication-acceptance.py",
                  "work-restart": "native-restore-work-restart-acceptance.py", "d2d": "native-d2d-acceptance.py",
                  "enrollment": "native-device-enrollment-acceptance.py", "upgrade": "native-released-upgrade-acceptance.py",
@@ -231,17 +239,63 @@ def require_outer_results(directory):
         raise RuntimeError("Expected exactly one completed waiting driver on each managed device")
 
 
-def assemble_candidate_apks(output, package, *, root=ROOT, run=subprocess.run):
+def assemble_candidate_apks(output, package, *, root=ROOT, run=subprocess.run, recovery_assets=None, app_only=False, sdk=None):
     if not re.fullmatch(r"studio\.hypertext\.logdate(?:\.[a-z][a-z0-9_]*)*\.debug", package):
         raise ValueError("Native acceptance requires the matching LogDate debug application ID")
     application_id = package.removesuffix(".debug")
-    arguments = ["./gradlew", ":app:android-main:assembleDebug", ":app:android-main:assembleDebugAndroidTest"]
+    arguments = ["./gradlew", ":app:android-main:assembleDebug"]
+    if not app_only:
+        arguments.append(":app:android-main:assembleDebugAndroidTest")
+    if recovery_assets is not None:
+        if app_only or not recovery_assets.is_dir():
+            raise ValueError("Manual recovery requires an existing private acceptance asset directory")
+        arguments.append(f"-Plogdate.recoveryAcceptanceAssetsDir={recovery_assets}")
     if application_id != "studio.hypertext.logdate":
         arguments.append(f"-Plogdate.applicationId={application_id}")
     arguments.extend(("--no-daemon", "--max-workers=2", "--console=plain"))
     output.mkdir(mode=0o700, parents=True, exist_ok=True)
     with (output / "candidate-build.log").open("wb") as log:
-        run(arguments, cwd=root, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=1800)
+        environment = dict(os.environ, ANDROID_HOME=str(sdk), ANDROID_SDK_ROOT=str(sdk)) if sdk is not None else None
+        run(arguments, cwd=root, env=environment, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=1800)
+
+
+def android_signing_origin(sdk, apk, *, execute=None):
+    execute = execute or command
+    versions = sorted((sdk / "build-tools").glob("*/apksigner"), reverse=True)
+    if not versions:
+        raise RuntimeError("Android SDK has no apksigner for the selected APK")
+    result = execute(str(versions[0]), "verify", "--print-certs", str(apk))
+    digests = re.findall(rb"(?m)^Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]{64})$", result.stdout)
+    if len(digests) != 1:
+        raise RuntimeError("The selected APK must have exactly one signer")
+    return "android:apk-key-hash:" + base64.urlsafe_b64encode(bytes.fromhex(digests[0].decode())).decode().rstrip("=")
+
+
+def start_manual_fixture(options, output, sdk, package):
+    if any(path is None or not path.is_file() for path in (options.classpath, options.fixture_environment)):
+        raise ValueError("Manual account recovery requires a private server classpath and fixture environment")
+    assemble_candidate_apks(output, package, app_only=True, sdk=sdk)
+    candidate = ROOT / "app/android-main/build/outputs/apk/debug/android-main-debug.apk"
+    if not candidate.is_file():
+        raise RuntimeError("The candidate application APK was not built")
+    origin = android_signing_origin(sdk, candidate)
+    fixture = output / "manual-account-fixture"
+    if fixture.exists():
+        raise RuntimeError("Manual account recovery requires a fresh private fixture directory")
+    arguments = [sys.executable, str(ROOT / "tests/e2e/manual-account-recovery-fixture.py"),
+                 "--classpath", str(options.classpath), "--fixture-environment", str(options.fixture_environment),
+                 "--android-origin", origin, "--output", str(fixture), "--lifetime", "3600"]
+    with (output / "manual-account-fixture.log").open("wb") as log:
+        process = subprocess.Popen(arguments, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
+    deadline = time.monotonic() + 150
+    while not (fixture / "fixture-ready").is_file():
+        if process.poll() is not None or time.monotonic() >= deadline:
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=15)
+            raise RuntimeError("The private manual recovery fixture did not become ready; inspect manual-account-fixture.log")
+        time.sleep(.1)
+    return process, fixture, origin
 
 
 def verify_pinned_packages(sdk, app, probe, package, *, execute=None):
@@ -255,7 +309,7 @@ def verify_pinned_packages(sdk, app, probe, package, *, execute=None):
             raise RuntimeError(f"Pinned {apk.name} has application ID {actual!r}; expected {expected!r}")
 
 
-def run(options):
+def run_managed_pair(options, *, recovery_assets=None, fixture_control=None, expected_android_origin=None):
     validate_native_arguments(options.native_arguments)
     if options.mode != "transfer" and options.native_arguments:
         raise ValueError("Only transfer mode accepts native scenario arguments")
@@ -266,12 +320,12 @@ def run(options):
     validate_followups(options.mode, options.after_transfer)
     budget = acceptance_budget(len(options.after_transfer), mode=options.mode)
     output = options.output.resolve()
-    output.mkdir(mode=0o700)
+    output.mkdir(mode=0o700, exist_ok=options.mode == "manual-account")
     nonce = str(uuid.uuid4())
     sdk = options.sdk.resolve()
     adb = str(sdk / "platform-tools/adb")
     package = os.environ.get("LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.debug")
-    assemble_candidate_apks(output, package)
+    assemble_candidate_apks(output, package, recovery_assets=recovery_assets, sdk=sdk)
     app = ROOT / "app/android-main/build/outputs/apk/debug/android-main-debug.apk"
     probe = ROOT / "app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk"
     for apk in (app, probe):
@@ -289,6 +343,8 @@ def run(options):
         pinned.append(destination)
     app, probe = pinned
     verify_pinned_packages(sdk, app, probe, package)
+    if expected_android_origin is not None and android_signing_origin(sdk, app) != expected_android_origin:
+        raise RuntimeError("The pinned APK signer changed after the local recovery fixture was created")
     initial_app, initial_probe, frozen_fixture = initial_installation(
         options.mode, app, probe, options.fixture_environment, output)
     hashes = [hashlib.sha256(apk.read_bytes()).hexdigest() for apk in (initial_app, initial_probe)]
@@ -414,7 +470,8 @@ def run(options):
                     output / "managed-emulator-launches", targets, nonce, stations)
                 save(output / "managed-network-stations.json", station_identity)
             scenario_args = scenario_command(options.mode, source, destination, app, probe, output / "native-transfer", options.native_arguments,
-                                             classpath=options.classpath, fixture_environment=frozen_fixture)
+                                             classpath=options.classpath, fixture_environment=frozen_fixture,
+                                             fixture_control=fixture_control)
             with (output / "native-harness.log").open("wb") as harness_log:
                 subprocess.run(scenario_args, cwd=ROOT, env=env, stdout=harness_log, stderr=subprocess.STDOUT, check=True, timeout=budget["native"])
             for followup in options.after_transfer:
@@ -475,12 +532,41 @@ def run(options):
         save(output / "acceptance.json", acceptance_receipt(options.mode, options.native_arguments, options.after_transfer))
 
 
+def run(options):
+    if options.mode != "manual-account":
+        return run_managed_pair(options)
+    if options.after_transfer or options.native_arguments:
+        raise ValueError("Focused manual recovery uses its own untouched managed pair")
+    output = options.output.resolve()
+    output.mkdir(mode=0o700, parents=True, exist_ok=True)
+    sdk = options.sdk.resolve()
+    package = os.environ.get("LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.debug")
+    process, fixture, origin = start_manual_fixture(options, output, sdk, package)
+    try:
+        run_managed_pair(options, recovery_assets=fixture / "assets", fixture_control=fixture / "server-control",
+                         expected_android_origin=origin)
+        process.wait(timeout=30)
+        if process.returncode != 0:
+            raise RuntimeError("The local recovery fixture did not finish successfully; inspect its private log")
+    except BaseException:
+        (output / "acceptance.json").unlink(missing_ok=True)
+        raise
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--sdk", type=Path, default=Path(os.environ.get("ANDROID_HOME", str(Path.home() / "Library/Android/sdk"))))
     parser.add_argument("--after-transfer", action="append", choices=sorted(FOLLOWUPS), default=[])
-    parser.add_argument("--mode", choices=("transfer", "publication", "work-restart", "d2d", "enrollment", "upgrade", "network-policy", "widget", "late-media"), default="transfer")
+    parser.add_argument("--mode", choices=("transfer", "publication", "work-restart", "d2d", "enrollment", "upgrade", "network-policy", "widget", "late-media", "manual-account"), default="transfer")
     parser.add_argument("--classpath", type=Path)
     parser.add_argument("--fixture-environment", type=Path)
     options, native_arguments = parser.parse_known_args()

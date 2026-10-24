@@ -45,6 +45,7 @@ import app.logdate.feature.core.profile.navigation.profileEntry
 import app.logdate.feature.core.requiresUnlock
 import app.logdate.feature.core.settings.navigation.BirthdaySettingsRoute
 import app.logdate.feature.core.settings.navigation.ExportSettingsRoute
+import app.logdate.feature.core.settings.navigation.RecoveryPhraseEntrySettingsRoute
 import app.logdate.feature.core.settings.navigation.SettingsRoute
 import app.logdate.feature.core.settings.navigation.StreakSettingsRoute
 import app.logdate.feature.core.settings.navigation.SyncSettingsRoute
@@ -274,6 +275,7 @@ fun LogDateNavDisplay(
                                             onImportBackup = { backStack.add(ExportSettingsRoute) },
                                             onOpenMediaDetail = { backStack.add(MediaDetailRoute(it)) },
                                             onOpenSyncSettings = { backStack.add(SyncSettingsRoute) },
+                                            onEnterRecoveryPhrase = { backStack.add(RecoveryPhraseEntrySettingsRoute) },
                                             onOpenWatch = { backStack.add(WatchSettingsRoute) },
                                             onOpenDay = { date -> backStack.add(TimelineDetailRoute(date.toString())) },
                                             onOpenTextNote = { backStack.add(NoteDetailRoute(it)) },

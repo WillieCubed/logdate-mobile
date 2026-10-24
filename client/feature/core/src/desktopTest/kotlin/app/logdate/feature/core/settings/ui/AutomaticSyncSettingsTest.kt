@@ -1,17 +1,21 @@
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
+import androidx.compose.ui.unit.Density
 import app.logdate.client.sync.SyncPausedReason
 import app.logdate.client.sync.SyncStatus
 import app.logdate.ui.theme.LogDateTheme
@@ -24,8 +28,9 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class AutomaticSyncSettingsTest {
     @Test
-    fun keyRecoveryStatusStaysSpecificWithoutTroubleshootingChores() =
+    fun keyRecoveryStatusOffersDirectPhraseEntryOnTablet() =
         runDesktopComposeUiTest(width = 720, height = 900) {
+            var phraseEntries = 0
             setContent {
                 LogDateTheme(darkTheme = false) {
                     SyncSettingsContent(
@@ -35,6 +40,7 @@ class AutomaticSyncSettingsTest {
                         isAuthenticated = true,
                         onSyncNow = {},
                         onNavigateToSignIn = {},
+                        onNavigateToRecoveryPhrase = { phraseEntries++ },
                         quotaUsage = StorageQuotaUi(100, 0, 0f, formattedTotal = "100 B", formattedUsed = "0 B"),
                         isQuotaAvailable = true,
                         snackbarHostState = SnackbarHostState(),
@@ -42,13 +48,44 @@ class AutomaticSyncSettingsTest {
                 }
             }
             onNodeWithText("Sync entries").assertDoesNotExist()
-            onNodeWithText("Enter recovery phrase").assertDoesNotExist()
+            onNodeWithText("Enter recovery phrase").assertIsDisplayed().performClick()
+            assertEquals(1, phraseEntries)
             onNodeWithText("Entry sync").assertDoesNotExist()
             onNodeWithText("Encrypted Cloud archive").assertDoesNotExist()
             onAllNodesWithText("This device needs your recovery phrase to keep syncing.").assertCountEquals(1)
             onNodeWithText("LogDate will try again automatically.").assertDoesNotExist()
             onNodeWithText("Sync paused while this device gets access to your journal.").assertDoesNotExist()
             saveScreenshot("tablet-journal-access", onRoot().captureToImage())
+        }
+
+    @Test
+    fun archiveKeyRecoveryActionRemainsReachableAtLargeTextOnPhone() =
+        runDesktopComposeUiTest(width = 411, height = 891) {
+            var phraseEntries = 0
+            setContent {
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
+                    LogDateTheme {
+                        SyncSettingsContent(
+                            onBack = {},
+                            syncStatus = SyncStatus(true, null, 0, false, false),
+                            cloudArchiveStatus = CloudArchiveStatus(CloudArchivePhase.NEEDS_RECOVERY),
+                            isAuthenticated = true,
+                            onSyncNow = {},
+                            onNavigateToSignIn = {},
+                            onNavigateToRecoveryPhrase = { phraseEntries++ },
+                            quotaUsage = StorageQuotaUi(100, 0, 0f, formattedTotal = "100 B", formattedUsed = "0 B"),
+                            isQuotaAvailable = false,
+                            snackbarHostState = SnackbarHostState(),
+                        )
+                    }
+                }
+            }
+            onNodeWithText("Enter recovery phrase").assertIsDisplayed().performClick()
+            assertEquals(1, phraseEntries)
+            onNodeWithText("This device needs your recovery phrase to keep syncing.").assertExists()
+            onNodeWithText("LogDate will try again automatically.").assertDoesNotExist()
+            saveScreenshot("phone-large-text-key-recovery", onRoot().captureToImage())
         }
 
     @Test

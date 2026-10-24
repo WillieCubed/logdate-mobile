@@ -13,6 +13,7 @@ internal fun SyncSettingsSection(
     onSyncUsingMobileData: () -> Unit = {},
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
+    onEnterRecoveryPhrase: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     BackupCloudSection(
@@ -22,6 +23,7 @@ internal fun SyncSettingsSection(
         onSyncUsingMobileData = onSyncUsingMobileData,
         onCreateAccount = onNavigateToCloudAccountCreation,
         onSignIn = onNavigateToSignIn,
+        onEnterRecoveryPhrase = onEnterRecoveryPhrase,
         modifier = modifier,
     )
 }

@@ -949,6 +949,36 @@ The missing-key probe rejects replacement identity and media keys, including new
 backups, after failed startup and Activity recreation. Credentials-only delivery must remain
 `CONTENT_MISSING` even after the empty destination database opens.
 
+### Manual account recovery on a fresh managed pair
+
+`managed-native-restore-acceptance.py --mode manual-account` owns two new Gradle Managed Device
+guests and a disposable local passkey account. It first builds the application to derive its
+Android signing origin, starts the loopback server, embeds the server-issued synthetic fixture in
+the instrumentation APK, and pins both APKs before boot. The source writes an encrypted journal
+and original media. The destination signs into that account through Credential Manager while its
+journal keys remain absent, enters a different checksum-valid phrase, and must stay on the form
+without revealing content. Entering the source phrase then restores the text and media. This
+focused mode does not claim Android setup transfer or Google Restore Credentials acceptance.
+
+Build `:integration:server-client-e2e:writeAndroidHistoryHarnessClasspath`. Provide a mode-`0600`
+JSON file with `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`, `SERVER_ENCRYPTION_KEY`, and
+`LOGDATE_BLOB_STORAGE_DIR`, using a disposable loopback PostgreSQL database and a Base64-encoded
+random 32-byte server key. Give each run a new private output directory; the controller rejects
+stale fixture directories and verifies
+the final pinned APK signer against the origin accepted by the server:
+
+```sh
+python3 tests/e2e/managed-native-restore-acceptance.py --mode manual-account \
+  --classpath integration/server-client-e2e/build/android-history-harness.classpath \
+  --fixture-environment /private/temporary/manual-recovery-environment.json \
+  --output /private/temporary/manual-recovery-result
+```
+
+The result has separate inner journey and outer managed-lifecycle receipts. The fixture and test
+APK contain disposable credentials; keep the output private during diagnosis, then remove those
+assets after retiring the local database and role. A successful local journey does not replace a
+test of the real Google provider with a dedicated account.
+
 ### Released-version upgrade and native restore
 
 `native-released-upgrade-acceptance.py` verifies two histories in one fresh managed pair: an

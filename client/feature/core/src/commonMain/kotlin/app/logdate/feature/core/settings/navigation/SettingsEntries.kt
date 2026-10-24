@@ -170,7 +170,7 @@ fun EntryProviderScope<NavKey>.settingsEntries(
     taggedEntry<DataSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Backup, categories)) {
         DataSettingsScreen(
             onBack = onBack,
-            onNavigateToRecoveryPhrase = { onNavigateTo(RecoveryPhraseRoute) },
+            onNavigateToRecoveryPhrase = { onNavigateTo(RecoveryPhraseEntrySettingsRoute) },
         )
     }
     taggedEntry<AdvancedSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.About, categories)) {
@@ -229,7 +229,7 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             onBack = onBack,
             onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
             onNavigateToSignIn = onNavigateToSignIn,
-            onNavigateToRecoveryPhrase = { onNavigateTo(RecoveryPhraseRoute) },
+            onNavigateToRecoveryPhrase = { onNavigateTo(RecoveryPhraseEntrySettingsRoute) },
             onNavigateToExport = { onNavigateTo(ExportSettingsRoute) },
             onRecoverJournalMerge = { operation ->
                 onNavigateTo(JournalMergeRoute(operation.sourceId.toString(), operation.operationId.toString()))

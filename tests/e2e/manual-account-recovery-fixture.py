@@ -86,7 +86,7 @@ def serve(options):
             process = subprocess.Popen(
                 ["java", "-Xmx1g", "-Djava.awt.headless=true", "-cp", classpath,
                  "app.logdate.integration.e2e.harness.NativeDeviceEnrollmentHarness",
-                 str(control), str(port), str(options.lifetime)],
+                 str(control), str(port), str(options.lifetime), "manual-account"],
                 cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT,
             )
         while not (control / "ready").is_file():

@@ -216,10 +216,15 @@
 
     <!-- Recovery phrase entry from Settings -->
     <string name="recovery_phrase_entry_settings_title">Recovery phrase</string>
-    <string name="recovery_phrase_entry_settings_description">Enter the 12-word recovery phrase for this account to keep backing up on this device.</string>
+    <string name="recovery_phrase_entry_settings_description">Enter the 12-word recovery phrase for your journal to keep backing up on this device.</string>
     <string name="recovery_phrase_entry_settings_submit">Continue</string>
-    <string name="recovery_phrase_entry_settings_error">Those words don’t match this account. Check them and try again.</string>
+    <string name="recovery_phrase_entry_settings_error">Those words aren’t a valid recovery phrase. Check their spelling and order.</string>
+    <string name="recovery_phrase_entry_settings_mismatch_error">This phrase doesn’t unlock this account’s current journal. Check the words or use another signed-in device.</string>
+    <string name="recovery_phrase_entry_settings_unavailable_error">LogDate can’t verify the phrase now. Check your connection and that LogDate is up to date, then retry.</string>
+    <string name="recovery_phrase_entry_settings_no_proof_error">LogDate can’t confirm this phrase for your account. Restore a retained backup or transfer from another signed-in device.</string>
+    <string name="recovery_phrase_entry_settings_retry_error">Couldn’t finish restoring access. Try again; your journal remains protected.</string>
     <string name="recovery_phrase_entry_settings_word_count_error">Enter all 12 words.</string>
+    <string name="recovery_phrase_entry_word_number">Word %1$d</string>
     <string name="backing_up_progress">Backing up %1$d of %2$d</string>
     <!-- First sync -->
     <string name="first_sync_running">Backing up your journal…</string>

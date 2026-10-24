@@ -27,9 +27,10 @@ internal fun BackupCloudSection(
     onSignIn: () -> Unit,
     modifier: Modifier = Modifier,
     onUpdateApp: (() -> Unit)? = null,
+    onEnterRecoveryPhrase: (() -> Unit)? = null,
 ) {
     if (isAuthenticated) {
-        BackupStatusItem(syncStatus, cloudArchiveStatus, onSyncUsingMobileData, modifier, onUpdateApp)
+        BackupStatusItem(syncStatus, cloudArchiveStatus, onSyncUsingMobileData, modifier, onUpdateApp, onEnterRecoveryPhrase)
     } else {
         SyncPromotionCard(
             onCreateAccount = onCreateAccount,

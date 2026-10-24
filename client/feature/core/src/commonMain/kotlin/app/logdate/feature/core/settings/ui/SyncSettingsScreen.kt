@@ -191,6 +191,7 @@ fun SyncSettingsContent(
                 onSyncUsingMobileData = onSyncUsingMobileData,
                 onCreateAccount = onNavigateToCloudAccountCreation,
                 onSignIn = onNavigateToSignIn,
+                onEnterRecoveryPhrase = onNavigateToRecoveryPhrase,
                 modifier = Modifier.padding(horizontal = Spacing.lg),
                 onUpdateApp = onUpdateApp,
             )
