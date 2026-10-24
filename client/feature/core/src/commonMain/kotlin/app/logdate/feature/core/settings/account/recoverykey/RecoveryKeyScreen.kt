@@ -58,7 +58,6 @@ import logdate.client.feature.core.generated.resources.recovery_key_error_step_u
 import logdate.client.feature.core.generated.resources.recovery_key_error_step_up_unavailable
 import logdate.client.feature.core.generated.resources.recovery_key_error_unexpected_change
 import logdate.client.feature.core.generated.resources.recovery_key_error_unreachable
-import logdate.client.feature.core.generated.resources.recovery_key_from_phrase
 import logdate.client.feature.core.generated.resources.recovery_key_intro
 import logdate.client.feature.core.generated.resources.recovery_key_limits
 import logdate.client.feature.core.generated.resources.recovery_key_load_failed
@@ -90,7 +89,6 @@ import logdate.client.feature.core.generated.resources.recovery_key_try_again
 import logdate.client.feature.core.generated.resources.recovery_key_turn_on
 import logdate.client.feature.core.generated.resources.recovery_key_turn_on_needs_phrase
 import logdate.client.feature.core.generated.resources.recovery_key_warning
-import logdate.client.feature.core.generated.resources.recovery_key_what_it_does
 import logdate.client.feature.core.generated.resources.recovery_key_without_phrase_body
 import logdate.client.feature.core.generated.resources.recovery_key_without_phrase_title
 import org.jetbrains.compose.resources.stringResource
@@ -106,7 +104,7 @@ data class RecoveryKeyDestinations(
     val onRecoveryPhrase: () -> Unit,
 )
 
-/** Sets up the person's recovery key, uses it to replace the server's key, and replaces a lost one. */
+/** Turns on the person's recovery key, uses it to take back their username, and switches it to a new phrase. */
 @Composable
 fun RecoveryKeyScreen(
     destinations: RecoveryKeyDestinations,
@@ -174,7 +172,7 @@ fun RecoveryKeyContent(
                 item { Explanation(state.handle, state.serverName) }
                 state.error?.let { failure -> item { ErrorNotice(state, failure, actions.onDismissError) } }
                 if (state.replacedServerKey) {
-                    item { Notice(stringResource(Res.string.recovery_key_recovered, state.serverName, state.handle)) }
+                    item { Notice(stringResource(Res.string.recovery_key_recovered, state.handle)) }
                 }
                 if (state.replacedRecoveryKey) {
                     item { Notice(stringResource(Res.string.recovery_key_replaced_key, state.handle)) }
@@ -238,8 +236,6 @@ private fun Explanation(
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Text(stringResource(Res.string.recovery_key_intro, handle, serverName), style = MaterialTheme.typography.bodyLarge)
-        Text(stringResource(Res.string.recovery_key_what_it_does, serverName, handle), style = MaterialTheme.typography.bodyLarge)
-        SupportingText(stringResource(Res.string.recovery_key_from_phrase, serverName))
         SupportingText(stringResource(Res.string.recovery_key_limits, serverName))
     }
 }
@@ -323,7 +319,7 @@ private fun TurnOnAction(
         modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        SupportingText(stringResource(Res.string.recovery_key_warning, state.handle))
+        SupportingText(stringResource(Res.string.recovery_key_warning))
         Button(onClick = onTurnOn, enabled = state.canTurnOn, modifier = Modifier.fillMaxWidth()) {
             WorkingLabel(working = state.action == RecoveryKeyAction.TURNING_ON, label = stringResource(Res.string.recovery_key_turn_on))
         }
@@ -343,7 +339,7 @@ private fun StatusSection(state: RecoveryKeyUiState.Ready) {
             KeyStatus.ON ->
                 SimpleSettingsItem(
                     title = stringResource(Res.string.recovery_key_on_title),
-                    description = stringResource(Res.string.recovery_key_on_body, state.serverName, state.handle),
+                    description = stringResource(Res.string.recovery_key_on_body, state.handle),
                     leadingContent = {
                         Icon(
                             Icons.Outlined.VerifiedUser,
@@ -409,7 +405,7 @@ private fun ReplaceRecoveryKeySection(
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Text(stringResource(Res.string.recovery_key_replace_key_section), style = MaterialTheme.typography.titleMedium)
-        SupportingText(stringResource(Res.string.recovery_key_replace_key_body, state.handle, state.serverName))
+        SupportingText(stringResource(Res.string.recovery_key_replace_key_body, state.handle))
         if (state.phrase != PhraseStatus.CONFIRMED) {
             SettingsSection(title = stringResource(Res.string.recovery_key_setup_section)) {
                 SettingsNavigationItem(
@@ -472,7 +468,7 @@ private fun errorMessage(
         IdentityRecoveryFailure.ALREADY_SET -> stringResource(Res.string.recovery_key_error_already_set, state.handle)
         IdentityRecoveryFailure.NOT_SET -> stringResource(Res.string.recovery_key_error_not_set, state.handle)
         IdentityRecoveryFailure.KEY_REMOVED -> stringResource(Res.string.recovery_key_error_key_removed, state.handle, state.serverName)
-        IdentityRecoveryFailure.PHRASE_MISMATCH -> stringResource(Res.string.recovery_key_error_phrase_mismatch, state.handle)
+        IdentityRecoveryFailure.PHRASE_MISMATCH -> stringResource(Res.string.recovery_key_error_phrase_mismatch)
         IdentityRecoveryFailure.SIGNATURE_REJECTED -> stringResource(Res.string.recovery_key_error_signature_rejected, state.serverName)
         IdentityRecoveryFailure.UNEXPECTED_CHANGE -> stringResource(Res.string.recovery_key_error_unexpected_change, state.serverName)
         IdentityRecoveryFailure.SERVER_KEY_MISSING ->

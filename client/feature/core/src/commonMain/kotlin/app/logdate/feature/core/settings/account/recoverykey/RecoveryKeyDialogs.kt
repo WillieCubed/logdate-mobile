@@ -40,14 +40,14 @@ fun TurnOnRecoveryKeyDialog(
 ) {
     ConfirmDialog(
         title = stringResource(Res.string.recovery_key_turn_on_confirm_title),
-        text = { Text(stringResource(Res.string.recovery_key_turn_on_confirm_body, state.serverName, state.handle)) },
+        text = { Text(stringResource(Res.string.recovery_key_turn_on_confirm_body, state.handle)) },
         confirmLabel = stringResource(Res.string.recovery_key_turn_on_confirm_action),
         onConfirm = onConfirm,
         onDismiss = onDismiss,
     )
 }
 
-/** Lists what replacing the server's key will do before anything is sent. */
+/** Lists what taking back the username will do before anything is sent. */
 @Composable
 fun ReplaceServerKeyDialog(
     state: RecoveryKeyUiState.Ready,
@@ -72,7 +72,7 @@ fun ReplaceRecoveryKeyDialog(
 ) {
     ConfirmDialog(
         title = stringResource(Res.string.recovery_key_replace_key_confirm_title),
-        text = { Text(stringResource(Res.string.recovery_key_replace_key_confirm_body, state.serverName, state.handle)) },
+        text = { Text(stringResource(Res.string.recovery_key_replace_key_confirm_body, state.handle)) },
         confirmLabel = stringResource(Res.string.recovery_key_replace_key_confirm_action),
         onConfirm = onConfirm,
         onDismiss = onDismiss,
@@ -103,7 +103,7 @@ private fun ReplaceSteps(state: RecoveryKeyUiState.Ready) {
         listOf(
             stringResource(Res.string.recovery_key_recover_confirm_step_check),
             stringResource(Res.string.recovery_key_recover_confirm_step_passkey),
-            stringResource(Res.string.recovery_key_recover_confirm_step_replace, state.serverName, state.handle),
+            stringResource(Res.string.recovery_key_recover_confirm_step_replace, state.handle),
             stringResource(Res.string.recovery_key_recover_confirm_step_rank),
             stringResource(Res.string.recovery_key_recover_confirm_step_unchanged),
         ).forEach { step ->

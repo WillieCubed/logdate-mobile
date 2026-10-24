@@ -33,10 +33,10 @@ class RecoveryKeyDialogPrivacyTest {
                     }
                 }
             }
-            onNodeWithText("Turn on your recovery key?").assertIsDisplayed()
+            onNodeWithText("Turn on recovery key?").assertIsDisplayed()
             runOnIdle { visible.value = false }
-            onNodeWithText("Turn on your recovery key?").assertDoesNotExist()
+            onNodeWithText("Turn on recovery key?").assertDoesNotExist()
             runOnIdle { visible.value = true }
-            onNodeWithText("Turn on your recovery key?").assertIsDisplayed()
+            onNodeWithText("Turn on recovery key?").assertIsDisplayed()
         }
 }
