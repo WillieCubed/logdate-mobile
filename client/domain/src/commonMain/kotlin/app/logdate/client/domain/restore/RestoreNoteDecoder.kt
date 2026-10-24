@@ -23,15 +23,7 @@ internal fun ExportNote.toJournalNote(
     val note =
         when (type.lowercase()) {
             "text" -> {
-                JournalNote.Text(
-                    uid = id,
-                    creationTimestamp = createdAt,
-                    lastUpdated = updatedAt,
-                    content = content.orEmpty(),
-                    timeZoneId = timeZone,
-                    syncVersion = syncVersion,
-                    location = location,
-                )
+                toTextNote(id, location)
             }
 
             "image" -> {
@@ -84,6 +76,20 @@ internal fun ExportNote.toJournalNote(
         } ?: return null
     return note.withCapturedOn(CaptureDevice.fromWireName(capturedOn)).withCapturedDuring(CaptureActivity.fromWireName(capturedDuring))
 }
+
+private fun ExportNote.toTextNote(
+    id: Uuid,
+    location: NoteLocation?,
+): JournalNote.Text =
+    JournalNote.Text(
+        uid = id,
+        creationTimestamp = createdAt,
+        lastUpdated = updatedAt,
+        content = content.orEmpty(),
+        timeZoneId = timeZone,
+        syncVersion = syncVersion,
+        location = location,
+    )
 
 private fun ArchiveNoteLocation.toNoteLocation() =
     NoteLocation(

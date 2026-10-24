@@ -363,11 +363,7 @@ class LocationHistoryService(
         val edits = payloads.filterIsInstance<HistoryPayload.Correction>().map { it.value }
         val places = applyPlaceLabels(payloads.filterIsInstance<HistoryPayload.Place>().map { it.value }.distinctBy { it.id }, edits)
         val links = payloads.filterIsInstance<HistoryPayload.MemoryLink>().map { it.value }
-        val manual =
-            payloads.filterIsInstance<HistoryPayload.Manual>().mapNotNull { payload ->
-                val place = places.firstOrNull { it.id == payload.value.placeId } ?: return@mapNotNull null
-                payload.value.let { PlaceVisit(it.id, it.start, it.end, listOf(it.id), place.latitude, place.longitude, true, place) }
-            }
+        val manual = manualVisits(payloads, places)
         val corrected = ApplyHistoryEdits()(inferred + manual, edits, places)
         val dated = corrected.filter { it.overlaps(start, end) }.sortedBy { it.start }
         val visits =
@@ -421,6 +417,15 @@ class LocationHistoryService(
             resolvePlaceAliases(edits),
         )
     }
+
+    private fun manualVisits(
+        payloads: List<HistoryPayload>,
+        places: List<SemanticPlace>,
+    ): List<PlaceVisit> =
+        payloads.filterIsInstance<HistoryPayload.Manual>().mapNotNull { payload ->
+            val place = places.firstOrNull { it.id == payload.value.placeId } ?: return@mapNotNull null
+            payload.value.let { PlaceVisit(it.id, it.start, it.end, listOf(it.id), place.latitude, place.longitude, true, place) }
+        }
 
     suspend fun savePlace(place: SemanticPlace) {
         val scope = scope()
