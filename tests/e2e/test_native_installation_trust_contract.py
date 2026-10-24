@@ -94,6 +94,9 @@ class InstallationTrustContractTest(unittest.TestCase):
                          "restore_radio_state", "wait_for_timeline"):
                 stack.enter_context(patch.object(HARNESS, name))
             stack.enter_context(patch.object(HARNESS, "backup_source", return_value=(b"backup", {})))
+            stack.enter_context(patch.object(
+                HARNESS, "selected_database_snapshot", return_value={"bytes": 1, "sha256": "0" * 64}
+            ))
             stack.enter_context(patch.object(HARNESS, "package_file_snapshot", return_value={}))
             stack.enter_context(patch.object(HARNESS, "radio_state", return_value=(False, b"1")))
             stack.enter_context(patch.object(HARNESS, "probe", side_effect=probe))
