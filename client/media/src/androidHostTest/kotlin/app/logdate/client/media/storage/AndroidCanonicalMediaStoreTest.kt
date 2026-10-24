@@ -36,7 +36,7 @@ class AndroidCanonicalMediaStoreTest {
                 assertContentEquals(bytes, file.readBytes())
                 assertEquals(1, File(root, "media/objects").walkTopDown().count { it.isFile })
                 assertTrue(
-                    File(root, "media/staging").walkTopDown().none { it.isFile },
+                    File(root, "media/staging").walkTopDown().none { it.isFile && it.extension == "tmp" },
                     "A successful duplicate import must immediately discard its staging copy",
                 )
             }
@@ -115,6 +115,52 @@ class AndroidCanonicalMediaStoreTest {
             assertContentEquals(workingBytes, destination.readBytes())
             assertEquals(digest(bytes), destination.name.substringBefore('.'))
         }
+
+    @Test
+    fun `an incomplete reserved destination survives and a retry uses a retained path`() =
+        withStore { store, root ->
+            val bytes = "complete incoming media".encodeToByteArray()
+            val digest = digest(bytes)
+            val directory = File(root, "media/objects/sha256/${digest.take(2)}").apply { mkdirs() }
+            val interrupted = File(directory, "$digest.jpg").apply { writeText("partial") }
+
+            val uri = store.store(bytes.inputStream(), "image/jpeg", bytes.size.toLong())
+
+            assertEquals("$digest.retained-1.jpg", File(java.net.URI(uri)).name)
+            assertEquals("partial", interrupted.readText())
+            assertContentEquals(bytes, File(java.net.URI(uri)).readBytes())
+            assertEquals(uri, AndroidCanonicalMediaStore(root).store(bytes.inputStream(), "image/jpeg", bytes.size.toLong()))
+        }
+
+    @Test
+    fun `retry syncs an already-complete reserved inode before returning its reference`() {
+        val root = Files.createTempDirectory("logdate-unsynced-media-").toFile()
+        try {
+            val bytes = "complete bytes after an interrupted force".encodeToByteArray()
+            val digest = digest(bytes)
+            val directory = File(root, "media/objects/sha256/${digest.take(2)}").apply { mkdirs() }
+            val reserved = File(directory, "$digest.jpg").apply { writeBytes(bytes) }
+            var fileSyncAttempts = 0
+            val store =
+                AndroidCanonicalMediaStore(
+                    root,
+                    syncFile = {
+                        fileSyncAttempts++
+                        assertEquals(reserved, it)
+                        if (fileSyncAttempts == 1) throw IOException("previous publication was not durable")
+                    },
+                )
+
+            runBlocking {
+                assertFailsWith<IOException> { store.store(bytes.inputStream(), "image/jpeg", bytes.size.toLong()) }
+                assertEquals(reserved.toURI().toString(), store.store(bytes.inputStream(), "image/jpeg", bytes.size.toLong()))
+            }
+            assertEquals(2, fileSyncAttempts)
+            assertContentEquals(bytes, reserved.readBytes())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
 
     @Test
     fun `MIME parameters normalize to the trusted extension`() =
