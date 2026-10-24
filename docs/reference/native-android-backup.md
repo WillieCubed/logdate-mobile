@@ -62,6 +62,13 @@ and offer archive export without requiring an account. A native quota callback r
 reported failure in non-backed-up storage; the UI displays that failed attempt independently of
 LogDate Cloud status.
 
+Before emitting a cloud backup, the native agent checks that a live journal has a committed
+portable passphrase and that the passphrase opens and passes integrity validation on the live
+SQLCipher database, including the supported legacy cipher settings. A missing, malformed, or
+mismatched key aborts the backup before Android receives journal bytes. With no database yet,
+an absent key is valid, but a malformed orphan key is not: it would block a fresh restore.
+Device transfer uses its separately verified selected snapshot.
+
 ## Background account recovery
 
 The restricted backup callback retains the original delivery, generation, server/privacy digest,

@@ -4,9 +4,11 @@ import android.app.backup.FullBackupDataOutput
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import app.logdate.client.data.account.NativeRestoreAccountPolicy
+import app.logdate.client.database.requirePortableCloudBackupKey
 import app.logdate.client.device.restore.NativeBackupAgent
 import app.logdate.client.device.restore.PostRestoreDetector
 import kotlinx.coroutines.flow.first
+import java.io.File
 
 /** The restricted callback retains a nonsecret request; the system job performs authentication. */
 class NativeAccountBackupAgent : NativeBackupAgent() {
@@ -14,6 +16,12 @@ class NativeAccountBackupAgent : NativeBackupAgent() {
     private val journalRestore by lazy { NativeJournalTransferRestore(this, ::restoreNativeJournalPreferences) }
 
     override val retainedPreferenceNames: Set<String> = setOf("logdate_widget_instances")
+
+    override fun requireCloudJournalRecoverability() =
+        requirePortableCloudBackupKey(
+            getDatabasePath("logdate"),
+            File(filesDir, "db_recovery/passphrase_backup"),
+        )
 
     override fun prepareNativeJournalTransferBackup() = journalTransfer.prepare()
 

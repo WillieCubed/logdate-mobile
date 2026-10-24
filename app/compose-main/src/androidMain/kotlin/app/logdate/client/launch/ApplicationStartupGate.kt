@@ -62,6 +62,20 @@ internal fun FragmentActivity.whenApplicationReady(onReady: () -> Unit) {
                             )
                         },
                         confirmButton = {
+                            val updateRequired = message == ApplicationStartupFailureMessage.UPDATE_REQUIRED
+                            TextButton(onClick = { if (updateRequired) openJournalAppUpdate() else startup.start() }) {
+                                Text(
+                                    stringResource(
+                                        if (updateRequired) {
+                                            R.string.database_update_required_action
+                                        } else {
+                                            R.string.application_startup_retry
+                                        },
+                                    ),
+                                )
+                            }
+                        },
+                        dismissButton = {
                             if (message == ApplicationStartupFailureMessage.DATABASE_KEY_RECOVERY) {
                                 TextButton(onClick = {
                                     startup.recoverRetainedJournal {
@@ -70,19 +84,6 @@ internal fun FragmentActivity.whenApplicationReady(onReady: () -> Unit) {
                                         }
                                     }
                                 }) { Text(stringResource(R.string.database_key_recovery_backup_action)) }
-                            } else {
-                                val updateRequired = message == ApplicationStartupFailureMessage.UPDATE_REQUIRED
-                                TextButton(onClick = { if (updateRequired) openJournalAppUpdate() else startup.start() }) {
-                                    Text(
-                                        stringResource(
-                                            if (updateRequired) {
-                                                R.string.database_update_required_action
-                                            } else {
-                                                R.string.application_startup_retry
-                                            },
-                                        ),
-                                    )
-                                }
                             }
                         },
                     )
