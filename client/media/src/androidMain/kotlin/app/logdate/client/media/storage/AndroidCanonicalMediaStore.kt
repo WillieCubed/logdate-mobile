@@ -57,17 +57,20 @@ class AndroidCanonicalMediaStore(
             val destinationDirectory = File(objectsDirectory, hexDigest.take(2))
             ensurePrivateDirectory(destinationDirectory)
             if (!canCommit()) throw CancellationException("Media store commit is no longer valid")
-            return publicationLock.withLock {
-                val lockChannel =
-                    FileChannel.open(
-                        File(stagingDirectory, ".publication.lock").toPath(),
-                        StandardOpenOption.CREATE,
-                        StandardOpenOption.WRITE,
-                        LinkOption.NOFOLLOW_LINKS,
-                    )
-                lockChannel.use {
-                    lockChannel.lock().use {
-                        publishUnderLock(stagingFile, destinationDirectory, hexDigest, extension, copiedBytes, canCommit)
+            // Claims precede publication locks because recovery already holds a claim.
+            return withPublicationClaim {
+                publicationLock.withLock {
+                    val lockChannel =
+                        FileChannel.open(
+                            File(stagingDirectory, ".publication.lock").toPath(),
+                            StandardOpenOption.CREATE,
+                            StandardOpenOption.WRITE,
+                            LinkOption.NOFOLLOW_LINKS,
+                        )
+                    lockChannel.use {
+                        lockChannel.lock().use {
+                            publishUnderLock(stagingFile, destinationDirectory, hexDigest, extension, copiedBytes, canCommit)
+                        }
                     }
                 }
             }
