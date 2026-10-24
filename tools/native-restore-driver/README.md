@@ -4,11 +4,10 @@ This unshipped app keeps Gradle Managed Devices alive while Android restarts Log
 during native backup and restore. Its instrumentation runs in a separate package.
 The transport waiting driver never acquires `UiAutomation`; nested LogDate probes own that connection.
 
-The host entry point is `tests/e2e/managed-native-restore-acceptance.py`. Assemble the
-LogDate app and instrumentation APKs before invoking it:
+The host entry point is `tests/e2e/managed-native-restore-acceptance.py`. It builds
+and pins the matching LogDate app and instrumentation APKs before starting devices:
 
 ```sh
-./gradlew :app:android-main:assembleDebug :app:android-main:assembleDebugAndroidTest
 python3 tests/e2e/managed-native-restore-acceptance.py \
   --output /tmp/logdate-managed-native-transfer \
   --after-transfer missing-media --after-transfer storage --after-transfer ui \
