@@ -15,6 +15,7 @@ import uuid
 SPEC = importlib.util.spec_from_file_location("native_backup", Path(__file__).with_name("native-backup-acceptance.py"))
 native = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(native)
+add_failure_note = native.add_failure_note
 
 
 def probe(serial, stage, fixture, output, metadata=None):
@@ -68,7 +69,7 @@ def run(options):
         except Exception as error:
             if primary_error is None:
                 raise
-            primary_error.add_note(f"Source fixture cleanup also failed: {error}")
+            add_failure_note(primary_error, f"Source fixture cleanup also failed: {error}")
 
     native.private_file(options.output / "publication-acceptance.json", json.dumps({
         "nativeTransfer": True, "replacementTrust": True, "restartReplay": True,

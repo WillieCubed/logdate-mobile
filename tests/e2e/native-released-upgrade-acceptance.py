@@ -13,6 +13,7 @@ import stat
 
 ROOT = Path(__file__).resolve().parents[2]
 H = runpy.run_path(str(ROOT / "tests/e2e/native-backup-acceptance.py"))
+add_failure_note = H["add_failure_note"]
 TARGET = runpy.run_path(str(ROOT / "tests/e2e/managed-native-target.py"))
 PROBE = "app.logdate.client.e2e.NativeReleasedUpgradeProbeTest"
 MARKER = "native-released-upgrade.json"
@@ -103,7 +104,7 @@ def restore_radios(radios, primary_error=None):
     if failures:
         if primary_error is None:
             raise RuntimeError("Compatibility radio restoration failed: " + ", ".join(failures))
-        primary_error.add_note("Radio restoration also failed: " + ", ".join(failures))
+        add_failure_note(primary_error, "Radio restoration also failed: " + ", ".join(failures))
 
 
 def run(options):

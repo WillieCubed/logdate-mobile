@@ -9,6 +9,7 @@ import shlex
 import time
 
 H = runpy.run_path(str(Path(__file__).with_name("native-backup-acceptance.py")))
+add_failure_note = H["add_failure_note"]
 MEDIA = runpy.run_path(str(Path(__file__).with_name("native-missing-media-acceptance.py")))
 SELECTOR = "app.logdate.client.e2e.ManualAccountRecoveryE2ETest#ordinarySignInThenSettingsPhraseRecoversOriginalContent"
 SOURCE_SELECTOR = "app.logdate.client.e2e.RecoveryAcceptanceProbeTest"
@@ -99,7 +100,7 @@ def run(source, destination, output):
         except Exception as cleanup:
             if primary is None:
                 raise
-            primary.add_note("Managed radio restoration also failed: " + type(cleanup).__name__)
+            add_failure_note(primary, "Managed radio restoration also failed: " + type(cleanup).__name__)
     receipt = {
         "retainedWorkspaceAndSqlCipherCopyAccepted": True,
         "nativeCredentialCallbackAutomaticRetryAccepted": True,
@@ -139,4 +140,4 @@ if __name__ == "__main__":
         except Exception as cleanup:
             if primary is None:
                 raise
-            primary.add_note("Local fixture completion notification also failed: " + type(cleanup).__name__)
+            add_failure_note(primary, "Local fixture completion notification also failed: " + type(cleanup).__name__)

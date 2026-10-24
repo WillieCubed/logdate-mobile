@@ -25,6 +25,9 @@ DRIVER_CASE = "app.logdate.tools.restoredriver.NativeRestoreDriverTest"
 FOLLOWUPS = {"account-job": "native-account-job-acceptance.py", "missing-media": "native-missing-media-acceptance.py",
              "storage": "native-storage-recovery-acceptance.py", "ui": "native-recovery-ui-acceptance.py",
              "permissions": "native-permission-acceptance.py", "contracts": "native-post-transfer-acceptance.py"}
+add_failure_note = runpy.run_path(
+    str(Path(__file__).with_name("native-failure-diagnostics.py"))
+)["add_failure_note"]
 
 
 def retain_terminal_results(process, results, output, started_ns):
@@ -427,14 +430,14 @@ def run(options):
                 if primary is None:
                     primary = failure
                 else:
-                    primary.add_note("Could not remove private managed SDK facade: " + type(failure).__name__)
+                    add_failure_note(primary, "Could not remove private managed SDK facade: " + type(failure).__name__)
             if len(custody["targets"]) == 2:
                 try:
                     retain_terminal_results(process, results, output, results_started_ns)
                 except Exception as failure:
                     if primary is None:
                         raise
-                    primary.add_note("Could not retain managed results: " + type(failure).__name__)
+                    add_failure_note(primary, "Could not retain managed results: " + type(failure).__name__)
         if primary is not None:
             raise primary
         if process.poll() is None:

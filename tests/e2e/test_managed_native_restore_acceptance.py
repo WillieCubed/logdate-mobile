@@ -1,4 +1,6 @@
+from contextlib import redirect_stderr
 from pathlib import Path
+import io
 import os
 import json
 import re
@@ -13,6 +15,29 @@ MODULE = runpy.run_path(str(Path(__file__).with_name("managed-native-restore-acc
 
 
 class ManagedDriverControllerTest(unittest.TestCase):
+    def test_cleanup_diagnostics_preserve_a_failure_on_python_without_exception_notes(self):
+        class LegacyFailure(RuntimeError):
+            def __getattribute__(self, name):
+                if name == "add_note":
+                    raise AttributeError(name)
+                return super().__getattribute__(name)
+
+        failure = LegacyFailure("managed restore failed")
+        diagnostics = io.StringIO()
+        with redirect_stderr(diagnostics):
+            MODULE["add_failure_note"](failure, "Could not retain managed results")
+        self.assertEqual("managed restore failed", str(failure))
+        self.assertEqual(["Could not retain managed results"], failure.__notes__)
+        self.assertIn("Could not retain managed results", diagnostics.getvalue())
+
+    def test_diagnostic_stream_failure_does_not_replace_the_primary_error(self):
+        failure = RuntimeError("managed restore failed")
+        unavailable = io.StringIO()
+        unavailable.close()
+        with redirect_stderr(unavailable):
+            MODULE["add_failure_note"](failure, "Could not retain managed results")
+        self.assertEqual(["Could not retain managed results"], failure.__notes__)
+
     def test_emulator_preflight_is_headless_and_retains_its_private_output(self):
         with tempfile.TemporaryDirectory() as folder:
             output = Path(folder)

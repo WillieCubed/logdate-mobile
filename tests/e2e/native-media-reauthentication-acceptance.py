@@ -5,6 +5,7 @@ import runpy
 import shlex
 
 H = runpy.run_path(str(Path(__file__).with_name("native-backup-acceptance.py")))
+add_failure_note = H["add_failure_note"]
 MEDIA = runpy.run_path(str(Path(__file__).with_name("native-missing-media-acceptance.py")))
 
 
@@ -106,4 +107,4 @@ def run(serial, control, server, output, wait_for, publish_control):
         if failures:
             if primary is None:
                 raise RuntimeError("Reauthentication network cleanup failed: " + ", ".join(failures))
-            primary.add_note("Network cleanup also failed: " + ", ".join(failures))
+            add_failure_note(primary, "Network cleanup also failed: " + ", ".join(failures))

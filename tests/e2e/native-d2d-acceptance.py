@@ -26,6 +26,7 @@ SPEC = importlib.util.spec_from_file_location(
 )
 HARNESS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(HARNESS)
+add_failure_note = HARNESS.add_failure_note
 D2D_TRANSPORT = "com.google.android.gms/.backup.migrate.service.D2dTransport"
 D2D_TEST_MODE = "backup_enable_d2d_test_mode"
 GMS_BACKUP_TRANSPORT = "com.google.android.gms/.backup.BackupTransportService"
@@ -114,7 +115,7 @@ def wait_for_d2d_restore_set(serial, output):
         except Exception as diagnostic_error:
             if failure is None:
                 raise
-            failure.add_note(f"D2D readiness diagnostics could not be retained: {type(diagnostic_error).__name__}")
+            add_failure_note(failure, f"D2D readiness diagnostics could not be retained: {type(diagnostic_error).__name__}")
 
 
 def select_d2d_transport(serial, attempts=30, output=None):

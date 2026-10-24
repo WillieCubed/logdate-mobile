@@ -9,6 +9,7 @@ import runpy
 import shlex
 
 NATIVE = runpy.run_path(str(Path(__file__).with_name("native-backup-acceptance.py")))
+add_failure_note = NATIVE["add_failure_note"]
 
 
 def probe(serial, stage, output, old_id=None):
@@ -33,7 +34,7 @@ def probe(serial, stage, output, old_id=None):
                 diagnostic = NATIVE["adb"](serial, "shell", "dumpsys", *service.split())
                 NATIVE["private_file"](output.with_suffix("." + service.split()[0] + ".txt"), diagnostic)
         except Exception as error:
-            failure.add_note(f"Could not retain widget platform diagnostics: {type(error).__name__}")
+            add_failure_note(failure, f"Could not retain widget platform diagnostics: {type(error).__name__}")
         for name in (f"native-widget-{stage}.png", "native-widget-failure.png", "native-widget-failure.xml"):
             try:
                 saved = NATIVE["adb"](serial, "exec-out", "run-as", NATIVE["PACKAGE"], "cat", "no_backup/" + name)
@@ -43,7 +44,7 @@ def probe(serial, stage, output, old_id=None):
                     raise ValueError("Widget failure hierarchy is unavailable")
                 NATIVE["private_file"](output.parent / f"{serial}-{name}", saved)
             except Exception as error:
-                failure.add_note(f"Could not retain {name}: {type(error).__name__}")
+                add_failure_note(failure, f"Could not retain {name}: {type(error).__name__}")
         raise failure
 
 
@@ -91,7 +92,7 @@ def run(options):
             message = "Registered widget fixture cleanup failed: " + ", ".join(failures)
             if primary is None:
                 raise RuntimeError(message)
-            primary.add_note(message)
+            add_failure_note(primary, message)
     NATIVE["private_file"](options.output / "widget-acceptance.json", json.dumps({
         "nativeTransfer": True, "registeredSourceWidget": True, "registeredReplacementWidget": True,
         "systemRestoresRegisteredWidgetWithoutInjectedCallbacks": True,

@@ -33,6 +33,9 @@ instrumentation_passed = runpy.run_path(
 managed_adb_command = runpy.run_path(
     str(Path(__file__).with_name("managed-native-target.py"))
 )["managed_adb_command"]
+add_failure_note = runpy.run_path(
+    str(Path(__file__).with_name("native-failure-diagnostics.py"))
+)["add_failure_note"]
 
 
 PACKAGE = os.environ.get("LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.debug")
@@ -40,6 +43,8 @@ RUNNER = PACKAGE + ".test/androidx.test.runner.AndroidJUnitRunner"
 PROBE = "app.logdate.client.e2e.NativeBackupTransferProbeTest"
 TRANSPORT = "com.android.localtransport/.LocalTransport"
 TRANSPORT_FILES = "/data/user/0/com.android.localtransport/files"
+# Managed guests can spend several minutes compiling the first instrumentation APK.
+INSTRUMENTATION_TIMEOUT_SECONDS = 600
 USER_CONTENT_PATHS = (
     "./shared_prefs/logdate_secure_storage.xml",
     "./databases/logdate",
@@ -274,7 +279,8 @@ def adb(serial, *arguments, timeout=180, input_bytes=None):
         stderr = error.stderr or b""
         if isinstance(stderr, bytes):
             stderr = stderr.decode(errors="replace")
-        error.add_note(
+        add_failure_note(
+            error,
             f"Managed ADB failure: start_monotonic_ns={started_ns}, failure_monotonic_ns={failed_ns}, "
             f"failure_unix_ns={time.time_ns()}, stderr={stderr[:4096]}"
         )
@@ -920,14 +926,14 @@ def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_
     if missing_media_path:
         arguments.extend(("-e", "expectedMissingMediaPath", missing_media_path))
     arguments.append(RUNNER)
-    result = adb(serial, *arguments)
+    result = adb(serial, *arguments, timeout=INSTRUMENTATION_TIMEOUT_SECONDS)
     private_file(output, result)
     if not instrumentation_passed(result):
         failure = RuntimeError(f"native {mode} probe failed; inspect {output}")
         try:
             private_file(output.with_suffix(".logcat.log"), adb(serial, "logcat", "-d", "-b", "crash", "-v", "threadtime"))
         except Exception as error:
-            failure.add_note(f"Crash diagnostics could not be collected: {error}")
+            add_failure_note(failure, f"Crash diagnostics could not be collected: {error}")
         raise failure
 
 
@@ -944,7 +950,7 @@ def verify_restarted_content(serial, output, metadata, identity):
         if len(set(journals)) != 2 or base.intersection(journals):
             raise ValueError("Archive restart journal IDs must be distinct from the transfer fixture")
         arguments.extend(("-e", "nativeRetainedArchiveJournals", ",".join(journals)))
-    result = adb(serial, *arguments, RUNNER)
+    result = adb(serial, *arguments, RUNNER, timeout=INSTRUMENTATION_TIMEOUT_SECONDS)
     log = output / "destination-retained-offline-edit.log"
     private_file(log, result)
     if not instrumentation_passed(result):
@@ -955,7 +961,7 @@ def verify_restarted_content(serial, output, metadata, identity):
 def privacy_probe(serial, mode, output):
     result = adb(serial, "shell", "am", "instrument", "-w", "-r", "-e", "class",
                  "app.logdate.client.e2e.NativeRestorePrivacyRuntimeTest",
-                 "-e", "restorePrivacyMode", mode, RUNNER)
+                 "-e", "restorePrivacyMode", mode, RUNNER, timeout=INSTRUMENTATION_TIMEOUT_SECONDS)
     private_file(output, result)
     if not instrumentation_passed(result):
         raise RuntimeError(f"native privacy {mode} probe failed; inspect {output}")
@@ -1030,7 +1036,7 @@ def recording_policy_probe(serial, output):
                 cleanup_errors.append(f"{permission}: {error}")
         if probe_error is not None:
             for error in cleanup_errors:
-                probe_error.add_note(f"Runtime permission cleanup also failed: {error}")
+                add_failure_note(probe_error, f"Runtime permission cleanup also failed: {error}")
             raise probe_error
         if cleanup_errors:
             raise RuntimeError("Could not restore recording probe permissions: " + "; ".join(cleanup_errors))
@@ -1044,7 +1050,7 @@ def archive_probe(serial, mode, output, fixture=None, fixture_label="transfer"):
     if fixture:
         arguments.extend(("-e", "archiveRecoveryFixture", fixture))
     arguments.append(RUNNER)
-    result = adb(serial, "shell", shlex.join(arguments))
+    result = adb(serial, "shell", shlex.join(arguments), timeout=INSTRUMENTATION_TIMEOUT_SECONDS)
     private_file(output, result)
     if not instrumentation_passed(result):
         raise RuntimeError(f"archive {mode} probe failed; inspect {output}")
@@ -1135,7 +1141,7 @@ def data_only_source_session(source, output, enabled):
         if cleanup_errors:
             if primary_error is None:
                 raise RuntimeError("Synthetic source session or network cleanup failed") from cleanup_errors[0]
-            primary_error.add_note("Synthetic source cleanup also failed: " + ", ".join(type(error).__name__ for error in cleanup_errors))
+            add_failure_note(primary_error, "Synthetic source cleanup also failed: " + ", ".join(type(error).__name__ for error in cleanup_errors))
 
 
 def restore_transport(serial, *, system_widgets=False):

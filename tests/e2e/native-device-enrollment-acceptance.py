@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
 H = runpy.run_path(str(Path(__file__).with_name("native-backup-acceptance.py")))
+add_failure_note = H["add_failure_note"]
 PACKAGE = H["PACKAGE"]
 RUNNER = H["RUNNER"]
 FIXTURE = "native-device-enrollment-fixture.json"
@@ -81,7 +82,7 @@ def probe(serial, stage, output):
         try:
             capture_failure_diagnostics(serial, output.parent / "failure-diagnostics" / output.stem)
         except Exception as diagnostic:
-            failure.add_note("Enrollment diagnostics also failed: " + type(diagnostic).__name__)
+            add_failure_note(failure, "Enrollment diagnostics also failed: " + type(diagnostic).__name__)
         raise failure
 
 
@@ -190,7 +191,7 @@ def cleanup(process, radios, primary=None):
         if primary is None:
             raise RuntimeError("Enrollment cleanup failed: " + ", ".join(failures))
         for failure in failures:
-            primary.add_note("Enrollment cleanup also failed: " + failure)
+            add_failure_note(primary, "Enrollment cleanup also failed: " + failure)
 
 
 def registry_check(control, process, stage, identifiers, owner, proof=None):

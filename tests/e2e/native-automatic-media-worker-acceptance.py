@@ -5,6 +5,7 @@ import runpy
 import uuid
 
 MEDIA = runpy.run_path(str(Path(__file__).with_name("native-missing-media-acceptance.py")))
+add_failure_note = MEDIA["add_failure_note"]
 
 
 def run(serial, control, server, output, wait_for, failure_diagnostics=None):
@@ -93,7 +94,7 @@ def run(serial, control, server, output, wait_for, failure_diagnostics=None):
                 path.write_bytes(snapshot)
                 path.chmod(0o600)
             except Exception as error:
-                failure.add_note(f"Could not retain managed {label} diagnostics: {type(error).__name__}")
+                add_failure_note(failure, f"Could not retain managed {label} diagnostics: {type(error).__name__}")
         raise
     finally:
         errors = []
@@ -117,6 +118,6 @@ def run(serial, control, server, output, wait_for, failure_diagnostics=None):
             if primary is None:
                 raise errors[0]
             for error in errors:
-                primary.add_note("Automatic media cleanup also failed: " + type(error).__name__)
+                add_failure_note(primary, "Automatic media cleanup also failed: " + type(error).__name__)
     return {"automaticOriginalMediaRecovery": True, "mediaInboxOperationRetainedAcrossRestart": True,
             "deferredOriginalUploadResumesAfterPolicyLiftDuringWorker": True}
