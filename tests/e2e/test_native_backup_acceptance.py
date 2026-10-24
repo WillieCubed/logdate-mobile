@@ -950,6 +950,9 @@ class CredentialsOnlyBackupFilterTest(unittest.TestCase):
             (prefix + "/_manifest", b"manifest"),
             (prefix + "/db/logdate", b"encrypted journal"),
             (prefix + "/f/db_recovery/passphrase_backup", b"cloud key"),
+            (prefix + "/f/logdate.preferences_pb", b"owner preferences"),
+            (prefix + "/f/identity_recovery/phrase_backup", b"identity key"),
+            (prefix + "/f/identity_recovery/media_key_backup", b"media key"),
         ]
         full_backup_name = f"1/_full/{harness.PACKAGE}"
 

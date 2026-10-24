@@ -910,6 +910,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
 
     def test_snapshot_existing_source_cannot_seed_archive_recovery(self):
         options = argparse.Namespace(
+            exercise_cloud_backup=False,
             source="emulator-5576",
             destination="emulator-5584",
             exercise_missing_keys=False,

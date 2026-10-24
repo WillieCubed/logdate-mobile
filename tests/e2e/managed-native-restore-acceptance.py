@@ -47,9 +47,12 @@ def retain_terminal_results(process, results, output, started_ns):
 
 
 def acceptance_receipt(mode, native_arguments, followups):
+    cloud_selection = mode == "transfer" and any(
+        choice in native_arguments for choice in ("--exercise-cloud-backup", "--exercise-credentials-only"))
     return {"managedDeviceLifecycleAccepted": True, "outerDrivers": 2, "mode": mode,
             "managedNativeTransport": mode not in {"work-restart", "network-policy", "late-media", "manual-account"},
-            "crossDeviceTransferAccepted": mode in {"transfer", "publication", "enrollment", "upgrade", "widget"},
+            "crossDeviceTransferAccepted": mode in {"transfer", "publication", "enrollment", "upgrade", "widget"} and not cloud_selection,
+            "localCloudSelectionAccepted": cloud_selection and "--exercise-cloud-backup" in native_arguments,
             "nativeArguments": native_arguments, "followups": followups,
             "manualAccountRecoveryAccepted": mode == "manual-account",
             "googleRestoreProviderAccepted": False}
@@ -145,7 +148,7 @@ def initial_installation(mode, app, probe, fixture_environment, output):
 
 def validate_native_arguments(arguments):
     allowed = {"--exercise-quota", "--exercise-archive-recovery", "--exercise-missing-keys",
-               "--exercise-missing-privacy", "--exercise-credentials-only", "--exercise-data-only",
+               "--exercise-missing-privacy", "--exercise-credentials-only", "--exercise-cloud-backup", "--exercise-data-only",
                "--exercise-duplicate-restore", "--exercise-partial-media"}
     remaining = iter(arguments)
     for argument in remaining:
