@@ -70,6 +70,10 @@ revision consume the rendered Neon contract.
   and anything published to the public PLC directory stays there; the contract renderer refuses it.
   Production turns it on only by following
   [identity publishing runbook](identity-publishing.md).
+- Do not set `ATPROTO_RELAY_HOSTS` in staging. Relays are asked to follow the server only from
+  production, and the contract renderer refuses it elsewhere. Production sets it only after
+  `ATPROTO_FIREHOSE_ENABLED=true`, following the
+  [repository event stream runbook](repository-event-stream.md).
 - Do not add non-Cloud-Run domains to Terraform `domains`. Marketing redirects
   and unrelated DNS live outside this Cloud Run service.
 - Do not mount optional Cloud Run secrets until the Secret Manager container
