@@ -4,6 +4,7 @@ import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermission
 import java.security.MessageDigest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,6 +13,46 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class NativeJournalMediaInventoryTest {
+    @Test
+    fun `selected transfer ignores inaccessible orphan directories`() =
+        fixture { root ->
+            val files = File(root, "files")
+            val selected = "files/media/kept.jpg"
+            write(files, "media/kept.jpg", "kept".encodeToByteArray())
+            val orphan =
+                File(files, "media/old-orphans").apply {
+                    mkdirs()
+                    File(this, "private.jpg").writeText("deleted")
+                }
+            val original = Files.getPosixFilePermissions(orphan.toPath())
+            try {
+                Files.setPosixFilePermissions(orphan.toPath(), emptySet<PosixFilePermission>())
+                val inventoryFile = File(root, NATIVE_MEDIA_INVENTORY_PATH)
+                writeNativeJournalMediaInventory(inventoryFile, files, setOf(selected))
+                val inventory = verifyNativeJournalMediaInventory(inventoryFile, sha256(inventoryFile.readBytes()))
+                assertEquals(listOf(selected), inventory.files.map { it.path })
+            } finally {
+                Files.setPosixFilePermissions(orphan.toPath(), original)
+            }
+        }
+
+    @Test
+    fun `selected transfer never follows a linked media directory`() =
+        fixture { root ->
+            val files = File(root, "files")
+            val outside = File(root, "outside").apply { mkdirs() }
+            File(outside, "private.jpg").writeText("other app's bytes")
+            val media = File(files, "media").apply { mkdirs() }
+            Files.createSymbolicLink(File(media, "linked").toPath(), outside.toPath())
+            val inventoryFile = File(root, NATIVE_MEDIA_INVENTORY_PATH)
+
+            writeNativeJournalMediaInventory(inventoryFile, files, setOf("files/media/linked/private.jpg"))
+
+            val inventory = verifyNativeJournalMediaInventory(inventoryFile, sha256(inventoryFile.readBytes()))
+            assertTrue(inventory.files.isEmpty())
+            assertTrue(File(outside, "private.jpg").exists())
+        }
+
     @Test
     fun `transfer inventory contains referenced canonical originals but omits orphaned originals`() =
         fixture { root ->

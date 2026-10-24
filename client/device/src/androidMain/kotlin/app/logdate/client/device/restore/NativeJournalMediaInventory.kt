@@ -36,36 +36,58 @@ fun writeNativeJournalMediaInventory(
 ) {
     val files = mutableListOf<NativeJournalMediaInventory.Entry>()
     val base = filesDir.toPath()
-    for (root in MEDIA_ROOTS) {
-        val directory = base.resolve(root)
-        if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) continue
-        Files.walkFileTree(
-            directory,
-            object : SimpleFileVisitor<Path>() {
-                override fun visitFile(
-                    file: Path,
-                    attributes: BasicFileAttributes,
-                ): FileVisitResult {
-                    if (!attributes.isRegularFile || attributes.size() < 0) return FileVisitResult.CONTINUE
-                    val path = "files/" + base.relativize(file).toString().replace(File.separatorChar, '/')
-                    if (!validNativeMediaInventoryPath(path, allowStaging = selectedPaths != null)) return FileVisitResult.CONTINUE
-                    if (selectedPaths != null && path !in selectedPaths) return FileVisitResult.CONTINUE
-                    val hash = retainedJournalChecksum(file.toFile())
-                    val after = Files.readAttributes(file, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
-                    if (!after.isRegularFile ||
-                        after.size() != attributes.size() ||
-                        after.lastModifiedTime() != attributes.lastModifiedTime()
-                    ) {
+
+    fun capture(
+        file: Path,
+        path: String,
+        attributes: BasicFileAttributes,
+    ) {
+        if (!attributes.isRegularFile || attributes.size() < 0) return
+        val hash = retainedJournalChecksum(file.toFile())
+        val after = Files.readAttributes(file, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+        if (!after.isRegularFile ||
+            after.size() != attributes.size() ||
+            after.lastModifiedTime() != attributes.lastModifiedTime()
+        ) {
+            return
+        }
+        if (path.startsWith("files/media/objects/sha256/") && retainedCanonicalMediaDigest(path) != hash) return
+        files += NativeJournalMediaInventory.Entry(path, attributes.size(), hash)
+    }
+
+    if (selectedPaths != null) {
+        selectedPaths.forEach selected@{ path ->
+            if (!validNativeMediaInventoryPath(path, allowStaging = true)) return@selected
+            val segments = path.removePrefix("files/").split('/')
+            var directory = base
+            for (segment in segments.dropLast(1)) {
+                directory = directory.resolve(segment)
+                if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) return@selected
+            }
+            val file = directory.resolve(segments.last())
+            val attributes =
+                runCatching { Files.readAttributes(file, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS) }
+                    .getOrNull() ?: return@selected
+            capture(file, path, attributes)
+        }
+    } else {
+        for (root in MEDIA_ROOTS) {
+            val directory = base.resolve(root)
+            if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) continue
+            Files.walkFileTree(
+                directory,
+                object : SimpleFileVisitor<Path>() {
+                    override fun visitFile(
+                        file: Path,
+                        attributes: BasicFileAttributes,
+                    ): FileVisitResult {
+                        val path = "files/" + base.relativize(file).toString().replace(File.separatorChar, '/')
+                        if (validNativeMediaInventoryPath(path)) capture(file, path, attributes)
                         return FileVisitResult.CONTINUE
                     }
-                    if (path.startsWith("files/media/objects/sha256/") && retainedCanonicalMediaDigest(path) != hash) {
-                        return FileVisitResult.CONTINUE
-                    }
-                    files += NativeJournalMediaInventory.Entry(path, attributes.size(), hash)
-                    return FileVisitResult.CONTINUE
-                }
-            },
-        )
+                },
+            )
+        }
     }
     val inventory = NativeJournalMediaInventory(1, files.sortedBy(NativeJournalMediaInventory.Entry::path))
     val encoded = Json.encodeToString(inventory)
