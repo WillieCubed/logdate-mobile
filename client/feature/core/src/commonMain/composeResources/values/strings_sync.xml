@@ -57,8 +57,8 @@
     </plurals>
     <string name="sync_status_failed_items_detail">These changes remain on this device. LogDate keeps trying automatically.</string>
     <plurals name="sync_status_unreadable_cloud_items">
-        <item quantity="one">%1$d item from another setup can\'t be read here</item>
-        <item quantity="other">%1$d items from another setup can\'t be read here</item>
+        <item quantity="one">%1$d item from another setup can’t be read here</item>
+        <item quantity="other">%1$d items from another setup can’t be read here</item>
     </plurals>
     <!-- Backup status sheet: which items of a group, by title or snippet -->
     <string name="sync_status_item_text_fallback">Entry</string>
@@ -218,7 +218,7 @@
     <string name="recovery_phrase_entry_settings_title">Recovery phrase</string>
     <string name="recovery_phrase_entry_settings_description">Enter the 12-word recovery phrase for this account to keep backing up on this device.</string>
     <string name="recovery_phrase_entry_settings_submit">Continue</string>
-    <string name="recovery_phrase_entry_settings_error">Couldn\'t recover this identity. Check the phrase and try again.</string>
+    <string name="recovery_phrase_entry_settings_error">Those words don’t match this account. Check them and try again.</string>
     <string name="recovery_phrase_entry_settings_word_count_error">Enter all 12 words.</string>
     <string name="backing_up_progress">Backing up %1$d of %2$d</string>
     <!-- First sync -->

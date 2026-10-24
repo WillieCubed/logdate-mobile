@@ -30,7 +30,7 @@ class JournalStorageSectionTest {
                     )
                 }
             }
-            onNodeWithText("Drafts: 2 on this device haven’t reached the server yet", substring = true).assertIsDisplayed()
+            onNodeWithText("Drafts: 2 on this device haven’t been backed up yet", substring = true).assertIsDisplayed()
             onNodeWithText("Try again").performClick()
             assertEquals(1, retries)
         }
@@ -67,7 +67,7 @@ class JournalStorageSectionTest {
                     )
                 }
             }
-            onNodeWithText("Switch back to the previous storage").performClick()
+            onNodeWithText("Switch back to standard encryption").performClick()
             assertEquals(0, switched)
             onNodeWithText("Switch back").performClick()
             assertEquals(1, switched)

@@ -53,7 +53,7 @@
     <string name="continue_with_google">Continue with Google</string>
     <string name="google_sign_in_cancelled">Google sign-in was cancelled. Please try again.</string>
     <string name="google_sign_in_no_account">No Google account is available on this device.</string>
-    <string name="google_sign_in_unavailable">Google sign-in isn\'t available right now.</string>
+    <string name="google_sign_in_unavailable">Google sign-in isn’t available right now.</string>
     <string name="google_sign_in_failed">Google sign-in failed. Please try again.</string>
     <string name="google_sign_in_account_conflict">This Google account is already linked to a different LogDate account.</string>
     <string name="google_sign_in_rate_limited">Too many attempts. Please wait a moment before trying again.</string>
