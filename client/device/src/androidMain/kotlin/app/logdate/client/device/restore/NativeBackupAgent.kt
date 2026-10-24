@@ -101,6 +101,7 @@ open class NativeBackupAgent : BackupAgent() {
                 try {
                     if (data.transportFlags and FLAG_DEVICE_TO_DEVICE_TRANSFER != 0) prepareNativeJournalTransferBackup()
                     super.onFullBackup(data)
+                    if (data.transportFlags and FLAG_DEVICE_TO_DEVICE_TRANSFER != 0) backupSelectedNativeMedia(data)
                 } finally {
                     finishNativeJournalTransferBackup()
                 }
@@ -404,6 +405,8 @@ open class NativeBackupAgent : BackupAgent() {
     protected open fun scheduleRetainedJournalReconciliation() = Unit
 
     protected open fun prepareNativeJournalTransferBackup() = Unit
+
+    protected open fun backupSelectedNativeMedia(data: FullBackupDataOutput) = Unit
 
     protected open fun finishNativeJournalTransferBackup() = Unit
 

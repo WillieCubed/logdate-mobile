@@ -33,7 +33,7 @@ internal fun selectNativeLegacyLateMediaCandidates(
     val payloadsByPath = payloads.groupBy(NativeIncomingJournal.Payload::path)
     val selected = linkedMapOf<String, NativeLegacyLateMediaCandidate>()
     currentReferences.forEach { reference ->
-        nativeLegacyLateMediaPaths(reference, packageName)
+        nativeLegacyLateMediaPaths(reference, packageName, allowAuthenticatedStaging = true)
             .firstNotNullOfOrNull { path ->
                 val expected = inventory.entry(path) ?: return@firstNotNullOfOrNull null
                 val verified =
@@ -60,17 +60,15 @@ internal fun nativeLegacyLateMediaPath(
 private fun nativeLegacyLateMediaPaths(
     reference: String,
     packageName: String,
+    allowAuthenticatedStaging: Boolean = false,
 ): List<String> {
     val original = UnavailableMediaReferences.nativeSource(reference) ?: reference
     return when (val parsed = MediaReference.parse(original)) {
-        is MediaReference.Owned ->
-            if (parsed.ref.collection == MediaCollection.Recordings &&
-                safeLegacyRelative("audio_notes/${parsed.ref.path}")
-            ) {
-                listOf("files/audio_notes/${parsed.ref.path}")
-            } else {
-                emptyList()
-            }
+        is MediaReference.Owned -> {
+            val root = if (parsed.ref.collection == MediaCollection.Recordings) "audio_notes" else "media"
+            val relative = "$root/${parsed.ref.path}"
+            if (safeLegacyRelative(relative, allowAuthenticatedStaging)) listOf("files/$relative") else emptyList()
+        }
         is MediaReference.LocalFile ->
             listOfNotNull(parsed.path, parsed.alternatePath)
                 .mapNotNull { path ->
@@ -80,7 +78,7 @@ private fun nativeLegacyLateMediaPaths(
                         return@mapNotNull null
                     }
                     val relative = match.groupValues[2]
-                    if (!safeLegacyRelative(relative)) {
+                    if (!safeLegacyRelative(relative, allowAuthenticatedStaging)) {
                         return@mapNotNull null
                     }
                     "files/$relative"
@@ -89,11 +87,17 @@ private fun nativeLegacyLateMediaPaths(
     }
 }
 
-private fun safeLegacyRelative(relative: String): Boolean {
+private fun safeLegacyRelative(
+    relative: String,
+    allowAuthenticatedStaging: Boolean,
+): Boolean {
     val parts = relative.split('/')
+    val eligibleRoot =
+        parts.first() in setOf("user_media", "audio_notes") ||
+            (parts.first() == "media" && parts.getOrNull(1) == "staging" && allowAuthenticatedStaging)
     return parts.size >= 2 &&
-        parts.first() in setOf("user_media", "audio_notes") &&
-        !(parts.first() == "audio_notes" && parts.getOrNull(1) == "staging") &&
+        eligibleRoot &&
+        (allowAuthenticatedStaging || !(parts.first() == "audio_notes" && parts.getOrNull(1) == "staging")) &&
         relative.length <= 1024 &&
         parts.none { part ->
             part.isEmpty() || part == "." || part == ".." || '\\' in part || part.any { it.code < 32 }
@@ -125,4 +129,4 @@ private fun verifiedLegacyPayloadSha256(payload: NativeIncomingJournal.Payload):
 }
 
 private val APP_PRIVATE_MEDIA =
-    Regex("^/data/(?:data|user/\\d+|user_de/\\d+)/([^/]+)/files/((?:user_media|audio_notes)/.+)$")
+    Regex("^/data/(?:data|user/\\d+|user_de/\\d+)/([^/]+)/files/((?:media|user_media|audio_notes)/.+)$")

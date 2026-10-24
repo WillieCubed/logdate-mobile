@@ -1,5 +1,6 @@
 package app.logdate.client.data.restore
 
+import android.app.backup.FullBackupDataOutput
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import app.logdate.client.data.account.NativeRestoreAccountPolicy
@@ -15,6 +16,8 @@ class NativeAccountBackupAgent : NativeBackupAgent() {
     override val retainedPreferenceNames: Set<String> = setOf("logdate_widget_instances")
 
     override fun prepareNativeJournalTransferBackup() = journalTransfer.prepare()
+
+    override fun backupSelectedNativeMedia(data: FullBackupDataOutput) = journalTransfer.backupSelectedMedia { fullBackupFile(it, data) }
 
     override fun finishNativeJournalTransferBackup() = journalTransfer.finish()
 

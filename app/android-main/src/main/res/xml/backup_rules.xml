@@ -40,12 +40,6 @@
              requireFlags="deviceToDeviceTransfer"/>
     <include domain="file" path="identity_recovery/"
              requireFlags="deviceToDeviceTransfer"/>
-    <include domain="file" path="media/"
-             requireFlags="deviceToDeviceTransfer"/>
-    <include domain="file" path="user_media/"
-             requireFlags="deviceToDeviceTransfer"/>
-    <include domain="file" path="audio_notes/"
-             requireFlags="deviceToDeviceTransfer"/>
     <include domain="database" path="logdate"
              requireFlags="deviceToDeviceTransfer"/>
     <include domain="database" path="logdate-wal"

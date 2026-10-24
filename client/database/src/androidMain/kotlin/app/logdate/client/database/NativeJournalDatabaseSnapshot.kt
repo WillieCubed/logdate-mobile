@@ -60,6 +60,39 @@ fun verifyNativeJournalDatabaseSnapshot(
     }
 }
 
+/** Reads only live media references from the already verified, immutable transfer database. */
+fun readNativeJournalSnapshotMediaReferences(
+    file: File,
+    key: ByteArray,
+): Set<String> {
+    require(key.size == 32)
+    check(Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS))
+    System.loadLibrary("sqlcipher")
+    return SQLiteDatabase.openDatabase(file.absolutePath, key, null, SQLiteDatabase.OPEN_READONLY, null, null).use { database ->
+        requireNativeJournalDatabaseIntegrity(database)
+        collectNativeJournalMediaReferences { sql ->
+            database.rawQuery(sql, emptyArray<String>()).use { rows ->
+                buildList { while (rows.moveToNext()) add(rows.getString(0)) }
+            }
+        }
+    }
+}
+
+internal fun collectNativeJournalMediaReferences(query: (String) -> List<String?>): Set<String> =
+    buildSet {
+        listOf(
+            "SELECT contentUri FROM image_notes WHERE deletedAt IS NULL",
+            "SELECT contentUri FROM video_notes WHERE deletedAt IS NULL",
+            "SELECT contentUri FROM audio_notes WHERE deletedAt IS NULL",
+            "SELECT coverImageUri FROM journals WHERE deletedAt IS NULL",
+            "SELECT cover_image_uri FROM events WHERE deleted_at IS NULL",
+            "SELECT uri FROM rewind_image_content",
+            "SELECT uri FROM rewind_video_content",
+            "SELECT photo_uri FROM people WHERE deleted_at IS NULL",
+            "SELECT image_uri FROM stickers",
+        ).forEach { sql -> query(sql).filterNotNull().forEach(::add) }
+    }
+
 private fun requireNativeJournalDatabaseIntegrity(database: SQLiteDatabase) {
     check(database.version == DATABASE_VERSION) { "Native journal snapshot requires the current database schema" }
     database.rawQuery("PRAGMA cipher_integrity_check", emptyArray<String>()).use { check(!it.moveToFirst()) }
