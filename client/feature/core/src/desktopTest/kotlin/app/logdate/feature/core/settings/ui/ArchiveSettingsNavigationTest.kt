@@ -64,6 +64,38 @@ class ArchiveSettingsNavigationTest {
         }
 
     @Test
+    fun exportImportDestinationGroupsItsTwoActionsWithoutARepeatedHeading() =
+        runDesktopComposeUiTest(width = 411, height = 900) {
+            setContent {
+                LogDateTheme {
+                    ExportSettingsContent(
+                        onBack = {},
+                        exportState = ExportState.Idle,
+                        onShowExportOptions = {},
+                        onUpdateExportOptions = {},
+                        onConfirmExport = {},
+                        onCancelExport = {},
+                        onRetryExport = {},
+                        onDismissExport = {},
+                        restoreState = RestoreState.Idle,
+                        onShowRestoreSheet = {},
+                        onSelectRestoreFile = {},
+                        onUpdateImportOptions = {},
+                        onConfirmImport = {},
+                        onCancelRestore = {},
+                        onRetryRestore = {},
+                        onDismissRestore = {},
+                        snackbarHostState = SnackbarHostState(),
+                    )
+                }
+            }
+            onNodeWithText("Export & Import").assertIsDisplayed()
+            onNodeWithText("Data Management").assertDoesNotExist()
+            onNodeWithText("Export data").assertHasClickAction()
+            onNodeWithText("Import backup").assertHasClickAction()
+        }
+
+    @Test
     fun previewSheetsReceiveRealConfirmationTapsAboveTheSettingsScaffold() {
         listOf(false, true).forEach { importing ->
             runDesktopComposeUiTest(width = 411, height = 1200) {

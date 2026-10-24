@@ -19,11 +19,10 @@ import app.logdate.feature.core.restore.ImportOptions
 import app.logdate.feature.core.restore.RestoreBottomSheet
 import app.logdate.feature.core.restore.RestoreState
 import app.logdate.feature.core.restore.UserDataRestoreViewModel
+import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.SettingsScaffold
-import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.data_management
 import logdate.client.feature.core.generated.resources.export_and_import
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -92,8 +91,7 @@ fun ExportSettingsContent(
             snackbarHostState = snackbarHostState,
         ) {
             item {
-                SettingsSection(
-                    title = stringResource(Res.string.data_management),
+                MaterialContainer(
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 ) {
                     ExportDataItem(onShowExportOptions)
