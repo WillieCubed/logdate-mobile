@@ -61,7 +61,8 @@ internal class NativeIosTransferSender(
     ) {
         discard()
         try {
-            journal.prepare()
+            journal.prepare(includeProfileOnlySource = true)
+            if (journal.skipEmptyIosTransfer()) return
             val archive = File(root, "archive")
             journal.writeArchive3(StagingDirectoryArchiveContainer(FileSystem.SYSTEM, archive.path.toPath()))
             val archiveFiles =

@@ -80,14 +80,14 @@ internal class NativeJournalTransferSnapshot(
     private var noDatabasePreferencesChecksum: String? = null
     private var noDatabaseDraftChecksum: String? = null
 
-    fun prepare() {
+    fun prepare(includeProfileOnlySource: Boolean = false) {
         selectedMedia = emptyList()
         entryDraftFileChecksum = null
         preferencesChecksum = null
         noDatabaseSource = false
         noDatabasePreferencesChecksum = null
         noDatabaseDraftChecksum = null
-        if (prepareWithoutDatabaseIfPossible()) return
+        if (prepareWithoutDatabaseIfPossible(includeProfileOnlySource)) return
         ownership.discardOwned()
         check(!current.exists()) { "Incoming native journal inputs must remain in custody" }
         check(root.mkdirs() || root.isDirectory)
@@ -151,7 +151,7 @@ internal class NativeJournalTransferSnapshot(
         checkPinnedPreferencesUnchanged()
     }
 
-    private fun prepareWithoutDatabaseIfPossible(): Boolean {
+    private fun prepareWithoutDatabaseIfPossible(includeProfileOnlySource: Boolean): Boolean {
         if (!context.getDatabasePath("logdate").exists()) {
             check(!current.exists()) { "The retained native journal must remain available for recovery" }
             val preferencesFile = File(context.filesDir, "logdate.preferences_pb")
@@ -168,6 +168,7 @@ internal class NativeJournalTransferSnapshot(
                 )
             prepareNativeDraftOnlyDatabase(context, ::initializeDraftOnlyDatabase) {
                 drafts.isNotEmpty() ||
+                    (includeProfileOnlySource && NativeArchive3SourceCensus.hasPreDatabaseIosContent(preferences)) ||
                     selectedPaths.any { path ->
                         File(context.filesDir, path.removePrefix("files/")).exists()
                     }
@@ -218,6 +219,19 @@ internal class NativeJournalTransferSnapshot(
         }
         checkEntryDraftFileUnchanged()
         checkPinnedPreferencesUnchanged()
+    }
+
+    /** A never-used installation has no Apple payload; do not manufacture a journal or identity for it. */
+    fun skipEmptyIosTransfer(): Boolean {
+        if (!noDatabaseSource) return false
+        checkNoDatabaseSourceUnchanged(noDatabasePreferencesChecksum, noDatabaseDraftChecksum)
+        val preferences = runBlocking { createAndroidMainDataStore(context).data.first() }
+        check(
+            NativeArchive3SourceCensus.unsupportedPreferences(preferences).isEmpty() &&
+                !NativeArchive3SourceCensus.hasPreDatabaseIosContent(preferences),
+        ) { "Database-free source contains content that cannot be skipped" }
+        checkNoDatabaseSourceUnchanged(noDatabasePreferencesChecksum, noDatabaseDraftChecksum)
+        return true
     }
 
     /** Produces an admitted major-3 directory from the callback's already fenced native snapshot. */

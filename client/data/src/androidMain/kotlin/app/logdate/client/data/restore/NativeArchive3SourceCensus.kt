@@ -14,6 +14,24 @@ import kotlin.uuid.Uuid
 
 /** A conservative inventory of user rows before claiming a complete Android-to-Apple export. */
 internal object NativeArchive3SourceCensus {
+    private val profilePreferences =
+        setOf(
+            "display_name",
+            "birthday",
+            "bio",
+            "original_bio",
+            "profile_created_at",
+            "profile_last_updated_at",
+            "profile_photo_uri",
+        )
+
+    fun hasPreDatabaseIosContent(preferences: Preferences): Boolean =
+        preferences.asMap().any { (key, value) ->
+            key.name in profilePreferences ||
+                key.name == "identity.canonical_owner_id" ||
+                (key.name == "identity.canonical_owner_bound" && value == "true")
+        }
+
     // Source columns were reviewed against the exported Room 58 schema before claiming complete scope.
     private const val REVIEWED_ROOM_IDENTITY = "d8b23ded9a1a82c49e39b8df9ef25e35"
     private val represented =
@@ -236,16 +254,6 @@ internal object NativeArchive3SourceCensus {
 
     /** Only profile fields are currently represented in the Apple auxiliary payload. */
     fun unsupportedPreferences(preferences: Preferences): Set<String> {
-        val profile =
-            setOf(
-                "display_name",
-                "birthday",
-                "bio",
-                "original_bio",
-                "profile_created_at",
-                "profile_last_updated_at",
-                "profile_photo_uri",
-            )
         val operational =
             setOf(
                 "backend_url",
@@ -260,7 +268,7 @@ internal object NativeArchive3SourceCensus {
                 "identity.pending_history_owner_adoption.v1",
             )
         return preferences.asMap().keys.map(Preferences.Key<*>::name).filterTo(mutableSetOf()) { name ->
-            name !in profile &&
+            name !in profilePreferences &&
                 name !in operational &&
                 !name.startsWith("editor_drafts") &&
                 !name.matches(
