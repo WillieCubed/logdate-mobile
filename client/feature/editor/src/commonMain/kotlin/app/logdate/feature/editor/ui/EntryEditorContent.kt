@@ -145,18 +145,24 @@ fun EntryEditorContent(
 
     val handleEditorBack: () -> Unit = {
         when {
-            editorState.isSaving || editorState.shouldExit -> Unit
+            editorState.isSaving || editorState.shouldExit -> {
+                Unit
+            }
+
             activeCamera -> {
                 viewModel.dismissExpandedBlockOrClearSingleEmpty()
                 Unit
             }
+
             shouldReturnToPickerOnBack -> {
                 viewModel.clearSingleEmptyBlock()
                 Unit
             }
+
             !editorState.canExitWithoutSaving -> {
                 showExitConfirmation = true
             }
+
             else -> {
                 onNavigateBack()
             }
@@ -210,6 +216,7 @@ fun EntryEditorContent(
         if (editorState.shouldExit) {
             when (editorState.exitReason) {
                 EditorExitReason.DISCARDED -> onNavigateBack()
+
                 EditorExitReason.ENTRY_SAVED,
                 null,
                 -> onEntrySaved()
@@ -315,18 +322,23 @@ fun EntryEditorContent(
                         },
                     ).onPreviewKeyEvent { event ->
                         when (AppKeyboardShortcut.match(event, AppShortcutScope.Editor)) {
-                            AppKeyboardShortcut.SaveEntry ->
+                            AppKeyboardShortcut.SaveEntry -> {
                                 canSave.also { save ->
                                     if (save) {
                                         haptics.saveSucceeded()
                                         viewModel.saveEntry(editorState)
                                     }
                                 }
+                            }
+
                             AppKeyboardShortcut.CloseEditor -> {
                                 handleEditorBack()
                                 true
                             }
-                            else -> false
+
+                            else -> {
+                                false
+                            }
                         }
                     },
             isImmersiveBlockActive = isImmersiveBlockActive,
