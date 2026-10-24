@@ -1,6 +1,8 @@
 package app.logdate.client.database.encryption
 
 import android.content.Context
+import app.logdate.client.database.retainedDatabaseNeedsExistingKey
+import app.logdate.client.device.restore.NativeJournalRestoreAuthority
 import app.logdate.client.device.storage.SecureStorage
 import io.github.aakira.napier.Antilog
 import io.github.aakira.napier.LogLevel
@@ -77,6 +79,47 @@ class DatabasePassphraseRecoveryTest {
             assertContentEquals(byteArrayOf(8, 9, 10), original.readBytes())
             assertFalse(File(directory, "db_recovery/passphrase_backup").exists())
             coVerify(exactly = 0) { secureStorage.putString(any(), any()) }
+        }
+
+    @Test
+    fun `required native snapshot blocks replacement key but accepts the original key when it arrives`() =
+        runTest {
+            every { context.noBackupFilesDir } returns directory
+            NativeJournalRestoreAuthority(context).requireSnapshot()
+            coEvery { secureStorage.getString("db_encryption_key") } returns null
+            val database = File(directory, "logdate")
+            val provider =
+                DatabasePassphraseProvider(secureStorage, store) {
+                    retainedDatabaseNeedsExistingKey(
+                        database,
+                        NativeJournalRestoreAuthority(context).isSnapshotRequired(),
+                    )
+                }
+
+            assertFailsWith<DatabaseKeyRecoveryRequiredException> { provider.getPassphraseCandidates() }
+            assertFalse(store.hasBackup())
+            coVerify(exactly = 0) { secureStorage.putString(any(), any()) }
+
+            val original = ByteArray(32) { it.toByte() }
+            store.write(original)
+            assertContentEquals(original, provider.getPassphraseCandidates().single())
+            coVerify(exactly = 0) { secureStorage.putString(any(), any()) }
+        }
+
+    @Test
+    fun `fresh installation still creates its first portable key`() =
+        runTest {
+            coEvery { secureStorage.getString("db_encryption_key") } returns null
+            val database = File(directory, "logdate")
+            val provider =
+                DatabasePassphraseProvider(secureStorage, store) {
+                    retainedDatabaseNeedsExistingKey(database, false)
+                }
+
+            val generated = provider.getPassphraseCandidates().single()
+            assertEquals(32, generated.size)
+            assertContentEquals(generated, store.read())
+            coVerify(exactly = 1) { secureStorage.putString("db_encryption_key", Base64.encode(generated)) }
         }
 
     @Test
