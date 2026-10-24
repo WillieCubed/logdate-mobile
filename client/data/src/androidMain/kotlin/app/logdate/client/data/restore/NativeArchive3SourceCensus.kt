@@ -2,6 +2,11 @@ package app.logdate.client.data.restore
 
 import androidx.datastore.preferences.core.Preferences
 import androidx.sqlite.db.SupportSQLiteDatabase
+import app.logdate.client.repository.journals.CaptureActivity
+import app.logdate.client.repository.journals.CaptureDevice
+import app.logdate.client.repository.location.LocationCapturePipeline
+import app.logdate.client.repository.location.LocationCaptureSource
+import app.logdate.shared.model.PhotoPresentation
 
 /** A conservative inventory of user rows before claiming a complete Android-to-Apple export. */
 internal object NativeArchive3SourceCensus {
@@ -16,7 +21,6 @@ internal object NativeArchive3SourceCensus {
             "video_notes",
             "journal_content_links",
             "media_captions",
-            "user_places",
             "location_logs",
         )
     private val regenerable =
@@ -57,6 +61,8 @@ internal object NativeArchive3SourceCensus {
         }
         val unsupported = unsupportedPopulatedTables(rows).toMutableSet()
         unsupported += deletedSourceRows(database)
+        unsupported += unrepresentedNoteFields(database)
+        unsupported += unrepresentedLocationFields(database)
         if (hasUnrepresentedJournalLinks(database)) unsupported += "journalContentWithoutNote"
         if (hasUnrepresentedMediaCaptions(database)) unsupported += "mediaCaptionWithoutMediaNote"
         if ("journal_notes" in unsupported && legacyJournalLinksCovered(database)) unsupported.remove("journal_notes")
@@ -67,6 +73,59 @@ internal object NativeArchive3SourceCensus {
         setOf("text_notes", "image_notes", "audio_notes", "video_notes", "journal_content_links").filterTo(mutableSetOf()) { table ->
             database.query("SELECT 1 FROM $table WHERE deletedAt IS NOT NULL LIMIT 1").use { it.moveToFirst() }
         }
+
+    fun unrepresentedNoteFields(database: SupportSQLiteDatabase): Set<String> =
+        buildSet {
+            for (table in listOf("text_notes", "image_notes", "audio_notes", "video_notes")) {
+                if (hasUnexpectedValue(database, table, "captured_on", CaptureDevice.entries.map(CaptureDevice::wireName))) {
+                    add("noteCaptureDevice")
+                }
+                if (hasUnexpectedValue(database, table, "captured_during", CaptureActivity.entries.map(CaptureActivity::wireName))) {
+                    add("noteCaptureActivity")
+                }
+                // The current model projection decodes leniently and does not preserve every stored location field.
+                if (database.query("SELECT 1 FROM $table WHERE location_metadata IS NOT NULL LIMIT 1").use { it.moveToFirst() }) {
+                    add("noteLocationMetadata")
+                }
+            }
+            if (
+                hasUnexpectedValue(
+                    database,
+                    "image_notes",
+                    "presentation",
+                    PhotoPresentation.entries.map { it.name },
+                    false,
+                )
+            ) {
+                add("imagePresentation")
+            }
+        }
+
+    fun unrepresentedLocationFields(database: SupportSQLiteDatabase): Set<String> =
+        buildSet {
+            if (hasUnexpectedValue(database, "location_logs", "capture_pipeline", LocationCapturePipeline.entries.map { it.name }, false)) {
+                add("locationCapturePipeline")
+            }
+            if (hasUnexpectedValue(database, "location_logs", "capture_source", LocationCaptureSource.entries.map { it.name }, false)) {
+                add("locationCaptureSource")
+            }
+        }
+
+    private fun hasUnexpectedValue(
+        database: SupportSQLiteDatabase,
+        table: String,
+        column: String,
+        accepted: List<String>,
+        allowNull: Boolean = true,
+    ): Boolean {
+        val known =
+            accepted.joinToString(",") { value ->
+                require(value.matches(Regex("[A-Za-z_]+")))
+                "'$value'"
+            }
+        val predicate = if (allowNull) "$column IS NOT NULL AND $column NOT IN ($known)" else "$column IS NULL OR $column NOT IN ($known)"
+        return database.query("SELECT 1 FROM $table WHERE $predicate LIMIT 1").use { it.moveToFirst() }
+    }
 
     fun hasUnrepresentedJournalLinks(database: SupportSQLiteDatabase): Boolean =
         database

@@ -34,9 +34,92 @@ class NativeArchive3SourceCensusTest {
                 "storage_metadata" to 1L,
             )
         assertEquals(
-            setOf("transcriptions", "audio_tags", "people", "unknown_future_table", "indexed_media"),
+            setOf("user_places", "transcriptions", "audio_tags", "people", "unknown_future_table", "indexed_media"),
             NativeArchive3SourceCensus.unsupportedPopulatedTables(rows),
         )
+    }
+
+    @Test
+    fun `raw note fields that model mappers discard cannot claim complete transfer`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val helper =
+            FrameworkSQLiteOpenHelperFactory().create(
+                SupportSQLiteOpenHelper.Configuration
+                    .builder(context)
+                    .name("native-archive3-note-fields-${System.nanoTime()}.db")
+                    .callback(
+                        object : SupportSQLiteOpenHelper.Callback(1) {
+                            override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                                for (table in listOf("text_notes", "image_notes", "audio_notes", "video_notes")) {
+                                    val presentationColumn = if (table == "image_notes") ", presentation TEXT" else ""
+                                    db.execSQL(
+                                        "CREATE TABLE $table " +
+                                            "(captured_on TEXT, captured_during TEXT, location_metadata TEXT$presentationColumn)",
+                                    )
+                                }
+                            }
+
+                            override fun onUpgrade(
+                                db: androidx.sqlite.db.SupportSQLiteDatabase,
+                                oldVersion: Int,
+                                newVersion: Int,
+                            ) = Unit
+                        },
+                    ).build(),
+            )
+        try {
+            val database = helper.writableDatabase
+            database.execSQL("INSERT INTO text_notes VALUES ('phone', 'moving', NULL)")
+            database.execSQL("INSERT INTO image_notes VALUES ('watch', 'in_vehicle', NULL, 'Framed')")
+            assertEquals(emptySet(), NativeArchive3SourceCensus.unrepresentedNoteFields(database))
+            database.execSQL("INSERT INTO text_notes VALUES ('future-device', NULL, NULL)")
+            assertEquals(setOf("noteCaptureDevice"), NativeArchive3SourceCensus.unrepresentedNoteFields(database))
+            database.execSQL("INSERT INTO audio_notes VALUES (NULL, 'future-activity', NULL)")
+            database.execSQL("INSERT INTO video_notes VALUES (NULL, NULL, '{\"future\":true}')")
+            database.execSQL("INSERT INTO image_notes VALUES (NULL, NULL, NULL, 'FuturePresentation')")
+            assertEquals(
+                setOf("noteCaptureDevice", "noteCaptureActivity", "noteLocationMetadata", "imagePresentation"),
+                NativeArchive3SourceCensus.unrepresentedNoteFields(database),
+            )
+        } finally {
+            helper.close()
+        }
+    }
+
+    @Test
+    fun `unknown location capture values cannot be silently rewritten`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val helper =
+            FrameworkSQLiteOpenHelperFactory().create(
+                SupportSQLiteOpenHelper.Configuration
+                    .builder(context)
+                    .name("native-archive3-location-fields-${System.nanoTime()}.db")
+                    .callback(
+                        object : SupportSQLiteOpenHelper.Callback(1) {
+                            override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                                db.execSQL("CREATE TABLE location_logs (capture_pipeline TEXT, capture_source TEXT)")
+                            }
+
+                            override fun onUpgrade(
+                                db: androidx.sqlite.db.SupportSQLiteDatabase,
+                                oldVersion: Int,
+                                newVersion: Int,
+                            ) = Unit
+                        },
+                    ).build(),
+            )
+        try {
+            val database = helper.writableDatabase
+            database.execSQL("INSERT INTO location_logs VALUES ('HIGH_DETAIL', 'PASSIVE_UPDATE')")
+            assertEquals(emptySet(), NativeArchive3SourceCensus.unrepresentedLocationFields(database))
+            database.execSQL("INSERT INTO location_logs VALUES ('FUTURE_PIPELINE', 'FUTURE_SOURCE')")
+            assertEquals(
+                setOf("locationCapturePipeline", "locationCaptureSource"),
+                NativeArchive3SourceCensus.unrepresentedLocationFields(database),
+            )
+        } finally {
+            helper.close()
+        }
     }
 
     @Test
