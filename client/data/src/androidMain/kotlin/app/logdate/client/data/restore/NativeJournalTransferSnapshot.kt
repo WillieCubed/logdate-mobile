@@ -225,15 +225,16 @@ internal class NativeJournalTransferSnapshot(
             val prefs = pinnedPreferences.data.first()
             unsupported += NativeArchive3SourceCensus.unsupportedPreferences(prefs)
             val entryDrafts = AndroidLocalEntryDraftStore(context).getAllDrafts()
-            if (entryDrafts.isNotEmpty()) unsupported += "entryDrafts"
             val receipt = Json.decodeFromString<NativeJournalSourceReceipt>(checkNotNull(files[NATIVE_SOURCE_RECEIPT_PATH]).readText())
-            val drafts =
+            val modernDrafts =
                 NativeArchive3EditorDrafts.read(
                     prefs,
                     receipt.canonicalOwnerId,
                     receipt.canonicalOwnerBound == "true",
                     receipt.backendOrigin,
                 )
+            val drafts = modernDrafts + NativeArchive3EntryDrafts.convert(entryDrafts, receipt.canonicalOwnerBound == "true")
+            check(drafts.map { it.id }.distinct().size == drafts.size) { "Draft identities conflict across source stores" }
             val journals = database.journalDao().getAll()
             if (journals.any { it.deletedAt != null || it.coverImageUri != null }) unsupported += "journalCoversOrDeletion"
             val queries =

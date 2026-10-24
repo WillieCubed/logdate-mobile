@@ -9,6 +9,7 @@ import app.logdate.client.domain.export.archive.StagingDirectoryArchiveContainer
 import app.logdate.client.domain.restore.archive3.NativeArchive3Bundle
 import app.logdate.client.domain.restore.archive3.NativeArchive3SnapshotInput
 import app.logdate.client.domain.restore.archive3.NativeArchive3SnapshotWriter
+import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
@@ -67,7 +68,27 @@ class NativeIosTransferInteropFixtureTest {
                                     createdAt = timestamp,
                                     lastModifiedAt = timestamp,
                                 ),
-                            ),
+                            ) +
+                                NativeArchive3EntryDrafts.convert(
+                                    listOf(
+                                        EntryDraft(
+                                            id = Uuid.parse("77777777-7777-7777-7777-777777777777"),
+                                            notes =
+                                                listOf(
+                                                    JournalNote.Text(
+                                                        uid = Uuid.parse("88888888-8888-8888-8888-888888888888"),
+                                                        creationTimestamp = timestamp,
+                                                        lastUpdated = timestamp,
+                                                        content = "Still writing",
+                                                    ),
+                                                ),
+                                            createdAt = timestamp,
+                                            updatedAt = timestamp,
+                                            selectedJournalIds = listOf(journalId),
+                                        ),
+                                    ),
+                                    ownerBound = false,
+                                ),
                         profile = LogDateProfile(),
                         places = emptyList(),
                         locationHistory = emptyList(),
@@ -85,9 +106,9 @@ class NativeIosTransferInteropFixtureTest {
                         .toList()
                 val bundle = NativeArchive3Bundle.read(names, { File(archive, it).source() })
                 assertEquals(1, bundle.notes.size)
-                assertEquals(1, bundle.drafts.size)
-                assertEquals("63f8bcf450282ada4adb6364c03742a88e51255df0ae03b1cc20e8d6d924d125", bundle.checksumsSha256)
-                assertEquals("b7f8583ef8c1a074eba0161b2208d27f0667e83732e09e5748ccb5e483882477", bundle.manifestSha256)
+                assertEquals(2, bundle.drafts.size)
+                assertEquals("f0856d4dabf2686c5887ed721e8f432d88b33d6576bf0a427a5c22fbf793eeaa", bundle.checksumsSha256)
+                assertEquals("9c80a5b98b08373ce0642fe68535c8c820c85e2e3c31853f8b25f6e6377a5f9e", bundle.manifestSha256)
                 val custody = File(root, ".logdate-os-private/custody-v1.json")
                 assertTrue(custody.parentFile!!.mkdirs())
                 val emptyStorage =
@@ -125,7 +146,7 @@ class NativeIosTransferInteropFixtureTest {
                     )
                 record.withEncodedBytes { custody.writeBytes(it) }
                 assertEquals(
-                    "da2e87b71420e70a23e91f6fa75d01da7fbf5149993583d49293ad3ace35857b",
+                    "0e9a678434c28fa62651e2c7f64318ad30949b1a20e2139f39e53e3423288efd",
                     MessageDigest.getInstance("SHA-256").digest(custody.readBytes()).joinToString("") { "%02x".format(it) },
                 )
                 val emitted = mutableListOf<String>()
