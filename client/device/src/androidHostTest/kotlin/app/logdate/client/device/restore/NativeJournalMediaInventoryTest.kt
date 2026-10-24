@@ -61,6 +61,24 @@ class NativeJournalMediaInventoryTest {
         }
 
     @Test
+    fun `retained collision variant is included in device transfer only with its exact digest`() =
+        fixture { root ->
+            val files = File(root, "files")
+            val bytes = "incoming photo bytes".encodeToByteArray()
+            val hash = sha256(bytes)
+            val path = "files/media/objects/sha256/${hash.take(2)}/$hash.retained-1.jpg"
+            write(files, path.removePrefix("files/"), bytes)
+            write(files, "media/objects/sha256/${hash.take(2)}/$hash.retained-2.jpg", "other bytes".encodeToByteArray())
+            val inventoryFile = File(root, NATIVE_MEDIA_INVENTORY_PATH)
+
+            writeNativeJournalMediaInventory(inventoryFile, files)
+            val inventory = verifyNativeJournalMediaInventory(inventoryFile, sha256(inventoryFile.readBytes()))
+
+            assertEquals(hash, inventory.entry(path)?.sha256)
+            assertNull(inventory.entry("files/media/objects/sha256/${hash.take(2)}/$hash.retained-2.jpg"))
+        }
+
+    @Test
     fun `v2 receipt retains journal compatibility but v3 receipt pins a separate inventory hash`() =
         fixture { root ->
             val files = File(root, "files")

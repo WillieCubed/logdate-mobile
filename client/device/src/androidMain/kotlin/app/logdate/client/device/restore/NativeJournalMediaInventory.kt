@@ -119,7 +119,7 @@ private fun retainedCanonicalMediaDigest(path: String): String? {
 const val NATIVE_MEDIA_INVENTORY_PATH = "files/db_recovery/native_media_inventory.json"
 private val MEDIA_ROOTS = listOf("media/objects/sha256", "user_media", "audio_notes")
 private val CANONICAL_MEDIA =
-    Regex("files/media/objects/sha256/([a-f0-9]{2})/([a-f0-9]{64})\\.[^/.]+", RegexOption.IGNORE_CASE)
+    Regex("files/media/objects/sha256/([a-f0-9]{2})/([a-f0-9]{64})(?:\\.retained-[1-9][0-9]*)?\\.[^/.]+", RegexOption.IGNORE_CASE)
 private val SHA256 = Regex("[a-f0-9]{64}")
 private const val MAX_INVENTORY_BYTES = 128 * 1024 * 1024
 private const val MAX_INVENTORY_ENTRIES = 500_000

@@ -18,6 +18,7 @@ internal class RetainedManagedMediaSource(
         val file: File,
         val fileName: String,
         val mimeType: String,
+        val sourcePath: String = "",
     )
 
     fun resolve(reference: String): Asset? {
@@ -35,7 +36,7 @@ internal class RetainedManagedMediaSource(
                 if (digest != null) additionalSources.forEach { it[key]?.let { file -> yield(file) } }
             }
         for (file in candidates) {
-            val asset = resolveFile(file, relative, digest)
+            val asset = resolveFile(file, key, relative, digest)
             if (asset != null) return asset
         }
         return null
@@ -43,6 +44,7 @@ internal class RetainedManagedMediaSource(
 
     private fun resolveFile(
         file: File,
+        sourcePath: String,
         relative: String,
         digest: String?,
     ): Asset? {
@@ -53,7 +55,7 @@ internal class RetainedManagedMediaSource(
         if (digest != null && !matchesDigest(canonical, digest)) return null
         val originalName = relative.substringAfterLast('/')
         val mime = retainedMediaMimeType(originalName) ?: return null
-        return Asset(canonical, originalName, mime)
+        return Asset(canonical, originalName, mime, sourcePath)
     }
 
     private fun matchesDigest(
@@ -117,7 +119,11 @@ internal suspend fun verifiedCanonicalMediaReference(
     return original.takeIf { verify(it) }
 }
 
-private val RETAINED_CANONICAL_OBJECT = Regex("objects/sha256/([a-f0-9]{2})/([a-f0-9]{64})\\.[^/.]+", RegexOption.IGNORE_CASE)
+private val RETAINED_CANONICAL_OBJECT =
+    Regex(
+        "objects/sha256/([a-f0-9]{2})/([a-f0-9]{64})(?:\\.retained-[1-9][0-9]*)?\\.[^/.]+",
+        RegexOption.IGNORE_CASE,
+    )
 
 internal fun retainedMediaMimeType(name: String): String? =
     when (name.substringAfterLast('.', "").lowercase()) {
