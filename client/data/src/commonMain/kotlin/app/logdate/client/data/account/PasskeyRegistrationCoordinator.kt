@@ -163,11 +163,17 @@ internal class PasskeyRegistrationCoordinator(
             // Step 4: Complete authentication
             val completeData = apiClient.completeAuthentication(CompleteAuthenticationRequest(assertion, beginData.challenge)).getOrThrow()
             when (bindingGuard.ownerBindingFor(completeData.account, adoptLocalData)) {
-                CanonicalOwnerBindingGuard.OwnerBinding.ALLOWED -> Unit
-                CanonicalOwnerBindingGuard.OwnerBinding.NEEDS_LOCAL_DATA_CONSENT ->
+                CanonicalOwnerBindingGuard.OwnerBinding.ALLOWED -> {
+                    Unit
+                }
+
+                CanonicalOwnerBindingGuard.OwnerBinding.NEEDS_LOCAL_DATA_CONSENT -> {
                     return Result.failure(LocalDataAdoptionRequiredException())
-                CanonicalOwnerBindingGuard.OwnerBinding.REFUSED ->
+                }
+
+                CanonicalOwnerBindingGuard.OwnerBinding.REFUSED -> {
                     return Result.failure(CanonicalOwnerMismatchException())
+                }
             }
 
             unlockAccountKeys(completeData, assertion.id, unlockSecret, originalOwner, apiBaseUrl)

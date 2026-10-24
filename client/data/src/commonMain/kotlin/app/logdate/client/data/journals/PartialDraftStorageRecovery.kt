@@ -48,10 +48,19 @@ internal object PartialDraftStorageRecovery {
                 continue
             }
             when (character) {
-                '"' -> quoted = true
-                '{', '[' -> depth++
-                '}' -> depth--
-                ']' ->
+                '"' -> {
+                    quoted = true
+                }
+
+                '{', '[' -> {
+                    depth++
+                }
+
+                '}' -> {
+                    depth--
+                }
+
+                ']' -> {
                     if (depth == 0) {
                         value
                             .substring(begin, index)
@@ -62,7 +71,9 @@ internal object PartialDraftStorageRecovery {
                     } else {
                         depth--
                     }
-                ',' ->
+                }
+
+                ',' -> {
                     if (depth == 0) {
                         value
                             .substring(begin, index)
@@ -71,6 +82,7 @@ internal object PartialDraftStorageRecovery {
                             ?.let(values::add)
                         begin = index + 1
                     }
+                }
             }
         }
         if (depth == 0 && !quoted) {
@@ -94,8 +106,14 @@ internal object PartialDraftStorageRecovery {
         var index = first
         while (index < value.length) {
             when (value[index]) {
-                '{', '[' -> depth++
-                '}', ']' -> depth--
+                '{', '[' -> {
+                    depth++
+                }
+
+                '}', ']' -> {
+                    depth--
+                }
+
                 '"' -> {
                     val begin = index++
                     var escaped = false
