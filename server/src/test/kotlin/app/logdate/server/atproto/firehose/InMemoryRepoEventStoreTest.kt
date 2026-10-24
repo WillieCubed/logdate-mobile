@@ -33,6 +33,10 @@ class InMemoryRepoEventStoreTest {
     fun `deleting every event keeps the latest number`() = RepoEventStoreContract.deletingEverythingKeepsTheLatestNumber(store())
 
     @Test
+    fun `a repository stays known after all its events are deleted`() =
+        RepoEventStoreContract.remembersARepositoryAfterAllItsEventsAreDeleted(store())
+
+    @Test
     fun `concurrent appends get distinct numbers without gaps`() =
         RepoEventStoreContract.concurrentAppendsGetDistinctNumbersWithoutGaps(store())
 }

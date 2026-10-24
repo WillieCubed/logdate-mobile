@@ -128,6 +128,16 @@ internal object RepoEventStoreContract {
             assertEquals(2, store.append(draft(alice)).seq)
         }
 
+    fun remembersARepositoryAfterAllItsEventsAreDeleted(store: RepoEventStore) =
+        runTest {
+            store.append(draft(alice, time = Clock.System.now() - 30.hours))
+            store.deleteBefore(Clock.System.now() - 1.hours)
+
+            assertNull(store.earliestSeq())
+            assertTrue(store.hasEvents(alice), "followers were told about this repository, so deleting its events must not make it unknown")
+            assertFalse(store.hasEvents(bob))
+        }
+
     fun concurrentAppendsGetDistinctNumbersWithoutGaps(store: RepoEventStore) =
         runTest {
             val stored = coroutineScope { (1..24).map { async { store.append(draft(if (it % 2 == 0) alice else bob)) } }.awaitAll() }

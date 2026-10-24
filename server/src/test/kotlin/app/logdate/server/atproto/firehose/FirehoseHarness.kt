@@ -78,7 +78,7 @@ internal class FirehoseHarness(
     val gate = AccountPublicRepoGate(accounts, identityConfig, eventStore)
     val sequencer = RepoEventSequencer(eventStore, rawBlocks, gate, policy, clock)
     val blocks: RepoBlockStore = SequencingRepoBlockStore(rawBlocks, lazy { sequencer })
-    val access = PublicRepoAccess(gate, policy, rawBlocks, accounts)
+    val access = PublicRepoAccess(gate, policy, rawBlocks, AccountsPublicRepoDirectory(accounts, gate, rawBlocks))
     val stream =
         RepoEventStream(
             store = eventStore,

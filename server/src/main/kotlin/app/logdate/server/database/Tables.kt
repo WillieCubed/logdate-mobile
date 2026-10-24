@@ -347,6 +347,14 @@ object AtprotoRepoEventsTable : Table("atproto_repo_events") {
     }
 }
 
+/** Every repository followers were ever told about, kept after its events are pruned; see V51. */
+object AtprotoRepoAnnouncedTable : Table("atproto_repo_announced") {
+    val repoDid = varchar("repo_did", 255)
+    val firstAnnouncedAt = timestamp("first_announced_at")
+
+    override val primaryKey = PrimaryKey(repoDid)
+}
+
 /** The single row holding the last event number handed out; appending locks it. */
 object AtprotoRepoEventSequenceTable : Table("atproto_repo_event_sequence") {
     val id = short("id")

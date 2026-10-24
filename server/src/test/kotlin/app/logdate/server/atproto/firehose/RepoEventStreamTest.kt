@@ -149,6 +149,34 @@ class RepoEventStreamTest {
         }
 
     @Test
+    fun `a cursor behind the newest event gets a notice when every event has been pruned`() =
+        runTest {
+            val store = InMemoryRepoEventStore()
+            repeat(3) { store.append(draft(Clock.System.now() - 30.days)) }
+            store.deleteBefore(Clock.System.now() - 1.days)
+            val received = mutableListOf<RepoStreamMessage>()
+            val job = launch { stream(store).frames(1).collect { received += decode(it) } }
+            runCurrent()
+
+            assertEquals("OutdatedCursor", assertIs<RepoInfoMessage>(received.single()).name)
+            job.cancel()
+        }
+
+    @Test
+    fun `a cursor at the newest event gets no notice when every event has been pruned`() =
+        runTest {
+            val store = InMemoryRepoEventStore()
+            repeat(3) { store.append(draft(Clock.System.now() - 30.days)) }
+            store.deleteBefore(Clock.System.now() - 1.days)
+            val received = mutableListOf<RepoStreamMessage>()
+            val job = launch { stream(store).frames(3).collect { received += decode(it) } }
+            runCurrent()
+
+            assertTrue(received.isEmpty())
+            job.cancel()
+        }
+
+    @Test
     fun `a cursor just behind the oldest kept event gets no notice because nothing was missed`() =
         runTest {
             val store = InMemoryRepoEventStore()

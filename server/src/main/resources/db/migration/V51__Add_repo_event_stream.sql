@@ -31,3 +31,11 @@ CREATE TABLE atproto_repo_event_sequence (
 );
 
 INSERT INTO atproto_repo_event_sequence (id, last_seq) VALUES (1, 0);
+
+-- Every repository followers were ever told about. Events are deleted after a week, but a takedown or
+-- deletion months later still has to reach relays that heard about the account, so "was announced" is
+-- kept here for good, one small row per repository.
+CREATE TABLE atproto_repo_announced (
+    repo_did VARCHAR(255) PRIMARY KEY,
+    first_announced_at TIMESTAMPTZ NOT NULL
+);

@@ -69,6 +69,11 @@ every record in its tree is in a public collection. If a private record gets in,
 quiet instead of leaking, and the server refuses to write journal records into the repository of an
 account that keeps its journal in a personal space, so that cannot happen by accident.
 
+The same rule hides the repository's head, because a revision is the time of a write. An account that
+moved into its personal space keeps its old journal records in the tree for a while before they are
+erased. Until then `getLatestCommit` and `listRepos` do not show it, and `getRepoStatus` answers
+`active: true` without a revision. An account announced before it wrote anything also has no revision.
+
 ## Writing public records
 
 With the stream on, an account in a personal space writes public records through
@@ -88,7 +93,7 @@ None of these needs a sign-in. Each answers for a shown repository only.
 | Method | What it returns |
 |---|---|
 | `com.atproto.sync.subscribeRepos` | The event stream, over a WebSocket. |
-| `com.atproto.sync.listRepos` | The shown repositories, 500 per page by default and 1000 at most, ordered by DID. |
+| `com.atproto.sync.listRepos` | The shown repositories, 500 per page by default and 1000 at most, ordered by DID. A page can hold fewer than the limit and still carry a cursor, because one call looks at a bounded number of accounts; keep following the cursor until it is absent. |
 | `com.atproto.sync.getRepo` | The repository as a CAR file. `since` limits it to newer blocks. |
 | `com.atproto.sync.getLatestCommit` | The commit CID and revision. |
 | `com.atproto.sync.getRepoStatus` | Whether the repository is active, and its revision. |
@@ -123,7 +128,10 @@ Connect to `/xrpc/com.atproto.sync.subscribeRepos` and optionally pass `cursor`:
 - With a cursor, the server first replays every event after that number, then keeps the connection
   open and sends new events as they happen.
 - A cursor older than the oldest event the server still keeps gets an `#info` message named
-  `OutdatedCursor`, followed by everything the server has. The server keeps events for seven days.
+  `OutdatedCursor`, followed by everything the server has. That includes a cursor behind the newest
+  number when every event has been deleted. The server keeps events for seven days. It remembers for
+  good which accounts it announced, so a takedown or deletion long after the announcement still reaches
+  the relays that heard of the account.
 - A cursor beyond the newest event gets a `FutureCursor` error frame and the connection closes.
 - A follower that stops reading gets a `ConsumerTooSlow` error frame and the connection closes.
 - The server serves 64 followers at a time and closes extra connections with `TRY_AGAIN_LATER`.

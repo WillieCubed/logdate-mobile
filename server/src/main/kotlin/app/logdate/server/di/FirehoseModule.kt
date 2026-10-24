@@ -1,11 +1,13 @@
 package app.logdate.server.di
 
 import app.logdate.server.atproto.firehose.AccountPublicRepoGate
+import app.logdate.server.atproto.firehose.AccountsPublicRepoDirectory
 import app.logdate.server.atproto.firehose.AtprotoFirehoseConfig
 import app.logdate.server.atproto.firehose.InMemoryRepoEventStore
 import app.logdate.server.atproto.firehose.PublicRecordValidator
 import app.logdate.server.atproto.firehose.PublicRepoAccess
 import app.logdate.server.atproto.firehose.PublicRepoAnnouncer
+import app.logdate.server.atproto.firehose.PublicRepoDirectory
 import app.logdate.server.atproto.firehose.PublicRepoGate
 import app.logdate.server.atproto.firehose.PublicRepoPolicy
 import app.logdate.server.atproto.firehose.RelayCrawler
@@ -15,11 +17,13 @@ import app.logdate.server.atproto.firehose.RepoEventStream
 import app.logdate.server.atproto.firehose.SequencingRepoBlockStore
 import app.logdate.server.auth.AccountModerationService
 import app.logdate.server.auth.AccountStatusEvents
+import app.logdate.server.database.PostgreSQLPublicRepoDirectory
 import app.logdate.server.database.PostgreSQLRepoBlockStore
 import app.logdate.server.database.PostgreSQLRepoEventStore
 import app.logdate.server.identity.AtprotoIdentityConfig
 import io.ktor.client.HttpClient
 import org.koin.core.module.Module
+import org.koin.dsl.bind
 import studio.hypertext.atproto.repo.InMemoryRepoBlockStore
 import studio.hypertext.atproto.repo.RepoBlockStore
 
@@ -50,7 +54,7 @@ internal fun Module.firehoseDefinitions(isDatabaseAvailable: Boolean) {
     single<RepoEventStore> { if (isDatabaseAvailable) PostgreSQLRepoEventStore() else InMemoryRepoEventStore() }
     single { PublicRepoPolicy() }
     single { PublicRecordValidator() }
-    single<PublicRepoGate> { AccountPublicRepoGate(accounts = get(), identityConfig = get(), events = get()) }
+    single { AccountPublicRepoGate(accounts = get(), identityConfig = get(), events = get()) } bind PublicRepoGate::class
     single {
         RepoEventSequencer(
             store = get(),
@@ -59,12 +63,19 @@ internal fun Module.firehoseDefinitions(isDatabaseAvailable: Boolean) {
             policy = get(),
         )
     }
+    single<PublicRepoDirectory> {
+        if (isDatabaseAvailable) {
+            PostgreSQLPublicRepoDirectory(publishesPlc = get<AtprotoIdentityConfig>().publishesPlcOperations)
+        } else {
+            AccountsPublicRepoDirectory(accounts = get(), gate = get(), blocks = get<UndecoratedRepoBlocks>().store)
+        }
+    }
     single {
         PublicRepoAccess(
-            gate = get(),
+            gate = get<AccountPublicRepoGate>(),
             policy = get(),
             blocks = get<UndecoratedRepoBlocks>().store,
-            accounts = get(),
+            directory = get(),
         )
     }
     single {
