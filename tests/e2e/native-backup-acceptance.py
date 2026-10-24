@@ -367,7 +367,9 @@ def backup_source(serial, output, *, verify_after_backup=None):
     if before.get("databases/logdate") is None:
         raise RuntimeError("The synthetic source has no database to back up")
     enable_backup(serial)
-    backup = adb(serial, "shell", "bmgr", "backupnow", PACKAGE)
+    # A managed device can inherit a prior LocalTransport dataset even when its app fixture is
+    # fresh. Force a complete package snapshot so the nested archive belongs to this source.
+    backup = adb(serial, "shell", "bmgr", "backupnow", "@pm@", PACKAGE, "--non-incremental")
     private_file(output, backup)
     if f"Package {PACKAGE} with result: Success".encode() not in backup:
         try:
@@ -1206,6 +1208,7 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
         )
     payload = adb(source, "exec-out", "tar", "-C", TRANSPORT_FILES, "-cf", "-", "1")
     original_payload = payload
+    private_file(output / "native-transport-original.tar", original_payload)
     selected_source_files = {**source_files, "databases/logdate": selected_database_snapshot(original_payload)}
     missing_media_path = None
     if exercise_missing_keys:

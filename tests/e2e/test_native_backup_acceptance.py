@@ -99,6 +99,7 @@ class RestoreSnapshotValidationTest(unittest.TestCase):
             if arguments[:3] == ("shell", "am", "start"):
                 return b"Status: ok"
             if arguments[:3] == ("shell", "bmgr", "backupnow"):
+                calls.append(arguments)
                 return f"Package {harness.PACKAGE} with result: Success".encode()
             return b""
 
@@ -108,7 +109,10 @@ class RestoreSnapshotValidationTest(unittest.TestCase):
             harness, "private_file"
         ):
             harness.backup_source("emulator-5554", Path(directory) / "backup.log", verify_after_backup=lambda: calls.append("logical"))
-        self.assertEqual(["logical"], calls)
+        self.assertEqual(
+            [("shell", "bmgr", "backupnow", "@pm@", harness.PACKAGE, "--non-incremental"), "logical"],
+            calls,
+        )
 
     def test_datastore_atomic_write_staging_is_not_an_accepted_preferences_change(self):
         retained = {
