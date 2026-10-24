@@ -13,6 +13,7 @@ import app.logdate.client.device.restore.NativeJournalMediaInventory
 import app.logdate.client.device.restore.NativeJournalReplayCustody
 import app.logdate.client.device.restore.NativeJournalRestoreAuthority
 import app.logdate.client.device.restore.PostRestoreDetector
+import app.logdate.client.device.restore.PostRestoreType
 import app.logdate.client.device.restore.verifiedNativeJournalSources
 import app.logdate.client.device.restore.verifyNativeJournalSourceReceipt
 import app.logdate.client.device.restore.writeNativeJournalSourceReceipt
@@ -36,6 +37,42 @@ import kotlin.uuid.Uuid
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, sdk = [34], application = Application::class)
 class NativeJournalTransferRestoreTest {
+    @Test
+    fun `missing selected key leaves the journal encrypted and completes as missing content`() =
+        fixture { f ->
+            assertTrue(f.key.delete())
+            val authority = NativeJournalRestoreAuthority(f.context)
+            authority.requireSnapshot()
+            val restore = f.restore { throw MissingNativeJournalTransferKeyException() }
+
+            assertFalse(restore.restore())
+            assertFalse(f.database.exists())
+            assertTrue(f.current.isDirectory)
+
+            val detector = PostRestoreDetector(f.context)
+            detector.recordRestoreCompleted()
+            assertEquals(PostRestoreType.CONTENT_MISSING, detector.detect(isOnboarded = true))
+            restore.finish()
+            f.restore { throw MissingNativeJournalTransferKeyException() }.finish()
+            assertTrue(f.current.isDirectory)
+            assertTrue(authority.isSnapshotRequired())
+        }
+
+    @Test
+    fun `mismatched encrypted snapshot remains rejected without completing delivery`() =
+        fixture { f ->
+            NativeJournalRestoreAuthority(f.context).requireSnapshot()
+            val restore =
+                f.restore {
+                    throw IllegalStateException("Encrypted source scope does not match native preferences")
+                }
+
+            assertFailsWith<IllegalStateException> { restore.restore() }
+            assertEquals(PostRestoreType.RECOVERY_REQUIRED, PostRestoreDetector(f.context).detect(isOnboarded = true))
+            assertTrue(f.current.isDirectory)
+            assertFalse(f.database.exists())
+        }
+
     @Test
     fun `clean install accepts either source key name and raw legacy DB delivered afterward`() {
         for (keyName in listOf("passphrase_backup", "working_passphrase_backup")) {
@@ -542,11 +579,11 @@ class NativeJournalTransferRestoreTest {
             assertTrue(custody.sealedPayloads().any { it.path.endsWith(NATIVE_SOURCE_RECEIPT_PATH) && it.complete })
         }
 
-        fun restore() =
+        fun restore(validateSnapshot: ((android.content.Context) -> Map<String, File>?)? = null) =
             NativeJournalTransferRestore(
                 context,
                 { source -> source.copyTo(File(files, "logdate.preferences_pb"), overwrite = true) },
-                {
+                validateSnapshot ?: {
                     payloads().also { snapshot ->
                         verifyNativeJournalSourceReceipt(
                             checkNotNull(snapshot[NATIVE_SOURCE_RECEIPT_PATH]),

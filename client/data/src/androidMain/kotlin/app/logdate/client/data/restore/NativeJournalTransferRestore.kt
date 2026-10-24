@@ -4,6 +4,7 @@ import android.content.Context
 import app.logdate.client.device.restore.NATIVE_SOURCE_RECEIPT_PATH
 import app.logdate.client.device.restore.NativeJournalRestoreAuthority
 import app.logdate.client.device.restore.PostRestoreDetector
+import app.logdate.client.device.restore.PostRestoreType
 import app.logdate.client.device.restore.retainedJournalPassphraseFile
 import java.io.File
 import java.io.FileOutputStream
@@ -12,6 +13,8 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
+
+internal class MissingNativeJournalTransferKeyException : IllegalStateException()
 
 /** Installation is allowed only by local vacancy intent captured before the first native file. */
 internal class NativeJournalTransferRestore(
@@ -29,7 +32,12 @@ internal class NativeJournalTransferRestore(
             authority.authorizeCompletedReplay(context.getDatabasePath("logdate"))
             return true
         }
-        val files = validateSnapshot(context)
+        val files =
+            try {
+                validateSnapshot(context)
+            } catch (_: MissingNativeJournalTransferKeyException) {
+                return false
+            }
         if (files == null) {
             check(!authority.isSnapshotRequired() && authority.installedReceipt() == null) {
                 "The required immutable native journal remains incomplete"
@@ -68,7 +76,19 @@ internal class NativeJournalTransferRestore(
     fun wasStaged(): Boolean = staging.wasStaged()
 
     fun finish() {
-        check(PostRestoreDetector(context).hasCompletedNativeRestoreDelivery())
+        val detector = PostRestoreDetector(context)
+        check(detector.hasCompletedNativeRestoreDelivery())
+        if (current.isDirectory &&
+            authority.isSnapshotRequired() &&
+            authority.installedReceipt() == null &&
+            detector.detect(isOnboarded = true) == PostRestoreType.CONTENT_MISSING
+        ) {
+            try {
+                validateSnapshot(context)
+            } catch (_: MissingNativeJournalTransferKeyException) {
+                return
+            }
+        }
         if (staging.wasStaged()) {
             staging.finish()
             authority.finish()
