@@ -274,18 +274,7 @@ class DefaultCloudContentDataSource(
             }
 
             "IMAGE" -> {
-                JournalNote.Image(
-                    uid = uid,
-                    creationTimestamp = creationTimestamp,
-                    lastUpdated = lastUpdated,
-                    mediaRef = mediaUri ?: "",
-                    caption = decryptNoteCaption(uid, caption.orEmpty()),
-                    presentation = PhotoPresentation.entries.firstOrNull { it.name == photoPresentation } ?: PhotoPresentation.EdgeToEdge,
-                    location = decryptNoteLocation(uid, location),
-                    syncVersion = serverVersion,
-                    capturedOn = decryptNoteCapturedOn(uid, capturedOn),
-                    capturedDuring = decryptNoteCapturedDuring(uid, capturedDuring),
-                )
+                toImageNote(uid, creationTimestamp, lastUpdated)
             }
 
             "VIDEO" -> {
@@ -323,6 +312,24 @@ class DefaultCloudContentDataSource(
             }
         }
     }
+
+    private suspend fun ContentChange.toImageNote(
+        uid: Uuid,
+        creationTimestamp: Instant,
+        lastUpdated: Instant,
+    ): JournalNote.Image =
+        JournalNote.Image(
+            uid = uid,
+            creationTimestamp = creationTimestamp,
+            lastUpdated = lastUpdated,
+            mediaRef = mediaUri ?: "",
+            caption = decryptNoteCaption(uid, caption.orEmpty()),
+            presentation = PhotoPresentation.entries.firstOrNull { it.name == photoPresentation } ?: PhotoPresentation.EdgeToEdge,
+            location = decryptNoteLocation(uid, location),
+            syncVersion = serverVersion,
+            capturedOn = decryptNoteCapturedOn(uid, capturedOn),
+            capturedDuring = decryptNoteCapturedDuring(uid, capturedDuring),
+        )
 
     private suspend fun encryptNoteText(
         noteId: Uuid,
