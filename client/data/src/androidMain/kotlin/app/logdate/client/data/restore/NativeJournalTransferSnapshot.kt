@@ -219,38 +219,38 @@ internal class NativeJournalTransferSnapshot(
             try {
                 val preferences =
                     captureNativeJournalDatabaseSnapshot(context.getDatabasePath("logdate"), key, target) { writeScope ->
-                        val transactionThread = Thread.currentThread()
                         // SQL -> DataStore is the same order used by scoped journal/draft writes.
-                        // The synchronous callback keeps the SQLite transaction on its owner thread.
-                        runBlocking {
-                            withTimeout(15_000) {
+                        // DataStore may run its transform on another thread; write the SQL scope only after it returns.
+                        capturePreferencesOnSqlThread(
+                            capture = {
                                 createAndroidMainDataStore(context).updateData { snapshot ->
-                                    check(Thread.currentThread() === transactionThread) { "Native SQL transaction changed thread" }
-                                    val scope =
-                                        checkNotNull(
-                                            RetainedJournalSourceScope.from(
-                                                snapshot,
-                                                app.logdate.shared.config.DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL,
-                                            ),
-                                        )
                                     copyDurably(
                                         File(context.filesDir, "logdate.preferences_pb"),
                                         File(staging, "files/logdate.preferences_pb"),
                                     )
-                                    writeScope(
-                                        NativeJournalSnapshotScope(
-                                            checkNotNull(scope.ownerId),
-                                            scope.bound,
-                                            scope.backendOrigin,
-                                            nativeSnapshotChecksum(File(staging, "files/logdate.preferences_pb")),
-                                        ),
-                                    )
-                                    val portable = File(staging, "files/db_recovery/${retainedJournalPassphraseFile(context).name}")
-                                    writeDurably(portable, Base64.encode(key).encodeToByteArray())
                                     snapshot
                                 }
-                            }
-                        }
+                            },
+                            write = { snapshot ->
+                                val scope =
+                                    checkNotNull(
+                                        RetainedJournalSourceScope.from(
+                                            snapshot,
+                                            app.logdate.shared.config.DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL,
+                                        ),
+                                    )
+                                writeScope(
+                                    NativeJournalSnapshotScope(
+                                        checkNotNull(scope.ownerId),
+                                        scope.bound,
+                                        scope.backendOrigin,
+                                        nativeSnapshotChecksum(File(staging, "files/logdate.preferences_pb")),
+                                    ),
+                                )
+                                val portable = File(staging, "files/db_recovery/${retainedJournalPassphraseFile(context).name}")
+                                writeDurably(portable, Base64.encode(key).encodeToByteArray())
+                            },
+                        )
                     }
                 return preferences to key
             } catch (error: Exception) {
@@ -294,6 +294,18 @@ internal class NativeJournalTransferSnapshot(
             candidates.forEach { it.fill(0) }
         }
     }
+}
+
+/** Waits for DataStore while SQL is held, then resumes the SQL write on its transaction thread. */
+internal fun <T> capturePreferencesOnSqlThread(
+    capture: suspend () -> T,
+    write: (T) -> Unit,
+): T {
+    val owner = Thread.currentThread()
+    val value = runBlocking { withTimeout(15_000) { capture() } }
+    check(Thread.currentThread() === owner) { "Native SQL transaction changed thread" }
+    write(value)
+    return value
 }
 
 internal fun validateNativeJournalTransfer(context: Context): Map<String, File>? {
