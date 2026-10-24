@@ -2,7 +2,7 @@
 
 **Authoritative reference for all environment variables used by the LogDate server.**
 
-> Last updated: 2026-10-18
+> Last updated: 2026-10-23
 
 ---
 
@@ -656,6 +656,56 @@ with the change that makes them required.
   replacing it and replacing the server's key each also need a fresh passkey confirmation.
   A deployment sets it in the deployment contract's `env_vars` in either environment; the contract
   renderer accepts only `true` or `false`.
+
+### `ATPROTO_FIREHOSE_ENABLED`
+- **Description**: Whether the server announces public repositories to the rest of the AT Protocol
+  network. When it is on, the server serves the repository event stream
+  (`com.atproto.sync.subscribeRepos`) and `com.atproto.sync.listRepos`, and anyone can read public
+  records and their blobs, the latest commit, the repository status and the repository itself
+  without signing in. Each change to a public repository is written to an event log that relays
+  replay from any point they name.
+- **Type**: Boolean (`true` to enable)
+- **Default**: `false`
+- **Example**: `ATPROTO_FIREHOSE_ENABLED=true`
+- **Required**: No
+- **Notes**:
+  - Only the profile, the sharing keys other people encrypt to, and the stories a person publishes are
+    public (`app.logdate.actor.profile`, `app.logdate.crypto.keyDeclaration`,
+    `site.standard.publication` and `site.standard.document`), plus any collection later opened to
+    apps. The list is fixed in code. Nothing from a personal or shared space, no sealed record and no
+    `studio.hypertext.logdate.*` or other `app.logdate.*` record is ever shown or announced.
+  - A repository is shown only while its account is active, keeps its journal in its personal space,
+    and has a DID other apps can look up (a `did:web`, or a `did:plc` once
+    `ATPROTO_PLC_PUBLISH_ENABLED` has published it). A repository whose record tree holds even one
+    private record is not exported or announced at all, because a tree names every record it holds.
+  - With the flag on, an account in a personal space can write public records through
+    `com.atproto.repo.createRecord` and `putRecord`, and is refused when it tries to write journal
+    records into its repository.
+  - Events live in the database (table `atproto_repo_events`, migration V51) and every server instance
+    serves the same log. Events are kept for seven days; a relay whose cursor is older gets an
+    `OutdatedCursor` notice and then everything that remains.
+  - With the flag off, none of this exists: the stream route is not registered, the repository
+    methods are open to the account's owner only, and no event is written.
+  - A deployment sets it in the deployment contract's `env_vars` in either environment; the contract
+    renderer accepts only `true` or `false`. Production turns it on in a separate step after identities
+    are published.
+
+### `ATPROTO_RELAY_HOSTS`
+- **Description**: The relays the server asks to follow its event stream, by sending each one
+  `com.atproto.sync.requestCrawl` when the server starts and when an account is first announced. The
+  request names the host from `ATPROTO_PDS_SERVICE_URL`.
+- **Type**: String (comma-separated hostnames, lowercase, no scheme, port or path)
+- **Default**: Empty, so the server asks no relay and a relay has to be pointed at it by hand
+- **Example**: `ATPROTO_RELAY_HOSTS=relay1.us-east.bsky.network,relay1.us-west.bsky.network`
+- **Required**: No
+- **Notes**:
+  - Read only when `ATPROTO_FIREHOSE_ENABLED` is `true`. A value that is not a list of hostnames stops
+    the server at startup.
+  - At startup, a relay that cannot be reached is asked again after 10, 20, 40 and 80 seconds. After
+    that, a round goes out when an account is announced for the first time, at most once every ten
+    minutes, because a relay that already follows the server learns about later accounts from the stream.
+  - The deployment contract renderer accepts it only for production, only with
+    `ATPROTO_FIREHOSE_ENABLED` set to `true`, and only as distinct lowercase hostnames.
 
 ### `ATPROTO_PLC_DIRECTORY_URL`
 - **Description**: The PLC directory to publish to and resolve `did:plc` identities from.
