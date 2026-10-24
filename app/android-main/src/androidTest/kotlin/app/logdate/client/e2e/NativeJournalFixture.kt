@@ -151,7 +151,11 @@ internal class NativeJournalFixture(
         final.writeBytes("committed recording".encodeToByteArray())
         val inFlight = CrashSafeRecording.inFlightFile(final, isolateForBackup = true)
         inFlight.writeBytes("unfinished raw recording".encodeToByteArray())
-        CrashSafeRecording.remuxStagingFile(inFlight, final).writeBytes("unfinished remux".encodeToByteArray())
+        val remux = CrashSafeRecording.remuxStagingFile(inFlight, final)
+        remux.writeBytes("unfinished remux".encodeToByteArray())
+        check(remux.readBytes().contentEquals("unfinished remux".encodeToByteArray())) {
+            "The source fixture did not seed an interrupted remux"
+        }
     }
 
     suspend fun verifyAndEdit() {
