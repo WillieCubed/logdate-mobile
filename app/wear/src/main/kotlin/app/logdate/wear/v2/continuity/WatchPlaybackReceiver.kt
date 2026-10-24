@@ -74,16 +74,7 @@ class WatchPlaybackReceiver(
                                 PlaybackHandoffResult(accepted = failure == null, failure = failure),
                             )
                         }
-                        val started =
-                            if (note == null) {
-                                false
-                            } else {
-                                withContext(Dispatchers.Main.immediate) {
-                                    withTimeoutOrNull(20_000) {
-                                        player.continuePlayback(note, command.positionMs ?: 0, command.speed ?: 1f)
-                                    } ?: false
-                                }
-                            }
+                        val started = continuePlayback(note, command)
                         when {
                             note == null -> {
                                 HandoffFailure.AUDIO_NOT_ON_WATCH
@@ -105,6 +96,20 @@ class WatchPlaybackReceiver(
                     }
                 }
             WearJson.encodeToBytes(PlaybackHandoffResult.serializer(), PlaybackHandoffResult(accepted = failure == null, failure = failure))
+        }
+
+    private suspend fun continuePlayback(
+        note: JournalNote.Audio?,
+        command: LivePlaybackCommand,
+    ): Boolean =
+        if (note == null) {
+            false
+        } else {
+            withContext(Dispatchers.Main.immediate) {
+                withTimeoutOrNull(20_000) {
+                    player.continuePlayback(note, command.positionMs ?: 0, command.speed ?: 1f)
+                } ?: false
+            }
         }
 
     private suspend fun awaitNote(

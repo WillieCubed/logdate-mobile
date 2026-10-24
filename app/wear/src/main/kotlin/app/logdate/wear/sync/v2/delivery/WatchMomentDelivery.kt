@@ -112,19 +112,7 @@ class WatchMomentDelivery(
             if (!outbox.isCurrentOperation(EntityType.MOMENT, capture.pending)) continue
             val entry = ledger.get(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.MOMENT, capture.key) ?: continue
             if (entry.holdReason == HoldReason.SEND_FAILED && (entry.nextAttemptAt ?: 0) > now()) continue
-            val localProof = hasLocalProof(proof, capture)
-            val cloudPresence = proof?.cloud ?: conditions.phoneCloud
-            val fresh =
-                conditions.copy(
-                    phoneCloud =
-                        if (cloudPresence == CloudPresence.NO_ACCOUNT &&
-                            !localProof
-                        ) {
-                            CloudPresence.UNKNOWN
-                        } else {
-                            cloudPresence
-                        },
-                )
+            val fresh = routingConditions(conditions, proof, capture)
             val since = if (entry.state == DeliveryState.SENT) entry.lastAttemptAt ?: entry.stateChangedAt else entry.stateChangedAt
             when (
                 val route =
@@ -159,6 +147,23 @@ class WatchMomentDelivery(
         }
         if (usable(peer)) cleanup(peer, transport)
         return SyncResult(success = errors.isEmpty(), uploadedItems = settled, errors = errors, lastSyncTime = clock.now())
+    }
+
+    private fun routingConditions(
+        conditions: RouteConditions,
+        proof: ReceiptsResponse?,
+        capture: Capture,
+    ): RouteConditions {
+        val localProof = hasLocalProof(proof, capture)
+        val cloudPresence = proof?.cloud ?: conditions.phoneCloud
+        return conditions.copy(
+            phoneCloud =
+                if (cloudPresence == CloudPresence.NO_ACCOUNT && !localProof) {
+                    CloudPresence.UNKNOWN
+                } else {
+                    cloudPresence
+                },
+        )
     }
 
     private fun hasLocalProof(
