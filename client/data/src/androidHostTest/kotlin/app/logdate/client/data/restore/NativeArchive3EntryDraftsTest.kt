@@ -2,6 +2,9 @@ package app.logdate.client.data.restore
 
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.NoteCoordinates
+import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.journals.NotePlace
 import app.logdate.shared.model.SerializableTextBlock
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -53,6 +56,34 @@ class NativeArchive3EntryDraftsTest {
         val note = JournalNote.Text(noteId, stamp, stamp, "First")
         val source = EntryDraft(draftId, listOf(note, note.copy(content = "Second")), stamp, stamp)
         assertFailsWith<IllegalStateException> { NativeArchive3EntryDrafts.convert(listOf(source), ownerBound = false) }
+    }
+
+    @Test
+    fun `GPS coordinates remain attached to a simple text draft block`() {
+        val coordinates = NoteCoordinates(36.1699, -115.1398, altitude = 625.0)
+        val note = JournalNote.Text(noteId, stamp, stamp, "At the park", location = NoteLocation(coordinates))
+        val source = EntryDraft(draftId, listOf(note), stamp, stamp)
+
+        val converted = NativeArchive3EntryDrafts.convert(listOf(source), ownerBound = false)
+        val block = converted.single().blocks.single()
+
+        assertEquals(SerializableTextBlock(noteId, stamp, 36.1699, -115.1398, 625.0, "At the park"), block)
+    }
+
+    @Test
+    fun `place identity and GPS accuracy stay in Android custody until the Apple draft can retain them`() {
+        val coordinates = NoteCoordinates(36.1699, -115.1398, accuracy = 4f)
+        val note = JournalNote.Text(noteId, stamp, stamp, "At the park", location = NoteLocation(coordinates))
+        val source = EntryDraft(draftId, listOf(note), stamp, stamp)
+        assertFailsWith<IllegalStateException> { NativeArchive3EntryDrafts.convert(listOf(source), ownerBound = false) }
+
+        val place = NotePlace(Uuid.parse("44444444-4444-4444-4444-444444444444"), name = "Park")
+        assertFailsWith<IllegalStateException> {
+            NativeArchive3EntryDrafts.convert(
+                listOf(source.copy(notes = listOf(note.copy(location = NoteLocation(place = place))))),
+                ownerBound = false,
+            )
+        }
     }
 
     @Test

@@ -37,12 +37,32 @@ internal object NativeArchive3EntryDrafts {
                         check(
                             note.lastUpdated == note.creationTimestamp &&
                                 note.syncVersion == 0L &&
-                                note.location == null &&
                                 note.timeZoneId == null &&
                                 note.capturedOn == null &&
                                 note.capturedDuring == null,
                         ) { "Entry draft block has state outside the Apple editor" }
-                        SerializableTextBlock(note.uid, note.creationTimestamp, content = note.content)
+                        val coordinates =
+                            note.location?.let { location ->
+                                val coordinates = checkNotNull(location.coordinates) { "Entry draft place is not portable" }
+                                check(
+                                    location.place == null &&
+                                        coordinates.accuracy == null &&
+                                        coordinates.latitude.isFinite() &&
+                                        coordinates.latitude in -90.0..90.0 &&
+                                        coordinates.longitude.isFinite() &&
+                                        coordinates.longitude in -180.0..180.0 &&
+                                        (coordinates.altitude?.isFinite() ?: true),
+                                ) { "Entry draft location has state outside the Apple editor" }
+                                coordinates
+                            }
+                        SerializableTextBlock(
+                            id = note.uid,
+                            timestamp = note.creationTimestamp,
+                            locationLat = coordinates?.latitude,
+                            locationLng = coordinates?.longitude,
+                            altitude = coordinates?.altitude,
+                            content = note.content,
+                        )
                     },
                 selectedJournalIds = draft.selectedJournalIds,
                 createdAt = draft.createdAt,
