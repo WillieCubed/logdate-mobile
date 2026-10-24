@@ -501,10 +501,10 @@ def rewrite_native_full_backup(payload, transform):
     return payload[:item.offset] + bytes(header) + filtered_full_backup + padding + payload[old_payload_end:]
 
 
-def selected_database_snapshot(payload):
+def selected_database_snapshot(payload, *, cloud_backup=False):
     """Hash the journal file selected by the backup agent, not the live WAL database."""
     full_backup_name = f"1/_full/{PACKAGE}"
-    selected_database = f"apps/{PACKAGE}/f/native_journal_transfer/current/database/logdate"
+    selected_database = f"apps/{PACKAGE}/" + ("db/logdate" if cloud_backup else "f/native_journal_transfer/current/database/logdate")
     with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as transport:
         full_backup_item = next((item for item in transport.getmembers() if item.name == full_backup_name and item.isfile()), None)
         full_backup = transport.extractfile(full_backup_item) if full_backup_item else None
@@ -520,15 +520,19 @@ def selected_database_snapshot(payload):
 
 
 def assert_cloud_backup_contents(payload):
-    """A cloud partial-delivery fixture must start with the live journal and its recovery key."""
+    """Cloud delivery must preserve owner/preferences and the journal's portable recovery keys."""
     full_backup_name = f"1/_full/{PACKAGE}"
     file_prefix = f"apps/{PACKAGE}/f/"
     required = {
         f"apps/{PACKAGE}/db/logdate",
         file_prefix + "db_recovery/passphrase_backup",
+        file_prefix + "logdate.preferences_pb",
+        file_prefix + "identity_recovery/media_key_backup",
     }
+    identity_keys = {file_prefix + "identity_recovery/" + name for name in ("phrase_backup", "account_key_backup")}
     excluded_roots = (
         file_prefix + "native_journal_transfer/current/",
+        file_prefix + "retained_journals/",
         file_prefix + "archive_recovery/sources/",
         *(file_prefix + path for path in ("media/", "user_media/", "audio_notes/", "camera-captures/")),
     )
@@ -539,8 +543,8 @@ def assert_cloud_backup_contents(payload):
             raise RuntimeError("cloud backup did not contain the LogDate full backup")
         with tarfile.open(fileobj=io.BytesIO(full_backup.read()), mode="r:") as app_backup:
             present = {item.name for item in app_backup.getmembers() if item.isfile() and item.size > 0}
-    if not required.issubset(present):
-        raise RuntimeError("cloud backup omitted the journal database or its live recovery key")
+    if not required.issubset(present) or not identity_keys.intersection(present):
+        raise RuntimeError("cloud backup omitted the journal database, owner preferences, or portable recovery material")
     if any(path.startswith(excluded_roots) for path in present):
         raise RuntimeError("cloud backup included device-transfer data or original media")
 
@@ -1188,7 +1192,7 @@ def capture_widget_restore_delivery(serial, output):
 def transfer(source, destination, app_apk, test_apk, output, identity, exercise_archive_recovery=False,
              exercise_missing_keys=False, exercise_credentials_only=False, seed_source=True, snapshot_source=False,
              exercise_duplicate_restore=False, exercise_partial_media=False, exercise_data_only=False,
-             exercise_missing_privacy=False, exercise_system_widgets=False):
+             exercise_missing_privacy=False, exercise_system_widgets=False, exercise_cloud_backup=False):
     prepare_source(
         source,
         app_apk,
@@ -1204,6 +1208,9 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
     raw_metadata = adb(source, "exec-out", "cat", f"/data/user/0/{PACKAGE}/no_backup/native-backup-fixture.json")
     private_file(output / "source-fixture.json", raw_metadata)
     metadata = json.loads(raw_metadata)
+    if exercise_cloud_backup and metadata.get("recordingTransferFixture") is not True:
+        raise RuntimeError("Full cloud recovery requires the complete synthetic recording and media fixture")
+    exercise_duplicate_restore = exercise_duplicate_restore or exercise_cloud_backup
     archive_fixture = None
     archive_fixture_label = "transfer-" + uuid.uuid4().hex
     if exercise_archive_recovery:
@@ -1235,11 +1242,12 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
     payload = adb(source, "exec-out", "tar", "-C", TRANSPORT_FILES, "-cf", "-", "1")
     original_payload = payload
     private_file(output / "native-transport-original.tar", original_payload)
-    if exercise_credentials_only:
+    if exercise_credentials_only or exercise_cloud_backup:
         assert_cloud_backup_contents(original_payload)
+    if exercise_credentials_only:
         selected_source_files = source_files
     else:
-        selected_source_files = {**source_files, "databases/logdate": selected_database_snapshot(original_payload)}
+        selected_source_files = {**source_files, "databases/logdate": selected_database_snapshot(original_payload, cloud_backup=exercise_cloud_backup)}
     missing_media_path = None
     if exercise_missing_keys:
         payload = without_portable_recovery_keys(payload)
@@ -1284,6 +1292,8 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
     restored_files = package_file_snapshot(destination)
     private_file(output / "source-files-before-backup.json", json.dumps(source_files, indent=2).encode())
     private_file(output / "destination-files-after-restore.json", json.dumps(restored_files, indent=2).encode())
+    if exercise_cloud_backup and contains_media_files(restored_files):
+        raise RuntimeError("Cloud restore unexpectedly delivered original media")
     if exercise_missing_keys:
         verify_missing_keys_snapshot(restored_files)
     else:
@@ -1424,6 +1434,7 @@ def main():
     parser.add_argument("--exercise-archive-recovery", action="store_true", help="transfer an edited partial archive and recover its originals on the destination")
     parser.add_argument("--exercise-missing-keys", action="store_true", help="omit portable key files from the native payload and verify safe recovery")
     parser.add_argument("--exercise-missing-privacy", action="store_true", help="omit privacy metadata, verify protected recovery, then deliver original preferences")
+    parser.add_argument("--exercise-cloud-backup", action="store_true", help="restore the complete encrypted-cloud selection, replay it, and verify offline editing without original media")
     parser.add_argument("--exercise-credentials-only", action="store_true", help="restore portable recovery keys without journal or media data")
     parser.add_argument("--exercise-data-only", action="store_true", help="verify journal and media restore without an account session")
     parser.add_argument("--exercise-duplicate-restore", action="store_true", help="replay native restore before app launch and verify idempotent durable state")
@@ -1440,9 +1451,9 @@ def main():
         options.source,
         allow_existing=options.resume_seeded_source or options.snapshot_existing_source,
         allow_preinstalled_empty=options.seed_empty_source,
-        cloud_backup=options.exercise_credentials_only,
+        cloud_backup=options.exercise_credentials_only or options.exercise_cloud_backup,
     )
-    prepare(options.destination, allow_preinstalled_empty=True, cloud_backup=options.exercise_credentials_only)
+    prepare(options.destination, allow_preinstalled_empty=True, cloud_backup=options.exercise_credentials_only or options.exercise_cloud_backup)
     transfer(
         options.source,
         options.destination,
@@ -1459,6 +1470,7 @@ def main():
         exercise_partial_media=options.exercise_partial_media,
         exercise_data_only=options.exercise_data_only,
         exercise_missing_privacy=options.exercise_missing_privacy,
+        exercise_cloud_backup=options.exercise_cloud_backup,
     )
     if options.exercise_quota:
         verify_quota(options.source, options.output.resolve())
@@ -1468,6 +1480,7 @@ def validate_options(options, parser):
     if options.source == options.destination:
         parser.error("source and destination must be different emulators")
     filtered_scenarios = [
+        options.exercise_cloud_backup,
         options.exercise_missing_keys,
         options.exercise_credentials_only,
         options.exercise_archive_recovery,

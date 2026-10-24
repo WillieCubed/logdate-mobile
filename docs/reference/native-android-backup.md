@@ -727,6 +727,15 @@ live journal recovery key while excluding selected transfer bundles and original
 harness verifies native callbacks, selected files, and destination recovery across two app
 installations. LocalTransport does not prove Google's provider delivery or the setup wizard.
 
+For complete cloud-selected journal recovery, run the managed controller in transfer mode with
+`-- --exercise-cloud-backup`. It selects encrypted cloud rules on both fresh managed devices and
+restores the unfiltered payload, including the database, actual owner/preferences file, and portable
+identity, media and database recovery keys. The source archive and destination must exclude original
+media, retained journal custody and transfer-only bundles. The destination verifies journal content,
+drafts, deletion state, identity and key continuity, duplicate delivery, and an offline edit across a
+cold app restart. Missing originals remain unavailable. The local transport's encryption flag tests
+rule selection; it does not establish Google's encryption, retention or account delivery.
+
 `native-d2d-acceptance.py` follows the guide's repeatable single-device GMS `D2dTransport` test-mode
 flow on an API 31+ Google Play emulator. It backs up a synthetic journal, changes its title and a
 committed recording after backup, then runs `bmgr restore` and verifies that both saved versions

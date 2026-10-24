@@ -47,11 +47,15 @@ class NativeBackupPolicyTest(unittest.TestCase):
                 with self.subTest(modern=modern, path=path):
                     self.assertFalse(included("file", path, modern=modern, transfer=False, encrypted=False))
 
-    def test_direct_transfer_preserves_committed_original_media(self):
+    def test_direct_transfer_requires_agent_selection_for_original_media(self):
         for modern in (False, True):
             for path in ("audio_notes/accepted.m4a", "media/objects/photo.jpg", "media/objects/movie.mp4"):
                 with self.subTest(modern=modern, path=path):
+                    self.assertFalse(included("file", path, modern=modern, transfer=True))
+            for path in ("native_journal_transfer/current/database/logdate", "native_journal_transfer/current/media-inventory.json"):
+                with self.subTest(modern=modern, selected=path):
                     self.assertTrue(included("file", path, modern=modern, transfer=True))
+                    self.assertFalse(included("file", path, modern=modern, transfer=False))
 
     def test_direct_transfer_excludes_unfinished_camera_capture_outputs(self):
         for modern in (False, True):
