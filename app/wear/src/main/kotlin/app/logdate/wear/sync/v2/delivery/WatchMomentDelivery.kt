@@ -79,7 +79,7 @@ class WatchMomentDelivery(
         var routing: RouteConditions? = null
         for (capture in captures(peer)) {
             val entry = ledger.get(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.MOMENT, capture.key)
-            if (entry == null || entry.holdReason == null && entry.nextAttemptAt == null) {
+            if (entry == null || (entry.holdReason == null && entry.nextAttemptAt == null)) {
                 due += now()
             } else if (entry.nextAttemptAt != null) {
                 entry.nextAttemptAt?.let(due::add)
@@ -132,15 +132,24 @@ class WatchMomentDelivery(
                         RouteInput(capture.pending.operation, false, entry.state, (now() - since).coerceAtLeast(0), fresh),
                     )
             ) {
-                Route.Settle -> if (settle(peer, transport, capture, entry)) settled++
-                Route.SendToPhone -> send(peer, transport, capture, entry)?.let(errors::add)
+                Route.Settle -> {
+                    if (settle(peer, transport, capture, entry)) settled++
+                }
+
+                Route.SendToPhone -> {
+                    send(peer, transport, capture, entry)?.let(errors::add)
+                }
+
                 Route.UploadDirect -> {
                     val moved = ledger.moveTo(entry, DeliveryState.CLOUD_PENDING, nextAttemptAt = now() + HoldTimes.RECHECK_MS)
                     if (moved.state == DeliveryState.CLOUD_PENDING && moved.contentVersion == capture.version) {
                         toCloud += CloudCapture(capture.pending, capture.version, EntityType.MOMENT)
                     }
                 }
-                is Route.Wait -> ledger.moveTo(entry, entry.state, route.reason, HoldTimes.recheckAt(route.reason, entry, now()))
+
+                is Route.Wait -> {
+                    ledger.moveTo(entry, entry.state, route.reason, HoldTimes.recheckAt(route.reason, entry, now()))
+                }
             }
         }
         if (toCloud.isNotEmpty() && usable(peer)) {
@@ -290,10 +299,14 @@ class WatchMomentDelivery(
                     ?: return null
             val compatible =
                 proof.cloud == CloudPresence.UNKNOWN ||
-                    proof.cloud == CloudPresence.SIGNED_IN &&
-                    peer.mode == LinkMode.CLOUD ||
-                    proof.cloud == CloudPresence.NO_ACCOUNT &&
-                    peer.mode == LinkMode.PAIR
+                    (
+                        proof.cloud == CloudPresence.SIGNED_IN &&
+                            peer.mode == LinkMode.CLOUD
+                    ) ||
+                    (
+                        proof.cloud == CloudPresence.NO_ACCOUNT &&
+                            peer.mode == LinkMode.PAIR
+                    )
             if (proof.context != peer || !compatible) return null
             receipts.apply(peer.phoneNode, bytes)
             return proof.takeIf { usable(peer) }
