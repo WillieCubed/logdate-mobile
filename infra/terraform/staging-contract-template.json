@@ -7,6 +7,7 @@
   "domain": "",
   "webauthn_additional_origins": [],
   "env_vars": {
+    "ATPROTO_FIREHOSE_ENABLED": "true",
     "ATPROTO_HANDLE_DOMAIN": "cloud-staging.logdate.app",
     "ATPROTO_PDS_SERVICE_URL": "https://cloud-staging.logdate.app",
     "ATPROTO_RECOVERY_KEYS_ENABLED": "true",
