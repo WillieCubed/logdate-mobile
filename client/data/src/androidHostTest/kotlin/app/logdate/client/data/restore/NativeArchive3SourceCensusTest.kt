@@ -11,8 +11,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.uuid.Uuid
 
 @RunWith(RobolectricTestRunner::class)
 class NativeArchive3SourceCensusTest {
@@ -78,9 +80,46 @@ class NativeArchive3SourceCensusTest {
             database.execSQL("INSERT INTO video_notes VALUES (NULL, NULL, '{\"future\":true}')")
             database.execSQL("INSERT INTO image_notes VALUES (NULL, NULL, NULL, 'FuturePresentation')")
             assertEquals(
-                setOf("noteCaptureDevice", "noteCaptureActivity", "noteLocationMetadata", "imagePresentation"),
+                setOf("noteCaptureDevice", "noteCaptureActivity", "imagePresentation"),
                 NativeArchive3SourceCensus.unrepresentedNoteFields(database),
             )
+        } finally {
+            helper.close()
+        }
+    }
+
+    @Test
+    fun `raw note location metadata retains exact source bytes and refuses conflicting identities`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val helper =
+            FrameworkSQLiteOpenHelperFactory().create(
+                SupportSQLiteOpenHelper.Configuration
+                    .builder(context)
+                    .name("native-archive3-location-custody-${System.nanoTime()}.db")
+                    .callback(
+                        object : SupportSQLiteOpenHelper.Callback(1) {
+                            override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                                for (table in listOf("text_notes", "image_notes", "audio_notes", "video_notes")) {
+                                    db.execSQL("CREATE TABLE $table (uid TEXT NOT NULL, location_metadata TEXT)")
+                                }
+                            }
+
+                            override fun onUpgrade(
+                                db: androidx.sqlite.db.SupportSQLiteDatabase,
+                                oldVersion: Int,
+                                newVersion: Int,
+                            ) = Unit
+                        },
+                    ).build(),
+            )
+        try {
+            val database = helper.writableDatabase
+            val id = Uuid.parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+            val raw = "{ \"coordinates\": {\"latitude\":36.1}, \"preserveSourcePlace\":true }"
+            database.execSQL("INSERT INTO text_notes VALUES (?, ?)", arrayOf(id.toString(), raw))
+            assertEquals(mapOf(id to raw), NativeArchive3SourceCensus.noteLocationMetadata(database))
+            database.execSQL("INSERT INTO image_notes VALUES (?, ?)", arrayOf(id.toString(), "{}"))
+            assertFailsWith<IllegalStateException> { NativeArchive3SourceCensus.noteLocationMetadata(database) }
         } finally {
             helper.close()
         }

@@ -13,6 +13,7 @@ import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.journals.NotePlace
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.Place
@@ -53,6 +54,8 @@ class NativeIosTransferInteropFixtureTest {
                 val ownerId = "55555555-5555-5555-5555-555555555555"
                 val placeId = Uuid.parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
                 val timestamp = Instant.parse("2026-10-23T00:00:00Z")
+                val rawLocation =
+                    """{"coordinates":{"latitude":36.1699,"longitude":-115.1398,"altitude":625.0},"place":{"id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","name":"Home"},"preserveSourcePlace":true}"""
                 NativeArchive3SnapshotWriter.write(
                     NativeArchive3SnapshotInput(
                         exportedAt = timestamp.toString(),
@@ -74,9 +77,15 @@ class NativeIosTransferInteropFixtureTest {
                                     creationTimestamp = timestamp,
                                     lastUpdated = timestamp,
                                     content = "Hello",
+                                    location =
+                                        NoteLocation(
+                                            coordinates = NoteCoordinates(36.1699, -115.1398, altitude = 625.0),
+                                            place = NotePlace(placeId, "Home"),
+                                        ),
                                 ),
                             ),
                         journalIdsByNote = mapOf(noteId to listOf(journalId)),
+                        noteSourceLocationMetadata = mapOf(noteId to rawLocation),
                         drafts =
                             listOf(
                                 EditorDraft(
@@ -142,7 +151,7 @@ class NativeIosTransferInteropFixtureTest {
                 assertEquals("true", journal.getValue("favorite").jsonPrimitive.content)
                 assertEquals(1, bundle.notes.size)
                 assertEquals(2, bundle.drafts.size)
-                assertEquals("e55241eba74daed76db58b9fdcac51d5315b8bbe64f8ad5d35f65df9ba9f1cc0", bundle.checksumsSha256)
+                assertEquals("adac218ddea82bcd7bf399c8b4e7c2508cd09accc06b668b8cac2872ac2717a7", bundle.checksumsSha256)
                 assertEquals("b99019111b117b80f48079e4c197c6fd1cbe071be884f857eb1b52a31024566d", bundle.manifestSha256)
                 val custody = File(root, ".logdate-os-private/custody-v1.json")
                 assertTrue(custody.parentFile!!.mkdirs())
@@ -181,7 +190,7 @@ class NativeIosTransferInteropFixtureTest {
                     )
                 record.withEncodedBytes { custody.writeBytes(it) }
                 assertEquals(
-                    "af0392eb88a6f70631130e025b6d53bd7a3c4211407e2219917a720214b3c0e2",
+                    "1e5da6600e0277de66ec588cb37c205118e4a8ff3c72e4cc5062ed55697cd66b",
                     MessageDigest.getInstance("SHA-256").digest(custody.readBytes()).joinToString("") { "%02x".format(it) },
                 )
                 val emitted = mutableListOf<String>()

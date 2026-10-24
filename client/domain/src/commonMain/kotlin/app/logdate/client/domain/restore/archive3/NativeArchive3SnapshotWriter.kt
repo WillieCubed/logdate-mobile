@@ -41,6 +41,7 @@ data class NativeArchive3SnapshotInput(
     val exportedAt: String,
     val journals: List<Journal>,
     val notes: List<JournalNote>,
+    val noteSourceLocationMetadata: Map<Uuid, String> = emptyMap(),
     val journalIdsByNote: Map<Uuid, List<Uuid>>,
     val drafts: List<EditorDraft>,
     val profile: LogDateProfile,
@@ -66,6 +67,10 @@ object NativeArchive3SnapshotWriter {
     ) {
         try {
             require(input.unsupportedPopulatedCategories.isEmpty()) { "Native transfer source has unsupported content" }
+            val noteIdCounts = input.notes.groupingBy { it.uid }.eachCount()
+            require(input.noteSourceLocationMetadata.keys.all { noteIdCounts[it] == 1 }) {
+                "Native transfer note location metadata has no matching source note"
+            }
             require(input.places.map { it.id }.toSet() == input.placeSourceTimes.keys && input.places.size == input.placeSourceTimes.size) {
                 "Native transfer place timestamps are incomplete"
             }
@@ -102,8 +107,11 @@ object NativeArchive3SnapshotWriter {
                         val archive = note.toArchiveNote(input.journalIdsByNote[note.uid].orEmpty(), media)
                         val payload = json.encodeToJsonElement(archive) as JsonObject
                         JsonObject(
-                            payload +
-                                ("nativePrimaryJournalId" to JsonPrimitive(input.journalIdsByNote[note.uid]?.firstOrNull()?.toString())),
+                            buildMap {
+                                putAll(payload)
+                                put("nativePrimaryJournalId", JsonPrimitive(input.journalIdsByNote[note.uid]?.firstOrNull()?.toString()))
+                                input.noteSourceLocationMetadata[note.uid]?.let { put("nativeAndroidLocationMetadata", JsonPrimitive(it)) }
+                            },
                         )
                     },
                 )

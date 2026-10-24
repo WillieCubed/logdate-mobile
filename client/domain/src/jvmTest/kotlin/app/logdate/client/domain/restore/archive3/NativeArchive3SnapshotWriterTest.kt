@@ -125,6 +125,14 @@ class NativeArchive3SnapshotWriterTest {
                         ?.let { it as kotlinx.serialization.json.JsonPrimitive }
                         ?.content,
                 )
+                val orphaned = parent.resolve("orphaned-location").absolutePath.toPath()
+                assertFailsWith<IllegalArgumentException> {
+                    NativeArchive3SnapshotWriter.write(
+                        source.copy(noteSourceLocationMetadata = mapOf(Uuid.random() to "{}")),
+                        StagingDirectoryArchiveContainer(FileSystem.SYSTEM, orphaned),
+                    )
+                }
+                assertFalse(FileSystem.SYSTEM.exists(orphaned))
             } finally {
                 parent.deleteRecursively()
             }

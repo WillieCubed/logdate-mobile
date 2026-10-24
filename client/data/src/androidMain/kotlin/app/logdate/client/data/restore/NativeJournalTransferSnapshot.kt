@@ -248,6 +248,7 @@ internal class NativeJournalTransferSnapshot(
                     null,
                 )
             val notes = queries.allNotesObserved.first()
+            val noteLocationMetadata = NativeArchive3SourceCensus.noteLocationMetadata(database.openHelper.readableDatabase)
             val links = queries.getAllJournalNoteLinks().groupBy({ it.second }, { it.first })
             val userData = LogdatePreferencesDataSource(pinnedPreferences).userData.first()
             if (userData.profilePhotoUri != null) unsupported += "profilePhoto"
@@ -302,6 +303,7 @@ internal class NativeJournalTransferSnapshot(
                     exportedAt = Clock.System.now().toString(),
                     journals = journals.map { it.toModel() },
                     notes = notes,
+                    noteSourceLocationMetadata = noteLocationMetadata,
                     journalIdsByNote = links,
                     drafts = drafts,
                     profile = profile,

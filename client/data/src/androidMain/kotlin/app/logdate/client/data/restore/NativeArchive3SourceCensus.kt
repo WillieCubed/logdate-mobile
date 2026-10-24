@@ -7,6 +7,7 @@ import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.location.LocationCapturePipeline
 import app.logdate.client.repository.location.LocationCaptureSource
 import app.logdate.shared.model.PhotoPresentation
+import kotlin.uuid.Uuid
 
 /** A conservative inventory of user rows before claiming a complete Android-to-Apple export. */
 internal object NativeArchive3SourceCensus {
@@ -84,10 +85,6 @@ internal object NativeArchive3SourceCensus {
                 if (hasUnexpectedValue(database, table, "captured_during", CaptureActivity.entries.map(CaptureActivity::wireName))) {
                     add("noteCaptureActivity")
                 }
-                // The current model projection decodes leniently and does not preserve every stored location field.
-                if (database.query("SELECT 1 FROM $table WHERE location_metadata IS NOT NULL LIMIT 1").use { it.moveToFirst() }) {
-                    add("noteLocationMetadata")
-                }
             }
             if (
                 hasUnexpectedValue(
@@ -99,6 +96,20 @@ internal object NativeArchive3SourceCensus {
                 )
             ) {
                 add("imagePresentation")
+            }
+        }
+
+    fun noteLocationMetadata(database: SupportSQLiteDatabase): Map<Uuid, String> =
+        buildMap {
+            val seenIds = mutableSetOf<Uuid>()
+            for (table in listOf("text_notes", "image_notes", "audio_notes", "video_notes")) {
+                database.query("SELECT uid, location_metadata FROM $table").use { rows ->
+                    while (rows.moveToNext()) {
+                        val id = Uuid.parse(rows.getString(0))
+                        check(seenIds.add(id)) { "Native source note identities conflict" }
+                        if (!rows.isNull(1)) put(id, rows.getString(1))
+                    }
+                }
             }
         }
 
