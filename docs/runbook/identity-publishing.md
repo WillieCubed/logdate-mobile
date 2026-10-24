@@ -87,7 +87,7 @@ you start. If any one fails, stop and fix it first.
    set to `true` in the deployment contract's `env_vars`:
 
    ```bash
-   curl https://cloud.logdate.app/api/v1/info
+   curl -s https://cloud.logdate.app/api/v1/server/info | jq '.data.protocolFeatures'
    ```
 
    Then register a recovery key from the app on a test account, and check that it appears first in
