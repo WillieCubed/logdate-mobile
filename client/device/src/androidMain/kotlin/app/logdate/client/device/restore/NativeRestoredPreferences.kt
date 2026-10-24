@@ -58,6 +58,22 @@ internal fun restoreMainPreferences(
     }
 }
 
+internal fun restoreVerifiedNativeJournalPreferences(
+    context: Context,
+    file: File,
+) {
+    val job = SupervisorJob()
+    try {
+        runBlocking(Dispatchers.IO) {
+            val verified = PreferenceDataStoreFactory.create(scope = CoroutineScope(job + Dispatchers.IO)) { file }
+            val snapshot = verified.data.first().toPreferences()
+            createAndroidMainDataStore(context).updateData { snapshot }
+        }
+    } finally {
+        runBlocking { job.cancelAndJoin() }
+    }
+}
+
 private fun digest(file: File): ByteArray {
     val digest = MessageDigest.getInstance("SHA-256")
     file.inputStream().use { input ->

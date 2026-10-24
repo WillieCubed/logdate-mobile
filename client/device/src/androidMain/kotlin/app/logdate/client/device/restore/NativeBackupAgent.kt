@@ -427,11 +427,7 @@ open class NativeBackupAgent : BackupAgent() {
     }
 
     protected fun restoreNativeJournalPreferences(file: File) {
-        ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
-            restoreMainPreferences(this, descriptor, file.length()) { input ->
-                super.onRestoreFile(input, file.length(), File(filesDir, "logdate.preferences_pb"), TYPE_FILE, 0x180L, 0L)
-            }
-        }
+        restoreVerifiedNativeJournalPreferences(this, file)
     }
 
     protected open suspend fun retainAccountRecoveryBeforeCompletion(
