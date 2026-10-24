@@ -19,8 +19,10 @@ import app.logdate.client.database.getRoomDatabase
 import app.logdate.client.database.protectDatabaseFile
 import app.logdate.client.database.readNativeJournalSnapshotMediaReferences
 import app.logdate.client.database.verifyNativeJournalDatabaseSnapshot
+import app.logdate.client.datastore.DataStoreKeyValueStorage
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.createAndroidMainDataStore
+import app.logdate.client.device.identity.DefaultCanonicalOwnerProvider
 import app.logdate.client.device.restore.NATIVE_MEDIA_INVENTORY_PATH
 import app.logdate.client.device.restore.NATIVE_SOURCE_RECEIPT_PATH
 import app.logdate.client.device.restore.NativeJournalMediaInventory
@@ -154,11 +156,21 @@ internal class NativeJournalTransferSnapshot(
     private fun prepareWithoutDatabaseIfPossible(includeProfileOnlySource: Boolean): Boolean {
         if (!context.getDatabasePath("logdate").exists()) {
             check(!current.exists()) { "The retained native journal must remain available for recovery" }
+            val dataStore = createAndroidMainDataStore(context)
+            if (includeProfileOnlySource) {
+                val existing = runBlocking { dataStore.data.first() }
+                if (NativeArchive3SourceCensus.hasPreDatabaseIosContent(existing)) {
+                    check(NativeArchive3SourceCensus.unsupportedPreferences(existing).isEmpty()) {
+                        "Native iOS transfer cannot retain these preferences"
+                    }
+                    runBlocking { DefaultCanonicalOwnerProvider(DataStoreKeyValueStorage(dataStore)).getCanonicalOwnerId() }
+                }
+            }
             val preferencesFile = File(context.filesDir, "logdate.preferences_pb")
             val draftFile = File(context.filesDir, "datastore/entry_drafts.preferences_pb")
             val beforePreferences = preferencesFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)
             val beforeDrafts = draftFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)
-            val preferences = runBlocking { createAndroidMainDataStore(context).data.first() }
+            val preferences = runBlocking { dataStore.data.first() }
             val drafts = runBlocking { AndroidLocalEntryDraftStore(context).getAllDrafts() }
             val selectedPaths =
                 nativeTransferMediaPaths(
@@ -243,24 +255,40 @@ internal class NativeJournalTransferSnapshot(
         val keyFile = listOf("passphrase_backup", "working_passphrase_backup").mapNotNull { files["files/db_recovery/$it"] }.single()
         val passphrase = Base64.decode(keyFile.readText().trim())
         val databaseKey = passphrase.copyOf()
+        val readWorkspace = File(context.filesDir, "logdate-os-transfer/.read")
+        val readDatabase = File(readWorkspace, "logdate")
         val preferenceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         var openedDatabase: LogDateDatabase? = null
         try {
-            val pinnedPreferences =
-                PreferenceDataStoreFactory.createWithPath(scope = preferenceScope, produceFile = { preferencesFile.path.toPath() })
-            val database = getRoomDatabase(getDatabaseBuilder(context, databaseKey, databaseFile), driver = null)
-            openedDatabase = database
-            val input = sourceArchiveInput(database, pinnedPreferences, files, databaseFile)
-            NativeArchive3SnapshotWriter.write(input, container)
-            checkNotNull(validateNativeJournalTransfer(context))
+            try {
+                check(!readWorkspace.exists()) { "Native archive reader already exists" }
+                val pinnedChecksum = nativeSnapshotChecksum(databaseFile)
+                copyDurably(databaseFile, readDatabase)
+                requirePinnedNativeTransferFile(databaseFile, pinnedChecksum)
+                requirePinnedNativeTransferFile(readDatabase, pinnedChecksum)
+                val pinnedPreferences =
+                    PreferenceDataStoreFactory.createWithPath(scope = preferenceScope, produceFile = { preferencesFile.path.toPath() })
+                val database = getRoomDatabase(getDatabaseBuilder(context, databaseKey, readDatabase), driver = null)
+                openedDatabase = database
+                val input = sourceArchiveInput(database, pinnedPreferences, files, databaseFile)
+                NativeArchive3SnapshotWriter.write(input, container)
+                checkNotNull(validateNativeJournalTransfer(context))
+            } finally {
+                try {
+                    openedDatabase?.close()
+                } finally {
+                    try {
+                        check(readWorkspace.deleteRecursively()) { "Native archive reader could not be removed" }
+                    } finally {
+                        preferenceScope.cancel()
+                        databaseKey.fill(0)
+                        passphrase.fill(0)
+                    }
+                }
+            }
         } catch (failure: Throwable) {
             runCatching { container.discard() }
             throw failure
-        } finally {
-            openedDatabase?.close()
-            preferenceScope.cancel()
-            databaseKey.fill(0)
-            passphrase.fill(0)
         }
     }
 

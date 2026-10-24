@@ -57,6 +57,12 @@ internal object NativeArchive3SourceCensus {
             "media_exif_metadata",
             "indexed_media_images",
             "indexed_media_videos",
+            "entries_fts",
+            "entries_fts_config",
+            "entries_fts_data",
+            "entries_fts_docsize",
+            "entries_fts_idx",
+            "entries_fts_vocab",
             "storage_metadata",
             "user_devices",
         )

@@ -68,7 +68,9 @@ object NativeArchive3SnapshotWriter {
         container: StagingDirectoryArchiveContainer,
     ) {
         try {
-            require(input.unsupportedPopulatedCategories.isEmpty()) { "Native transfer source has unsupported content" }
+            require(input.unsupportedPopulatedCategories.isEmpty()) {
+                "Native transfer cannot retain: ${input.unsupportedPopulatedCategories.sorted().joinToString()}"
+            }
             val noteIdCounts = input.notes.groupingBy { it.uid }.eachCount()
             require(input.noteSourceLocationMetadata.keys.all { noteIdCounts[it] == 1 }) {
                 "Native transfer note location metadata has no matching source note"

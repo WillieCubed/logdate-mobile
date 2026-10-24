@@ -115,11 +115,18 @@ class NativeArchive3SourceCensusTest {
                 "unknown_future_table" to 1L,
                 "room_master_table" to 1L,
                 "native_journal_source_scope" to 1L,
+                "entries_fts" to 2L,
+                "entries_fts_config" to 1L,
+                "entries_fts_data" to 2L,
+                "entries_fts_docsize" to 1L,
+                "entries_fts_idx" to 1L,
+                "entries_fts_vocab" to 1L,
+                "entries_fts_future" to 1L,
                 "indexed_media" to 3L,
                 "storage_metadata" to 1L,
             )
         assertEquals(
-            setOf("transcriptions", "audio_tags", "people", "unknown_future_table", "indexed_media"),
+            setOf("transcriptions", "audio_tags", "people", "unknown_future_table", "entries_fts_future", "indexed_media"),
             NativeArchive3SourceCensus.unsupportedPopulatedTables(rows),
         )
     }
