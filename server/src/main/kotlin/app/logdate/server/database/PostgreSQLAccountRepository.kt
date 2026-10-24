@@ -1,6 +1,7 @@
 package app.logdate.server.database
 
 import app.logdate.server.auth.Account
+import app.logdate.server.auth.AccountModeration
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.entitlements.AccountEntitlementsTable
 import app.logdate.shared.model.AccountStorageMode
@@ -140,6 +141,16 @@ class PostgreSQLAccountRepository : AccountRepository {
             } == 1
         }
     }
+
+    override suspend fun setModeration(
+        accountId: Uuid,
+        moderation: AccountModeration?,
+    ): Boolean =
+        transaction {
+            AccountsTable.update({ AccountsTable.id eq accountId.toJavaUUID() }) {
+                it[AccountsTable.moderation] = moderation?.wireValue
+            } == 1
+        }
 
     override suspend fun findById(id: Uuid): Account? =
         transaction {
@@ -357,5 +368,6 @@ class PostgreSQLAccountRepository : AccountRepository {
             isActive = this[AccountsTable.isActive],
             preferences = this[AccountsTable.preferences],
             storageMode = AccountStorageMode.fromWireValue(this[AccountsTable.storageMode]),
+            moderation = AccountModeration.fromWireValue(this[AccountsTable.moderation]),
         )
 }

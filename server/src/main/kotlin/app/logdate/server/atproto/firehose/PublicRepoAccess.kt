@@ -57,6 +57,12 @@ class PublicRepoAccess(
     private val treeChecks = ConcurrentHashMap<AtprotoDid, Pair<Cid, Boolean>>()
     private val blobIndexes = ConcurrentHashMap<AtprotoDid, Pair<Cid, Set<Cid>>>()
 
+    /** The standing of [did]'s account, or `null` when the server shows nothing about it. */
+    suspend fun standing(did: AtprotoDid): RepoStanding? = gate.standing(did)
+
+    /** The head of [did]'s repository whatever the account's standing, for the status of an account that is not shown. */
+    suspend fun headOf(did: AtprotoDid): RepoHead? = reader.loadHead(did).getOrThrow()
+
     /** The head of [did]'s repository when the server may show it, otherwise `null`. */
     suspend fun headIfShown(did: AtprotoDid): RepoHead? = if (gate.mayShow(did)) reader.loadHead(did).getOrThrow() else null
 

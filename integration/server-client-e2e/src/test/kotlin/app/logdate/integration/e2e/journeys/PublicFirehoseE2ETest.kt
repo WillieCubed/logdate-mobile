@@ -146,6 +146,34 @@ class PublicFirehoseE2ETest {
         }
 
     @Test
+    fun `a record that does not follow its lexicon is refused and never announced`() =
+        runBlocking<Unit> {
+            withServerClientHarness {
+                val account = signUp()
+
+                val refused =
+                    putRecord(
+                        account,
+                        PROFILE,
+                        "self",
+                        buildJsonObject {
+                            put("\$type", PROFILE)
+                            put("displayName", "x".repeat(65))
+                        },
+                    )
+
+                assertEquals(HttpStatusCode.BadRequest, refused.status, refused.bodyAsText())
+                assertTrue("displayName: longer than 64 graphemes" in refused.bodyAsText(), refused.bodyAsText())
+                val read = anonymous.get("${origin()}/xrpc/com.atproto.repo.getRecord?repo=${account.did}&collection=$PROFILE&rkey=self")
+                assertTrue(read.status != HttpStatusCode.OK, "a refused record must not be readable")
+                withFollower(cursor = 0) {
+                    val frames = drain().map { RepoEventFrames.decode(it) }
+                    assertTrue(frames.none { it is RepoCommitEvent && it.repo.toString() == account.did })
+                }
+            }
+        }
+
+    @Test
     fun `nothing from the personal space or the journal reaches the stream or the public methods`() =
         runBlocking<Unit> {
             withServerClientHarness {

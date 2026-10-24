@@ -3,6 +3,7 @@ package app.logdate.server.di
 import app.logdate.server.atproto.firehose.AccountPublicRepoGate
 import app.logdate.server.atproto.firehose.AtprotoFirehoseConfig
 import app.logdate.server.atproto.firehose.InMemoryRepoEventStore
+import app.logdate.server.atproto.firehose.PublicRecordValidator
 import app.logdate.server.atproto.firehose.PublicRepoAccess
 import app.logdate.server.atproto.firehose.PublicRepoAnnouncer
 import app.logdate.server.atproto.firehose.PublicRepoGate
@@ -12,7 +13,8 @@ import app.logdate.server.atproto.firehose.RepoEventSequencer
 import app.logdate.server.atproto.firehose.RepoEventStore
 import app.logdate.server.atproto.firehose.RepoEventStream
 import app.logdate.server.atproto.firehose.SequencingRepoBlockStore
-import app.logdate.server.auth.AccountRemovalEvents
+import app.logdate.server.auth.AccountModerationService
+import app.logdate.server.auth.AccountStatusEvents
 import app.logdate.server.database.PostgreSQLRepoBlockStore
 import app.logdate.server.database.PostgreSQLRepoEventStore
 import app.logdate.server.identity.AtprotoIdentityConfig
@@ -42,11 +44,13 @@ internal fun Module.firehoseDefinitions(isDatabaseAvailable: Boolean) {
         val plain = get<UndecoratedRepoBlocks>().store
         if (firehose.enabled) SequencingRepoBlockStore(plain, lazy { get<RepoEventSequencer>() }) else plain
     }
+    single { AccountModerationService(accounts = get(), statusEvents = getOrNull<AccountStatusEvents>()) }
     if (!firehose.enabled) return
 
     single<RepoEventStore> { if (isDatabaseAvailable) PostgreSQLRepoEventStore() else InMemoryRepoEventStore() }
     single { PublicRepoPolicy() }
-    single<PublicRepoGate> { AccountPublicRepoGate(accounts = get(), identityConfig = get()) }
+    single { PublicRecordValidator() }
+    single<PublicRepoGate> { AccountPublicRepoGate(accounts = get(), identityConfig = get(), events = get()) }
     single {
         RepoEventSequencer(
             store = get(),
@@ -71,7 +75,7 @@ internal fun Module.firehoseDefinitions(isDatabaseAvailable: Boolean) {
         )
     }
     single { PublicRepoAnnouncer(accounts = get(), sequencer = get(), crawler = get()) }
-    single<AccountRemovalEvents> { get<PublicRepoAnnouncer>() }
+    single<AccountStatusEvents> { get<PublicRepoAnnouncer>() }
     single {
         RepoEventStream(
             store = get(),

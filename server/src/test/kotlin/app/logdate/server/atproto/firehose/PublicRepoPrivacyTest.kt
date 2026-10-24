@@ -1,6 +1,11 @@
 package app.logdate.server.atproto.firehose
 
 import app.logdate.server.auth.Account
+import app.logdate.server.logdate.LogDateBlobNamespace
+import app.logdate.server.logdate.LogDateBlobWriteRequest
+import app.logdate.server.space.InMemorySpaceStore
+import app.logdate.server.space.SpaceBlob
+import app.logdate.server.space.SpaceRecordWrite
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocket
@@ -13,16 +18,23 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import studio.hypertext.atproto.repo.DefaultRepoEngine
+import studio.hypertext.atproto.repo.RepoEvent
 import studio.hypertext.atproto.repo.RepoRecordId
 import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.syntax.RecordKey
 import java.io.File
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.toJavaUuid
 
 /**
  * Proof that nothing from a personal or shared space, a sealed record, or a `studio.hypertext.logdate`
@@ -34,7 +46,7 @@ import kotlin.uuid.ExperimentalUuidApi
  * A marker found in a response would also show up in a leak of the record's key or its collection name,
  * not only its content.
  */
-@OptIn(ExperimentalUuidApi::class)
+@OptIn(ExperimentalUuidApi::class, ExperimentalEncodingApi::class)
 class PublicRepoPrivacyTest {
     private val profile = Nsid.require("app.logdate.actor.profile")
     private val document = Nsid.require("site.standard.document")
@@ -56,7 +68,16 @@ class PublicRepoPrivacyTest {
         )
 
     private val markers =
-        listOf("MARKERKEY", "MARKERTEXT") + privateCollections
+        listOf(
+            "MARKERKEY",
+            "MARKERTEXT",
+            "MARKERPERSONALREC",
+            "MARKERCIRCLEREC",
+            "MARKERCIRCLEKEY",
+            "bmarkerspaceblobcid",
+            PRIVATE_EPOCH_MILLIS.toString(),
+            PRIVATE_ISO_TIME,
+        ) + privateCollections
 
     private fun publicProfile(): JsonObject =
         buildJsonObject {
@@ -68,6 +89,8 @@ class PublicRepoPrivacyTest {
         buildJsonObject {
             put("\$type", document.toString())
             put("title", "A story I chose to publish")
+            put("site", "https://lena.logdate.app")
+            put("publishedAt", "2026-10-23T12:00:00.000Z")
         }
 
     /** Puts the markers where a careless implementation might find them: records of private collections in the repository tree. */
@@ -85,7 +108,12 @@ class PublicRepoPrivacyTest {
                             Nsid.require(collection),
                             RecordKey.require("MARKERKEY-${collection.substringAfterLast('.')}"),
                         ),
-                        buildJsonObject { put("text", "MARKERTEXT in $collection") },
+                        buildJsonObject {
+                            put("text", "MARKERTEXT in $collection")
+                            put("createdAt", PRIVATE_EPOCH_MILLIS)
+                            put("lastUpdated", PRIVATE_EPOCH_MILLIS)
+                            put("capturedAt", PRIVATE_ISO_TIME)
+                        },
                     ).getOrThrow()
             }
         }
@@ -202,6 +230,84 @@ class PublicRepoPrivacyTest {
         }
 
     @Test
+    fun `personal and circle space records and blobs never reach a stranger or a relay`() =
+        testApplication {
+            val clock = FixedClock(Instant.parse("2030-01-01T00:00:00Z"))
+            val h = FirehoseHarness(clock = clock).also { it.install(this) }
+            val alice = h.createAccount("alice")
+            val spaces = InMemorySpaceStore()
+            val owner = alice.id.toJavaUuid()
+            val personal = "at://${alice.did}/space/app.logdate.space.personal/self"
+            val circle = "at://${alice.did}/space/app.logdate.space.circle/MARKERCIRCLEKEY"
+            spaces.put(SpaceRecordWrite(owner, personal, alice.did!!, "MARKERPERSONALREC", sealedEnvelope(), emptyList(), null, false))
+            spaces.put(SpaceRecordWrite(owner, circle, alice.did!!, "MARKERCIRCLEREC", sealedEnvelope(), emptyList(), null, false))
+            val blobPath =
+                h.blobStorage.putBlob(
+                    LogDateBlobWriteRequest(
+                        owner,
+                        LogDateBlobNamespace.SPACE,
+                        SPACE_BLOB_CID,
+                        null,
+                        "application/octet-stream",
+                        byteArrayOf(1),
+                    ),
+                )
+            spaces.putBlob(owner, personal, SpaceBlob(SPACE_BLOB_CID, "application/octet-stream", 1, blobPath))
+            h.seedPrivateData(alice, inRepository = false)
+            h.put(client, alice, profile.toString(), "self", publicProfile())
+            h.put(client, alice, document.toString(), "3kaaa", publicDocument())
+            h.announcer.identityChanged(alice)
+
+            val seen =
+                whatAStrangerCanSee(
+                    alice,
+                    extraPaths =
+                        listOf(
+                            "/xrpc/com.atproto.sync.getBlob?did=${alice.did}&cid=$SPACE_BLOB_CID",
+                            "/xrpc/com.atproto.repo.getRecord?repo=${alice.did}&collection=app.logdate.space.circle&rkey=MARKERCIRCLEREC",
+                            "/xrpc/com.atproto.repo.getRecord?repo=${alice.did}&collection=app.logdate.space.personal&rkey=MARKERPERSONALREC",
+                        ),
+                )
+
+            assertNoMarker(seen)
+            assertNoMarker(h.crawlRequests.map { it.encodeToByteArray() })
+            assertTrue(seen.any { "A story I chose to publish" in it.decodeToString() }, "the public story is announced")
+            assertEquals(1, spaces.changes(personal, alice.did!!, 0, 10).changes.size, "the space still holds its record")
+        }
+
+    @Test
+    fun `relays are asked to crawl with the server hostname and nothing about any account`() =
+        testApplication {
+            val h = FirehoseHarness().also { it.install(this) }
+            val alice = h.createAccount("alice")
+            h.seedPrivateData(alice, inRepository = true)
+            h.put(client, alice, profile.toString(), "self", publicProfile())
+
+            h.announcer.identityChanged(alice)
+            h.crawler.requestCrawl()
+
+            assertTrue(h.crawlRequests.isNotEmpty())
+            h.crawlRequests.forEach { request ->
+                assertEquals("https://relay.example.com/xrpc/com.atproto.sync.requestCrawl {\"hostname\":\"logdate.app\"}", request)
+            }
+        }
+
+    @Test
+    fun `event times are the moment of announcement and never a time from a record`() =
+        testApplication {
+            val announcedAt = Instant.parse("2030-01-01T00:00:00Z")
+            val h = FirehoseHarness(clock = FixedClock(announcedAt)).also { it.install(this) }
+            val alice = h.createAccount("alice")
+            h.put(client, alice, profile.toString(), "self", publicProfile())
+            h.announcer.identityChanged(alice)
+
+            val events = h.eventStore.read(0, 100).map { it.decode() }
+
+            assertTrue(events.size >= 2)
+            events.forEach { event -> assertEquals(announcedAt, (event as RepoEvent).time) }
+        }
+
+    @Test
     fun `the public code never reaches the stores that hold spaces`() {
         val publicSources =
             listOf(
@@ -227,5 +333,26 @@ class PublicRepoPrivacyTest {
         }
         assertTrue(policy.isPublic(profile))
         assertTrue(policy.isPublic(document))
+    }
+
+    private fun sealedEnvelope(): JsonObject =
+        buildJsonObject {
+            put("\$type", "app.logdate.crypto.sealed")
+            put("version", 1)
+            put("keyId", "abcdefghijklm")
+            putJsonObject("nonce") { put("\$bytes", Base64.encode(ByteArray(12))) }
+            putJsonObject("ciphertext") { put("\$bytes", Base64.encode(ByteArray(528))) }
+        }
+
+    private class FixedClock(
+        private val instant: Instant,
+    ) : Clock {
+        override fun now(): Instant = instant
+    }
+
+    private companion object {
+        const val PRIVATE_EPOCH_MILLIS = 1771111111111L
+        const val PRIVATE_ISO_TIME = "2031-04-05T06:07:08.000Z"
+        const val SPACE_BLOB_CID = "bmarkerspaceblobcid"
     }
 }

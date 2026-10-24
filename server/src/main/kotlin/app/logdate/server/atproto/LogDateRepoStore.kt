@@ -2,6 +2,7 @@
 
 package app.logdate.server.atproto
 
+import app.logdate.server.atproto.firehose.PublicRecordValidator
 import app.logdate.server.atproto.firehose.PublicRepoPolicy
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.database.toJavaUUID
@@ -65,6 +66,7 @@ class LogDateRepoStore(
     accountRepository: AccountRepository,
     blockStore: RepoBlockStore,
     private val publicPolicy: PublicRepoPolicy? = null,
+    private val publicRecords: PublicRecordValidator? = null,
 ) : RepoEngine {
     private val canonicalEngine = DefaultRepoEngine(blockStore, signer = HostedRepoCommitSigner(accountRepository, signingKeyService))
 
@@ -265,6 +267,7 @@ class LogDateRepoStore(
     ): RepoWriteResult {
         requirePublicRecordOwner(repo)
         requireMatchingType(value = value, collection = collection)
+        publicRecords?.validate(collection, value)
         val resolvedKey = recordKey ?: RecordKey.require(Tid.fromInstant(Clock.System.now()).toString())
         requirePublicRecordKey(collection, resolvedKey)
         return canonicalEngine.putRecordIfAbsent(RepoRecordId(repo, collection, resolvedKey), value).getOrThrow()
@@ -277,6 +280,7 @@ class LogDateRepoStore(
     ): RepoWriteResult {
         requirePublicRecordOwner(recordId.repo)
         requireMatchingType(value = value, collection = recordId.collection)
+        publicRecords?.validate(recordId.collection, value)
         requirePublicRecordKey(recordId.collection, recordId.recordKey)
         return canonicalEngine.putRecord(recordId, value, swapRecord).getOrThrow()
     }

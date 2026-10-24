@@ -2,7 +2,7 @@ package app.logdate.server.atproto.firehose
 
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountDeletionService
-import app.logdate.server.auth.AccountRemovalEvents
+import app.logdate.server.auth.AccountStatusEvents
 import app.logdate.server.identity.IdentityEvents
 import app.logdate.server.logdate.CompositeLogDateMediaBlobRepository
 import app.logdate.server.logdate.InMemoryLogDateAtprotoBlobRepository
@@ -146,7 +146,7 @@ class PublicRepoAnnouncerTest {
         runBlocking<Unit> {
             val h = FirehoseHarness()
             val alice = h.createAccount("alice")
-            val failing = AccountRemovalEvents { _, _ -> error("the event log is down") }
+            val failing = AccountStatusEvents { _, _, _ -> error("the event log is down") }
 
             val summary = deletionService(h, failing).deleteAccount(alice.id)
 
@@ -192,12 +192,12 @@ class PublicRepoAnnouncerTest {
 
     private fun deletionService(
         h: FirehoseHarness,
-        events: AccountRemovalEvents,
+        events: AccountStatusEvents,
     ) = AccountDeletionService(
         accountRepository = h.accounts,
         mediaBlobRepository = CompositeLogDateMediaBlobRepository(InMemoryLogDateMediaRepository(), InMemoryLogDateAtprotoBlobRepository()),
         backupRepository = InMemoryLogDateBackupRepository(),
         blobStorage = h.blobStorage,
-        removalEvents = events,
+        statusEvents = events,
     )
 }

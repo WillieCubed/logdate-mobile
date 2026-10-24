@@ -1,6 +1,8 @@
 package app.logdate.server.routes
 
+import app.logdate.server.atproto.firehose.AtprotoRepoStatus
 import app.logdate.server.atproto.firehose.PublicRepoAccess
+import app.logdate.server.atproto.firehose.RepoStanding
 import app.logdate.server.identity.AtprotoIdentityService
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -82,6 +84,7 @@ internal class PublicRepoReads(
         did: AtprotoDid,
         since: Tid?,
     ): Boolean {
+        if (respondIfInactive(call, did)) return true
         if (access.headIfShown(did) == null) return false
         val export = access.export(did, since)
         if (export == null) {
@@ -96,6 +99,7 @@ internal class PublicRepoReads(
         call: ApplicationCall,
         did: AtprotoDid,
     ): Boolean {
+        if (respondIfInactive(call, did)) return true
         val head = access.headIfShown(did) ?: return false
         call.respond(HttpStatusCode.OK, GetLatestCommitResponse(cid = head.commitCid, rev = Tid.fromLong(head.revision)))
         return true
@@ -105,8 +109,16 @@ internal class PublicRepoReads(
         call: ApplicationCall,
         did: AtprotoDid,
     ): Boolean {
-        val head = access.headIfShown(did) ?: return false
-        call.respond(HttpStatusCode.OK, GetRepoStatusResponse(did = did, active = true, rev = Tid.fromLong(head.revision)))
+        when (val standing = access.standing(did) ?: return false) {
+            RepoStanding.Active -> {
+                val head = access.headIfShown(did) ?: return false
+                call.respond(HttpStatusCode.OK, GetRepoStatusResponse(did = did, active = true, rev = Tid.fromLong(head.revision)))
+            }
+            is RepoStanding.Inactive -> {
+                val rev = if (standing.deleted) null else access.headOf(did)?.let { Tid.fromLong(it.revision) }
+                call.respond(HttpStatusCode.OK, GetRepoStatusResponse(did = did, active = false, status = standing.status, rev = rev))
+            }
+        }
         return true
     }
 
@@ -128,6 +140,37 @@ internal class PublicRepoReads(
         }
         val contentType = runCatching { ContentType.parse(download.contentType) }.getOrDefault(ContentType.Application.OctetStream)
         call.respondBytes(download.bytes, contentType, HttpStatusCode.OK)
+        return true
+    }
+
+    /**
+     * Answers a method that needs the repository itself with the error the AT Protocol names for an
+     * account that is not active, as a reference PDS does, and returns `true`. A deleted account is
+     * a repository that does not exist.
+     */
+    private suspend fun respondIfInactive(
+        call: ApplicationCall,
+        did: AtprotoDid,
+    ): Boolean {
+        val inactive = access.standing(did) as? RepoStanding.Inactive ?: return false
+        when (inactive.status) {
+            AtprotoRepoStatus.DEACTIVATED ->
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    PdsErrorResponse("RepoDeactivated", "Repo has been deactivated: $did"),
+                )
+            AtprotoRepoStatus.SUSPENDED ->
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    PdsErrorResponse("RepoSuspended", "Repo has been suspended: $did"),
+                )
+            AtprotoRepoStatus.TAKENDOWN ->
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    PdsErrorResponse("RepoTakendown", "Repo has been taken down: $did"),
+                )
+            else -> call.respond(HttpStatusCode.NotFound, PdsErrorResponse("RepoNotFound", "Unknown repo: $did"))
+        }
         return true
     }
 

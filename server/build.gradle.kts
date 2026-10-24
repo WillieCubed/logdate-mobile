@@ -41,6 +41,7 @@ dependencies {
     implementation(projects.shared.atprotoPdsRuntime)
     implementation(projects.shared.atprotoPlc)
     implementation(projects.shared.atprotoRepo)
+    implementation(projects.shared.lexicon)
     implementation(projects.shared.space)
     implementation(projects.client.util)
 
