@@ -122,10 +122,11 @@ fun RecoveryPhraseContent(
                     RecoveryPhraseUiState.Checking,
                     RecoveryPhraseUiState.Confirming,
                     RecoveryPhraseUiState.Verifying,
-                    ->
+                    -> {
                         Box(modifier = Modifier.fillMaxWidth().padding(Spacing.xl), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator()
                         }
+                    }
 
                     RecoveryPhraseUiState.NotOnThisDevice -> {
                         Text(stringResource(Res.string.recovery_phrase_missing_title), style = MaterialTheme.typography.titleMedium)

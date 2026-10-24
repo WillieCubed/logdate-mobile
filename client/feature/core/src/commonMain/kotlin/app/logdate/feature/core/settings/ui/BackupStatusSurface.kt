@@ -61,14 +61,20 @@ internal fun BackupStatusItem(
     val title =
         when (status) {
             AccountSyncStatus.WAITING_FOR_WIFI -> Res.string.sync_heading_wifi
+
             AccountSyncStatus.OFFLINE -> Res.string.sync_heading_offline
+
             AccountSyncStatus.BACKGROUND_RESTRICTED -> Res.string.sync_heading_background
+
             AccountSyncStatus.STORAGE_FULL -> Res.string.sync_heading_storage
+
             AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED -> Res.string.sync_heading_update
+
             AccountSyncStatus.UNKNOWN, AccountSyncStatus.SERVER_UNAVAILABLE, AccountSyncStatus.CONNECTION_UNAVAILABLE,
             AccountSyncStatus.DEVICE_ACCESS_REQUIRED, AccountSyncStatus.CONFLICT, AccountSyncStatus.LOCAL_DATA_UNAVAILABLE,
             AccountSyncStatus.MEDIA_TOO_LARGE,
             -> Res.string.sync_heading_failed
+
             else -> status.messageResource()
         }
     MaterialCard(
@@ -108,10 +114,17 @@ internal fun BackupStatusItem(
                     if (title != status.messageResource()) {
                         val detail =
                             when {
-                                status == AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED ->
+                                status == AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED -> {
                                     Res.string.sync_account_storage_unsupported_detail
-                                title == Res.string.sync_heading_failed -> Res.string.sync_retry_automatic_detail
-                                else -> status.messageResource()
+                                }
+
+                                title == Res.string.sync_heading_failed -> {
+                                    Res.string.sync_retry_automatic_detail
+                                }
+
+                                else -> {
+                                    status.messageResource()
+                                }
                             }
                         Text(
                             stringResource(detail),

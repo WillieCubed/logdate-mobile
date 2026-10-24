@@ -159,7 +159,7 @@ fun AccountContent(
 
     val title = stringResource(Res.string.account_title)
     when (state) {
-        AccountUiState.Loading ->
+        AccountUiState.Loading -> {
             SettingsScaffold(title = title, onBack = destinations.onBack, snackbarHostState = snackbarHostState) {
                 item {
                     Box(modifier = Modifier.fillMaxWidth().padding(Spacing.xl), contentAlignment = Alignment.Center) {
@@ -167,13 +167,15 @@ fun AccountContent(
                     }
                 }
             }
+        }
 
-        AccountUiState.SignedOut ->
+        AccountUiState.SignedOut -> {
             SettingsScaffold(title = title, onBack = destinations.onBack, snackbarHostState = snackbarHostState) {
                 item { SignedOutPrompt(destinations) }
             }
+        }
 
-        is AccountUiState.SignedIn ->
+        is AccountUiState.SignedIn -> {
             FoldableBookLayout(
                 modifier = Modifier.fillMaxSize(),
                 minPaneWidth = 320.dp,
@@ -211,6 +213,7 @@ fun AccountContent(
                     }
                 },
             )
+        }
     }
 
     val signedIn = state as? AccountUiState.SignedIn

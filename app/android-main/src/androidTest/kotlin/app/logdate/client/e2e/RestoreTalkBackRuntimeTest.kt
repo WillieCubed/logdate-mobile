@@ -254,6 +254,7 @@ class RestoreTalkBackRuntimeTest {
                                     assertEquals(value, current)
                                 }
                             }
+
                             "secure accessibility_enabled" -> {
                                 if (value == "null") {
                                     await {
@@ -265,6 +266,7 @@ class RestoreTalkBackRuntimeTest {
                                     assertEquals(value, restored)
                                 }
                             }
+
                             "secure enabled_accessibility_services" -> {
                                 if (value == "null") {
                                     await { shell("settings get $setting").trim().let { it == "null" || it.isEmpty() } }
@@ -273,7 +275,10 @@ class RestoreTalkBackRuntimeTest {
                                     assertEquals(value, restored)
                                 }
                             }
-                            else -> assertEquals(value, restored)
+
+                            else -> {
+                                assertEquals(value, restored)
+                            }
                         }
                     }
                 } +

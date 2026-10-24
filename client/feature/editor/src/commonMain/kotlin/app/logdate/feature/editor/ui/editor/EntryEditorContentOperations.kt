@@ -90,40 +90,45 @@ internal fun EntryEditorViewModel.createNewBlockImpl(
 
     val newBlock =
         when (type) {
-            BlockType.TEXT ->
+            BlockType.TEXT -> {
                 TextBlockUiState(
                     id = id,
                     timestamp = timestamp,
                     location = location,
                 )
+            }
 
-            BlockType.IMAGE ->
+            BlockType.IMAGE -> {
                 ImageBlockUiState(
                     id = id,
                     timestamp = timestamp,
                     location = location,
                 )
+            }
 
-            BlockType.VIDEO ->
+            BlockType.VIDEO -> {
                 VideoBlockUiState(
                     id = id,
                     timestamp = timestamp,
                     location = location,
                 )
+            }
 
-            BlockType.AUDIO ->
+            BlockType.AUDIO -> {
                 AudioBlockUiState(
                     id = id,
                     timestamp = timestamp,
                     location = location,
                 )
+            }
 
-            BlockType.CAMERA ->
+            BlockType.CAMERA -> {
                 CameraBlockUiState(
                     id = id,
                     timestamp = timestamp,
                     location = location,
                 )
+            }
         }
 
     mutateEditorContent { currentState ->
@@ -188,7 +193,10 @@ internal fun EntryEditorViewModel.applyBlockChanges(
     base: EntryBlockUiState,
 ): EntryBlockUiState =
     when (updated) {
-        is TextBlockUiState -> applyTextChanges(existing as TextBlockUiState, updated, base as TextBlockUiState)
+        is TextBlockUiState -> {
+            applyTextChanges(existing as TextBlockUiState, updated, base as TextBlockUiState)
+        }
+
         is ImageBlockUiState -> {
             existing as ImageBlockUiState
             base as ImageBlockUiState
@@ -201,6 +209,7 @@ internal fun EntryEditorViewModel.applyBlockChanges(
                 presentation = changed(existing.presentation, updated.presentation, base.presentation),
             )
         }
+
         is VideoBlockUiState -> {
             existing as VideoBlockUiState
             base as VideoBlockUiState
@@ -213,6 +222,7 @@ internal fun EntryEditorViewModel.applyBlockChanges(
                 durationMs = changed(existing.durationMs, updated.durationMs, base.durationMs),
             )
         }
+
         is CameraBlockUiState -> {
             existing as CameraBlockUiState
             base as CameraBlockUiState
@@ -226,6 +236,7 @@ internal fun EntryEditorViewModel.applyBlockChanges(
                 durationMs = changed(existing.durationMs, updated.durationMs, base.durationMs),
             )
         }
+
         is AudioBlockUiState -> {
             existing as AudioBlockUiState
             base as AudioBlockUiState

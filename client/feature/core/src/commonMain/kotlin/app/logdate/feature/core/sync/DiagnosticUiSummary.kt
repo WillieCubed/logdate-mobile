@@ -61,11 +61,23 @@ fun summarizeDiagnostics(report: SyncDiagnosticReport): DiagnosticUiSummary {
         } ?: DiagnosticAction.NONE
     val retryCondition =
         when {
-            blocker?.reason == DiagnosticReason.NETWORK_POLICY -> DiagnosticRetryCondition.AUTOMATIC
-            blocker?.reason == DiagnosticReason.OFFLINE -> DiagnosticRetryCondition.NETWORK
-            action == DiagnosticAction.FREE_SPACE -> DiagnosticRetryCondition.FREE_SPACE
-            blocker?.outcome == DiagnosticOutcome.RETRY_SCHEDULED -> DiagnosticRetryCondition.AUTOMATIC
-            else ->
+            blocker?.reason == DiagnosticReason.NETWORK_POLICY -> {
+                DiagnosticRetryCondition.AUTOMATIC
+            }
+
+            blocker?.reason == DiagnosticReason.OFFLINE -> {
+                DiagnosticRetryCondition.NETWORK
+            }
+
+            action == DiagnosticAction.FREE_SPACE -> {
+                DiagnosticRetryCondition.FREE_SPACE
+            }
+
+            blocker?.outcome == DiagnosticOutcome.RETRY_SCHEDULED -> {
+                DiagnosticRetryCondition.AUTOMATIC
+            }
+
+            else -> {
                 when (action) {
                     DiagnosticAction.CONNECT -> DiagnosticRetryCondition.NETWORK
                     DiagnosticAction.SIGN_IN -> DiagnosticRetryCondition.SIGN_IN
@@ -79,6 +91,7 @@ fun summarizeDiagnostics(report: SyncDiagnosticReport): DiagnosticUiSummary {
                     DiagnosticAction.RETRY -> DiagnosticRetryCondition.USER_RETRY
                     else -> DiagnosticRetryCondition.UNKNOWN
                 }
+            }
         }
     return DiagnosticUiSummary(
         lastAttemptPhase = report.events.lastOrNull()?.phase,
@@ -96,22 +109,59 @@ private fun recommendedDiagnosticAction(
     outcome: DiagnosticOutcome,
 ): DiagnosticAction =
     when (reason) {
-        DiagnosticReason.NETWORK_POLICY -> DiagnosticAction.NONE
-        DiagnosticReason.OFFLINE -> DiagnosticAction.CONNECT
-        DiagnosticReason.SIGN_IN_REQUIRED -> DiagnosticAction.SIGN_IN
-        DiagnosticReason.QUOTA_EXCEEDED -> DiagnosticAction.MANAGE_STORAGE
-        DiagnosticReason.MEDIA_TOO_LARGE -> DiagnosticAction.REPLACE_MEDIA
-        DiagnosticReason.LOCAL_STORAGE, DiagnosticReason.PERSISTENCE_FAILED -> DiagnosticAction.RETRY
-        DiagnosticReason.KEY_RECOVERY_REQUIRED -> DiagnosticAction.RECOVER_KEY
-        DiagnosticReason.INCOMPATIBLE_SERVER -> DiagnosticAction.UPDATE_SERVER
-        DiagnosticReason.UNSUPPORTED_FORMAT -> DiagnosticAction.UPDATE_APP
-        DiagnosticReason.CONFLICT -> DiagnosticAction.REVIEW_CONFLICT
-        DiagnosticReason.SERVER_UNAVAILABLE, DiagnosticReason.RATE_LIMITED -> DiagnosticAction.RETRY
-        DiagnosticReason.NONE ->
+        DiagnosticReason.NETWORK_POLICY -> {
+            DiagnosticAction.NONE
+        }
+
+        DiagnosticReason.OFFLINE -> {
+            DiagnosticAction.CONNECT
+        }
+
+        DiagnosticReason.SIGN_IN_REQUIRED -> {
+            DiagnosticAction.SIGN_IN
+        }
+
+        DiagnosticReason.QUOTA_EXCEEDED -> {
+            DiagnosticAction.MANAGE_STORAGE
+        }
+
+        DiagnosticReason.MEDIA_TOO_LARGE -> {
+            DiagnosticAction.REPLACE_MEDIA
+        }
+
+        DiagnosticReason.LOCAL_STORAGE, DiagnosticReason.PERSISTENCE_FAILED -> {
+            DiagnosticAction.RETRY
+        }
+
+        DiagnosticReason.KEY_RECOVERY_REQUIRED -> {
+            DiagnosticAction.RECOVER_KEY
+        }
+
+        DiagnosticReason.INCOMPATIBLE_SERVER -> {
+            DiagnosticAction.UPDATE_SERVER
+        }
+
+        DiagnosticReason.UNSUPPORTED_FORMAT -> {
+            DiagnosticAction.UPDATE_APP
+        }
+
+        DiagnosticReason.CONFLICT -> {
+            DiagnosticAction.REVIEW_CONFLICT
+        }
+
+        DiagnosticReason.SERVER_UNAVAILABLE, DiagnosticReason.RATE_LIMITED -> {
+            DiagnosticAction.RETRY
+        }
+
+        DiagnosticReason.NONE -> {
             if (outcome == DiagnosticOutcome.INTERRUPTED || outcome == DiagnosticOutcome.RETRY_SCHEDULED) {
                 DiagnosticAction.RETRY
             } else {
                 DiagnosticAction.NONE
             }
-        else -> DiagnosticAction.CONTACT_SUPPORT
+        }
+
+        else -> {
+            DiagnosticAction.CONTACT_SUPPORT
+        }
     }

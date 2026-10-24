@@ -74,14 +74,20 @@ fun parseIdentityPublishingArgs(args: List<String>): IdentityPublishingInvocatio
         val name = args[index]
         if (!publish && name in publishOnly) throw IdentityPublishingUsageException("$name applies only to publish")
         when (name) {
-            in flags -> seenFlags += name
+            in flags -> {
+                seenFlags += name
+            }
+
             in valued -> {
                 val value = args.getOrNull(index + 1)
                 if (value == null || value.startsWith("--")) throw IdentityPublishingUsageException("$name needs a value")
                 if (values.put(name, value) != null) throw IdentityPublishingUsageException("$name was given twice")
                 index += 1
             }
-            else -> throw IdentityPublishingUsageException("Unknown argument $name")
+
+            else -> {
+                throw IdentityPublishingUsageException("Unknown argument $name")
+            }
         }
         index += 1
     }

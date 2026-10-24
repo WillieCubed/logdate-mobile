@@ -63,9 +63,15 @@ fun EntryProviderScope<NavKey>.watchHandoffEntries(
             } else {
                 val note = Uuid.parseOrNull(route.noteId)?.let { notes.getNoteById(it) }
                 when (route.target) {
-                    "edit" -> onOpenEditor(route.noteId)
-                    "play" -> onOpenPlayback(route.noteId)
-                    "day" ->
+                    "edit" -> {
+                        onOpenEditor(route.noteId)
+                    }
+
+                    "play" -> {
+                        onOpenPlayback(route.noteId)
+                    }
+
+                    "day" -> {
                         if (note != null) {
                             val zone =
                                 note.timeZoneId?.let { zoneId ->
@@ -75,13 +81,19 @@ fun EntryProviderScope<NavKey>.watchHandoffEntries(
                         } else {
                             state = WatchHandoffUiState.Missing
                         }
-                    "share" ->
+                    }
+
+                    "share" -> {
                         if (note != null) {
                             if (shareHandoffNote(note, sharing, shareTitle)) onBack() else state = WatchHandoffUiState.ShareFailed
                         } else {
                             state = WatchHandoffUiState.Missing
                         }
-                    else -> state = WatchHandoffUiState.Missing
+                    }
+
+                    else -> {
+                        state = WatchHandoffUiState.Missing
+                    }
                 }
             }
         }

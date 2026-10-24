@@ -411,7 +411,7 @@ class OfflineFirstPeopleGraphRepository(
             when (item.sourceType) {
                 InferredPersonEvidenceSourceType.ENTRY_TEXT.name,
                 InferredPersonEvidenceSourceType.TRANSCRIPT.name,
-                ->
+                -> {
                     PersonLinkEntity(
                         id = Uuid.random(),
                         personId = personId,
@@ -423,8 +423,9 @@ class OfflineFirstPeopleGraphRepository(
                         created = now,
                         lastUpdated = now,
                     )
+                }
 
-                InferredPersonEvidenceSourceType.EVENT_TEXT.name ->
+                InferredPersonEvidenceSourceType.EVENT_TEXT.name -> {
                     PersonLinkEntity(
                         id = Uuid.random(),
                         personId = personId,
@@ -436,8 +437,11 @@ class OfflineFirstPeopleGraphRepository(
                         created = now,
                         lastUpdated = now,
                     )
+                }
 
-                else -> null
+                else -> {
+                    null
+                }
             }
         }
     }
@@ -451,7 +455,9 @@ class OfflineFirstPeopleGraphRepository(
                 InferredPersonEvidenceSourceType.ENTRY_TEXT,
                 InferredPersonEvidenceSourceType.TRANSCRIPT,
                 -> PersonLinkTargetType.ENTRY
+
                 InferredPersonEvidenceSourceType.EVENT_TEXT -> PersonLinkTargetType.EVENT
+
                 else -> null
             } ?: return null
         val now = Clock.System.now()

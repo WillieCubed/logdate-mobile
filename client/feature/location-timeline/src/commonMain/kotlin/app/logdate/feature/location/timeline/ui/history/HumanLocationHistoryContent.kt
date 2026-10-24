@@ -547,10 +547,19 @@ private fun HumanHistoryWorkspace(
         focus = { mapContent(Modifier.fillMaxSize()) },
         supporting = {
             when {
-                supportingDetail != null -> supportingDetail()
-                state.detailVisible && state.selectedItem != null -> HistoryDetail(state.selectedItem!!, actions, embedded = true)
-                state.tab == HistoryTab.Places -> HistoryPlacesList(state, actions, placesState) { HistoryRecovery(state, actions) }
-                else ->
+                supportingDetail != null -> {
+                    supportingDetail()
+                }
+
+                state.detailVisible && state.selectedItem != null -> {
+                    HistoryDetail(state.selectedItem!!, actions, embedded = true)
+                }
+
+                state.tab == HistoryTab.Places -> {
+                    HistoryPlacesList(state, actions, placesState) { HistoryRecovery(state, actions) }
+                }
+
+                else -> {
                     HistoryDayList(state, actions, Modifier.fillMaxSize(), listState = listState) {
                         HistoryRecovery(state, actions)
                         HistoryDateHeader(state, actions)
@@ -563,6 +572,7 @@ private fun HumanHistoryWorkspace(
                         ) { Text(stringResource(if (replayVisible) Res.string.history_close_replay else Res.string.history_replay)) }
                         if (replayVisible) HistoryReplay(state, actions)
                     }
+                }
             }
         },
     )

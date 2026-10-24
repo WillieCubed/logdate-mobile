@@ -98,6 +98,7 @@ class DraftManager(
                     pendingDraftId = null
                     draft.id
                 }
+
                 DraftState.None -> {
                     val candidateId = pendingDraftId ?: Uuid.random().also { pendingDraftId = it }
                     createEntryDraft(
@@ -228,8 +229,11 @@ private fun AudioBlockUiState.toPendingMediaRecord(position: Int): PendingMediaR
     val filePath =
         when (val capture = captureState) {
             is AudioCaptureState.Recording -> capture.filePath
+
             is AudioCaptureState.Stopping -> capture.filePath
+
             is AudioCaptureState.Failed -> capture.filePath
+
             AudioCaptureState.Empty,
             is AudioCaptureState.Ready,
             -> return null
@@ -261,7 +265,7 @@ private fun AudioBlockUiState.toPendingMediaRecord(position: Int): PendingMediaR
  */
 private fun PendingMediaRecord.toBlock(): EntryBlockUiState? =
     when (mediaType) {
-        PendingMediaType.AUDIO ->
+        PendingMediaType.AUDIO -> {
             AudioBlockUiState(
                 id = blockId,
                 timestamp = createdAt,
@@ -270,4 +274,5 @@ private fun PendingMediaRecord.toBlock(): EntryBlockUiState? =
                 transcription = transcription,
                 timeZoneId = timeZoneId,
             )
+        }
     }

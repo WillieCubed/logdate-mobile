@@ -323,8 +323,14 @@ internal class InMemoryLogDateCollectionsMetadataStore : LogDateCollectionsMetad
             }
         states.compute(userId) { _, existing ->
             when {
-                existing == null -> LogDateCollectionsState(repoDid = repoDid, lastVersion = version)
-                existing.repoDid == repoDid -> existing.copy(lastVersion = version)
+                existing == null -> {
+                    LogDateCollectionsState(repoDid = repoDid, lastVersion = version)
+                }
+
+                existing.repoDid == repoDid -> {
+                    existing.copy(lastVersion = version)
+                }
+
                 else -> {
                     Napier.w("Preserving canonical repo DID ${existing.repoDid} for $userId instead of replacing it with $repoDid")
                     existing.copy(lastVersion = version)

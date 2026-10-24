@@ -210,6 +210,7 @@ fun calculateFoldableSplitLayout(
                 )
             }
         }
+
         FoldableHingeOrientation.Horizontal -> {
             val topHeight = hinge.bounds.top.coerceAtLeast(0.dp)
             val bottomHeight = (containerHeight - hinge.bounds.bottom).coerceAtLeast(0.dp)
@@ -239,7 +240,10 @@ fun calculateFoldableSplitLayout(
                 )
             }
         }
-        FoldableHingeOrientation.Unknown -> FoldableSplitLayout.None
+
+        FoldableHingeOrientation.Unknown -> {
+            FoldableSplitLayout.None
+        }
     }
 }
 

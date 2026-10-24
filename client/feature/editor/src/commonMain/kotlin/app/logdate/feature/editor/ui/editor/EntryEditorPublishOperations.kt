@@ -242,6 +242,7 @@ internal suspend fun EntryEditorViewModel.finalizePendingAudio(): Map<Uuid, Audi
                 }
                 return null
             }
+
             is AudioCaptureState.Failed -> {
                 Napier.w("Audio finalization failed for block $blockId: ${state.reason.key}")
                 mutableEditorState.update {
@@ -253,7 +254,10 @@ internal suspend fun EntryEditorViewModel.finalizePendingAudio(): Map<Uuid, Audi
                 }
                 return null
             }
-            else -> resolved[blockId] = state
+
+            else -> {
+                resolved[blockId] = state
+            }
         }
     }
     return resolved

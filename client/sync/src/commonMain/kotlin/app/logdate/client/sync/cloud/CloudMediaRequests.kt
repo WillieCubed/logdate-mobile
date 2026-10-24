@@ -56,7 +56,10 @@ internal suspend fun LogDateCloudApiClient.requestUploadMedia(
                 val responseBody = response.body<MediaUploadResponse>()
                 Result.success(responseBody)
             }
-            else -> handleApiError(response)
+
+            else -> {
+                handleApiError(response)
+            }
         }
     } catch (e: Exception) {
         if (e is CancellationException) throw e
@@ -106,10 +109,16 @@ internal suspend fun LogDateCloudApiClient.requestDownloadMedia(
                             ),
                         )
                     }
-                    else -> handleApiError(binaryResponse)
+
+                    else -> {
+                        handleApiError(binaryResponse)
+                    }
                 }
             }
-            else -> handleApiError(metadataResponse)
+
+            else -> {
+                handleApiError(metadataResponse)
+            }
         }
     } catch (e: Exception) {
         if (e is CancellationException) throw e

@@ -385,7 +385,10 @@ class LocationHistoryService(
                 links,
             ).associateBy { it.id }
         val linkedNoteIds = visits.values.flatMap { it.memoryIds }.toSet()
-        val datedNotes = notes.filter { it.creationTimestamp >= start && it.creationTimestamp < end || it.uid.toString() in linkedNoteIds }
+        val datedNotes =
+            notes.filter {
+                (it.creationTimestamp >= start && it.creationTimestamp < end) || it.uid.toString() in linkedNoteIds
+            }
         val superseded = edits.flatMap { it.supersedes }.toSet()
         val aliases = resolvePlaceAliases(edits)
         val displayedPlaces =
@@ -489,7 +492,7 @@ class LocationHistoryService(
         val raw =
             rawHistory
                 .getLocationHistoryBetween(item.start, item.end + 1.milliseconds)
-                .filter { it.userId == scope.first || it.userId == "default_user" && it.deviceId == currentDevice }
+                .filter { it.userId == scope.first || (it.userId == "default_user" && it.deviceId == currentDevice) }
                 .associateBy { it.sampleId }
         val changes = mutableListOf<HistoryRecord>()
         item.evidenceIds.distinct().forEach { evidenceId ->
@@ -585,7 +588,7 @@ class LocationHistoryService(
 private fun LocationDayItem.overlaps(
     start: Instant,
     end: Instant,
-): Boolean = this.start < end && (this.end > start || this.start == this.end && this.start >= start)
+): Boolean = this.start < end && (this.end > start || (this.start == this.end && this.start >= start))
 
 internal fun applyActivityEvidence(
     observations: List<LocationObservation>,

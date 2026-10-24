@@ -90,13 +90,19 @@ class OfflineFirstTranscriptionRepository(
                                 updateTranscription(note.uid, existing.text.orEmpty(), TranscriptionStatus.COMPLETED)
                             } else if (existing == null ||
                                 !matchesMedia ||
-                                existing.status == DbTranscriptionStatus.COMPLETED &&
-                                !final ||
+                                (
+                                    existing.status == DbTranscriptionStatus.COMPLETED &&
+                                        !final
+                                ) ||
                                 existing.status == DbTranscriptionStatus.PENDING ||
-                                existing.status == DbTranscriptionStatus.FAILED &&
-                                recovery ||
-                                existing.status == DbTranscriptionStatus.IN_PROGRESS &&
-                                (recovery || now() - existing.lastUpdated >= staleAfter)
+                                (
+                                    existing.status == DbTranscriptionStatus.FAILED &&
+                                        recovery
+                                ) ||
+                                (
+                                    existing.status == DbTranscriptionStatus.IN_PROGRESS &&
+                                        (recovery || now() - existing.lastUpdated >= staleAfter)
+                                )
                             ) {
                                 if (attempted.add(mediaRevision)) {
                                     val priority = if (recovery) TranscriptionPriority.RECOVERY else TranscriptionPriority.FOREGROUND
@@ -251,8 +257,10 @@ class OfflineFirstTranscriptionRepository(
                 val existing = transcriptionDao.getTranscriptionByNoteId(work.noteId)
                 if (note.deletedAt != null ||
                     note.contentUri != work.audioUri ||
-                    work.durationMs != null &&
-                    note.durationMs != work.durationMs ||
+                    (
+                        work.durationMs != null &&
+                            note.durationMs != work.durationMs
+                    ) ||
                     existing?.revision != work.transcriptRevision ||
                     existing.id != work.transcriptionId ||
                     existing.documentJson != work.documentJson ||
@@ -375,7 +383,7 @@ class OfflineFirstTranscriptionRepository(
         status: DbTranscriptionStatus,
     ): TranscriptionEntity {
         val base = existing ?: TranscriptionEntity(noteId = note.uid, text = null, status = status, created = now(), lastUpdated = now())
-        val invalid = !base.matchesMedia(note) || base.status == DbTranscriptionStatus.COMPLETED && !base.hasValidFinalDocument()
+        val invalid = !base.matchesMedia(note) || (base.status == DbTranscriptionStatus.COMPLETED && !base.hasValidFinalDocument())
         val row =
             if (invalid) {
                 base.copy(

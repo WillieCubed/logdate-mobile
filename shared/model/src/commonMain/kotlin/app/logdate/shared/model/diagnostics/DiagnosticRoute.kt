@@ -32,53 +32,69 @@ fun diagnosticRoute(path: String): DiagnosticRoute {
     val count = segments.size
     val tail = segments.lastOrNull()
     return when (segments.firstOrNull()) {
-        "contents" ->
+        "contents" -> {
             when {
                 count == 1 -> DiagnosticRoute.NOTES
                 count == 2 && tail == "changes" -> DiagnosticRoute.NOTE_CHANGES
                 count == 2 -> DiagnosticRoute.NOTE
                 else -> DiagnosticRoute.UNKNOWN
             }
-        "journals" ->
+        }
+
+        "journals" -> {
             when {
                 count == 1 -> DiagnosticRoute.JOURNALS
                 count == 2 && tail == "changes" -> DiagnosticRoute.JOURNAL_CHANGES
                 count == 2 -> DiagnosticRoute.JOURNAL
                 else -> DiagnosticRoute.UNKNOWN
             }
-        "drafts" ->
+        }
+
+        "drafts" -> {
             when {
                 count == 2 && tail == "changes" -> DiagnosticRoute.DRAFT_CHANGES
                 count == 2 -> DiagnosticRoute.DRAFT
                 else -> DiagnosticRoute.UNKNOWN
             }
-        "associations" ->
+        }
+
+        "associations" -> {
             when {
                 count == 1 -> DiagnosticRoute.ASSOCIATIONS
                 count == 2 && tail == "changes" -> DiagnosticRoute.ASSOCIATION_CHANGES
                 else -> DiagnosticRoute.UNKNOWN
             }
-        "media" ->
+        }
+
+        "media" -> {
             when {
                 count == 1 -> DiagnosticRoute.MEDIA
                 count == 2 -> DiagnosticRoute.MEDIA_ITEM
                 count == 3 && tail == "binary" -> DiagnosticRoute.MEDIA_BINARY
                 else -> DiagnosticRoute.UNKNOWN
             }
-        "backups" ->
+        }
+
+        "backups" -> {
             when {
                 count == 1 -> DiagnosticRoute.BACKUPS
                 count == 2 -> DiagnosticRoute.BACKUP
                 count == 3 && tail == "binary" -> DiagnosticRoute.BACKUP_BINARY
                 else -> DiagnosticRoute.UNKNOWN
             }
-        "diagnostics" ->
+        }
+
+        "diagnostics" -> {
             when {
                 count == 2 && tail == "reports" -> DiagnosticRoute.DIAGNOSTIC_REPORTS
                 count == 3 && segments[1] == "reports" -> DiagnosticRoute.DIAGNOSTIC_REPORT
                 else -> DiagnosticRoute.UNKNOWN
             }
-        else -> DiagnosticRoute.UNKNOWN
+        }
+
+        else -> {
+            DiagnosticRoute.UNKNOWN
+        }
     }
 }
 

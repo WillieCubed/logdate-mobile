@@ -354,7 +354,11 @@ internal class WearLegacyDelivery(
                 onSuccess()
                 settle(entityType, pending, version = 1)
             }
-            UploadOutcome.SKIPPED -> settle(entityType, pending, version = 0)
+
+            UploadOutcome.SKIPPED -> {
+                settle(entityType, pending, version = 0)
+            }
+
             UploadOutcome.AWAITING_ACK -> {
                 val errorMsg = "Phone did not confirm ${entityType.name.lowercase()} ${pending.entityId}"
                 val deadLettered = handleSyncFailure(pending, entityType, errorMsg, retryDelayMs = ACK_TIMEOUT_MS)
@@ -362,6 +366,7 @@ internal class WearLegacyDelivery(
                     errors.add(SyncError(type = SyncErrorType.NETWORK_ERROR, message = errorMsg, retryable = false))
                 }
             }
+
             UploadOutcome.FAILED -> {
                 val errorMsg = "Failed to sync ${entityType.name.lowercase()} ${pending.entityId}"
                 val deadLettered = handleSyncFailure(pending, entityType, errorMsg)

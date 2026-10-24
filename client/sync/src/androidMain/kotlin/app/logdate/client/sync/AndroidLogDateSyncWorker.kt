@@ -93,14 +93,17 @@ class AndroidLogDateSyncWorker(
                 Napier.d("Performing upload sync")
                 syncManager.uploadPendingChanges()
             }
+
             SYNC_TYPE_DOWNLOAD -> {
                 Napier.d("Performing download sync")
                 syncManager.downloadRemoteChanges()
             }
+
             SYNC_TYPE_FULL -> {
                 Napier.d("Performing full sync")
                 syncManager.fullSync()
             }
+
             else -> {
                 Napier.w("Unknown sync type, defaulting to full sync")
                 syncManager.fullSync()
