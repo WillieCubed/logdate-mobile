@@ -152,7 +152,10 @@ class RetainedJournalMergeRuntimeTest {
             koin.get<LogDateDatabase>().close()
             koin.get<SecureStorage>().remove(DATABASE_KEY_NAME)
             koin.get<PassphraseBackupStore>().clear()
-            assertNull(koin.get<SecureStorage>().getString(DATABASE_KEY_NAME))
+            assertTrue(
+                koin.get<SecureStorage>().getString(DATABASE_KEY_NAME) == null,
+                "The working database key was not durably removed",
+            )
             assertTrue(koin.get<PassphraseBackupStore>().readCandidates().isEmpty())
             val activeMedia = assertNotNull(sourceMediaPath)
             assertTrue(activeMedia.isFile)
@@ -405,7 +408,10 @@ class RetainedJournalMergeRuntimeTest {
             ?: error("Expected database-key recovery state")
 
     private suspend fun assertNoWorkingKey() {
-        assertNull(koin.get<SecureStorage>().getString(DATABASE_KEY_NAME))
+        assertTrue(
+            koin.get<SecureStorage>().getString(DATABASE_KEY_NAME) == null,
+            "The working database key is still present",
+        )
         assertTrue(koin.get<PassphraseBackupStore>().readCandidates().isEmpty())
     }
 

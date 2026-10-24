@@ -11,6 +11,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.IOException
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -47,21 +49,23 @@ class AndroidSecureStorage
 
         private val valueCache = mutableMapOf<String, String>()
         private val valueCacheFlow = MutableStateFlow<Map<String, String>>(emptyMap())
+        private val cacheMutex = Mutex()
         private val prefs: SharedPreferences = createEncryptedPrefs()
 
-        override suspend fun getString(key: String): String? {
-            val value = prefs.getString(key, null)
-            if (value != null) {
-                valueCache[key] = value
-                valueCacheFlow.value = valueCache.toMap()
+        override suspend fun getString(key: String): String? =
+            cacheMutex.withLock {
+                val value = prefs.getString(key, null)
+                if (value != null) {
+                    valueCache[key] = value
+                    valueCacheFlow.value = valueCache.toMap()
+                }
+                value
             }
-            return value
-        }
 
         override suspend fun putString(
             key: String,
             value: String,
-        ) {
+        ) = cacheMutex.withLock {
             if (!prefs.edit().putString(key, value).commit()) {
                 throw IOException("Encrypted secure storage write could not be committed")
             }
@@ -69,17 +73,23 @@ class AndroidSecureStorage
             valueCacheFlow.value = valueCache.toMap()
         }
 
-        override suspend fun remove(key: String) {
-            prefs.edit().remove(key).apply()
-            valueCache.remove(key)
-            valueCacheFlow.value = valueCache.toMap()
-        }
+        override suspend fun remove(key: String) =
+            cacheMutex.withLock {
+                if (!prefs.edit().remove(key).commit()) {
+                    throw IOException("Encrypted secure storage removal could not be committed")
+                }
+                valueCache.remove(key)
+                valueCacheFlow.value = valueCache.toMap()
+            }
 
-        override suspend fun clear() {
-            prefs.edit().clear().apply()
-            valueCache.clear()
-            valueCacheFlow.value = emptyMap()
-        }
+        override suspend fun clear() =
+            cacheMutex.withLock {
+                if (!prefs.edit().clear().commit()) {
+                    throw IOException("Encrypted secure storage clear could not be committed")
+                }
+                valueCache.clear()
+                valueCacheFlow.value = emptyMap()
+            }
 
         override fun observeString(key: String): Flow<String?> = valueCacheFlow.map { cache -> cache[key] }
 

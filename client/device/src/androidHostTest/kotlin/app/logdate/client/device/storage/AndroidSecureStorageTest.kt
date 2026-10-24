@@ -228,6 +228,82 @@ class AndroidSecureStorageTest {
             assertEquals(emptyMap(), storage.observeAll().first())
         }
 
+    @Test
+    fun `removing a key waits for the encrypted preferences commit`() =
+        runTest {
+            val editor = mockk<SharedPreferences.Editor>(relaxed = true)
+            every { editor.remove("session") } returns editor
+            every { editor.commit() } returns true
+            val prefs =
+                mockk<SharedPreferences> {
+                    every { all } returns mapOf("session" to "token")
+                    every { edit() } returns editor
+                }
+            val storage = AndroidSecureStorage { prefs }
+
+            storage.remove("session")
+
+            verify(exactly = 1) { editor.commit() }
+            verify(exactly = 0) { editor.apply() }
+            assertEquals(emptyMap(), storage.observeAll().first())
+        }
+
+    @Test
+    fun `a failed key removal does not publish an observed removal`() =
+        runTest {
+            val editor = mockk<SharedPreferences.Editor>(relaxed = true)
+            every { editor.remove("session") } returns editor
+            every { editor.commit() } returns false
+            val prefs =
+                mockk<SharedPreferences> {
+                    every { all } returns mapOf("session" to "token")
+                    every { edit() } returns editor
+                }
+            val storage = AndroidSecureStorage { prefs }
+
+            assertFailsWith<IOException> { storage.remove("session") }
+
+            assertEquals(mapOf("session" to "token"), storage.observeAll().first())
+        }
+
+    @Test
+    fun `clearing keys waits for the encrypted preferences commit`() =
+        runTest {
+            val editor = mockk<SharedPreferences.Editor>(relaxed = true)
+            every { editor.clear() } returns editor
+            every { editor.commit() } returns true
+            val prefs =
+                mockk<SharedPreferences> {
+                    every { all } returns mapOf("session" to "token")
+                    every { edit() } returns editor
+                }
+            val storage = AndroidSecureStorage { prefs }
+
+            storage.clear()
+
+            verify(exactly = 1) { editor.commit() }
+            verify(exactly = 0) { editor.apply() }
+            assertEquals(emptyMap(), storage.observeAll().first())
+        }
+
+    @Test
+    fun `a failed clear does not publish an observed clear`() =
+        runTest {
+            val editor = mockk<SharedPreferences.Editor>(relaxed = true)
+            every { editor.clear() } returns editor
+            every { editor.commit() } returns false
+            val prefs =
+                mockk<SharedPreferences> {
+                    every { all } returns mapOf("session" to "token")
+                    every { edit() } returns editor
+                }
+            val storage = AndroidSecureStorage { prefs }
+
+            assertFailsWith<IOException> { storage.clear() }
+
+            assertEquals(mapOf("session" to "token"), storage.observeAll().first())
+        }
+
     /**
      * Stands in for Tink's real `InvalidProtocolBufferException`, which is shaded into an
      * internal package and so can only be matched by class name, not by catching its type.
