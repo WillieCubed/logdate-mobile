@@ -374,6 +374,8 @@ def run(font, output, sdk):
                 "partial",
                 "paused",
                 "preview",
+                "archive-access-lost",
+                "backup-journal-access",
                 "missing-key",
                 "late-key",
                 "app-lock",

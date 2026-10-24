@@ -130,6 +130,16 @@ internal fun RestoreBottomSheet(
                             reason = resolveErrorText(state.error),
                             onRetry = onRetry,
                             onDismiss = onDismiss,
+                            actionLabel =
+                                if (state.error == RestoreError.FILE_NOT_ACCESSIBLE ||
+                                    state.error == RestoreError.INVALID_ARCHIVE ||
+                                    state.error == RestoreError.MISSING_SOURCE ||
+                                    state.error == RestoreError.UNSUPPORTED_VERSION
+                                ) {
+                                    stringResource(Res.string.restore_choose_file)
+                                } else {
+                                    null
+                                },
                         )
                     }
                     is RestoreState.Idle -> {

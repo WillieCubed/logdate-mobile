@@ -5,9 +5,11 @@ import app.logdate.feature.core.sync.SyncAction
 import app.logdate.feature.core.sync.SyncPresentation
 import app.logdate.feature.core.sync.messageResource
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.sync_account_device_access
+import logdate.client.feature.core.generated.resources.sync_account_local_unavailable
 import logdate.client.feature.core.generated.resources.sync_account_offline
 import logdate.client.feature.core.generated.resources.sync_account_recovery_required
-import logdate.client.feature.core.generated.resources.sync_account_unknown
+import logdate.client.feature.core.generated.resources.sync_account_server_unavailable
 import logdate.client.feature.core.generated.resources.sync_account_wifi
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,7 +19,9 @@ class AccountSyncPresentationTest {
     fun `known pauses explain why syncing cannot proceed`() {
         assertEquals(Res.string.sync_account_offline, AccountSyncStatus.OFFLINE.messageResource())
         assertEquals(Res.string.sync_account_wifi, AccountSyncStatus.WAITING_FOR_WIFI.messageResource())
-        assertEquals(Res.string.sync_account_unknown, AccountSyncStatus.SERVER_UNAVAILABLE.messageResource())
+        assertEquals(Res.string.sync_account_server_unavailable, AccountSyncStatus.SERVER_UNAVAILABLE.messageResource())
+        assertEquals(Res.string.sync_account_device_access, AccountSyncStatus.DEVICE_ACCESS_REQUIRED.messageResource())
+        assertEquals(Res.string.sync_account_local_unavailable, AccountSyncStatus.LOCAL_DATA_UNAVAILABLE.messageResource())
         assertEquals(Res.string.sync_account_recovery_required, AccountSyncStatus.KEY_RECOVERY_REQUIRED.messageResource())
     }
 

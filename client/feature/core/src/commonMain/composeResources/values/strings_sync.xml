@@ -278,10 +278,10 @@
     <string name="sync_account_recovery_required">This device needs your recovery phrase to keep syncing.</string>
     <string name="sync_account_wifi">Photos and recordings will sync when this device is on Wi-Fi.</string>
     <string name="sync_account_background">Sync paused: background network access is restricted on this device.</string>
-    <string name="sync_account_device_access">Sync paused while this device gets access to your journal.</string>
+    <string name="sync_account_device_access">Some cloud entries could not be opened on this device. Check another signed-in device for a readable copy.</string>
     <string name="sync_account_device_link">Sync paused: set up this device from your phone.</string>
     <string name="sync_account_conflict">Sync could not merge an entry edited on another device. Both copies are saved.</string>
-    <string name="sync_account_local_unavailable">Sync is incomplete: some local data is unavailable on this device.</string>
+    <string name="sync_account_local_unavailable">Some local data is unavailable. Your readable journal remains here. If you saved an archive, import it from Settings &gt; Data &amp; Storage.</string>
     <string name="sync_account_storage_unsupported">Sync paused: your journal is stored in a way this version of LogDate can’t sync. Update LogDate to keep syncing.</string>
     <string name="sync_account_update_app">Update LogDate</string>
     <string name="sync_account_media_too_large">Sync is incomplete: an attachment exceeds the current upload limit.</string>

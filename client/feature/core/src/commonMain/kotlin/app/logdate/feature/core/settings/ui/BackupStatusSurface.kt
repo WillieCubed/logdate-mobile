@@ -112,7 +112,7 @@ internal fun BackupStatusItem(
                             when {
                                 status == AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED ->
                                     Res.string.sync_account_storage_unsupported_detail
-                                title == Res.string.sync_heading_failed -> Res.string.sync_retry_automatic_detail
+                                status == AccountSyncStatus.UNKNOWN -> Res.string.sync_retry_automatic_detail
                                 else -> status.messageResource()
                             }
                         Text(
@@ -130,7 +130,9 @@ internal fun BackupStatusItem(
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 ) { Text(stringResource(Res.string.sync_account_mobile_data)) }
             }
-            if (status == AccountSyncStatus.KEY_RECOVERY_REQUIRED && onEnterRecoveryPhrase != null) {
+            val phraseRecoveryAvailable =
+                status == AccountSyncStatus.KEY_RECOVERY_REQUIRED || status == AccountSyncStatus.DEVICE_ACCESS_REQUIRED
+            if (phraseRecoveryAvailable && onEnterRecoveryPhrase != null) {
                 Button(
                     onClick = onEnterRecoveryPhrase,
                     shape = MaterialTheme.shapes.large,

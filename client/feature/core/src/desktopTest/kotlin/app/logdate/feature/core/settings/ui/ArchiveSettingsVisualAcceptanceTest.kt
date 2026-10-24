@@ -25,6 +25,7 @@ import app.logdate.client.domain.export.ExportCounts
 import app.logdate.client.domain.export.ExportSchemaVersion
 import app.logdate.client.domain.export.ExportStats
 import app.logdate.client.domain.restore.ArchivePreview
+import app.logdate.client.sync.SyncStatus
 import app.logdate.feature.core.export.ExportState
 import app.logdate.feature.core.restore.ImportOptions
 import app.logdate.feature.core.restore.RestoreState
@@ -38,6 +39,46 @@ import kotlin.time.Instant
 
 @OptIn(ExperimentalTestApi::class)
 class ArchiveSettingsVisualAcceptanceTest {
+    @Test
+    fun unreadableCloudEntriesKeepRecoveryActionVisibleOnTabletAndLargeTextPhone() {
+        listOf(Variant("tablet", 1280, 800), Variant("phone-200", 411, 891, 2f)).forEach { variant ->
+            runDesktopComposeUiTest(width = variant.width, height = variant.height) {
+                var phraseOpens = 0
+                setContent {
+                    val density = LocalDensity.current
+                    CompositionLocalProvider(LocalDensity provides Density(density.density, variant.fontScale)) {
+                        LogDateTheme(dynamicColor = false) {
+                            SyncSettingsContent(
+                                onBack = {},
+                                syncStatus =
+                                    SyncStatus(
+                                        isEnabled = true,
+                                        lastSyncTime = null,
+                                        pendingUploads = 0,
+                                        isSyncing = false,
+                                        hasErrors = false,
+                                        unreadableCloudCount = 1,
+                                    ),
+                                isAuthenticated = true,
+                                onSyncNow = {},
+                                onNavigateToSignIn = {},
+                                onNavigateToRecoveryPhrase = { phraseOpens++ },
+                                quotaUsage = StorageQuotaUi(0, 0, 0f, formattedTotal = "0 GB", formattedUsed = "0 GB"),
+                                isQuotaAvailable = false,
+                                snackbarHostState = SnackbarHostState(),
+                            )
+                        }
+                    }
+                }
+                onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Enter recovery phrase"))
+                onNodeWithText("Enter recovery phrase").assertIsDisplayed()
+                save("backup-unreadable-${variant.name}", onRoot().captureToImage())
+                onNodeWithText("Enter recovery phrase").performClick()
+                runOnIdle { assertEquals(1, phraseOpens) }
+            }
+        }
+    }
+
     @Test
     fun exportAndImportAdaptAcrossPhoneTabletShortLandscapeAndLargeText() {
         listOf(
