@@ -17,10 +17,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -40,8 +36,6 @@ sealed interface AccountUiState {
         val hasRecoveryPhrase: Boolean?,
         /** `null` when there is no email to show and no way to add one here. */
         val email: EmailRow?,
-        /** `null` when recovery keys are not offered: the feature is off or the server can't perform them. */
-        val recoveryKey: RecoveryKeyRow? = null,
         val server: ServerRow,
         val isSigningOut: Boolean,
     ) : AccountUiState
@@ -63,16 +57,6 @@ sealed interface SignInSummary {
 
     /** The list could not be read; the row still opens the screen that can retry. */
     data object Unknown : SignInSummary
-}
-
-/** What the Recovery key row says about the identity's recovery key. */
-enum class RecoveryKeyRow {
-    CHECKING,
-    ON,
-    OFF,
-
-    /** The identity could not be read; the row still opens the screen that can retry. */
-    UNKNOWN,
 }
 
 data class EmailRow(
@@ -110,10 +94,6 @@ class AccountViewModel(
     private val hasRecoveryPhrase: suspend () -> Boolean,
     private val isEmailVerificationAvailable: suspend () -> Boolean,
     private val verifyEmail: suspend () -> EmailVerificationOutcome,
-    /** Whether the recovery key is offered: its feature flag is on and the server supports it. */
-    private val isRecoveryKeyOffered: Flow<Boolean> = flowOf(false),
-    /** Whether the identity has a recovery key registered. */
-    private val hasRecoveryKey: suspend () -> Boolean = { false },
 ) : ViewModel() {
     private val details = MutableStateFlow(AccountDetails())
     private var loadJob: Job? = null
@@ -130,8 +110,8 @@ class AccountViewModel(
             accountRepository.currentAccount,
             userIdentity,
             connectedServer.info,
-            combine(details, isRecoveryKeyOffered) { details, offered -> details to offered },
-        ) { isAuthenticated, account, identity, server, (details, recoveryKeyOffered) ->
+            details,
+        ) { isAuthenticated, account, identity, server, loaded ->
             if (!isAuthenticated) return@combine AccountUiState.SignedOut
             AccountUiState.SignedIn(
                 header =
@@ -139,31 +119,26 @@ class AccountViewModel(
                         displayName = identity.displayName.ifBlank { account?.displayName.orEmpty() },
                         username = identity.username ?: account?.username,
                     ),
-                signIn = details.signIn,
-                hasRecoveryPhrase = details.hasRecoveryPhrase,
+                signIn = loaded.signIn,
+                hasRecoveryPhrase = loaded.hasRecoveryPhrase,
                 email =
                     when {
                         account?.email != null ->
                             EmailRow(
                                 address = account.email,
                                 isVerified = account.emailVerified,
-                                canVerify = !account.emailVerified && details.canVerifyEmail,
+                                canVerify = !account.emailVerified && loaded.canVerifyEmail,
                             )
-                        details.canVerifyEmail -> EmailRow(address = null, isVerified = false, canVerify = true)
+                        loaded.canVerifyEmail -> EmailRow(address = null, isVerified = false, canVerify = true)
                         else -> null
                     },
                 server = ServerRow(name = server.displayName, host = server.host, isLogDateCloud = server.isLogDateCloud),
-                recoveryKey = if (recoveryKeyOffered) details.recoveryKey else null,
-                isSigningOut = details.isSigningOut,
+                isSigningOut = loaded.isSigningOut,
             )
         }.stateIn(viewModelScope, SharingStarted.Eagerly, AccountUiState.Loading)
 
     init {
         refresh()
-        // The server's description is refreshed after the screen opens, so the row can become offered later.
-        viewModelScope.launch {
-            isRecoveryKeyOffered.drop(1).filter { it }.collect { loadRecoveryKey() }
-        }
     }
 
     /**
@@ -236,16 +211,7 @@ class AccountViewModel(
                 val signIn = loadSignInSummary()
                 details.update { it.copy(signIn = signIn) }
             }
-            launch { if (isRecoveryKeyOffered.first()) loadRecoveryKey() }
         }
-
-    private suspend fun loadRecoveryKey() {
-        val row =
-            runCatching { hasRecoveryKey() }
-                .onFailure { Napier.w("Could not check for a recovery key", it) }
-                .fold(onSuccess = { if (it) RecoveryKeyRow.ON else RecoveryKeyRow.OFF }, onFailure = { RecoveryKeyRow.UNKNOWN })
-        details.update { it.copy(recoveryKey = row) }
-    }
 
     private suspend fun loadSignInSummary(): SignInSummary {
         val (passkeys, providers) =
@@ -268,7 +234,6 @@ class AccountViewModel(
     private data class AccountDetails(
         val signIn: SignInSummary = SignInSummary.Loading,
         val hasRecoveryPhrase: Boolean? = null,
-        val recoveryKey: RecoveryKeyRow = RecoveryKeyRow.CHECKING,
         val canVerifyEmail: Boolean = false,
         val isSigningOut: Boolean = false,
     )

@@ -10,7 +10,6 @@ import app.logdate.client.domain.export.archive.MediaSourceOpener
 import app.logdate.client.domain.identity.ObserveUserIdentityUseCase
 import app.logdate.client.location.di.locationSettingsModule
 import app.logdate.client.permissions.PasskeyManager
-import app.logdate.client.repository.account.AccountIdentityRepository
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.BiometricGatekeeper
@@ -39,9 +38,10 @@ import app.logdate.feature.core.settings.account.move.LocalDataSurvey
 import app.logdate.feature.core.settings.account.move.MoveServerViewModel
 import app.logdate.feature.core.settings.account.move.ServerMove
 import app.logdate.feature.core.settings.account.move.ServerMoveStore
+import app.logdate.feature.core.settings.account.recovery.IdentityAccountRecovery
 import app.logdate.feature.core.settings.account.recovery.RecoveryPhraseViewModel
-import app.logdate.feature.core.settings.account.recoverykey.passkeysSupported
-import app.logdate.feature.core.settings.account.recoverykey.recoveryKeyOffered
+import app.logdate.feature.core.settings.account.recovery.accountRecoveryOffered
+import app.logdate.feature.core.settings.account.recovery.passkeysSupported
 import app.logdate.feature.core.settings.account.signin.SignInMethodsViewModel
 import app.logdate.feature.core.settings.ui.AdvancedSettingsViewModel
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
@@ -82,7 +82,6 @@ actual val coreFeatureModule: Module =
         includes(accountModule)
         includes(devicesModule)
         includes(labsSettingsModule)
-        includes(recoveryKeyModule)
         includes(locationSettingsModule)
 
         // TODO: Refactor to separate auth module
@@ -106,9 +105,6 @@ actual val coreFeatureModule: Module =
                 hasRecoveryPhrase = { get<IdentityKeyManager>().hasIdentityKey() },
                 isEmailVerificationAvailable = { get<EmailVerificationAvailability>().isAvailable() },
                 verifyEmail = { get<VerifyEmailUseCase>()() },
-                isRecoveryKeyOffered =
-                    recoveryKeyOffered(featureFlags = get(), connectedServer = get(), passkeysSupported = passkeysSupported(get())),
-                hasRecoveryKey = { get<AccountIdentityRepository>().getIdentityStatus().getOrThrow().plcRecoveryDidKey != null },
             )
         }
         viewModel {
@@ -117,6 +113,16 @@ actual val coreFeatureModule: Module =
                 loadPhrase = { get<IdentityKeyManager>().getStoredRecoveryPhrase()?.words },
                 confirmPhrase = { get<IdentityKeyManager>().verifyRecoveryPhrase(it) },
                 isPhraseVerified = { get<IdentityKeyManager>().isRecoveryPhraseVerified() },
+                recovery =
+                    IdentityAccountRecovery(
+                        identity = get(),
+                        isOffered =
+                            accountRecoveryOffered(
+                                featureFlags = get(),
+                                connectedServer = get(),
+                                passkeysSupported = passkeysSupported(get()),
+                            ),
+                    ),
             )
         }
         viewModel {
