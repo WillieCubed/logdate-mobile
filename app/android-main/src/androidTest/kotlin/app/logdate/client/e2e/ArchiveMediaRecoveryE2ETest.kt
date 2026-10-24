@@ -120,20 +120,50 @@ class ArchiveMediaRecoveryE2ETest {
                 require(arguments.getString("archiveCancellationAcceptance") == "true")
             }
             when (mode) {
-                "seed" -> seed(recoverableSource = arguments.getString("archiveCancellationAcceptance") == "true")
-                "repair" -> repair()
-                "automatic" -> automaticRepair()
-                "waiting" -> verifyRetainedWaitingState()
-                "verify" -> verify()
-                "cleanup-rejected-fixture" -> cleanupRejectedFixture()
-                "cancel-running" -> cancelRunningRecovery()
-                "paused" -> verifyCancelledAfterRestart()
-                "resume-cancelled" -> resumeCancelledRecovery()
+                "seed" -> {
+                    seed(recoverableSource = arguments.getString("archiveCancellationAcceptance") == "true")
+                }
+
+                "repair" -> {
+                    repair()
+                }
+
+                "automatic" -> {
+                    automaticRepair()
+                }
+
+                "waiting" -> {
+                    verifyRetainedWaitingState()
+                }
+
+                "verify" -> {
+                    verify()
+                }
+
+                "cleanup-rejected-fixture" -> {
+                    cleanupRejectedFixture()
+                }
+
+                "cancel-running" -> {
+                    cancelRunningRecovery()
+                }
+
+                "paused" -> {
+                    verifyCancelledAfterRestart()
+                }
+
+                "resume-cancelled" -> {
+                    resumeCancelledRecovery()
+                }
+
                 "verify-cancelled" -> {
                     verifyCancelledCompletion()
                     verify()
                 }
-                else -> error("Choose seed, repair, or verify for the owned emulator")
+
+                else -> {
+                    error("Choose seed, repair, or verify for the owned emulator")
+                }
             }
         }
 
