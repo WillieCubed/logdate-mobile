@@ -23,12 +23,12 @@ import java.io.FileOutputStream
 class AndroidManagedMediaImportSource(
     context: Context,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    stagingParent: File = context.cacheDir,
 ) : ManagedMediaImportSource {
     private val applicationContext = context.applicationContext
     private val contentResolver = applicationContext.contentResolver
 
-    // Looked up on first use, which is on the IO dispatcher; reading cacheDir touches the disk.
-    private val stagingDirectory by lazy { File(applicationContext.cacheDir, STAGING_DIRECTORY_NAME) }
+    private val stagingDirectory by lazy { File(stagingParent, STAGING_DIRECTORY_NAME) }
 
     override suspend fun stage(sourceUri: String): StagedMediaFile {
         var stagedFile: File? = null

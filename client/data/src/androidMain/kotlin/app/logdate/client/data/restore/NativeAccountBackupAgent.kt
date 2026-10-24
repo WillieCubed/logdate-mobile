@@ -7,7 +7,9 @@ import app.logdate.client.data.account.NativeRestoreAccountPolicy
 import app.logdate.client.database.requirePortableCloudBackupKey
 import app.logdate.client.device.restore.NativeBackupAgent
 import app.logdate.client.device.restore.PostRestoreDetector
+import app.logdate.client.media.storage.AndroidMediaClaimFence
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import java.io.File
 
 /** The restricted callback retains a nonsecret request; the system job performs authentication. */
@@ -23,17 +25,26 @@ class NativeAccountBackupAgent : NativeBackupAgent() {
             File(filesDir, "db_recovery/passphrase_backup"),
         )
 
-    override fun prepareNativeJournalTransferBackup() = journalTransfer.prepare()
+    override fun prepareNativeJournalTransferBackup() =
+        runBlocking { AndroidMediaClaimFence(noBackupFilesDir).withClaim { journalTransfer.prepare() } }
 
-    override fun backupSelectedNativeMedia(data: FullBackupDataOutput) = journalTransfer.backupSelectedMedia { fullBackupFile(it, data) }
+    override fun backupSelectedNativeMedia(data: FullBackupDataOutput) =
+        runBlocking {
+            AndroidMediaClaimFence(noBackupFilesDir).withClaim {
+                journalTransfer.backupSelectedMedia { fullBackupFile(it, data) }
+            }
+        }
 
-    override fun finishNativeJournalTransferBackup() = journalTransfer.finish()
+    override fun finishNativeJournalTransferBackup() =
+        runBlocking { AndroidMediaClaimFence(noBackupFilesDir).withClaim { journalTransfer.finish() } }
 
-    override fun restoreNativeJournalTransferSnapshot(): Boolean = journalRestore.restore()
+    override fun restoreNativeJournalTransferSnapshot(): Boolean =
+        runBlocking { AndroidMediaClaimFence(noBackupFilesDir).withClaim { journalRestore.restore() } }
 
     override fun wasNativeJournalTransferStaged(): Boolean = journalRestore.wasStaged()
 
-    override fun finishNativeJournalTransferRestore() = journalRestore.finish()
+    override fun finishNativeJournalTransferRestore() =
+        runBlocking { AndroidMediaClaimFence(noBackupFilesDir).withClaim { journalRestore.finish() } }
 
     override fun scheduleRetainedJournalReconciliation() {
         app.logdate.client.data.restore

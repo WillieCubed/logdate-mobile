@@ -2,9 +2,12 @@ package app.logdate.client.sync
 
 import app.logdate.client.device.crypto.IdentityKeyNotFoundException
 import app.logdate.client.media.ConditionalMediaSaver
+import app.logdate.client.media.ManagedMediaPublicationCustody
+import app.logdate.client.media.ManagedMediaPublicationCustody.None
 import app.logdate.client.media.MediaFileSource
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.media.StagedMediaFile
 import app.logdate.client.media.storage.MediaReference
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.media.storage.UnavailableMediaReferences
@@ -37,6 +40,7 @@ internal class SyncMediaTransfer(
     private val cloudMediaDataSource: CloudMediaDataSource,
     private val mediaReferences: StoredMediaReferences = StoredMediaReferences.Unchanged,
     private val mayDownload: suspend () -> Boolean = { true },
+    private val publicationCustody: ManagedMediaPublicationCustody = None,
 ) {
     /** Whether two stored references name the same local file, however each is spelled. */
     fun sameLocalFile(
@@ -482,6 +486,11 @@ internal class SyncMediaTransfer(
         try {
             if (file.contentId != note.uid) return MediaHydrationResult.Pending(DiagnosticReason.CORRUPT_PAYLOAD)
             if (isStillCurrent != null && !isStillCurrent()) throw CancellationException("Media hydration scope changed")
+            val ticket =
+                publicationCustody.reserve(
+                    "sync-media:${note.uid}:$mediaId",
+                    StagedMediaFile(file.path.toString(), file.fileName, file.mimeType),
+                )
             val localUri =
                 try {
                     if (isStillCurrent == null) {
@@ -495,6 +504,7 @@ internal class SyncMediaTransfer(
                 } catch (_: Exception) {
                     return MediaHydrationResult.Pending(DiagnosticReason.LOCAL_STORAGE)
                 }
+            publicationCustody.publish(ticket, localUri)
             if (isStillCurrent != null && !isStillCurrent()) {
                 throw CancellationException("Media hydration scope changed")
             }

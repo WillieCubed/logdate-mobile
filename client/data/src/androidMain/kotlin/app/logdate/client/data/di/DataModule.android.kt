@@ -44,6 +44,7 @@ import app.logdate.client.data.people.OfflineFirstPeopleRepository
 import app.logdate.client.data.places.OfflineFirstUserPlacesRepository
 import app.logdate.client.data.profile.OfflineFirstProfileRepository
 import app.logdate.client.data.quota.AndroidRemoteQuotaDataSource
+import app.logdate.client.data.restore.AndroidMediaOwnerCensus
 import app.logdate.client.data.rewind.DefaultRewindGenerationManager
 import app.logdate.client.data.rewind.OfflineFirstReflectionPromptResponseRepository
 import app.logdate.client.data.rewind.OfflineFirstRewindRepository
@@ -64,6 +65,8 @@ import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.userVisibleDeviceName
 import app.logdate.client.di.datastoreModule
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.storage.MediaClaimFence
+import app.logdate.client.media.storage.MediaOwnerCensus
 import app.logdate.client.media.storage.MediaReclamationJournal
 import app.logdate.client.media.storage.MediaRescuer
 import app.logdate.client.networking.DefaultAccountKeyEnvelopeApi
@@ -253,7 +256,17 @@ actual val dataModule: Module =
         single<EntryDraftRepository> { get<OfflineFirstEntryDraftRepository>() }
         single<EntryDraftRecoveryRepository> { get<OfflineFirstEntryDraftRepository>() }
         single { NativeEntryDraftMediaQuarantine(get()) }
-        factory<LocalEntryDraftStore> { AndroidLocalEntryDraftStore(get<Context>()) }
+        factory<LocalEntryDraftStore> { AndroidLocalEntryDraftStore(get<Context>(), get<MediaClaimFence>()) }
+        single<MediaOwnerCensus> {
+            AndroidMediaOwnerCensus(
+                get(),
+                get(
+                    org.koin.core.qualifier
+                        .named("mainDataStore"),
+                ),
+                AndroidLocalEntryDraftStore(get<Context>(), get<MediaClaimFence>()),
+            )
+        }
 
         // Rewind
         single<RewindRepository> { OfflineFirstRewindRepository(get()) }

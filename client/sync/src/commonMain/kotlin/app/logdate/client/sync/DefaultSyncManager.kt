@@ -3,6 +3,7 @@ package app.logdate.client.sync
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.identity.DeviceIdProvider
+import app.logdate.client.media.ManagedMediaPublicationCustody
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.networking.DataUsagePolicy
@@ -134,6 +135,7 @@ class DefaultSyncManager(
     spaceMigration: SpaceMigrationDependencies? = null,
     /** Which store this device last synced each account through, to notice when the account moves. */
     internal val syncRouteStore: SyncRouteStore = InMemorySyncRouteStore(),
+    private val publicationCustody: ManagedMediaPublicationCustody = ManagedMediaPublicationCustody.None,
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     internal val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -422,6 +424,7 @@ class DefaultSyncManager(
             cloudMediaDataSource = cloudMediaDataSource,
             mediaReferences = mediaReferences,
             mayDownload = { mediaRecoveryAllowed() },
+            publicationCustody = publicationCustody,
         )
 
     internal val retryCoordinator =

@@ -2,6 +2,7 @@ package app.logdate.client.sync
 
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.media.ManagedMediaPublicationCustody
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.media.storage.UnavailableMediaReferences
@@ -32,11 +33,17 @@ class AutomaticMediaRecovery(
     private val config: LogDateConfigRepository,
     references: StoredMediaReferences = StoredMediaReferences.Unchanged,
     private val dataUsagePolicy: app.logdate.client.networking.DataUsagePolicy? = null,
+    publicationCustody: ManagedMediaPublicationCustody = ManagedMediaPublicationCustody.None,
 ) {
     private val transfer =
-        SyncMediaTransfer(media, refs, cloud, references) {
-            dataUsagePolicy?.let { mediaSyncAllowed(it.currentMode(), currentScope()) } ?: true
-        }
+        SyncMediaTransfer(
+            media,
+            refs,
+            cloud,
+            references,
+            { dataUsagePolicy?.let { mediaSyncAllowed(it.currentMode(), currentScope()) } ?: true },
+            publicationCustody,
+        )
     private val tokens = SyncTokenRefresher(sessions, accounts)
 
     suspend fun recover(

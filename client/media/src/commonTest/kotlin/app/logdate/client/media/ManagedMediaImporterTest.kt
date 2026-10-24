@@ -18,6 +18,96 @@ import kotlin.time.Instant
 
 class ManagedMediaImporterTest {
     @Test
+    fun `a failed destination claim retains the staged import for recovery`() =
+        runTest {
+            val sourceUri = "content://picker/images/claim-crash"
+            val source = RevocableImportSource(sourceUri, "capture.jpg", "image/jpeg", byteArrayOf(1, 2, 3))
+            val manager = CopyingMediaManager(source::readStagedBytes)
+            val importer = ManagedMediaImporter(manager, source)
+
+            assertFailsWith<IllegalStateException> {
+                importer.importAndClaim("draft/first/image", sourceUri) { reference ->
+                    assertTrue(source.hasStagedFiles())
+                    assertTrue(manager.hasManagedMedia(reference))
+                    error("claim interrupted")
+                }
+            }
+
+            assertTrue(source.hasStagedFiles())
+            assertTrue(source.discardedPaths.isEmpty())
+        }
+
+    @Test
+    fun `a durable destination claim releases the staged import afterward`() =
+        runTest {
+            val sourceUri = "content://picker/images/claimed"
+            val source = RevocableImportSource(sourceUri, "capture.jpg", "image/jpeg", byteArrayOf(1, 2, 3))
+            val manager = CopyingMediaManager(source::readStagedBytes)
+            val importer = ManagedMediaImporter(manager, source)
+
+            val claimed =
+                importer.importAndClaim("draft/first/image", sourceUri) { reference ->
+                    assertTrue(source.hasStagedFiles())
+                    assertTrue(manager.hasManagedMedia(reference))
+                    true
+                }
+
+            assertTrue(claimed)
+            assertFalse(source.hasStagedFiles())
+        }
+
+    @Test
+    fun `publication ticket is acknowledged only after the destination claim commits`() =
+        runTest {
+            val sourceUri = "content://picker/images/ticketed"
+            val source = RevocableImportSource(sourceUri, "capture.jpg", "image/jpeg", byteArrayOf(1, 2, 3))
+            val events = mutableListOf<String>()
+            val custody =
+                object : ManagedMediaPublicationCustody {
+                    override suspend fun reserve(
+                        destination: String,
+                        stagedMedia: StagedMediaFile,
+                    ): String {
+                        events += "reserve:$destination:${stagedMedia.sourceFilePath}"
+                        return "ticket-1"
+                    }
+
+                    override suspend fun publish(
+                        ticketId: String,
+                        reference: String,
+                    ) {
+                        events += "publish:$ticketId:$reference"
+                    }
+
+                    override suspend fun acknowledge(
+                        ticketId: String,
+                        reference: String,
+                    ) {
+                        events += "acknowledge:$ticketId:$reference"
+                    }
+                }
+            val manager = CopyingMediaManager(source::readStagedBytes)
+            val importer = ManagedMediaImporter(manager, source, publicationCustody = custody)
+
+            assertTrue(
+                importer.importAndClaim("draft/first/photo", sourceUri) { reference ->
+                    events += "claim:$reference"
+                    true
+                },
+            )
+
+            assertEquals(
+                listOf(
+                    "reserve:draft/first/photo:staged://1",
+                    "publish:ticket-1:managed://media/1",
+                    "claim:managed://media/1",
+                    "acknowledge:ticket-1:managed://media/1",
+                ),
+                events,
+            )
+        }
+
+    @Test
     fun `imported image remains readable after source access is revoked`() =
         runTest {
             val sourceUri = "content://picker/images/42"

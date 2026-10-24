@@ -35,7 +35,9 @@ class AttachPhotoToMarkUseCaseTest {
     fun `attachment imports before saving and fills with saved note`() =
         runTest {
             coEvery { marks.getMark(id) } returns mark
-            coEvery { importer.import("gallery") } returns "managed"
+            coEvery { importer.importAndClaim("mark/$id", "gallery", any()) } coAnswers {
+                thirdArg<suspend (String) -> Boolean>()("managed")
+            }
             coEvery { notes.create(any()) } answers { firstArg<app.logdate.client.repository.journals.JournalNote>().uid }
             coEvery { marks.fill(id, "", any(), any()) } returns true
             assertTrue(AttachPhotoToMarkUseCase(marks, notes, importer, transaction)(id, "gallery"))
@@ -55,7 +57,7 @@ class AttachPhotoToMarkUseCaseTest {
         runTest {
             coEvery { marks.getMark(id) } returns null
             assertFalse(AttachPhotoToMarkUseCase(marks, notes, importer, transaction)(id, "gallery"))
-            coVerify(exactly = 0) { importer.import(any()) }
+            coVerify(exactly = 0) { importer.importAndClaim(any(), any(), any()) }
         }
 
     @Test
@@ -82,7 +84,9 @@ class AttachPhotoToMarkUseCaseTest {
             val context = mark.copy(caption = "Morning by the lake", location = MarkLocation(37.7, -122.4, 8f))
             val saved = mutableListOf<JournalNote>()
             coEvery { marks.getMark(id) } returns context
-            coEvery { importer.import("gallery") } returns "managed"
+            coEvery { importer.importAndClaim("mark/$id", "gallery", any()) } coAnswers {
+                thirdArg<suspend (String) -> Boolean>()("managed")
+            }
             coEvery { notes.create(any()) } answers { firstArg<JournalNote>().also(saved::add).uid }
             coEvery { marks.fill(id, context.caption, any(), any()) } returns true
             assertTrue(AttachPhotoToMarkUseCase(marks, notes, importer, transaction)(id, "gallery"))

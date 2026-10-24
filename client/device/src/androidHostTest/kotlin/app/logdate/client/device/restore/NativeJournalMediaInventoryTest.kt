@@ -14,6 +14,21 @@ import kotlin.test.assertTrue
 
 class NativeJournalMediaInventoryTest {
     @Test
+    fun `selected pending camera capture travels with its future draft claim`() =
+        fixture { root ->
+            val files = File(root, "files")
+            val capture = "files/camera-captures/LOGDATE_20261024_120000.jpg.00000000-0000-0000-0000-000000000001.tmp"
+            val bytes = "captured before draft autosave".encodeToByteArray()
+            write(files, capture.removePrefix("files/"), bytes)
+            val inventoryFile = File(root, NATIVE_MEDIA_INVENTORY_PATH)
+
+            writeNativeJournalMediaInventory(inventoryFile, files, setOf(capture))
+
+            val inventory = verifyNativeJournalMediaInventory(inventoryFile, sha256(inventoryFile.readBytes()))
+            assertEquals(sha256(bytes), inventory.entry(capture)?.sha256)
+        }
+
+    @Test
     fun `selected transfer ignores inaccessible orphan directories`() =
         fixture { root ->
             val files = File(root, "files")

@@ -60,6 +60,15 @@ class AndroidMediaReclamationJournal(
                 .sorted()
         }
 
+    suspend fun acknowledgeCandidate(reference: String) =
+        locked {
+            val file = candidateFile(reference)
+            if (!Files.exists(file.toPath(), LinkOption.NOFOLLOW_LINKS)) return@locked
+            check(readCandidate(file) == reference) { "Media reclamation candidate changed" }
+            Files.delete(file.toPath())
+            syncDirectory(directory)
+        }
+
     private suspend fun <T> locked(block: () -> T): T =
         withContext(Dispatchers.IO) {
             processMutex.withLock {

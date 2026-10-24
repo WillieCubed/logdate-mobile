@@ -333,6 +333,9 @@ val cloudModule =
                 get(),
                 dataUsagePolicy = get(),
                 references = getOrNull<StoredMediaReferences>() ?: StoredMediaReferences.Unchanged,
+                publicationCustody =
+                    getOrNull<app.logdate.client.media.ManagedMediaPublicationCustody>()
+                        ?: app.logdate.client.media.ManagedMediaPublicationCustody.None,
                 owner = get(),
                 config = get(),
             )

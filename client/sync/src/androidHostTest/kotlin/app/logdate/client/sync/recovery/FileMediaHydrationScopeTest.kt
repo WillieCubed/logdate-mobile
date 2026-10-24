@@ -3,8 +3,10 @@ package app.logdate.client.sync.recovery
 import android.content.Context
 import app.logdate.client.media.AndroidPhotoLibraryMediaManager
 import app.logdate.client.media.InMemoryMediaManager
+import app.logdate.client.media.ManagedMediaPublicationCustody
 import app.logdate.client.media.MediaFileSource
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.StagedMediaFile
 import app.logdate.client.media.storage.AndroidCanonicalMediaStore
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.sync.SyncMediaTransfer
@@ -33,6 +35,58 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class FileMediaHydrationScopeTest {
+    @Test
+    fun `sync hydration reserves and publishes a ticket around local media creation`() =
+        runTest {
+            val root = Files.createTempDirectory("logdate-file-hydration-").toFile()
+            try {
+                val events = mutableListOf<String>()
+                val custody =
+                    object : ManagedMediaPublicationCustody {
+                        override suspend fun reserve(
+                            destination: String,
+                            stagedMedia: StagedMediaFile,
+                        ): String {
+                            events += "reserve:$destination"
+                            return "ticket-1"
+                        }
+
+                        override suspend fun publish(
+                            ticketId: String,
+                            reference: String,
+                        ) {
+                            events += "publish:$ticketId:$reference"
+                        }
+
+                        override suspend fun acknowledge(
+                            ticketId: String,
+                            reference: String,
+                        ) {
+                            events += "acknowledge:$ticketId:$reference"
+                        }
+                    }
+                val store = AndroidCanonicalMediaStore(root)
+                val download = File(root, "download.png").apply { writeText("sync media") }
+                val note = remoteNote()
+                val transfer =
+                    SyncMediaTransfer(
+                        canonicalMedia(store),
+                        InMemoryMediaSyncRefStore(),
+                        fileSource(note.uid, download),
+                        publicationCustody = custody,
+                    )
+
+                transfer.hydrate("synthetic", note)
+                val localUri = events.last().substringAfter("publish:ticket-1:")
+
+                assertEquals("reserve:sync-media:${note.uid}:original", events.first())
+                assertEquals("publish:ticket-1:$localUri", events.last())
+                assertFalse(download.exists())
+            } finally {
+                root.deleteRecursively()
+            }
+        }
+
     @Test
     fun `account change after deduplication preserves an existing attachment original`() =
         runTest {
