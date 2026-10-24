@@ -1,5 +1,6 @@
 package app.logdate.client.sync
 
+import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.crypto.AccountIdentityBackup
 import app.logdate.client.device.crypto.IdentityKeyBackupStore
 import app.logdate.client.device.crypto.IdentityKeyManager
@@ -16,11 +17,13 @@ import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.InMemoryIdentityRecoveryNeededStore
 import app.logdate.client.sync.metadata.InMemoryUnreadableCloudRecordStore
 import app.logdate.client.sync.test.fakeCloudApiClient
+import app.logdate.client.sync.test.fakeSessionStorage
 import app.logdate.client.sync.test.fakeSyncMetadataService
 import app.logdate.client.sync.test.testDefaultSyncManager
 import app.logdate.shared.model.sync.JournalChange
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -63,6 +66,8 @@ class IdentityKeyProvisioningTest {
                     media,
                     InMemoryIdentityRecoveryNeededStore(),
                     InMemoryUnreadableCloudRecordStore(),
+                    proof = RecoveryPhraseAccountProof { "test-account-id" },
+                    sessionStorage = fakeSessionStorage(),
                 )
             val recoveredPhrase = List(12) { "recovered-$it" }
             assertTrue(recover(recoveredPhrase).isSuccess)
@@ -194,7 +199,16 @@ class IdentityKeyProvisioningTest {
                 MediaPayloadKeyProvider(InMemorySecureStorage(), cryptoManager, identityKeyManager, KeyDerivation(cryptoManager))
             val unreadableStore = InMemoryUnreadableCloudRecordStore()
             unreadableStore.record(EntityType.NOTE, listOf(kotlin.uuid.Uuid.random()))
-            val useCase = RecoverIdentityUseCase(identityKeyManager, metadata, mediaKeyProvider, recoveryStore, unreadableStore)
+            val useCase =
+                RecoverIdentityUseCase(
+                    identityKeyManager,
+                    metadata,
+                    mediaKeyProvider,
+                    recoveryStore,
+                    unreadableStore,
+                    proof = RecoveryPhraseAccountProof { "test-account-id" },
+                    sessionStorage = fakeSessionStorage(),
+                )
 
             val result = useCase((1..12).map { "recovered-$it" })
 
@@ -202,6 +216,136 @@ class IdentityKeyProvisioningTest {
             assertFalse(recoveryStore.isNeeded())
             assertNull(metadata.getLastSyncTime(EntityType.JOURNAL))
             assertEquals(1, unreadableStore.count(), "Recovering a key does not prove unreadable content recovered")
+        }
+
+    @Test
+    fun `unproven phrase leaves the installed key and recovery pause untouched`() =
+        runTest {
+            val storage = InMemorySecureStorage()
+            val crypto = TestCryptoManager()
+            val identity = IdentityKeyManager(storage, crypto)
+            val original = identity.setupNewIdentity()
+            val originalKey = identity.getIdentityKey()
+            val media = MediaPayloadKeyProvider(storage, crypto, identity, KeyDerivation(crypto))
+            val originalMedia = media.getOrCreateKey()
+            val recovery = InMemoryIdentityRecoveryNeededStore().apply { setNeeded(true) }
+            val metadata = fakeSyncMetadataService()
+            val syncTime = Instant.fromEpochMilliseconds(500)
+            metadata.updateLastSyncTime(EntityType.JOURNAL, syncTime)
+            val useCase =
+                RecoverIdentityUseCase(
+                    identity,
+                    metadata,
+                    media,
+                    recovery,
+                    InMemoryUnreadableCloudRecordStore(),
+                    proof = RecoveryPhraseAccountProof { throw RecoveryPhraseVerificationException() },
+                    sessionStorage = fakeSessionStorage(),
+                )
+
+            assertTrue(useCase(List(12) { "different-$it" }).isFailure)
+            assertContentEquals(originalKey, identity.getIdentityKey())
+            assertContentEquals(originalMedia, media.getOrCreateKey())
+            assertEquals(original.words, identity.getStoredRecoveryPhrase()?.words)
+            assertTrue(recovery.isNeeded())
+            assertEquals(syncTime, metadata.getLastSyncTime(EntityType.JOURNAL))
+        }
+
+    @Test
+    fun `account switch while phrase proof runs cannot install its key`() =
+        runTest {
+            val storage = InMemorySecureStorage()
+            val crypto = TestCryptoManager()
+            val identity = IdentityKeyManager(storage, crypto)
+            identity.setupNewIdentity()
+            val originalKey = identity.getIdentityKey()
+            val session = fakeSessionStorage()
+            val recovery = InMemoryIdentityRecoveryNeededStore().apply { setNeeded(true) }
+            val media = MediaPayloadKeyProvider(storage, crypto, identity, KeyDerivation(crypto))
+            val useCase =
+                RecoverIdentityUseCase(
+                    identity,
+                    fakeSyncMetadataService(),
+                    media,
+                    recovery,
+                    InMemoryUnreadableCloudRecordStore(),
+                    proof =
+                        RecoveryPhraseAccountProof {
+                            session.saveSession(UserSession("different-token", "different-refresh", "other-account"))
+                            "test-account-id"
+                        },
+                    sessionStorage = session,
+                )
+
+            assertTrue(useCase(List(12) { "different-$it" }).isFailure)
+            assertContentEquals(originalKey, identity.getIdentityKey())
+            assertTrue(recovery.isNeeded())
+        }
+
+    @Test
+    fun `account switch during native backup write leaves recovery paused`() =
+        runTest {
+            val session = fakeSessionStorage()
+            val backing = FakeIdentityKeyBackupStore()
+            var switchOnWrite = false
+            val backup =
+                object : IdentityKeyBackupStore by backing {
+                    override suspend fun writePhrase(phrase: String) {
+                        backing.writePhrase(phrase)
+                        if (switchOnWrite) session.saveSession(UserSession("other-token", "other-refresh", "other-account"))
+                    }
+                }
+            val storage = InMemorySecureStorage()
+            val crypto = TestCryptoManager()
+            val identity = IdentityKeyManager(storage, crypto, backup)
+            identity.setupNewIdentity()
+            val recovery = InMemoryIdentityRecoveryNeededStore().apply { setNeeded(true) }
+            val metadata = fakeSyncMetadataService()
+            val syncTime = Instant.fromEpochMilliseconds(500)
+            metadata.updateLastSyncTime(EntityType.JOURNAL, syncTime)
+            switchOnWrite = true
+            val useCase =
+                RecoverIdentityUseCase(
+                    identity,
+                    metadata,
+                    MediaPayloadKeyProvider(storage, crypto, identity, KeyDerivation(crypto)),
+                    recovery,
+                    InMemoryUnreadableCloudRecordStore(),
+                    proof = RecoveryPhraseAccountProof { "test-account-id" },
+                    sessionStorage = session,
+                )
+
+            val error = useCase(List(12) { "replacement-$it" }).exceptionOrNull()
+            assertEquals(RecoveryPhraseVerificationReason.UNAVAILABLE, (error as RecoveryPhraseVerificationException).reason)
+            assertTrue(recovery.isNeeded())
+            assertEquals(syncTime, metadata.getLastSyncTime(EntityType.JOURNAL))
+            assertFalse(identity.canUseForAccount("other-account"))
+        }
+
+    @Test
+    fun `retained journal owner conflict is not reported as invalid mnemonic`() =
+        runTest {
+            val storage = InMemorySecureStorage()
+            val crypto = TestCryptoManager()
+            val identity = IdentityKeyManager(storage, crypto)
+            identity.setupNewIdentity()
+            identity.bindToAccount("another-account")
+            val originalKey = identity.getIdentityKey()
+            val media = MediaPayloadKeyProvider(storage, crypto, identity, KeyDerivation(crypto))
+            val useCase =
+                RecoverIdentityUseCase(
+                    identity,
+                    fakeSyncMetadataService(),
+                    media,
+                    InMemoryIdentityRecoveryNeededStore(),
+                    InMemoryUnreadableCloudRecordStore(),
+                    proof = RecoveryPhraseAccountProof { "test-account-id" },
+                    sessionStorage = fakeSessionStorage(),
+                )
+
+            val error = useCase(List(12) { "replacement-$it" }).exceptionOrNull()
+            assertEquals(RecoveryPhraseVerificationReason.MISMATCH, (error as RecoveryPhraseVerificationException).reason)
+            assertContentEquals(originalKey, identity.getIdentityKey())
         }
 
     @Test

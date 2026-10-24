@@ -289,26 +289,38 @@ class IdentityKeyManager(
      * @param phrase The 12-word recovery phrase
      * @throws IllegalArgumentException if phrase is invalid
      */
-    suspend fun recoverIdentity(phrase: List<String>) =
-        identityMutex.withLock {
-            require(cryptoManager.validateRecoveryPhrase(phrase)) {
-                "Invalid recovery phrase"
-            }
-
-            val identityKey = cryptoManager.deriveMasterKey(phrase)
-            val phraseText = phrase.joinToString(" ")
-            val paired = backupStore.readAccountIdentity()
-            if (paired?.mediaKey != null) portable.preserveMedia(paired.key, paired.mediaKey)
-            val outgoingRoot = secureStorage.getBytes(KEY_IDENTITY_KEY)
-            val outgoingMedia = secureStorage.getBytes(KEY_MEDIA_KEY)
-            if (outgoingRoot != null && outgoingMedia != null) portable.preserveMedia(outgoingRoot, outgoingMedia)
-            if (outgoingRoot == null || !outgoingRoot.contentEquals(identityKey)) secureStorage.remove(KEY_MEDIA_KEY)
-            secureStorage.remove(KEY_RECOVERY_VERIFIED)
-            secureStorage.putBytes(KEY_IDENTITY_KEY, identityKey)
-            secureStorage.putString(KEY_RECOVERY_PHRASE, phraseText)
-            backupStore.writePhrase(phraseText)
-            Napier.d("Identity recovered from recovery phrase")
+    suspend fun recoverIdentity(
+        phrase: List<String>,
+        accountId: String? = null,
+        sessionCurrent: suspend () -> Boolean = { true },
+    ) = identityMutex.withLock {
+        require(cryptoManager.validateRecoveryPhrase(phrase)) {
+            "Invalid recovery phrase"
         }
+
+        val identityKey = cryptoManager.deriveMasterKey(phrase)
+        val phraseText = phrase.joinToString(" ")
+        if (accountId != null) {
+            if (!canUseForAccount(accountId)) throw IdentityRecoveryOwnerMismatchException()
+            expectedAccountOwner?.invoke()?.let { expected ->
+                if (!sameOwnerId(expected, accountId)) throw IdentityRecoveryOwnerMismatchException()
+            }
+            if (!sessionCurrent()) throw IdentityRecoverySessionChangedException()
+        }
+        val paired = backupStore.readAccountIdentity()
+        if (paired?.mediaKey != null) portable.preserveMedia(paired.key, paired.mediaKey)
+        val outgoingRoot = secureStorage.getBytes(KEY_IDENTITY_KEY)
+        val outgoingMedia = secureStorage.getBytes(KEY_MEDIA_KEY)
+        if (outgoingRoot != null && outgoingMedia != null) portable.preserveMedia(outgoingRoot, outgoingMedia)
+        if (outgoingRoot == null || !outgoingRoot.contentEquals(identityKey)) secureStorage.remove(KEY_MEDIA_KEY)
+        secureStorage.remove(KEY_RECOVERY_VERIFIED)
+        secureStorage.putBytes(KEY_IDENTITY_KEY, identityKey)
+        secureStorage.putString(KEY_RECOVERY_PHRASE, phraseText)
+        backupStore.writePhrase(phraseText)
+        if (accountId != null) secureStorage.putString(KEY_ACCOUNT_ID, accountId)
+        if (accountId != null && !sessionCurrent()) throw IdentityRecoverySessionChangedException()
+        Napier.d("Identity recovered from recovery phrase")
+    }
 
     /**
      * Attempts to silently restore the identity key from [backupStore] when [SecureStorage] has
@@ -462,3 +474,7 @@ class IdentityMintingNotAllowedException :
     IllegalStateException("This device never creates its own identity key; it is linked from a phone")
 
 class IdentityKeyFingerprintMismatchException : IllegalArgumentException("The identity key does not match the fingerprint sent with it")
+
+class IdentityRecoveryOwnerMismatchException : Exception("The retained journal belongs to another account")
+
+class IdentityRecoverySessionChangedException : Exception("The signed-in account changed during recovery")
