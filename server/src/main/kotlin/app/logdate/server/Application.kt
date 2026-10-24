@@ -1,6 +1,7 @@
 package app.logdate.server
 
 import app.logdate.SERVER_PORT
+import app.logdate.server.atproto.firehose.installFirehoseMaintenance
 import app.logdate.server.auth.handleAccountBlobCleanupCommand
 import app.logdate.server.config.ProductionConfigValidator
 import app.logdate.server.config.RuntimeProfile
@@ -85,6 +86,7 @@ fun Application.module(
     val openApiSpec = installOpenApi()
     installNetworkEdge()
     installServerKoin(isDatabaseAvailable)
+    installFirehoseMaintenance()
     installSyncMaintenance(isDatabaseAvailable)
     installDiagnosticReportMaintenance()
     installStoredKeyRewrap()

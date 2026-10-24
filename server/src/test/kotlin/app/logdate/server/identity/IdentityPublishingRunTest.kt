@@ -53,12 +53,16 @@ class IdentityPublishingRunTest {
             return if (provision) identityService(config(publishing = false)).ensureIdentity(account) else account
         }
 
-        fun TestScope.publishingRun(config: AtprotoIdentityConfig): IdentityPublishingRun =
+        fun TestScope.publishingRun(
+            config: AtprotoIdentityConfig,
+            onPublished: suspend (Uuid) -> Unit = {},
+        ): IdentityPublishingRun =
             IdentityPublishingRun(
                 service = publishingService(config),
                 loadAccounts = accounts::getAllAccounts,
                 pacer = PlcWritePacer(operationsPerMinute = 600, nowMillis = { testScheduler.currentTime }, sleepMillis = { delay(it) }),
                 directoryUrl = config.normalizedPlcDirectoryUrl,
+                onPublished = onPublished,
             )
     }
 
@@ -281,6 +285,39 @@ class IdentityPublishingRunTest {
             assertEquals(listOf(brie.did), one.accounts.map { it.did })
             assertEquals(1, fixture.directory.submissions)
             assertEquals(IdentityPublishingRun.EXIT_FAILED, nobody.exitCode)
+        }
+
+    @Test
+    fun `each identity the run publishes is announced once and others are not`() =
+        runTest {
+            val fixture = Fixture()
+            val alice = fixture.signUp("alice")
+            val brie = fixture.signUp("brie")
+            val on = fixture.config(publishing = true)
+            val announced = mutableListOf<Uuid>()
+
+            with(fixture) { publishingRun(on) { announced += it } }.run(status)
+            with(fixture) { publishingRun(on) { announced += it } }.run(IdentityPublishingOptions(publish = true, dryRun = true))
+            assertEquals(emptyList(), announced, "reading and dry runs announce nothing")
+
+            with(fixture) { publishingRun(on) { announced += it } }.run(publish)
+            assertEquals(listOf(alice.id, brie.id), announced)
+
+            with(fixture) { publishingRun(on) { announced += it } }.run(publish)
+            assertEquals(2, announced.size, "an identity that was already published is not announced again")
+        }
+
+    @Test
+    fun `a failure while announcing never fails the run`() =
+        runTest {
+            val fixture = Fixture()
+            fixture.signUp("alice")
+            val on = fixture.config(publishing = true)
+
+            val report = with(fixture) { publishingRun(on) { error("the event log is down") } }.run(publish)
+
+            assertEquals(IdentityPublishingRun.EXIT_OK, report.exitCode)
+            assertEquals(1, report.counts["now_published"])
         }
 
     @Test

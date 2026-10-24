@@ -3,6 +3,9 @@ package app.logdate.server.routes
 import app.logdate.server.ServerDescriptorConfig
 import app.logdate.server.accountkeys.AccountKeyEnvelopeRepository
 import app.logdate.server.atproto.AtprotoSessionTokenService
+import app.logdate.server.atproto.firehose.AtprotoFirehoseConfig
+import app.logdate.server.atproto.firehose.PublicRepoAccess
+import app.logdate.server.atproto.firehose.RepoEventStream
 import app.logdate.server.auth.AccessTokenVerifier
 import app.logdate.server.auth.AccountDeletionService
 import app.logdate.server.auth.AccountIdentityRepository
@@ -55,14 +58,19 @@ import app.logdate.server.transcription.cloudTranscriptionSessionProviderFromEnv
 import app.logdate.server.transfer.TransferSlots
 import io.ktor.client.HttpClient
 import io.ktor.server.application.Application
+import io.ktor.server.application.install
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
+import io.ktor.server.websocket.WebSockets
+import io.ktor.server.websocket.pingPeriod
+import io.ktor.server.websocket.timeout
 import org.koin.ktor.ext.inject
 import studio.hypertext.atproto.pds.PdsBlobService
 import studio.hypertext.atproto.pds.PdsDiscoveryService
 import studio.hypertext.atproto.pds.PdsRepoService
 import studio.hypertext.atproto.pds.PdsSessionService
 import studio.hypertext.atproto.pds.PdsSyncService
+import kotlin.time.Duration.Companion.seconds
 
 // The composition root: each function resolves what its routes need from Koin and hands it over
 // as explicit parameters, so the route files themselves stay container-free and testable with
@@ -86,19 +94,8 @@ internal fun Application.atprotoRoutes() {
     val oauthAccessTokenService by inject<OAuthAccessTokenService>()
     val oauthDpopVerifier by inject<OAuthDpopVerifier>()
     val oauthNonceService by inject<OAuthNonceService>()
-    val webAuthnService by inject<WebAuthnPasskeyService>()
-    // Built eagerly so a misconfigured issuer stops the server at startup instead of serving a
-    // page whose passkey button can never work.
-    val oauthPasskeySignIn =
-        oauthConfig.takeIf(OAuthConfig::passkeySignInEnabled)?.let { config ->
-            OAuthPasskeySignInService(
-                config = config,
-                authorizationService = oauthAuthorizationService,
-                webAuthnService = webAuthnService,
-                accountRepository = accountRepository,
-                identityService = atprotoIdentityService,
-            )
-        }
+    val publicRepos = publicReposIfEnabled()
+    val oauthPasskeySignIn = oauthPasskeySignInIfEnabled()
 
     routing {
         identityRoutes(atprotoIdentityService)
@@ -127,10 +124,53 @@ internal fun Application.atprotoRoutes() {
             oauthDpopVerifier = oauthDpopVerifier,
             oauthNonceService = oauthNonceService,
             publicOrigin = oauthConfig.normalizedResource,
+            publicRepos = publicRepos,
         )
     }
+    publicRepos?.let { firehoseRoutes(it) }
     personalSpaceRoutes()
 }
+
+/**
+ * Built eagerly so a misconfigured issuer stops the server at startup instead of serving a page
+ * whose passkey button can never work.
+ */
+private fun Application.oauthPasskeySignInIfEnabled(): OAuthPasskeySignInService? {
+    val oauthConfig by inject<OAuthConfig>()
+    val oauthAuthorizationService by inject<OAuthAuthorizationService>()
+    val webAuthnService by inject<WebAuthnPasskeyService>()
+    val accountRepository by inject<AccountRepository>()
+    val atprotoIdentityService by inject<AtprotoIdentityService>()
+    return oauthConfig.takeIf(OAuthConfig::passkeySignInEnabled)?.let { config ->
+        OAuthPasskeySignInService(
+            config = config,
+            authorizationService = oauthAuthorizationService,
+            webAuthnService = webAuthnService,
+            accountRepository = accountRepository,
+            identityService = atprotoIdentityService,
+        )
+    }
+}
+
+/** What strangers may read, or `null` while the repository event stream is turned off. */
+private fun Application.publicReposIfEnabled(): PublicRepoAccess? {
+    val firehoseConfig by inject<AtprotoFirehoseConfig>()
+    return if (firehoseConfig.enabled) inject<PublicRepoAccess>().value else null
+}
+
+/** `com.atproto.sync.subscribeRepos` and `listRepos`, served only while the event stream is turned on. */
+private fun Application.firehoseRoutes(publicRepos: PublicRepoAccess) {
+    val stream by inject<RepoEventStream>()
+    install(WebSockets) {
+        pingPeriod = WEBSOCKET_PING_PERIOD
+        timeout = WEBSOCKET_TIMEOUT
+        maxFrameSize = Long.MAX_VALUE
+    }
+    routing { repoEventStreamRoutes(stream, publicRepos) }
+}
+
+private val WEBSOCKET_PING_PERIOD = 20.seconds
+private val WEBSOCKET_TIMEOUT = 60.seconds
 
 /** `app.logdate.space.*` XRPC for the owner's own LogDate devices and linked watches, answering 501 until the server flag is on. */
 private fun Application.personalSpaceRoutes() {

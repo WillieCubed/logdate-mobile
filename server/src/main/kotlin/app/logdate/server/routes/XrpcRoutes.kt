@@ -2,6 +2,7 @@ package app.logdate.server.routes
 
 import app.logdate.server.atproto.AtprotoSessionTokenService
 import app.logdate.server.atproto.InvalidSwapException
+import app.logdate.server.atproto.firehose.PublicRepoAccess
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.TokenService
@@ -79,11 +80,16 @@ fun Route.xrpcRoutes(
     oauthNonceService: OAuthNonceService? = null,
     publicOrigin: String? = null,
     collectionsOpenToApps: Set<String> = OAuthScopes.collectionsOpenToApps,
+    publicRepos: PublicRepoAccess? = null,
 ) {
     val openCollections = OAuthScopes.requireOpenable(collectionsOpenToApps)
+    val publicReads = publicRepos?.let { PublicRepoReads(it, identityService, blobService) }
 
-    // Every repo holds its owner's private journal, so reads are owner-only. Anyone else gets
+    // A repo can hold its owner's private journal, so reads are owner-only. Anyone else gets
     // `respondAsMissing`, the answer for a repo that does not exist, before anything is looked up.
+    // The exception is a repo the server shows publicly (see [PublicRepoReads]): each read handler
+    // offers it to `publicReads` first, which answers only from public collections and returns
+    // without touching the response for any other repo.
     suspend fun ApplicationCall.requireRepoOwner(
         repo: String,
         respondAsMissing: suspend ApplicationCall.() -> Unit,
@@ -288,6 +294,7 @@ fun Route.xrpcRoutes(
                 call.respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", "Invalid did or since"))
                 return@get
             }
+            if (publicReads?.tryGetRepo(call, did, since) == true) return@get
             val principal = call.requireRepoOwner(didValue) { respondRepoNotFound(didValue) } ?: return@get
             if (principal.oauth != null) return@get call.respondClosedToOAuthApps()
             val result = syncApi.getRepo(GetRepoRequest(did = did, since = since))
@@ -318,6 +325,7 @@ fun Route.xrpcRoutes(
                 call.respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", "did is required"))
                 return@get
             }
+            if (publicReads?.tryGetLatestCommit(call, did) == true) return@get
             val principal = call.requireRepoOwner(didValue) { respondRepoNotFound(didValue) } ?: return@get
             if (principal.oauth != null) return@get call.respondClosedToOAuthApps()
             val result = syncApi.getLatestCommit(GetLatestCommitRequest(did))
@@ -344,6 +352,7 @@ fun Route.xrpcRoutes(
                 call.respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", "did is required"))
                 return@get
             }
+            if (publicReads?.tryGetRepoStatus(call, did) == true) return@get
             val principal = call.requireRepoOwner(didValue) { respondRepoNotFound(didValue) } ?: return@get
             if (principal.oauth != null) return@get call.respondClosedToOAuthApps()
             val result = syncApi.getRepoStatus(GetRepoStatusRequest(did))
@@ -381,6 +390,11 @@ fun Route.xrpcRoutes(
                 return@get
             }
 
+            val recordCid =
+                call.request.queryParameters["cid"]
+                    ?.trim()
+                    ?.takeIf(String::isNotEmpty)
+            if (publicReads?.tryGetRecord(call, repoValue, collectionValue, recordKeyValue, recordCid) == true) return@get
             val respondInvalidRecordId: suspend ApplicationCall.() -> Unit = {
                 respond(
                     HttpStatusCode.BadRequest,
@@ -439,6 +453,17 @@ fun Route.xrpcRoutes(
                 return@get
             }
 
+            val pageLimit =
+                (
+                    call.request.queryParameters["limit"]?.toIntOrNull()
+                        ?: studio.hypertext.atproto.pds.ListRecordsRequest.DEFAULT_PAGE_SIZE
+                ).coerceIn(1, 100)
+            val pageCursor =
+                call.request.queryParameters["cursor"]
+                    ?.trim()
+                    ?.takeIf(String::isNotEmpty)
+            val pageReverse = call.request.queryParameters["reverse"]?.toBooleanStrictOrNull() ?: false
+            if (publicReads?.tryListRecords(call, repoValue, collectionValue, pageLimit, pageCursor, pageReverse) == true) return@get
             val respondInvalidRepoOrCollection: suspend ApplicationCall.() -> Unit = {
                 respond(
                     HttpStatusCode.BadRequest,
@@ -714,6 +739,7 @@ fun Route.xrpcRoutes(
                 return@get
             }
 
+            if (publicReads?.tryGetBlob(call, did, cid) == true) return@get
             val principal = call.requireRepoOwner(didValue) { respondBlobNotFound() } ?: return@get
             if (principal.oauth != null) return@get call.respondClosedToOAuthApps()
             val result =
