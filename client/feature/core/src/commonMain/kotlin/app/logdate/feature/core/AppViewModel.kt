@@ -86,10 +86,13 @@ class AppViewModel(
                 securityLevelState.value = newLevel
 
                 when {
-                    newLevel != AppSecurityLevel.BIOMETRIC ->
+                    newLevel != AppSecurityLevel.BIOMETRIC -> {
                         appLockState.value = AppLockState.Unlocked
-                    isInitialEmission ->
+                    }
+
+                    isInitialEmission -> {
                         appLockState.value = AppLockState.Locked
+                    }
                     // Mid-session toggle to BIOMETRIC: leave the lock state alone.
                     // The user just authenticated to enable the setting; the lock will
                     // re-assert on next backgrounding or cold start.
@@ -157,10 +160,12 @@ class AppViewModel(
                 if (recoverMissingContent) onCloudRestoreSignIn()
                 true
             }
+
             is TryRestoreSignInUseCase.Result.NoCredential -> {
                 Napier.d("No restore credential on cloud-restored device — using manual sign-in")
                 false
             }
+
             is TryRestoreSignInUseCase.Result.Error -> {
                 Napier.i("Restore sign-in fell back to manual sign-in: ${result.message}")
                 false
@@ -243,17 +248,23 @@ private fun resolveAuthState(
         AppAuthState.UNSUPPORTED,
         AppAuthState.UPDATE_REQUIRED,
         AppAuthState.UNKNOWN,
-        -> biometricState
-        AppAuthState.AUTHENTICATED ->
+        -> {
+            biometricState
+        }
+
+        AppAuthState.AUTHENTICATED -> {
             if (appLockState == AppLockState.Unlocked) AppAuthState.AUTHENTICATED else AppAuthState.REQUIRE_PROMPT
+        }
+
         AppAuthState.NO_PROMPT_NEEDED,
         AppAuthState.REQUIRE_PROMPT,
-        ->
+        -> {
             if (appLockState == AppLockState.Locked) {
                 AppAuthState.REQUIRE_PROMPT
             } else {
                 AppAuthState.NO_PROMPT_NEEDED
             }
+        }
     }
 }
 

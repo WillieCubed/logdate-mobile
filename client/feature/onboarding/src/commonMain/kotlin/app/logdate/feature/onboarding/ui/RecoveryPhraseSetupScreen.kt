@@ -48,6 +48,7 @@ fun RecoveryPhraseSetupScreen(
                 Text(stringResource(Res.string.deriving_encryption_keys))
             }
         }
+
         errorMessage != null -> {
             Column(
                 modifier =
@@ -70,6 +71,7 @@ fun RecoveryPhraseSetupScreen(
                 }
             }
         }
+
         !isVerifying -> {
             RecoveryPhraseDisplayContent(
                 words = words,

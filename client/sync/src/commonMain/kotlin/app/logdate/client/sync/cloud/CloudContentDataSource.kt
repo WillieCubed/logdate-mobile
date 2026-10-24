@@ -260,7 +260,7 @@ class DefaultCloudContentDataSource(
         val lastUpdated = Instant.fromEpochMilliseconds(lastUpdated)
 
         return when (type) {
-            "TEXT" ->
+            "TEXT" -> {
                 JournalNote.Text(
                     uid = uid,
                     creationTimestamp = creationTimestamp,
@@ -271,7 +271,9 @@ class DefaultCloudContentDataSource(
                     capturedOn = decryptNoteCapturedOn(uid, capturedOn),
                     capturedDuring = decryptNoteCapturedDuring(uid, capturedDuring),
                 )
-            "IMAGE" ->
+            }
+
+            "IMAGE" -> {
                 JournalNote.Image(
                     uid = uid,
                     creationTimestamp = creationTimestamp,
@@ -284,7 +286,9 @@ class DefaultCloudContentDataSource(
                     capturedOn = decryptNoteCapturedOn(uid, capturedOn),
                     capturedDuring = decryptNoteCapturedDuring(uid, capturedDuring),
                 )
-            "VIDEO" ->
+            }
+
+            "VIDEO" -> {
                 JournalNote.Video(
                     uid = uid,
                     creationTimestamp = creationTimestamp,
@@ -296,7 +300,9 @@ class DefaultCloudContentDataSource(
                     capturedOn = decryptNoteCapturedOn(uid, capturedOn),
                     capturedDuring = decryptNoteCapturedDuring(uid, capturedDuring),
                 )
-            "AUDIO" ->
+            }
+
+            "AUDIO" -> {
                 JournalNote.Audio(
                     uid = uid,
                     creationTimestamp = creationTimestamp,
@@ -310,7 +316,11 @@ class DefaultCloudContentDataSource(
                     capturedOn = decryptNoteCapturedOn(uid, capturedOn),
                     capturedDuring = decryptNoteCapturedDuring(uid, capturedDuring),
                 )
-            else -> throw UnsupportedRemoteFormatException()
+            }
+
+            else -> {
+                throw UnsupportedRemoteFormatException()
+            }
         }
     }
 

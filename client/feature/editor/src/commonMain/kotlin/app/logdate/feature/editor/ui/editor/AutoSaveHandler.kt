@@ -342,6 +342,7 @@ internal fun getEditorDraftFingerprint(state: EditorState): String =
                         appendCommonBlockFields(block)
                         appendFingerprintField(block.content)
                     }
+
                     is ImageBlockUiState -> {
                         appendFingerprintField("image")
                         appendCommonBlockFields(block)
@@ -349,6 +350,7 @@ internal fun getEditorDraftFingerprint(state: EditorState): String =
                         appendFingerprintField(block.caption)
                         appendFingerprintField(block.presentation)
                     }
+
                     is VideoBlockUiState -> {
                         appendFingerprintField("video")
                         appendCommonBlockFields(block)
@@ -356,6 +358,7 @@ internal fun getEditorDraftFingerprint(state: EditorState): String =
                         appendFingerprintField(block.caption)
                         appendFingerprintField(block.durationMs)
                     }
+
                     is AudioBlockUiState -> {
                         appendFingerprintField("audio")
                         appendCommonBlockFields(block)
@@ -363,6 +366,7 @@ internal fun getEditorDraftFingerprint(state: EditorState): String =
                         appendFingerprintField(block.caption)
                         appendFingerprintField(block.transcription)
                     }
+
                     is CameraBlockUiState -> {
                         appendFingerprintField("camera")
                         appendCommonBlockFields(block)

@@ -194,6 +194,7 @@ fun AudioPlaybackComponent(
                         )
                     }
                 }
+
                 transcriptionText != null || uiState.transcription != null -> {
                     Text(
                         text = transcriptionText ?: uiState.transcription ?: "",

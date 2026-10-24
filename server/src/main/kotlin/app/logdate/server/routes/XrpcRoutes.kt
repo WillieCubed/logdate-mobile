@@ -822,7 +822,10 @@ private suspend fun io.ktor.server.application.ApplicationCall.requireAuthentica
     }
     val authHeader = request.header(HttpHeaders.Authorization)
     return when {
-        authHeader == null -> respondAuthRequired("Missing bearer token")
+        authHeader == null -> {
+            respondAuthRequired("Missing bearer token")
+        }
+
         authHeader.startsWith("DPoP ") -> {
             if (oauthAccessTokenService == null || oauthDpopVerifier == null || oauthNonceService == null) {
                 respond(HttpStatusCode.NotImplemented, PdsErrorResponse("Unsupported", "OAuth DPoP auth is not configured"))
@@ -835,7 +838,8 @@ private suspend fun io.ktor.server.application.ApplicationCall.requireAuthentica
                 accountRepository = accountRepository,
             )
         }
-        authHeader.startsWith("Bearer ") ->
+
+        authHeader.startsWith("Bearer ") -> {
             requireLogDatePrincipal(
                 bearerToken = authHeader.removePrefix("Bearer ").trim(),
                 identityService = identityService,
@@ -843,7 +847,11 @@ private suspend fun io.ktor.server.application.ApplicationCall.requireAuthentica
                 tokenService = tokenService,
                 atprotoSessionTokenService = atprotoSessionTokenService,
             )
-        else -> respondAuthRequired("Missing bearer token")
+        }
+
+        else -> {
+            respondAuthRequired("Missing bearer token")
+        }
     }
 }
 
@@ -1061,29 +1069,33 @@ private fun ownsRepo(
 
 private suspend fun io.ktor.server.application.ApplicationCall.respondForRepoError(error: Throwable?) {
     when (error) {
-        is UnsupportedCollectionException ->
+        is UnsupportedCollectionException -> {
             respond(
                 HttpStatusCode.BadRequest,
                 PdsErrorResponse("InvalidRequest", error.message ?: "Unsupported collection"),
             )
+        }
 
-        is studio.hypertext.atproto.repo.InvalidRepoCursorException ->
+        is studio.hypertext.atproto.repo.InvalidRepoCursorException -> {
             respond(
                 HttpStatusCode.BadRequest,
                 PdsErrorResponse("InvalidRequest", error.message ?: "Invalid cursor"),
             )
+        }
 
-        is InvalidSwapException ->
+        is InvalidSwapException -> {
             respond(
                 HttpStatusCode.BadRequest,
                 PdsErrorResponse("InvalidSwap", error.message ?: "swapRecord did not match"),
             )
+        }
 
-        else ->
+        else -> {
             respond(
                 HttpStatusCode.BadRequest,
                 PdsErrorResponse("InvalidRequest", error?.message ?: "Invalid XRPC request"),
             )
+        }
     }
 }
 
@@ -1105,33 +1117,41 @@ private suspend fun io.ktor.server.application.ApplicationCall.respondForBlobErr
 private suspend fun io.ktor.server.application.ApplicationCall.respondForSessionError(error: Throwable?) {
     val message = error?.message.orEmpty()
     when {
-        message == "UnsupportedDomain" ->
+        message == "UnsupportedDomain" -> {
             respond(HttpStatusCode.BadRequest, PdsErrorResponse("UnsupportedDomain", "Handle domain is not supported"))
+        }
 
-        message == "InvalidHandle" ->
+        message == "InvalidHandle" -> {
             respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidHandle", "Handle is reserved or not a single valid name"))
+        }
 
-        message == "InvalidPassword" || message.contains("Password must", ignoreCase = true) ->
+        message == "InvalidPassword" || message.contains("Password must", ignoreCase = true) -> {
             respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidPassword", "Password does not satisfy server requirements"))
+        }
 
-        message == "AccountTakedown" ->
+        message == "AccountTakedown" -> {
             respond(HttpStatusCode.Forbidden, PdsErrorResponse("AccountTakedown", "Account is not active"))
+        }
 
-        message == "InvalidToken" || message == "Invalid login" ->
+        message == "InvalidToken" || message == "Invalid login" -> {
             respond(HttpStatusCode.Unauthorized, PdsErrorResponse("InvalidToken", "Authentication failed"))
+        }
 
-        else ->
+        else -> {
             respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", message.ifBlank { "Invalid session request" }))
+        }
     }
 }
 
 private suspend fun io.ktor.server.application.ApplicationCall.respondForSyncError(error: Throwable?) {
     val message = error?.message.orEmpty()
     when {
-        message.startsWith("Unknown repo:") ->
+        message.startsWith("Unknown repo:") -> {
             respond(HttpStatusCode.NotFound, PdsErrorResponse("RepoNotFound", message))
+        }
 
-        else ->
+        else -> {
             respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", message.ifBlank { "Invalid sync request" }))
+        }
     }
 }

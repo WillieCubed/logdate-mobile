@@ -48,9 +48,15 @@ internal fun EntryContextPreview(
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
             ) {
                 when (block) {
-                    is TextBlockUiState -> MarkdownPreviewText(block.content, Modifier.padding(24.dp), maxLines = 8)
-                    is ImageBlockUiState -> if (block.uri != null) ImageBlockPreview(block, wrapToImage = true)
-                    is CameraBlockUiState ->
+                    is TextBlockUiState -> {
+                        MarkdownPreviewText(block.content, Modifier.padding(24.dp), maxLines = 8)
+                    }
+
+                    is ImageBlockUiState -> {
+                        if (block.uri != null) ImageBlockPreview(block, wrapToImage = true)
+                    }
+
+                    is CameraBlockUiState -> {
                         if (block.uri != null) {
                             if (block.mediaType == CapturedMediaType.VIDEO) {
                                 MarkdownPreviewText(
@@ -61,7 +67,9 @@ internal fun EntryContextPreview(
                                 ImageBlockPreview(ImageBlockUiState(id = block.id, uri = block.uri), wrapToImage = true)
                             }
                         }
-                    is AudioBlockUiState ->
+                    }
+
+                    is AudioBlockUiState -> {
                         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(formatMediaDuration(block.duration, true), style = MaterialTheme.typography.labelMedium)
                             if (block.transcription.isNotBlank()) {
@@ -73,13 +81,16 @@ internal fun EntryContextPreview(
                                 )
                             }
                         }
-                    is VideoBlockUiState ->
+                    }
+
+                    is VideoBlockUiState -> {
                         MarkdownPreviewText(
                             block.caption.ifBlank {
                                 memoryBlockLabel(block)
                             },
                             Modifier.padding(24.dp),
                         )
+                    }
                 }
             }
         }

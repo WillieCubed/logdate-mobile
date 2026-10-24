@@ -18,33 +18,40 @@ internal fun List<JournalNote>.withMarkedCapture(mark: MarkedMoment): List<Journ
             }
         val activity = mark.capturedDuring ?: note.capturedDuring
         when (note) {
-            is JournalNote.Text ->
+            is JournalNote.Text -> {
                 note.copy(
                     creationTimestamp = mark.capturedAt,
                     timeZoneId = mark.timeZoneId,
                     location = location,
                     capturedDuring = activity,
                 )
-            is JournalNote.Image ->
+            }
+
+            is JournalNote.Image -> {
                 note.copy(
                     creationTimestamp = mark.capturedAt,
                     timeZoneId = mark.timeZoneId,
                     location = location,
                     capturedDuring = activity,
                 )
-            is JournalNote.Audio ->
+            }
+
+            is JournalNote.Audio -> {
                 note.copy(
                     creationTimestamp = mark.capturedAt,
                     timeZoneId = mark.timeZoneId,
                     location = location,
                     capturedDuring = activity,
                 )
-            is JournalNote.Video ->
+            }
+
+            is JournalNote.Video -> {
                 note.copy(
                     creationTimestamp = mark.capturedAt,
                     timeZoneId = mark.timeZoneId,
                     location = location,
                     capturedDuring = activity,
                 )
+            }
         }
     }

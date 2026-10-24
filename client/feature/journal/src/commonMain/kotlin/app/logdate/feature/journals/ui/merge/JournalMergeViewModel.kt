@@ -51,8 +51,10 @@ class JournalMergeViewModel(
                         (
                             operation.operationId != pendingOperationId ||
                                 savedStateHandle.get<String>(STAGE) == COMPLETE ||
-                                savedStateHandle.get<String>(STAGE) == MERGING &&
-                                operation.destinationId.toString() == restoredDestination
+                                (
+                                    savedStateHandle.get<String>(STAGE) == MERGING &&
+                                        operation.destinationId.toString() == restoredDestination
+                                )
                         )
                 if (operation != null && (pendingOperationId == null || recoveredCommit)) {
                     mutableState.update { it.copy(stage = JournalMergeStage.Complete(operation), loading = false) }
@@ -240,14 +242,19 @@ class JournalMergeViewModel(
                     savedStateHandle[DESTINATION] = result.operation.destinationId.toString()
                     mutableState.update { it.copy(stage = JournalMergeStage.Complete(result.operation)) }
                 }
-                is JournalMergeResult.ReviewChanged ->
+
+                is JournalMergeResult.ReviewChanged -> {
                     mutableState.update {
                         it.copy(stage = JournalMergeStage.Review(result.preview), error = JournalMergeError.Changed)
                     }
-                JournalMergeResult.Failed ->
+                }
+
+                JournalMergeResult.Failed -> {
                     mutableState.update {
                         it.copy(stage = review, error = JournalMergeError.Failed)
                     }
+                }
+
                 JournalMergeResult.Unavailable -> {
                     savedStateHandle[STAGE] = PICKER
                     savedStateHandle[DESTINATION] = null

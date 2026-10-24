@@ -44,7 +44,7 @@ import kotlin.math.sqrt
 
 internal fun LocationDayItem.toHistoryUi(notes: List<JournalNote>): HistoryItemUi =
     when (this) {
-        is PlaceVisit ->
+        is PlaceVisit -> {
             HistoryItemUi(
                 id,
                 HistoryItemKind.Visit,
@@ -55,7 +55,9 @@ internal fun LocationDayItem.toHistoryUi(notes: List<JournalNote>): HistoryItemU
                 notes.filter { it.uid.toString() in memoryIds }.map { it.toHistoryMemory() },
                 isApproximate = !confirmedStay,
             )
-        is JourneyLeg ->
+        }
+
+        is JourneyLeg -> {
             HistoryItemUi(
                 id,
                 HistoryItemKind.Journey,
@@ -67,7 +69,9 @@ internal fun LocationDayItem.toHistoryUi(notes: List<JournalNote>): HistoryItemU
                     Res.string.history_around_time.toUiText(start.localTime)
                 },
             )
-        is HistoryGap ->
+        }
+
+        is HistoryGap -> {
             HistoryItemUi(
                 id,
                 HistoryItemKind.Gap,
@@ -75,6 +79,7 @@ internal fun LocationDayItem.toHistoryUi(notes: List<JournalNote>): HistoryItemU
                 historyTimeRange().toUiText(),
                 Res.string.history_add_missing_visit_hint.toUiText(),
             )
+        }
     }
 
 private fun LocationDayItem.historyTimeRange(): String {
@@ -99,9 +104,11 @@ internal fun TravelMode.humanName(): StringResource =
 
 internal fun JournalNote.toHistoryMemory(): HistoryMemoryUi =
     when (this) {
-        is JournalNote.Text ->
+        is JournalNote.Text -> {
             HistoryMemoryUi(uid.toString(), content.toUiText(), HistoryMemoryKind.Text, creationTimestamp.toReadableDateShort())
-        is JournalNote.Image ->
+        }
+
+        is JournalNote.Image -> {
             HistoryMemoryUi(
                 uid.toString(),
                 if (caption.isBlank()) Res.string.history_memory_photo.toUiText() else caption.toUiText(),
@@ -109,7 +116,9 @@ internal fun JournalNote.toHistoryMemory(): HistoryMemoryUi =
                 creationTimestamp.toReadableDateShort(),
                 mediaRef,
             )
-        is JournalNote.Video ->
+        }
+
+        is JournalNote.Video -> {
             HistoryMemoryUi(
                 uid.toString(),
                 if (caption.isBlank()) Res.string.history_memory_video.toUiText() else caption.toUiText(),
@@ -117,7 +126,9 @@ internal fun JournalNote.toHistoryMemory(): HistoryMemoryUi =
                 creationTimestamp.toReadableDateShort(),
                 mediaRef,
             )
-        is JournalNote.Audio ->
+        }
+
+        is JournalNote.Audio -> {
             HistoryMemoryUi(
                 uid.toString(),
                 Res.string.history_memory_recording.toUiText(),
@@ -125,6 +136,7 @@ internal fun JournalNote.toHistoryMemory(): HistoryMemoryUi =
                 creationTimestamp.toReadableDateShort(),
                 audio = MomentAudioUiState(mediaRef, durationMs, noteId = uid, recordedAt = creationTimestamp),
             )
+        }
     }
 
 internal fun LocationHistorySnapshot.visitPlaces(): List<SemanticPlace> =

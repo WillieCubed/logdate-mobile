@@ -52,7 +52,7 @@ private fun JournalNote.withEditorChanges(
     updatedAt: kotlin.time.Instant = edited.lastUpdated,
 ): JournalNote =
     when (this) {
-        is JournalNote.Text ->
+        is JournalNote.Text -> {
             (edited as JournalNote.Text).let {
                 copy(
                     content = it.content,
@@ -62,7 +62,9 @@ private fun JournalNote.withEditorChanges(
                         it.timeZoneId ?: timeZoneId,
                 )
             }
-        is JournalNote.Image ->
+        }
+
+        is JournalNote.Image -> {
             (edited as JournalNote.Image).let {
                 copy(
                     mediaRef = it.mediaRef,
@@ -73,7 +75,9 @@ private fun JournalNote.withEditorChanges(
                     timeZoneId = it.timeZoneId ?: timeZoneId,
                 )
             }
-        is JournalNote.Video ->
+        }
+
+        is JournalNote.Video -> {
             (edited as JournalNote.Video).let {
                 copy(
                     mediaRef = it.mediaRef,
@@ -84,7 +88,9 @@ private fun JournalNote.withEditorChanges(
                     timeZoneId = it.timeZoneId ?: timeZoneId,
                 )
             }
-        is JournalNote.Audio ->
+        }
+
+        is JournalNote.Audio -> {
             (edited as JournalNote.Audio).let {
                 copy(
                     mediaRef = it.mediaRef,
@@ -96,4 +102,5 @@ private fun JournalNote.withEditorChanges(
                     timeZoneId = it.timeZoneId ?: timeZoneId,
                 )
             }
+        }
     }

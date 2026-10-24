@@ -9,7 +9,7 @@ import app.logdate.client.repository.journals.isCapturedOnWatch
  */
 internal fun JournalNote.toEntryDisplayData(otherJournals: List<JournalReference> = emptyList()): EntryDisplayData =
     when (this) {
-        is JournalNote.Text ->
+        is JournalNote.Text -> {
             EntryDisplayData.TextEntry(
                 id = uid,
                 timestamp = creationTimestamp,
@@ -18,7 +18,9 @@ internal fun JournalNote.toEntryDisplayData(otherJournals: List<JournalReference
                 capturedOnWatch = isCapturedOnWatch,
                 capturedDuring = capturedDuring,
             )
-        is JournalNote.Image ->
+        }
+
+        is JournalNote.Image -> {
             EntryDisplayData.ImageEntry(
                 id = uid,
                 timestamp = creationTimestamp,
@@ -29,7 +31,9 @@ internal fun JournalNote.toEntryDisplayData(otherJournals: List<JournalReference
                 capturedOnWatch = isCapturedOnWatch,
                 capturedDuring = capturedDuring,
             )
-        is JournalNote.Video ->
+        }
+
+        is JournalNote.Video -> {
             EntryDisplayData.VideoEntry(
                 id = uid,
                 timestamp = creationTimestamp,
@@ -39,7 +43,9 @@ internal fun JournalNote.toEntryDisplayData(otherJournals: List<JournalReference
                 capturedOnWatch = isCapturedOnWatch,
                 capturedDuring = capturedDuring,
             )
-        is JournalNote.Audio ->
+        }
+
+        is JournalNote.Audio -> {
             EntryDisplayData.AudioEntry(
                 id = uid,
                 timestamp = creationTimestamp,
@@ -50,4 +56,5 @@ internal fun JournalNote.toEntryDisplayData(otherJournals: List<JournalReference
                 capturedOnWatch = isCapturedOnWatch,
                 capturedDuring = capturedDuring,
             )
+        }
     }

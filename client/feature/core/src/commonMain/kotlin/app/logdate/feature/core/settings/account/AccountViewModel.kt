@@ -123,14 +123,21 @@ class AccountViewModel(
                 hasRecoveryPhrase = loaded.hasRecoveryPhrase,
                 email =
                     when {
-                        account?.email != null ->
+                        account?.email != null -> {
                             EmailRow(
                                 address = account.email,
                                 isVerified = account.emailVerified,
                                 canVerify = !account.emailVerified && loaded.canVerifyEmail,
                             )
-                        loaded.canVerifyEmail -> EmailRow(address = null, isVerified = false, canVerify = true)
-                        else -> null
+                        }
+
+                        loaded.canVerifyEmail -> {
+                            EmailRow(address = null, isVerified = false, canVerify = true)
+                        }
+
+                        else -> {
+                            null
+                        }
                     },
                 server = ServerRow(name = server.displayName, host = server.host, isLogDateCloud = server.isLogDateCloud),
                 isSigningOut = loaded.isSigningOut,

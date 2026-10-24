@@ -18,15 +18,25 @@ import kotlin.time.Instant
 @Composable
 fun momentLabel(note: JournalNote): String =
     when (note) {
-        is JournalNote.Text ->
+        is JournalNote.Text -> {
             note.content
                 .lineSequence()
                 .map(String::trim)
                 .firstOrNull(String::isNotEmpty)
                 ?: stringResource(R.string.wear_moment_text)
-        is JournalNote.Audio -> stringResource(R.string.wear_moment_voice, formatClockDuration(note.durationMs.milliseconds))
-        is JournalNote.Image -> note.caption.ifBlank { stringResource(R.string.wear_moment_photo) }
-        is JournalNote.Video -> note.caption.ifBlank { stringResource(R.string.wear_moment_video) }
+        }
+
+        is JournalNote.Audio -> {
+            stringResource(R.string.wear_moment_voice, formatClockDuration(note.durationMs.milliseconds))
+        }
+
+        is JournalNote.Image -> {
+            note.caption.ifBlank { stringResource(R.string.wear_moment_photo) }
+        }
+
+        is JournalNote.Video -> {
+            note.caption.ifBlank { stringResource(R.string.wear_moment_video) }
+        }
     }
 
 /** The clock time of [instant] in [timeZone], in the user's 12 or 24 hour style. */

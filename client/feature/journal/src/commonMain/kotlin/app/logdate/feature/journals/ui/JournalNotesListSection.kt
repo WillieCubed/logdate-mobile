@@ -137,6 +137,7 @@ private fun JournalNoteItem(
                             )
                         }
                     }
+
                     is JournalNote.Image -> {
                         Text(
                             text = stringResource(Res.string.image_note),
@@ -152,12 +153,14 @@ private fun JournalNoteItem(
                             modifier = if (expanded) Modifier.fillMaxWidth() else Modifier,
                         )
                     }
+
                     is JournalNote.Video -> {
                         Text(
                             text = stringResource(Res.string.video_note),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
+
                     is JournalNote.Audio -> {
                         val labelResolver = remember { AudioLabelResolver() }
                         val labelResult =

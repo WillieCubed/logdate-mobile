@@ -96,13 +96,15 @@ fun SyncSettingsScreen(
                 )
             }
 
-            SyncFeedback.Started ->
+            SyncFeedback.Started -> {
                 snackbarHostState.showSnackbar(getString(Res.string.sync_feedback_started))
+            }
 
-            is SyncFeedback.Failed ->
+            is SyncFeedback.Failed -> {
                 snackbarHostState.showSnackbar(
                     getString(Res.string.sync_feedback_failed, getString(feedback.message)),
                 )
+            }
         }
         viewModel.consumeSyncFeedback()
     }

@@ -263,13 +263,25 @@ class LocationTimelineViewModel(
 
     private fun formatCoarseLocation(address: GeocodedAddress): UiText =
         when {
-            address.thoroughfare != null && address.locality != null ->
+            address.thoroughfare != null && address.locality != null -> {
                 Res.string.places_near_street.toUiText(address.thoroughfare.orEmpty(), address.locality.orEmpty())
-            address.subLocality != null && address.locality != null ->
+            }
+
+            address.subLocality != null && address.locality != null -> {
                 "${address.subLocality}, ${address.locality}".toUiText()
-            address.locality != null -> Res.string.places_somewhere_in.toUiText(address.locality.orEmpty())
-            address.adminArea != null -> Res.string.places_somewhere_in.toUiText(address.adminArea.orEmpty())
-            else -> "".toUiText()
+            }
+
+            address.locality != null -> {
+                Res.string.places_somewhere_in.toUiText(address.locality.orEmpty())
+            }
+
+            address.adminArea != null -> {
+                Res.string.places_somewhere_in.toUiText(address.adminArea.orEmpty())
+            }
+
+            else -> {
+                "".toUiText()
+            }
         }
 
     private suspend fun Location.toCurrentLocationUiModel(): CurrentLocationUiModel {

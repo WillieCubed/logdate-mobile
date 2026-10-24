@@ -43,29 +43,15 @@
     },
     {
       "include": ["**/*.pbxproj", "*.pbxproj"],
-      "argv": [
-        "python3",
-        "{repo}/.hypertext/formatter-tools/document-formats.py",
-        "pbxproj"
-      ]
+      "argv": ["python3", "{repo}/.hypertext/formatter-tools/document-formats.py", "pbxproj"]
     },
     {
       "include": ["**/*.xcconfig", "*.xcconfig"],
-      "argv": [
-        "python3",
-        "{repo}/.hypertext/formatter-tools/document-formats.py",
-        "xcconfig"
-      ]
+      "argv": ["python3", "{repo}/.hypertext/formatter-tools/document-formats.py", "xcconfig"]
     },
     {
       "include": ["**/Dockerfile", "Dockerfile"],
-      "argv": [
-        "python3",
-        "{repo}/.hypertext/formatter-tools/dsl.py",
-        "docker",
-        "--path",
-        "{path}"
-      ]
+      "argv": ["python3", "{repo}/.hypertext/formatter-tools/dsl.py", "docker", "--path", "{path}"]
     },
     {
       "include": ["**/*.pro", "*.pro"],
@@ -79,31 +65,15 @@
     },
     {
       "include": ["**/*.awk", "*.awk"],
-      "argv": [
-        "python3",
-        "{repo}/.hypertext/formatter-tools/dsl.py",
-        "awk",
-        "--path",
-        "{path}"
-      ]
+      "argv": ["python3", "{repo}/.hypertext/formatter-tools/dsl.py", "awk", "--path", "{path}"]
     },
     {
       "include": ["*.kt", "*.kts"],
-      "argv": [
-        "python3",
-        ".hypertext/formatter-tools/native.py",
-        "ktlint",
-        "{path}"
-      ]
+      "argv": ["python3", ".hypertext/formatter-tools/native.py", "ktlint", "{path}"]
     },
     {
       "include": ["*.md", "*.markdown", "*.mdc"],
-      "argv": [
-        "node",
-        ".hypertext/formatter-tools/prettier.mjs",
-        "{path}",
-        "markdown"
-      ]
+      "argv": ["node", ".hypertext/formatter-tools/prettier.mjs", "{path}", "markdown"]
     },
     {
       "include": [
@@ -117,21 +87,11 @@
         "*.bash",
         "*.zsh"
       ],
-      "argv": [
-        "node",
-        ".hypertext/formatter-tools/prettier.mjs",
-        "{path}",
-        "sh"
-      ]
+      "argv": ["node", ".hypertext/formatter-tools/prettier.mjs", "{path}", "sh"]
     },
     {
       "include": ["*.json"],
-      "argv": [
-        "node",
-        ".hypertext/formatter-tools/prettier.mjs",
-        "{path}",
-        "json"
-      ]
+      "argv": ["node", ".hypertext/formatter-tools/prettier.mjs", "{path}", "json"]
     },
     {
       "include": [".codex/rules/default.rules", "*.py", "*.pyi"],
@@ -139,12 +99,7 @@
     },
     {
       "include": ["*.yml", "*.yaml"],
-      "argv": [
-        "node",
-        ".hypertext/formatter-tools/prettier.mjs",
-        "{path}",
-        "yaml"
-      ]
+      "argv": ["node", ".hypertext/formatter-tools/prettier.mjs", "{path}", "yaml"]
     },
     {
       "include": [
@@ -159,12 +114,7 @@
         "*.xcbkptlist",
         "*.csproj"
       ],
-      "argv": [
-        "node",
-        ".hypertext/formatter-tools/prettier.mjs",
-        "{path}",
-        "xml"
-      ]
+      "argv": ["node", ".hypertext/formatter-tools/prettier.mjs", "{path}", "xml"]
     },
     {
       "include": [
@@ -173,66 +123,31 @@
         "client/feature/postcards/.editorconfig",
         "*.ini"
       ],
-      "argv": [
-        "node",
-        ".hypertext/formatter-tools/prettier.mjs",
-        "{path}",
-        "ini"
-      ]
+      "argv": ["node", ".hypertext/formatter-tools/prettier.mjs", "{path}", "ini"]
     },
     {
       "include": ["local.properties.example", "*.properties"],
-      "argv": [
-        "node",
-        ".hypertext/formatter-tools/prettier.mjs",
-        "{path}",
-        "properties"
-      ]
+      "argv": ["node", ".hypertext/formatter-tools/prettier.mjs", "{path}", "properties"]
     },
     {
       "include": ["*.toml"],
-      "argv": [
-        "node",
-        ".hypertext/formatter-tools/prettier.mjs",
-        "{path}",
-        "toml"
-      ]
+      "argv": ["node", ".hypertext/formatter-tools/prettier.mjs", "{path}", "toml"]
     },
     {
       "include": ["*.sql"],
-      "argv": [
-        "node",
-        ".hypertext/formatter-tools/prettier.mjs",
-        "{path}",
-        "sql"
-      ]
+      "argv": ["node", ".hypertext/formatter-tools/prettier.mjs", "{path}", "sql"]
     },
     {
       "include": ["*.js", "*.jsx", "*.mjs", "*.cjs"],
-      "argv": [
-        "node",
-        ".hypertext/formatter-tools/prettier.mjs",
-        "{path}",
-        "babel"
-      ]
+      "argv": ["node", ".hypertext/formatter-tools/prettier.mjs", "{path}", "babel"]
     },
     {
       "include": ["*.css"],
-      "argv": [
-        "node",
-        ".hypertext/formatter-tools/prettier.mjs",
-        "{path}",
-        "css"
-      ]
+      "argv": ["node", ".hypertext/formatter-tools/prettier.mjs", "{path}", "css"]
     },
     {
       "include": ["*.html"],
-      "argv": [
-        "node",
-        ".hypertext/formatter-tools/prettier.mjs",
-        "{path}",
-        "html"
-      ]
+      "argv": ["node", ".hypertext/formatter-tools/prettier.mjs", "{path}", "html"]
     }
   ],
   "exclude": [
@@ -242,7 +157,9 @@
         ".hypertext/formatter-tools/setup.py",
         ".hypertext/formatter-tools/run.py",
         ".hypertext/formatter-tools/prettier.mjs",
-        ".hypertext/formatter-tools/text.py"
+        ".hypertext/formatter-tools/text.py",
+        ".hypertext/formatter-tools/preset.mjs",
+        ".hypertext/formatter-tools/npm-lock.json"
       ],
       "kind": "vendored",
       "reason": "Locked shared formatter engine; maintained and formatted in product-standards."
@@ -273,16 +190,12 @@
       "reason": "Tool-owned dependency lock, credential/value file, or exact line protocol; preserve its semantic bytes."
     },
     {
-      "include": [
-        "app/android-main/src/androidTest/assets/parity/completed-recording.wav"
-      ],
+      "include": ["app/android-main/src/androidTest/assets/parity/completed-recording.wav"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/android-main/src/androidTest/assets/recovery/completed-recording.m4a"
-      ],
+      "include": ["app/android-main/src/androidTest/assets/recovery/completed-recording.m4a"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -317,16 +230,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/android-main/src/debug/res/drawable-nodpi/sample_note_photo.jpg"
-      ],
+      "include": ["app/android-main/src/debug/res/drawable-nodpi/sample_note_photo.jpg"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/android-main/src/debug/res/drawable/workspace_sample_photo.jpg"
-      ],
+      "include": ["app/android-main/src/debug/res/drawable/workspace_sample_photo.jpg"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -343,9 +252,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/android-main/src/main/res/mipmap-hdpi/ic_launcher_round.png"
-      ],
+      "include": ["app/android-main/src/main/res/mipmap-hdpi/ic_launcher_round.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -355,9 +262,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/android-main/src/main/res/mipmap-mdpi/ic_launcher_round.png"
-      ],
+      "include": ["app/android-main/src/main/res/mipmap-mdpi/ic_launcher_round.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -367,37 +272,27 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/android-main/src/main/res/mipmap-xhdpi/ic_launcher_round.png"
-      ],
+      "include": ["app/android-main/src/main/res/mipmap-xhdpi/ic_launcher_round.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/android-main/src/main/res/mipmap-xxhdpi/ic_launcher.png"
-      ],
+      "include": ["app/android-main/src/main/res/mipmap-xxhdpi/ic_launcher.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/android-main/src/main/res/mipmap-xxhdpi/ic_launcher_round.png"
-      ],
+      "include": ["app/android-main/src/main/res/mipmap-xxhdpi/ic_launcher_round.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/android-main/src/main/res/mipmap-xxxhdpi/ic_launcher.png"
-      ],
+      "include": ["app/android-main/src/main/res/mipmap-xxxhdpi/ic_launcher.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/android-main/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png"
-      ],
+      "include": ["app/android-main/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -10345,9 +10240,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/account-settings--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/account-settings--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -10359,23 +10252,17 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/account-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/account-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/account-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/account-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/advanced-settings--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/advanced-settings--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -10387,23 +10274,17 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/advanced-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/advanced-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/advanced-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/advanced-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/birthday-settings--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/birthday-settings--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -10415,16 +10296,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/birthday-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/birthday-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/birthday-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/birthday-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -10443,23 +10320,17 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/calendar-sync-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/calendar-sync-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/calendar-sync-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/calendar-sync-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/campfire-states--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/campfire-states--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -10471,16 +10342,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/campfire-states--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/campfire-states--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/campfire-states--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/campfire-states--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -10499,16 +10366,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/campfire-streak-burning--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/campfire-streak-burning--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/campfire-streak-burning--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/campfire-streak-burning--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -10527,23 +10390,17 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/campfire-streak-embers--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/campfire-streak-embers--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/campfire-streak-embers--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/campfire-streak-embers--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/campfire-streak-out--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/campfire-streak-out--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -10555,16 +10412,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/campfire-streak-out--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/campfire-streak-out--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/campfire-streak-out--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/campfire-streak-out--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -10639,16 +10492,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/campfire-streak-unlit--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/campfire-streak-unlit--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/campfire-streak-unlit--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/campfire-streak-unlit--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -10667,16 +10516,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/campfire-streak-waiting--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/campfire-streak-waiting--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/campfire-streak-waiting--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/campfire-streak-waiting--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -10695,9 +10540,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/captured-during-activity--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/captured-during-activity--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -10709,9 +10552,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/captured-on-watch--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/captured-on-watch--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -10723,16 +10564,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/captured-on-watch--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/captured-on-watch--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/captured-on-watch--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/captured-on-watch--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -10849,16 +10686,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/cloud-account-sign-in--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/cloud-account-sign-in--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/cloud-account-sign-in--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/cloud-account-sign-in--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -10877,44 +10710,32 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/cloud-account-welcome--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/cloud-account-welcome--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/cloud-account-welcome--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/cloud-account-welcome--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/data-settings--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/data-settings--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/data-settings--phone-landscape.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/data-settings--phone-landscape.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/data-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/data-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/data-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/data-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -10933,16 +10754,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/day-boundaries-checking--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/day-boundaries-checking--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/day-boundaries-checking--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/day-boundaries-checking--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11010,51 +10827,37 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/day-boundary-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/day-boundary-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/day-boundary-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/day-boundary-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/delete-account--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/delete-account--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/delete-account--phone-landscape.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/delete-account--phone-landscape.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/delete-account--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/delete-account--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/delete-account--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/delete-account--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/developer-tools--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/developer-tools--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11066,16 +10869,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/developer-tools--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/developer-tools--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/developer-tools--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/developer-tools--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11094,23 +10893,17 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/devices-linked-watch--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/devices-linked-watch--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/devices-linked-watch--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/devices-linked-watch--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/devices-settings--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/devices-settings--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11122,23 +10915,17 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/devices-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/devices-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/devices-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/devices-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/events-settings--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/events-settings--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11150,30 +10937,22 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/events-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/events-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/events-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/events-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/feature-previews--compact-phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/feature-previews--compact-phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/feature-previews--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/feature-previews--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11192,23 +10971,17 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/feature-previews--phone-rtl.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/feature-previews--phone-rtl.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/feature-previews--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/feature-previews--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/feature-previews--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/feature-previews--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11220,30 +10993,22 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/hosting--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/hosting--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/hosting--phone-landscape.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/hosting--phone-landscape.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/hosting--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/hosting--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/hosting--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/hosting--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11283,16 +11048,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/journal-storage-paused--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/journal-storage-paused--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/journal-storage-paused--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/journal-storage-paused--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11332,51 +11093,37 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/journal-storage-sealed--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/journal-storage-sealed--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/journal-storage-sealed--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/journal-storage-sealed--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/labs-settings--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/labs-settings--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/labs-settings--phone-landscape.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/labs-settings--phone-landscape.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/labs-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/labs-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/labs-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/labs-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/library-settings--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/library-settings--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11388,23 +11135,17 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/library-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/library-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/library-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/library-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/location-interval--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/location-interval--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11416,23 +11157,17 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/location-interval--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/location-interval--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/location-interval--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/location-interval--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/location-settings--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/location-settings--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11444,16 +11179,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/location-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/location-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/location-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/location-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11519,23 +11250,17 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/memories-import-info--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/memories-import-info--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/memories-import-info--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/memories-import-info--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/memories-settings--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/memories-settings--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11547,16 +11272,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/memories-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/memories-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/memories-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/memories-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11603,16 +11324,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/memory-selection-empty--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/memory-selection-empty--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/memory-selection-empty--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/memory-selection-empty--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11631,16 +11348,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/memory-selection-error--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/memory-selection-error--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/memory-selection-error--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/memory-selection-error--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11659,9 +11372,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/memory-selection-loading--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/memory-selection-loading--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11708,9 +11419,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/native-backup-quota--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/native-backup-quota--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11729,23 +11438,17 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/native-backup-quota--phone-rtl.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/native-backup-quota--phone-rtl.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/native-backup-quota--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/native-backup-quota--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/native-backup-quota--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/native-backup-quota--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11757,9 +11460,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/native-backup-ready--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/native-backup-ready--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11778,23 +11479,17 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/native-backup-ready--phone-rtl.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/native-backup-ready--phone-rtl.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/native-backup-ready--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/native-backup-ready--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/native-backup-ready--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/native-backup-ready--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11834,9 +11529,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/native-backup-signed-out--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/native-backup-signed-out--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11904,9 +11597,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/onboarding-birthday--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/onboarding-birthday--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -11918,16 +11609,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/onboarding-birthday--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/onboarding-birthday--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/onboarding-birthday--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/onboarding-birthday--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12086,9 +11773,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/onboarding-location--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/onboarding-location--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12100,16 +11785,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/onboarding-location--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/onboarding-location--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/onboarding-location--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/onboarding-location--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12142,9 +11823,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/onboarding-notifications--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/onboarding-notifications--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12170,9 +11849,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/onboarding-overview--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/onboarding-overview--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12184,16 +11861,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/onboarding-overview--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/onboarding-overview--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/onboarding-overview--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/onboarding-overview--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12254,9 +11927,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/onboarding-start-landing--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/onboarding-start-landing--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12282,16 +11953,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/onboarding-start-splash--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/onboarding-start-splash--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/onboarding-start-splash--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/onboarding-start-splash--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12324,16 +11991,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/onboarding-welcome-back--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/onboarding-welcome-back--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/onboarding-welcome-back--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/onboarding-welcome-back--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12366,9 +12029,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/past-rewinds--desktop.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/past-rewinds--desktop.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12387,9 +12048,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/personal-intro-bio--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/personal-intro-bio--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12401,16 +12060,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/personal-intro-bio--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/personal-intro-bio--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/personal-intro-bio--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/personal-intro-bio--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12429,9 +12084,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/personal-intro-name--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/personal-intro-name--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12443,30 +12096,22 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/personal-intro-name--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/personal-intro-name--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/personal-intro-name--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/personal-intro-name--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/privacy-settings--compact-phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/privacy-settings--compact-phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/privacy-settings--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/privacy-settings--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12485,23 +12130,17 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/privacy-settings--phone-rtl.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/privacy-settings--phone-rtl.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/privacy-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/privacy-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/privacy-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/privacy-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12513,9 +12152,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/quiet-save-settings--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/quiet-save-settings--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12534,23 +12171,17 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/quiet-save-settings--phone-rtl.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/quiet-save-settings--phone-rtl.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/quiet-save-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/quiet-save-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/quiet-save-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/quiet-save-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12569,16 +12200,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/recommendation-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/recommendation-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/recommendation-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/recommendation-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12611,23 +12238,17 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/recommendations-saving--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/recommendations-saving--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/recommendations-saving--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/recommendations-saving--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/recovery-key-on--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/recovery-key-on--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12639,23 +12260,17 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/recovery-key-on--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/recovery-key-on--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/recovery-key-on--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/recovery-key-on--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/recovery-key-setup--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/recovery-key-setup--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12674,30 +12289,22 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/recovery-key-setup--phone-rtl.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/recovery-key-setup--phone-rtl.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/recovery-key-setup--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/recovery-key-setup--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/recovery-key-setup--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/recovery-key-setup--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/recovery-phrase--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/recovery-phrase--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12709,16 +12316,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/recovery-phrase--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/recovery-phrase--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/recovery-phrase--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/recovery-phrase--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12728,9 +12331,7 @@
       "reason": "Legal text, frozen observation, exact dependency/registration list, or opaque document data; preserve its consumer representation."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/rewind-cover-card--desktop.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/rewind-cover-card--desktop.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12742,16 +12343,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/rewind-error--desktop.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/rewind-error--desktop.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/rewind-loading--desktop.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/rewind-loading--desktop.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12763,107 +12360,77 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/rewind-settings--desktop.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/rewind-settings--desktop.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/rewind-upgrade-chip--desktop.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/rewind-upgrade-chip--desktop.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/search-empty--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/search-empty--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/search-empty--phone-landscape.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/search-empty--phone-landscape.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/search-empty--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/search-empty--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/search-empty--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/search-empty--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/search-idle--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/search-idle--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/search-idle--phone-landscape.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/search-idle--phone-landscape.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/search-idle--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/search-idle--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/search-idle--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/search-idle--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/search-results--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/search-results--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/search-results--phone-landscape.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/search-results--phone-landscape.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/search-results--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/search-results--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/search-results--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/search-results--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/search-searching--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/search-searching--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12875,16 +12442,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/search-searching--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/search-searching--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/search-searching--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/search-searching--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12896,9 +12459,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/settings-components--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/settings-components--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12917,30 +12478,22 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/settings-components--phone-rtl.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/settings-components--phone-rtl.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/settings-components--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/settings-components--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/settings-components--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/settings-components--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/settings-overview--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/settings-overview--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12952,23 +12505,17 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/settings-overview--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/settings-overview--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/settings-overview--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/settings-overview--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/sign-in-methods--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/sign-in-methods--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -12980,30 +12527,22 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/sign-in-methods--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/sign-in-methods--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/sign-in-methods--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/sign-in-methods--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/storage-previews--compact-phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/storage-previews--compact-phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/storage-previews--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/storage-previews--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -13022,30 +12561,22 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/storage-previews--phone-rtl.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/storage-previews--phone-rtl.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/storage-previews--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/storage-previews--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/storage-previews--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/storage-previews--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/streak-settings--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/streak-settings--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -13057,44 +12588,32 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/streak-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/streak-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/streak-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/streak-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/sync-settings--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/sync-settings--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/sync-settings--phone-landscape.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/sync-settings--phone-landscape.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/sync-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/sync-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/sync-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/sync-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -13127,30 +12646,22 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/sync-update-required--phone-rtl.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/sync-update-required--phone-rtl.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/sync-update-required--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/sync-update-required--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/sync-update-required--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/sync-update-required--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/timeline-settings--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/timeline-settings--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -13162,16 +12673,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/timeline-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/timeline-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/timeline-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/timeline-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -13190,16 +12697,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/voice-notes-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/voice-notes-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/voice-notes-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/voice-notes-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -13232,30 +12735,22 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/watch-settings--phone-dark.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/watch-settings--phone-dark.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/watch-settings--phone-landscape.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/watch-settings--phone-landscape.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/watch-settings--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/watch-settings--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/watch-settings--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/watch-settings--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -13274,9 +12769,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/watch-settings-attention--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/watch-settings-attention--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -13302,9 +12795,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/watch-settings-reporting--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/watch-settings-reporting--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -13330,16 +12821,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/watch-troubleshooting--phone.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/watch-troubleshooting--phone.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "app/compose-main/src/desktopTest/reference/watch-troubleshooting--tablet.png"
-      ],
+      "include": ["app/compose-main/src/desktopTest/reference/watch-troubleshooting--tablet.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -13377,9 +12864,7 @@
       "reason": "Tool-owned dependency lock, credential/value file, or exact line protocol; preserve its semantic bytes."
     },
     {
-      "include": [
-        "app/wear/src/main/res/drawable-nodpi/ic_launcher_foreground_shadowed.png"
-      ],
+      "include": ["app/wear/src/main/res/drawable-nodpi/ic_launcher_foreground_shadowed.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -15629,9 +15114,7 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "docs/screenshots/android-os-integration/bubbles/app-bubble--phone-api37.png"
-      ],
+      "include": ["docs/screenshots/android-os-integration/bubbles/app-bubble--phone-api37.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -15650,23 +15133,17 @@
       "reason": "Legal text, frozen observation, exact dependency/registration list, or opaque document data; preserve its consumer representation."
     },
     {
-      "include": [
-        "docs/screenshots/android-os-integration/bubbles/float-action--phone-api36.png"
-      ],
+      "include": ["docs/screenshots/android-os-integration/bubbles/float-action--phone-api36.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "docs/screenshots/android-os-integration/bubbles/float-action--phone-api37.png"
-      ],
+      "include": ["docs/screenshots/android-os-integration/bubbles/float-action--phone-api37.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "docs/screenshots/android-os-integration/bubbles/float-action--tablet-api37.png"
-      ],
+      "include": ["docs/screenshots/android-os-integration/bubbles/float-action--tablet-api37.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -16315,16 +15792,12 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "docs/screenshots/android-os-integration/splash/launch--phone-api30.png"
-      ],
+      "include": ["docs/screenshots/android-os-integration/splash/launch--phone-api30.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "docs/screenshots/android-os-integration/splash/launch--phone-api37.png"
-      ],
+      "include": ["docs/screenshots/android-os-integration/splash/launch--phone-api37.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -16531,9 +16004,7 @@
       "reason": "Tool-owned dependency lock, credential/value file, or exact line protocol; preserve its semantic bytes."
     },
     {
-      "include": [
-        "iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/icon-1024.png"
-      ],
+      "include": ["iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/icon-1024.png"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
@@ -16575,30 +16046,22 @@
       "reason": "Legal text, frozen observation, exact dependency/registration list, or opaque document data; preserve its consumer representation."
     },
     {
-      "include": [
-        "server/src/main/resources/apple-root-certs/AppleIncRootCertificate.cer"
-      ],
+      "include": ["server/src/main/resources/apple-root-certs/AppleIncRootCertificate.cer"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "server/src/main/resources/apple-root-certs/AppleRootCA-G2.cer"
-      ],
+      "include": ["server/src/main/resources/apple-root-certs/AppleRootCA-G2.cer"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "server/src/main/resources/apple-root-certs/AppleRootCA-G3.cer"
-      ],
+      "include": ["server/src/main/resources/apple-root-certs/AppleRootCA-G3.cer"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V10__Add_logdate_atproto_blob_table.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V10__Add_logdate_atproto_blob_table.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
@@ -16631,23 +16094,17 @@
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V15__Add_oauth_runtime_state_tables.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V15__Add_oauth_runtime_state_tables.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V16__Billing_entitlements.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V16__Billing_entitlements.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V17__Cascade_delete_media_backups.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V17__Cascade_delete_media_backups.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
@@ -16659,37 +16116,27 @@
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V19__Restore_passkeys_account_id_fk.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V19__Restore_passkeys_account_id_fk.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V1__Initial_schema.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V1__Initial_schema.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V20__Add_resource_routes.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V20__Add_resource_routes.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V21__Add_revoked_refresh_tokens.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V21__Add_revoked_refresh_tokens.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V22__Add_email_verified_at_column.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V22__Add_email_verified_at_column.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
@@ -16722,51 +16169,37 @@
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V27__Add_restore_credentials_table.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V27__Add_restore_credentials_table.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V28__Preserve_account_original_bio.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V28__Preserve_account_original_bio.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V29__Add_encrypted_location_history.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V29__Add_encrypted_location_history.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V2__Add_user_id_to_sync_tables.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V2__Add_user_id_to_sync_tables.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V30__Add_diagnostic_reports.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V30__Add_diagnostic_reports.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V31__Add_device_enrollments.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V31__Add_device_enrollments.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V32__Add_account_key_vault.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V32__Add_account_key_vault.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
@@ -16778,9 +16211,7 @@
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V34__Add_account_device_registry.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V34__Add_account_device_registry.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
@@ -16792,44 +16223,32 @@
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V36__Add_oauth_signing_keys.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V36__Add_oauth_signing_keys.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V37__Add_journal_merge_operations.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V37__Add_journal_merge_operations.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V38__Add_oauth_signing_key_rotation.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V38__Add_oauth_signing_key_rotation.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V39__Add_device_sessions.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V39__Add_device_sessions.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V3__Enforce_sync_user_id_not_null.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V3__Enforce_sync_user_id_not_null.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V40__Durable_account_blob_cleanup.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V40__Durable_account_blob_cleanup.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
@@ -16841,16 +16260,12 @@
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V42__Add_personal_spaces.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V42__Add_personal_spaces.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V43__Add_oauth_used_values.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V43__Add_oauth_used_values.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
@@ -16869,16 +16284,12 @@
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V46__Add_account_storage_mode.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V46__Add_account_storage_mode.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V47__Add_account_storage_usage.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V47__Add_account_storage_usage.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
@@ -16897,37 +16308,27 @@
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V4__Add_duration_to_sync_content.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V4__Add_duration_to_sync_content.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V50__Add_space_migrations.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V50__Add_space_migrations.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V5__Auth_v1_identity_tables.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V5__Auth_v1_identity_tables.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V6__Add_atproto_identity.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V6__Add_atproto_identity.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },
     {
-      "include": [
-        "server/src/main/resources/db/migration/V7__Add_atproto_repo_store.sql"
-      ],
+      "include": ["server/src/main/resources/db/migration/V7__Add_atproto_repo_store.sql"],
       "kind": "non-formattable",
       "reason": "Already-published migration checksum contract; create a new migration instead of changing historical bytes."
     },

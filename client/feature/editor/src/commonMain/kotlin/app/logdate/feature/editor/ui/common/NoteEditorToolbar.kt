@@ -231,6 +231,7 @@ fun AutoSaveIndicator(
                     )
                 }
             }
+
             AutoSaveStatus.ERROR -> {
                 // Show error indicator with a temporary visibility state
                 var visibleState by remember { mutableStateOf(true) }
@@ -254,6 +255,7 @@ fun AutoSaveIndicator(
                     )
                 }
             }
+
             AutoSaveStatus.SAVING -> {
                 // Very subtle "Saving..." text
                 Text(
@@ -262,6 +264,7 @@ fun AutoSaveIndicator(
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 )
             }
+
             else -> {
                 // Don't show anything for IDLE state
             }
