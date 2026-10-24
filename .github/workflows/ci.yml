@@ -248,9 +248,10 @@ jobs:
 
   scripts:
     name: Script tests
-    # The scripts target developer Macs and use macOS tools (plutil, BSD stat),
-    # without an Apple Silicon dependency, so the standard Intel image is sufficient.
-    runs-on: macos-15-intel
+    # The scripts target developer Macs and use macOS tools (plutil, BSD stat). The
+    # pinned commit formatters the hook tests prepare ship only Apple Silicon builds
+    # for macOS, so this runs on the Apple Silicon image.
+    runs-on: macos-15
     timeout-minutes: 15
     steps:
       - name: Check out repository
