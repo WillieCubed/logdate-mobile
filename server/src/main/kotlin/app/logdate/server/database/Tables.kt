@@ -34,6 +34,9 @@ object AccountsTable : Table("accounts") {
     /** The [app.logdate.shared.model.AccountStorageMode.wireValue] of how the account's data is kept. */
     val storageMode = varchar("storage_mode", 32).default(AccountStorageMode.LEGACY.wireValue)
 
+    /** The [app.logdate.server.auth.AccountModeration.wireValue] when operators suspended or took down the account; null otherwise. */
+    val moderation = varchar("moderation", 16).nullable()
+
     override val primaryKey = PrimaryKey(id)
 }
 

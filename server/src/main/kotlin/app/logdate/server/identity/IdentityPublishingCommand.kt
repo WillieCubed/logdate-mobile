@@ -229,11 +229,12 @@ private fun publishedAnnouncer(
     val firehose = AtprotoFirehoseConfig.fromEnvironment()
     if (!firehose.enabled) return {}
     val blocks = PostgreSQLRepoBlockStore()
+    val events = PostgreSQLRepoEventStore()
     val sequencer =
         RepoEventSequencer(
-            store = PostgreSQLRepoEventStore(),
+            store = events,
             blocks = blocks,
-            gate = AccountPublicRepoGate(accounts, identityConfig),
+            gate = AccountPublicRepoGate(accounts, identityConfig, events),
             policy = PublicRepoPolicy(),
         )
     val crawler = RelayCrawler(httpClient, firehose.relayHosts, RelayCrawler.hostnameFor(identityConfig.pdsServiceEndpoint))

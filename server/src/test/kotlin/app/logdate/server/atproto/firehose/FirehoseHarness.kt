@@ -3,6 +3,7 @@ package app.logdate.server.atproto.firehose
 import app.logdate.server.atproto.LogDatePdsBlobStore
 import app.logdate.server.atproto.LogDateRepoStore
 import app.logdate.server.auth.Account
+import app.logdate.server.auth.AccountModerationService
 import app.logdate.server.auth.InMemoryAccountRepository
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.identity.AtprotoIdentityConfig
@@ -21,12 +22,16 @@ import app.logdate.server.routes.xrpcRoutes
 import app.logdate.server.serverJson
 import app.logdate.shared.model.AccountStorageMode
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.toByteArray
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
@@ -42,6 +47,7 @@ import studio.hypertext.atproto.pds.runtime.DefaultPdsRepoService
 import studio.hypertext.atproto.pds.runtime.DefaultPdsSyncService
 import studio.hypertext.atproto.repo.InMemoryRepoBlockStore
 import studio.hypertext.atproto.repo.RepoBlockStore
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
@@ -69,7 +75,7 @@ internal class FirehoseHarness(
     val rawBlocks = InMemoryRepoBlockStore()
     val eventStore = InMemoryRepoEventStore()
     val policy = PublicRepoPolicy()
-    val gate = AccountPublicRepoGate(accounts, identityConfig)
+    val gate = AccountPublicRepoGate(accounts, identityConfig, eventStore)
     val sequencer = RepoEventSequencer(eventStore, rawBlocks, gate, policy, clock)
     val blocks: RepoBlockStore = SequencingRepoBlockStore(rawBlocks, lazy { sequencer })
     val access = PublicRepoAccess(gate, policy, rawBlocks, accounts)
@@ -83,6 +89,23 @@ internal class FirehoseHarness(
             clock = clock,
         )
     val blobStorage = InMemoryLogDateBlobStorage()
+
+    /** Every request the server sent to a relay, as the URL and the body. */
+    val crawlRequests = CopyOnWriteArrayList<String>()
+    val crawler =
+        RelayCrawler(
+            httpClient =
+                HttpClient(
+                    MockEngine { request ->
+                        crawlRequests += "${request.url} ${String(request.body.toByteArray())}"
+                        respond("{}", HttpStatusCode.OK)
+                    },
+                ),
+            relayHosts = listOf("relay.example.com"),
+            serverHostname = "logdate.app",
+        )
+    val announcer = PublicRepoAnnouncer(accounts, sequencer, crawler)
+    val moderation = AccountModerationService(accounts, announcer)
     private val collections =
         RepoBackedLogDateCollectionsRepository(
             accountRepository = accounts,
@@ -99,6 +122,7 @@ internal class FirehoseHarness(
             accountRepository = accounts,
             blockStore = blocks,
             publicPolicy = policy,
+            publicRecords = PublicRecordValidator(),
         )
     private val blobService =
         DefaultPdsBlobService(

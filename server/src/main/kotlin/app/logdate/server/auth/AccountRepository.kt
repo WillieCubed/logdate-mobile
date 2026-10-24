@@ -31,6 +31,15 @@ interface AccountRepository {
     ): Boolean
 
     /**
+     * Sets or clears [moderation] for [accountId] and returns whether the account exists. Nothing else
+     * changes it: [save] keeps the stored value.
+     */
+    suspend fun setModeration(
+        accountId: Uuid,
+        moderation: AccountModeration?,
+    ): Boolean
+
+    /**
      * Persists a new account only when its ID has not already been claimed.
      *
      * Unlike [save], this operation must never update an existing account. Signup paths that
@@ -150,7 +159,7 @@ class InMemoryAccountRepository : AccountRepository {
 
     override suspend fun save(account: Account): Account {
         val existingAccount = accounts[account.id]
-        val stored = existingAccount?.let { account.copy(storageMode = it.storageMode) } ?: account
+        val stored = existingAccount?.let { account.copy(storageMode = it.storageMode, moderation = it.moderation) } ?: account
         if (existingAccount != null && existingAccount.username != account.username) {
             usernameIndex.remove(existingAccount.username)
         }
@@ -185,6 +194,16 @@ class InMemoryAccountRepository : AccountRepository {
             true
         }
     }
+
+    override suspend fun setModeration(
+        accountId: Uuid,
+        moderation: AccountModeration?,
+    ): Boolean =
+        synchronized(accounts) {
+            val account = accounts[accountId] ?: return@synchronized false
+            accounts[accountId] = account.copy(moderation = moderation)
+            true
+        }
 
     override suspend fun createOnly(account: Account): Boolean =
         synchronized(accounts) {

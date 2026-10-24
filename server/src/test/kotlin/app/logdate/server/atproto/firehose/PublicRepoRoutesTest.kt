@@ -53,6 +53,8 @@ class PublicRepoRoutesTest {
         buildJsonObject {
             put("\$type", document)
             put("title", title)
+            put("site", "https://lena.logdate.app")
+            put("publishedAt", "2026-10-23T12:00:00.000Z")
         }
 
     private suspend fun HttpResponse.parsed(): JsonObject = json.parseToJsonElement(bodyAsText()).jsonObject
@@ -454,6 +456,40 @@ class PublicRepoRoutesTest {
             assertTrue("personal space" in refused.bodyAsText(), refused.bodyAsText())
             assertEquals(HttpStatusCode.OK, allowed.status, allowed.bodyAsText())
             assertTrue(h.eventStore.read(0, 10).isEmpty())
+        }
+
+    @Test
+    fun `a malformed public record is refused and changes nothing`() =
+        testApplication {
+            val h = FirehoseHarness().also { it.install(this) }
+            val alice = h.createAccount("alice")
+            h.put(client, alice, profile, "self", profileRecord())
+            val headBefore = h.rawBlocks.readHead(h.did(alice)).getOrThrow()
+            val eventsBefore = h.eventStore.read(0, 100).size
+            val tooLong =
+                buildJsonObject {
+                    put("\$type", profile)
+                    put("displayName", "x".repeat(65))
+                }
+            val noTitle = buildJsonObject { put("\$type", document) }
+
+            val profileResponse = h.put(client, alice, profile, "self", tooLong)
+            val documentResponse = h.put(client, alice, document, "3kaaa", noTitle)
+            val created =
+                client.post("/xrpc/com.atproto.repo.createRecord") {
+                    header(HttpHeaders.Authorization, "Bearer ${h.bearer(alice)}")
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"repo":"${alice.did}","collection":"$document","record":{"${'$'}type":"$document","title":7}}""")
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, profileResponse.status)
+            assertTrue("displayName: longer than 64 graphemes" in profileResponse.bodyAsText(), profileResponse.bodyAsText())
+            assertEquals(HttpStatusCode.BadRequest, documentResponse.status)
+            assertTrue("title: required field is missing" in documentResponse.bodyAsText(), documentResponse.bodyAsText())
+            assertEquals(HttpStatusCode.BadRequest, created.status)
+            assertTrue("title: expected a string" in created.bodyAsText(), created.bodyAsText())
+            assertEquals(headBefore, h.rawBlocks.readHead(h.did(alice)).getOrThrow(), "a refused record must not move the repository")
+            assertEquals(eventsBefore, h.eventStore.read(0, 100).size, "a refused record must not be announced")
         }
 
     @Test

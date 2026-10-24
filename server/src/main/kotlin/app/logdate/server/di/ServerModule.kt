@@ -12,13 +12,14 @@ import app.logdate.server.atproto.InMemoryAtprotoPasswordCredentialRepository
 import app.logdate.server.atproto.InMemoryAtprotoSessionRepository
 import app.logdate.server.atproto.LogDatePdsBlobStore
 import app.logdate.server.atproto.LogDateRepoStore
+import app.logdate.server.atproto.firehose.PublicRecordValidator
 import app.logdate.server.atproto.firehose.PublicRepoPolicy
 import app.logdate.server.auth.AccessTokenVerifier
 import app.logdate.server.auth.AccountBlobCleanup
 import app.logdate.server.auth.AccountDeletionService
 import app.logdate.server.auth.AccountIdentityRepository
-import app.logdate.server.auth.AccountRemovalEvents
 import app.logdate.server.auth.AccountRepository
+import app.logdate.server.auth.AccountStatusEvents
 import app.logdate.server.auth.AuthMetricsRegistry
 import app.logdate.server.auth.DigitalCredentialVerifier
 import app.logdate.server.auth.EmailVerificationService
@@ -405,7 +406,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                         null
                     },
                 oauthGrantRevoker = get<OAuthAuthorizationService>(),
-                removalEvents = getOrNull<AccountRemovalEvents>(),
+                statusEvents = getOrNull<AccountStatusEvents>(),
             )
         }
 
@@ -460,6 +461,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 accountRepository = get(),
                 blockStore = get(),
                 publicPolicy = getOrNull<PublicRepoPolicy>(),
+                publicRecords = getOrNull<PublicRecordValidator>(),
             )
         } bind RepoEngine::class bind RepoRecordStore::class
 

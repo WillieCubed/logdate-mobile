@@ -175,7 +175,8 @@ internal object XrpcRepoDocs {
             Unless the repository is public, only its owner can read it: send their access token. Asking for any other
             repository answers exactly as if it did not exist. Public repositories are the exception: with
             `ATPROTO_FIREHOSE_ENABLED` on, anyone can read the status of a repository whose account keeps its journal
-            in a personal space, with no sign-in.
+            in a personal space, with no sign-in. An account that is not active answers `active: false` with a `status`
+            (`deactivated`, `suspended`, `takendown` or `deleted`) instead of an error.
             """,
         )
         request { didParameter() }

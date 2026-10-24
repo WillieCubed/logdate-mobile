@@ -214,7 +214,11 @@ class RepoEventSequencer(
     private fun now(): Instant = Instant.fromEpochMilliseconds(clock.now().toEpochMilliseconds())
 
     private companion object {
-        /** The event lexicon allows 200 operations in one commit event. */
+        /**
+         * The event lexicon allows 200 operations in one commit event. A commit over either limit is
+         * announced with #sync: the lexicon marks `tooBig` as replaced by "#sync event and data limits",
+         * and the consumer fetches the repository instead.
+         */
         const val MAX_OPERATIONS = 200
 
         /** The event lexicon allows 2,000,000 bytes of blocks in one commit event. */

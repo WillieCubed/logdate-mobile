@@ -17,13 +17,15 @@ import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid
 
 /**
- * Told when an account is gone from this server, so relays that followed its repository can drop it.
+ * Told when an account becomes active or stops being active on this server, so relays that followed
+ * its repository can keep or drop it.
  */
-fun interface AccountRemovalEvents {
-    /** The account [did] was deleted; [status] is the reason the AT Protocol event stream reports. */
-    suspend fun accountRemoved(
+fun interface AccountStatusEvents {
+    /** The account [did] is [active] or not; [status] is the reason the AT Protocol event stream reports when it is not. */
+    suspend fun accountStatusChanged(
         did: String,
-        status: String,
+        active: Boolean,
+        status: String?,
     )
 }
 
@@ -36,7 +38,7 @@ class AccountDeletionService(
     private val blobStorage: LogDateBlobStorage?,
     private val blobCleanup: AccountBlobCleanup? = null,
     private val oauthGrantRevoker: OAuthGrantRevoker? = null,
-    private val removalEvents: AccountRemovalEvents? = null,
+    private val statusEvents: AccountStatusEvents? = null,
 ) {
     data class Summary(
         val mediaBlobsDeleted: Int,
@@ -86,9 +88,9 @@ class AccountDeletionService(
     }
 
     private suspend fun announceRemoval(did: String) {
-        val events = removalEvents ?: return
+        val events = statusEvents ?: return
         try {
-            events.accountRemoved(did, DELETED_STATUS)
+            events.accountStatusChanged(did, active = false, status = DELETED_STATUS)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
