@@ -73,6 +73,7 @@ class NativeBackupTransferProbeTest {
                         "quota",
                         "quota-cleanup",
                         "missing-keys",
+                        "missing-keys-rejected",
                         "credentials-only",
                         "source-account-session",
                         "source-account-session-cleanup",
@@ -197,6 +198,10 @@ class NativeBackupTransferProbeTest {
             }
             if (mode == "missing-keys") {
                 verifyMissingRecoveryKeys(context, koin)
+                return@runBlocking
+            }
+            if (mode == "missing-keys-rejected") {
+                verifyRejectedMissingRecoveryKeys(context, koin)
                 return@runBlocking
             }
             if (mode == "credentials-only") {

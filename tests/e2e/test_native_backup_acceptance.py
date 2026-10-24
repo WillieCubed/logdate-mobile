@@ -221,6 +221,19 @@ class RestoreSnapshotValidationTest(unittest.TestCase):
                 credentials_only=False,
             )
 
+    def test_missing_key_snapshot_accepts_rejected_journal_and_retained_preferences(self):
+        NATIVE_BACKUP_ACCEPTANCE.verify_missing_keys_snapshot(
+            {"files/logdate.preferences_pb": {"sha256": "preferences"}},
+        )
+
+    def test_missing_key_snapshot_rejects_a_delivered_database_or_portable_key(self):
+        for path in ("databases/logdate", "databases/logdate-wal", "files/db_recovery/passphrase_backup",
+                     "files/identity_recovery/phrase_backup", "files/media/objects/original.png"):
+            with self.subTest(path=path), self.assertRaisesRegex(RuntimeError, "missing-key restore"):
+                NATIVE_BACKUP_ACCEPTANCE.verify_missing_keys_snapshot(
+                    {"files/logdate.preferences_pb": {"sha256": "preferences"}, path: {"sha256": "unexpected"}},
+                )
+
     def test_credentials_only_snapshot_allows_startup_created_empty_database(self):
         NATIVE_BACKUP_ACCEPTANCE.verify_restored_snapshot(
             {

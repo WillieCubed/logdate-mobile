@@ -14,11 +14,14 @@ import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.database.encryption.PassphraseBackupStore
 import app.logdate.client.device.crypto.AndroidIdentityKeyBackupStore
 import app.logdate.client.device.crypto.IdentityKeyManager
+import app.logdate.client.device.restore.PostRestoreDetector
+import app.logdate.client.device.restore.PostRestoreType
 import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.ensureLogDateApplicationStarted
 import app.logdate.client.media.audio.AndroidRecordingServiceController
 import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.media.audio.RecordingSessionOptions
+import app.logdate.client.repository.journals.JournalRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -122,6 +125,37 @@ internal suspend fun verifyMissingRecoveryKeys(
         originalDatabaseDigest,
         MessageDigest.getInstance("SHA-256").digest(databaseFile.readBytes()),
         "Recovery handling changed the retained encrypted journal",
+    )
+}
+
+internal suspend fun verifyRejectedMissingRecoveryKeys(
+    context: android.content.Context,
+    koin: org.koin.core.Koin,
+) {
+    val detector = PostRestoreDetector(context)
+    assertEquals(
+        PostRestoreType.CONTENT_MISSING,
+        detector.detect(isOnboarded = true),
+        "An incomplete native journal must remain eligible for content recovery",
+    )
+    assertFalse(PassphraseBackupStore(context).hasBackup(), "The rejected transfer retained a portable journal key")
+    val identityBackup = AndroidIdentityKeyBackupStore(context)
+    assertFalse(identityBackup.hasRootBackup(), "The rejected transfer retained an identity recovery key")
+    assertFalse(identityBackup.hasMediaBackup(), "The rejected transfer retained a media recovery key")
+    val database = koin.get<LogDateDatabase>()
+    assertTrue(database.journalDao().getAll().isEmpty(), "The rejected transfer exposed source journals")
+    assertTrue(database.textNoteDao().getAll().isEmpty(), "The rejected transfer exposed source notes")
+    assertTrue(database.imageNoteDao().getAll().isEmpty(), "The rejected transfer exposed source images")
+    assertTrue(database.videoNoteDao().getAll().isEmpty(), "The rejected transfer exposed source videos")
+    assertTrue(database.audioNoteDao().getAll().isEmpty(), "The rejected transfer exposed source audio")
+    assertTrue(koin.get<JournalRepository>().getAllDrafts().isEmpty(), "The rejected transfer exposed source drafts")
+    ActivityScenario.launch(MainActivity::class.java).use { activity ->
+        activity.recreate()
+    }
+    assertEquals(
+        PostRestoreType.CONTENT_MISSING,
+        detector.detect(isOnboarded = true),
+        "A restart must not acknowledge an incomplete native journal",
     )
 }
 
