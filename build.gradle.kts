@@ -91,6 +91,7 @@ subprojects {
     }
 
     configure<KtlintExtension> {
+        version.set("1.5.0")
         filter {
             exclude { it.file.path.contains("/build/") }
         }
