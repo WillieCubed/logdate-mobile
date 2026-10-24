@@ -57,12 +57,7 @@ class IdentityPublishingUsageException(
  */
 fun parseIdentityPublishingArgs(args: List<String>): IdentityPublishingInvocation {
     val subcommand = args.firstOrNull() ?: throw IdentityPublishingUsageException("Name a subcommand: status or publish")
-    val publish =
-        when (subcommand) {
-            "status" -> false
-            "publish" -> true
-            else -> throw IdentityPublishingUsageException("Unknown subcommand $subcommand; use status or publish")
-        }
+    val publish = isPublishSubcommand(subcommand)
     val flags = setOf("--dry-run", "--reconcile")
     val valued =
         setOf("--handle", "--limit", "--batch-size", "--operations-per-minute", "--max-failures", "--report-file", "--confirm-directory")
@@ -123,6 +118,13 @@ fun parseIdentityPublishingArgs(args: List<String>): IdentityPublishingInvocatio
         reportFile = values["--report-file"]?.let(Path::of),
     )
 }
+
+private fun isPublishSubcommand(subcommand: String): Boolean =
+    when (subcommand) {
+        "status" -> false
+        "publish" -> true
+        else -> throw IdentityPublishingUsageException("Unknown subcommand $subcommand; use status or publish")
+    }
 
 /**
  * Returns the notice explaining why [invocation] must not run against [config], or null when it may.
