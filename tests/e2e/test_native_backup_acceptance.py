@@ -1,4 +1,5 @@
 import argparse
+from contextlib import redirect_stderr
 import hashlib
 import importlib.util
 import io
@@ -596,6 +597,40 @@ class NativeTimelineSystemDialogTest(unittest.TestCase):
 
 
 class NativeProbeDiagnosticsTest(unittest.TestCase):
+    def test_cold_instrumentation_uses_a_bounded_timeout(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            harness, "adb", return_value=b"OK (1 test)\n"
+        ) as adb:
+            output = Path(directory)
+            harness.probe("emulator-5554", "seed", output / "source-seed.log")
+            harness.probe("emulator-5554", "verify", output / "destination-verify.log")
+            harness.archive_probe("emulator-5554", "seed", output / "archive-seed.log")
+            harness.privacy_probe("emulator-5554", "blocked", output / "privacy.log")
+            harness.verify_restarted_content("emulator-5554", output, {}, "phrase")
+        instrument_calls = [item for item in adb.call_args_list if "instrument" in " ".join(map(str, item.args))]
+        self.assertEqual(6, len(instrument_calls))
+        self.assertTrue(all(item.kwargs.get("timeout") == 600 for item in instrument_calls))
+
+    def test_adb_timeout_preserves_original_failure_on_python_without_exception_notes(self):
+        class LegacyTimeout(subprocess.TimeoutExpired):
+            def __getattribute__(self, name):
+                if name == "add_note":
+                    raise AttributeError(name)
+                return super().__getattribute__(name)
+
+        failure = LegacyTimeout("owned-adb", 180, stderr=b"ART verification still running")
+        diagnostics = io.StringIO()
+        with patch.object(NATIVE_BACKUP_ACCEPTANCE, "managed_adb_command", return_value=["owned-adb"]), patch.object(
+            NATIVE_BACKUP_ACCEPTANCE.subprocess, "run", side_effect=failure
+        ), redirect_stderr(diagnostics):
+            with self.assertRaises(LegacyTimeout) as raised:
+                NATIVE_BACKUP_ACCEPTANCE.adb("emulator-5554", "shell", "am", "instrument", "-w")
+        self.assertIs(failure, raised.exception)
+        self.assertTrue(any("Managed ADB failure" in note for note in failure.__notes__))
+        self.assertIn("Managed ADB failure", diagnostics.getvalue())
+        self.assertIn("ART verification still running", diagnostics.getvalue())
+
     @patch.object(NATIVE_BACKUP_ACCEPTANCE, "adb", side_effect=[
         b"INSTRUMENTATION_RESULT: shortMsg=Process crashed.\nINSTRUMENTATION_CODE: 0\n",
         b"synthetic fatal exception\n",

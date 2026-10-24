@@ -8,6 +8,7 @@ import shlex
 import uuid
 
 NATIVE = runpy.run_path(str(Path(__file__).with_name("native-backup-acceptance.py")))
+add_failure_note = NATIVE["add_failure_note"]
 PREFIX = "app.logdate.client.e2e."
 LOCK_EVIDENCE_STAGES = (
     "native-enrollment", "enrollment-canceled", "initial-pin-challenge", "foreground-pin-challenge",
@@ -53,7 +54,7 @@ def instrument_journal_lock(serial, output):
         except Exception as capture_error:
             if failure is None:
                 raise
-            failure.add_note(f"Native lock evidence capture failed: {capture_error}")
+            add_failure_note(failure, f"Native lock evidence capture failed: {capture_error}")
 
 
 def run(serial, output):

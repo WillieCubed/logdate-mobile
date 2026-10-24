@@ -18,6 +18,7 @@ instrumentation_passed = runpy.run_path(
 
 
 NATIVE = runpy.run_path(str(Path(__file__).with_name("native-backup-acceptance.py")))
+add_failure_note = NATIVE["add_failure_note"]
 
 
 PACKAGE = os.environ.get("LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.transfer.debug")
@@ -123,7 +124,7 @@ def set_offline(serial, output=None):
             except Exception as diagnostic_error:
                 if failure is None:
                     raise
-                failure.add_note(f"Offline diagnostics could not be retained: {type(diagnostic_error).__name__}")
+                add_failure_note(failure, f"Offline diagnostics could not be retained: {type(diagnostic_error).__name__}")
 
 
 def restore_radio_state(serial, original):

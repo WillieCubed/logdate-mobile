@@ -38,7 +38,7 @@ class RestartContentTest(unittest.TestCase):
     def test_read_only_assertion_precedes_any_mutating_verification(self):
         events = []
         with tempfile.TemporaryDirectory() as temporary, patch.object(
-            NATIVE, "adb", side_effect=lambda *args: events.append("read-only") or b"OK (1 test)\n"
+            NATIVE, "adb", side_effect=lambda *args, **kwargs: events.append("read-only") or b"OK (1 test)\n"
         ), patch.object(NATIVE, "probe", side_effect=lambda *args: events.append("verify")):
             NATIVE.verify_restarted_content("emulator-5580", Path(temporary), {}, "phrase")
         self.assertEqual(["read-only", "verify"], events)

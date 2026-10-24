@@ -22,6 +22,9 @@ instrumentation_passed = runpy.run_path(
 managed_adb_command = runpy.run_path(
     str(Path(__file__).with_name("managed-native-target.py"))
 )["managed_adb_command"]
+add_failure_note = runpy.run_path(
+    str(Path(__file__).with_name("native-failure-diagnostics.py"))
+)["add_failure_note"]
 
 
 PACKAGE = os.environ.get("LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.debug")
@@ -107,17 +110,17 @@ def instrument_failure_cleanup(serial, log, failure, failure_diagnostics):
         try:
             failure_diagnostics(serial, log, failure)
         except Exception as error:
-            failure.add_note("Failure diagnostics could not be retained: " + type(error).__name__)
+            add_failure_note(failure, "Failure diagnostics could not be retained: " + type(error).__name__)
     try:
         safe_target(serial)
     except Exception as error:
-        failure.add_note("Instrument cleanup ownership check failed: " + type(error).__name__)
+        add_failure_note(failure, "Instrument cleanup ownership check failed: " + type(error).__name__)
         return
     for package in (PACKAGE, PACKAGE + ".test"):
         try:
             adb(serial, "shell", "am", "force-stop", package)
         except Exception as error:
-            failure.add_note("Instrument force-stop cleanup failed: " + type(error).__name__)
+            add_failure_note(failure, "Instrument force-stop cleanup failed: " + type(error).__name__)
 
 
 def instrument(serial, selector, log, extras=(), release_network=None, status_actions=None, timeout=120, failure_diagnostics=None, expected_tests=1):
@@ -166,10 +169,10 @@ def instrument(serial, selector, log, extras=(), release_network=None, status_ac
                 primary = errors[0]
                 instrument_failure_cleanup(serial, log, primary, None)
                 for error in errors[1:]:
-                    primary.add_note("Instrumentation finalization also failed: " + type(error).__name__)
+                    add_failure_note(primary, "Instrumentation finalization also failed: " + type(error).__name__)
                 raise primary
             for error in errors:
-                primary.add_note("Instrumentation finalization also failed: " + type(error).__name__)
+                add_failure_note(primary, "Instrumentation finalization also failed: " + type(error).__name__)
 
 
 def restore_environment(serial, network, original, saver, airplane, wifi, grants):
