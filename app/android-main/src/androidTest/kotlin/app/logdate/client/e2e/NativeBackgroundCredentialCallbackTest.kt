@@ -446,6 +446,7 @@ class NativeBackgroundCredentialCallbackTest {
             agent.onRestoreFinished()
             guard.verifyBeforeContent { true }
             assertEquals("BIOMETRIC", live.data.first()[stringPreferencesKey("security_level")])
+            NativeRetainedPrivacyBoundary.verify(context)
         }
 
     private fun deliverPreferences(

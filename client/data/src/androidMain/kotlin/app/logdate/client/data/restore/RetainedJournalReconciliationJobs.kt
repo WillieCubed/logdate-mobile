@@ -136,6 +136,9 @@ class RetainedJournalReconciliationJobService : JobService() {
             GlobalContext.getOrNull() ?: run {
                 return true
             }
+        nativeRestoreDeliveryGate().withLock {
+            RetainedNativePrivacyRepair(this).repairUnderDeliveryLock()
+        }
         return RetainedJournalReconciliationLock.prepareThenWithDeliveryGate(
             nativeRestoreDeliveryGate(),
             prepare = {

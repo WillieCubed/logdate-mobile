@@ -1283,6 +1283,35 @@ class PinnedNativeTransferArchiveTest(unittest.TestCase):
             selected["sha256"],
         )
 
+    def test_existing_framework_and_cloud_selection_bind_the_same_immutable_database(
+        self,
+    ):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        prefix = f"apps/{harness.PACKAGE}"
+        nested = PartialNativeTransportTest.make_tar(
+            [
+                (prefix + "/db/logdate", b"selected cloud database"),
+                (
+                    prefix + "/f/native_journal_transfer/current/database/logdate",
+                    b"different D2D database",
+                ),
+            ]
+        )
+        payload = PartialNativeTransportTest.make_tar(
+            [(f"1/_full/{harness.PACKAGE}", nested)]
+        )
+        expected = {
+            "bytes": len(b"selected cloud database"),
+            "sha256": hashlib.sha256(b"selected cloud database").hexdigest(),
+        }
+        self.assertEqual(
+            expected, harness.selected_database_snapshot(payload, framework=True)
+        )
+        self.assertEqual(
+            expected, harness.selected_database_snapshot(payload, cloud_backup=True)
+        )
+        self.assertNotEqual(expected, harness.selected_database_snapshot(payload))
+
     def test_selected_database_hash_rejects_missing_snapshot(self):
         harness = NATIVE_BACKUP_ACCEPTANCE
         nested = PartialNativeTransportTest.make_tar(
@@ -1359,6 +1388,92 @@ class PinnedNativeTransferArchiveTest(unittest.TestCase):
 
 
 class MissingPrivacyBackupFilterTest(unittest.TestCase):
+    def test_policy_repair_preserves_the_occupied_destination_and_only_adds_source_policy(
+        self,
+    ):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        before = {
+            "databases/logdate": {"sha256": "occupied-cloud"},
+            "files/db_recovery/passphrase_backup": {"sha256": "installed-key"},
+            "files/datastore/entry_drafts.preferences_pb": {"sha256": "draft"},
+        }
+        owner = harness.length_delimited_field(
+            1, CredentialsOnlyBackupFilterTest.preference_entry("owner", "retained")
+        )
+        policy = self.policy(harness)
+        harness.verify_privacy_repair_snapshot(
+            before, dict(before), owner, owner + policy, policy
+        )
+        for path in before:
+            with (
+                self.subTest(path=path),
+                self.assertRaisesRegex(RuntimeError, "changed durable data"),
+            ):
+                changed = {**before, path: {"sha256": "incoming-replacement"}}
+                harness.verify_privacy_repair_snapshot(
+                    before, changed, owner, owner + policy, policy
+                )
+
+    def test_policy_repair_rejects_unrelated_changes_present_policy_and_wrong_source_policy(
+        self,
+    ):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        files = {"databases/logdate": {"sha256": "occupied"}}
+        owner = harness.length_delimited_field(
+            1, CredentialsOnlyBackupFilterTest.preference_entry("owner", "retained")
+        )
+        policy = self.policy(harness)
+        other = harness.length_delimited_field(
+            1, CredentialsOnlyBackupFilterTest.preference_entry("owner", "replaced")
+        )
+        none = self.policy(harness, security="NONE")
+        for before, after, source in (
+            (owner, other + policy, policy),
+            (owner + policy, owner + policy, policy),
+            (owner, owner + none, policy),
+            (owner, owner, policy),
+        ):
+            with (
+                self.subTest(before=bool(before), after=len(after)),
+                self.assertRaisesRegex(RuntimeError, "privacy repair"),
+            ):
+                harness.verify_privacy_repair_snapshot(
+                    files, files, before, after, source
+                )
+
+    def test_policy_oracle_selects_the_authenticated_snapshot_preferences(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        path = f"apps/{harness.PACKAGE}/f/native_journal_transfer/current/files/logdate.preferences_pb"
+        nested = PartialNativeTransportTest.make_tar(
+            [
+                (path, self.policy(harness)),
+                (
+                    f"apps/{harness.PACKAGE}/f/logdate.preferences_pb",
+                    self.policy(harness, security="NONE"),
+                ),
+            ]
+        )
+        outer = PartialNativeTransportTest.make_tar(
+            [(f"1/_full/{harness.PACKAGE}", nested)]
+        )
+        self.assertEqual(
+            self.policy(harness), harness.selected_backup_contents(outer, path)
+        )
+
+    @staticmethod
+    def policy(harness, security="BIOMETRIC"):
+        onboarded = harness.length_delimited_field(
+            1, b"is_onboarded"
+        ) + harness.length_delimited_field(2, b"\x08\x01")
+        return harness.length_delimited_field(
+            1, onboarded
+        ) + harness.length_delimited_field(
+            1,
+            CredentialsOnlyBackupFilterTest.preference_entry(
+                "security_level", security
+            ),
+        )
+
     def test_partial_privacy_capture_uses_cloud_bytes_and_preserves_the_source_transport_setting(
         self,
     ):
@@ -1375,8 +1490,14 @@ class MissingPrivacyBackupFilterTest(unittest.TestCase):
                 (prefix + "/f/logdate.preferences_pb", preferences),
                 (prefix + "/db/logdate", b"cloud encrypted database"),
                 (prefix + "/f/db_recovery/passphrase_backup", b"retained key"),
-                (prefix + "/f/identity_recovery/phrase_backup", b"identity key"),
-                (prefix + "/f/identity_recovery/media_key_backup", b"media key"),
+                (
+                    prefix + "/f/identity_recovery/phrase_backup",
+                    b"identity recovery key",
+                ),
+                (
+                    prefix + "/f/identity_recovery/media_key_backup",
+                    b"media recovery key",
+                ),
             ]
         )
         payload = PartialNativeTransportTest.make_tar(

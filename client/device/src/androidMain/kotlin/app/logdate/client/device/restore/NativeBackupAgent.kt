@@ -120,6 +120,7 @@ open class NativeBackupAgent : BackupAgent() {
             finishCompletedNativeJournalCleanup()
             if (finishRetainedNativeDelivery()) {
                 // A late delivery must not reset the accepted working installation or its account.
+                repairRetainedNativePrivacyUnderDeliveryLock()
                 scheduleRetainedJournalReconciliationSafely()
                 super.onRestoreFinished()
                 return
@@ -132,7 +133,9 @@ open class NativeBackupAgent : BackupAgent() {
                     finishStagedNativeJournalTransfer()
                     return
                 }
-                if (!completedReplay.finish()) scheduleRetainedJournalReconciliationSafely()
+                val replayComplete = completedReplay.finish()
+                repairRetainedNativePrivacyUnderDeliveryLock()
+                if (!replayComplete) scheduleRetainedJournalReconciliationSafely()
                 super.onRestoreFinished()
                 return
             }
@@ -150,6 +153,7 @@ open class NativeBackupAgent : BackupAgent() {
                 }
             if (duplicateCompletion) {
                 val retainedCameraSource = finishNativeJournalTransferRestore()
+                repairRetainedNativePrivacyUnderDeliveryLock()
                 super.onRestoreFinished()
                 retryAccountRecovery()
                 if (retainedCameraSource && scheduleRetainedJournalReconciliationSafely()) {
@@ -186,6 +190,7 @@ open class NativeBackupAgent : BackupAgent() {
         }
         detector.recordRestoreCompletedUnderDeliveryLock()
         val retainedCameraSource = finishNativeJournalTransferRestore()
+        repairRetainedNativePrivacyUnderDeliveryLock()
         synchronized(callbackLock) { restoreCompletionRecorded = true }
         try {
             runBlocking(Dispatchers.IO) {
@@ -216,6 +221,7 @@ open class NativeBackupAgent : BackupAgent() {
         detector.markNativePrivacyPayloadReceived()
         detector.recordRestoreCompletedUnderDeliveryLock()
         synchronized(callbackLock) { restoreCompletionRecorded = true }
+        repairRetainedNativePrivacyUnderDeliveryLock()
         scheduleRetainedJournalReconciliationSafely()
     }
 
@@ -423,6 +429,9 @@ open class NativeBackupAgent : BackupAgent() {
             return false
         }
     }
+
+    /** Completion has sealed incoming cohorts and still owns the native delivery gate. */
+    protected open fun repairRetainedNativePrivacyUnderDeliveryLock() = Unit
 
     protected open fun scheduleRetainedJournalReconciliation(): Boolean = false
 

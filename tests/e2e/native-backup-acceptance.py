@@ -440,6 +440,27 @@ def assert_snapshot_preserved(
         raise RuntimeError("snapshot changed durable data: " + ", ".join(changed_paths))
 
 
+def verify_privacy_repair_snapshot(
+    before, after, before_preferences, after_preferences, source_preferences
+):
+    """A late policy repair preserves the occupied journal and changes exactly two fields."""
+    policy_names = {"is_onboarded", "security_level"}
+    assert_snapshot_preserved(
+        before, after, ignored_paths={"files/logdate.preferences_pb"}
+    )
+    changes = preference_changes(before_preferences, after_preferences)
+    if changes != {"added": sorted(policy_names), "removed": [], "changed": []}:
+        raise RuntimeError(
+            "privacy repair changed fields beyond the two missing policy values"
+        )
+    if canonical_preferences(
+        after_preferences, allowed_names=policy_names
+    ) != canonical_preferences(source_preferences, allowed_names=policy_names):
+        raise RuntimeError(
+            "privacy repair did not restore the authenticated source policy"
+        )
+
+
 def enable_backup(serial, attempts=3):
     state = b""
     for attempt in range(attempts):
@@ -716,12 +737,22 @@ def rewrite_native_full_backup(payload, transform):
 
 def selected_database_snapshot(payload, *, framework=False, cloud_backup=False):
     """Hash the journal file selected by the backup agent, not the live WAL database."""
-    full_backup_name = f"1/_full/{PACKAGE}"
     selected_database = (
         f"apps/{PACKAGE}/db/logdate"
         if framework or cloud_backup
         else f"apps/{PACKAGE}/f/native_journal_transfer/current/database/logdate"
     )
+    contents = selected_backup_contents(
+        payload, selected_database, description="selected journal database"
+    )
+    return {"bytes": len(contents), "sha256": hashlib.sha256(contents).hexdigest()}
+
+
+def selected_backup_contents(
+    payload, selected_path, *, description="selected backup file"
+):
+    """Read the exact selected file from Android's nested immutable source archive."""
+    full_backup_name = f"1/_full/{PACKAGE}"
     with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as transport:
         full_backup_item = next(
             (
@@ -745,17 +776,16 @@ def selected_database_snapshot(payload, *, framework=False, cloud_backup=False):
                 (
                     item
                     for item in app_backup.getmembers()
-                    if item.name == selected_database and item.isfile()
+                    if item.name == selected_path and item.isfile()
                 ),
                 None,
             )
             database = app_backup.extractfile(database_item) if database_item else None
             if database is None:
                 raise RuntimeError(
-                    "native transport did not contain the selected journal database"
+                    "native transport did not contain the " + description
                 )
-            contents = database.read()
-    return {"bytes": len(contents), "sha256": hashlib.sha256(contents).hexdigest()}
+            return database.read()
 
 
 def assert_cloud_backup_contents(payload):
@@ -2032,6 +2062,21 @@ def transfer(
         )
         # Deliver the original source policy through Android, without clearing destination data.
         adb(destination, "shell", "am", "force-stop", PACKAGE)
+        # The first launch may checkpoint the cloud WAL. The occupied destination immediately
+        # before this new delivery is authoritative; an earlier D2D export must not replace it.
+        before_repair = package_file_snapshot(destination)
+        before_policy = adb(
+            destination,
+            "exec-out",
+            "run-as",
+            PACKAGE,
+            "cat",
+            "files/logdate.preferences_pb",
+        )
+        private_file(
+            output / "destination-files-before-policy-repair.json",
+            json.dumps(before_repair, indent=2).encode(),
+        )
         private_file(output / "native-transport-complete.tar", original_payload)
         adb(
             destination,
@@ -2067,13 +2112,28 @@ def transfer(
             raise RuntimeError(
                 "Android did not finish delivering the original privacy policy"
             )
-        verify_restored_snapshot(
-            package_file_snapshot(destination),
-            {
-                **selected_source_files,
-                "databases/logdate": selected_database_snapshot(original_payload),
-            },
-            credentials_only=False,
+        after_repair = package_file_snapshot(destination)
+        after_policy = adb(
+            destination,
+            "exec-out",
+            "run-as",
+            PACKAGE,
+            "cat",
+            "files/logdate.preferences_pb",
+        )
+        private_file(
+            output / "destination-files-after-policy-repair.json",
+            json.dumps(after_repair, indent=2).encode(),
+        )
+        verify_privacy_repair_snapshot(
+            before_repair,
+            after_repair,
+            before_policy,
+            after_policy,
+            selected_backup_contents(
+                original_payload,
+                f"apps/{PACKAGE}/f/native_journal_transfer/current/files/logdate.preferences_pb",
+            ),
         )
         privacy_probe(
             destination, "resolved", output / "destination-privacy-resolved.log"
