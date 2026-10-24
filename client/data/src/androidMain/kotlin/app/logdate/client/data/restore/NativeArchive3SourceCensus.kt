@@ -22,6 +22,7 @@ internal object NativeArchive3SourceCensus {
             "journal_content_links",
             "media_captions",
             "location_logs",
+            "user_places",
         )
     private val regenerable =
         setOf(

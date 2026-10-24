@@ -8,7 +8,6 @@ import app.logdate.client.data.location.OfflineFirstLocationHistoryRepository
 import app.logdate.client.data.notes.DatabaseNotePlaceResolver
 import app.logdate.client.data.notes.JournalNoteQueries
 import app.logdate.client.data.notes.drafts.AndroidLocalEntryDraftStore
-import app.logdate.client.data.places.OfflineFirstUserPlacesRepository
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.database.NativeJournalSnapshotScope
 import app.logdate.client.database.captureNativeJournalDatabaseSnapshot
@@ -261,7 +260,20 @@ internal class NativeJournalTransferSnapshot(
                     createdAt = userData.profileCreatedAt,
                     lastUpdatedAt = userData.profileLastUpdatedAt,
                 )
-            val places = OfflineFirstUserPlacesRepository(database.userPlaceDao()).getAllPlaces().filterIsInstance<Place.UserDefined>()
+            val placeRows = database.userPlaceDao().getAllPlaces()
+            val places =
+                placeRows.map { row ->
+                    Place.UserDefined(
+                        id = Uuid.parse(row.id),
+                        displayName = row.name,
+                        lat = row.latitude,
+                        lng = row.longitude,
+                        radiusMeters = row.radiusMeters,
+                        description = row.description,
+                    )
+                }
+            val placeSourceTimes = placeRows.associate { Uuid.parse(it.id) to (it.createdAt to it.updatedAt) }
+            check(placeSourceTimes.size == placeRows.size)
             val location = OfflineFirstLocationHistoryRepository(database.locationHistoryDao()).getAllLocationHistory()
             val mediaByPath = selectedMedia.associateBy { it.path }
             val originalReferences = (notes.mapNotNull { it.mediaRefOrNull() } + drafts.flatMap { it.lateMediaReferences() }).distinct()
@@ -294,6 +306,7 @@ internal class NativeJournalTransferSnapshot(
                     drafts = drafts,
                     profile = profile,
                     places = places,
+                    placeSourceTimes = placeSourceTimes,
                     locationHistory = location,
                     originals = originals,
                     unsupportedPopulatedCategories = unsupported,

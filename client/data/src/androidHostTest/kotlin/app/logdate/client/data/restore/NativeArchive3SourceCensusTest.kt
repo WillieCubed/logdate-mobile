@@ -34,7 +34,7 @@ class NativeArchive3SourceCensusTest {
                 "storage_metadata" to 1L,
             )
         assertEquals(
-            setOf("user_places", "transcriptions", "audio_tags", "people", "unknown_future_table", "indexed_media"),
+            setOf("transcriptions", "audio_tags", "people", "unknown_future_table", "indexed_media"),
             NativeArchive3SourceCensus.unsupportedPopulatedTables(rows),
         )
     }

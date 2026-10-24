@@ -9,6 +9,7 @@ import app.logdate.shared.model.Journal
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
 import app.logdate.shared.model.PhotoPresentation
+import app.logdate.shared.model.Place
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.profile.LogDateProfile
 import kotlinx.coroutines.runBlocking
@@ -28,6 +29,43 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class NativeArchive3SnapshotWriterTest {
+    @Test
+    fun `saved places without source timestamps are refused`() =
+        runBlocking {
+            val parent = Files.createTempDirectory("logdate-archive3-place-times").toFile()
+            try {
+                val root = parent.resolve("archive").absolutePath.toPath()
+                val place =
+                    Place.UserDefined(
+                        id = Uuid.parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                        displayName = "Home",
+                        lat = 36.1699,
+                        lng = -115.1398,
+                        radiusMeters = 120.0,
+                    )
+                val source =
+                    NativeArchive3SnapshotInput(
+                        exportedAt = "2026-10-23T00:00:00Z",
+                        journals = emptyList(),
+                        notes = emptyList(),
+                        journalIdsByNote = emptyMap(),
+                        drafts = emptyList(),
+                        profile = LogDateProfile(),
+                        places = listOf(place),
+                        locationHistory = emptyList(),
+                        originals = emptyList(),
+                        unsupportedPopulatedCategories = emptySet(),
+                        validateContext = {},
+                    )
+                assertFailsWith<IllegalArgumentException> {
+                    NativeArchive3SnapshotWriter.write(source, StagingDirectoryArchiveContainer(FileSystem.SYSTEM, root))
+                }
+                assertFalse(FileSystem.SYSTEM.exists(root))
+            } finally {
+                parent.deleteRecursively()
+            }
+        }
+
     @Test
     fun `frozen journal and text note retain membership and original values`() =
         runBlocking {

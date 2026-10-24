@@ -45,6 +45,7 @@ data class NativeArchive3SnapshotInput(
     val drafts: List<EditorDraft>,
     val profile: LogDateProfile,
     val places: List<Place.UserDefined>,
+    val placeSourceTimes: Map<Uuid, Pair<Long, Long>> = emptyMap(),
     val locationHistory: List<LocationHistoryItem>,
     val originals: List<NativeArchive3Original>,
     val unsupportedPopulatedCategories: Set<String>,
@@ -65,6 +66,9 @@ object NativeArchive3SnapshotWriter {
     ) {
         try {
             require(input.unsupportedPopulatedCategories.isEmpty()) { "Native transfer source has unsupported content" }
+            require(input.places.map { it.id }.toSet() == input.placeSourceTimes.keys && input.places.size == input.placeSourceTimes.size) {
+                "Native transfer place timestamps are incomplete"
+            }
             input.validateContext()
             val sources = input.originals.associateBy { it.reference }
             require(sources.size == input.originals.size)
@@ -105,7 +109,20 @@ object NativeArchive3SnapshotWriter {
                 )
             val drafts = JsonArray(input.drafts.map { json.encodeToJsonElement(it.toArchiveDraft(media)) })
             val profile = input.profile.toArchiveProfile()?.let { json.encodeToJsonElement(it) as JsonObject }
-            val places = JsonArray(input.places.map { json.encodeToJsonElement(it.toArchivePlace()) })
+            val places =
+                JsonArray(
+                    input.places.map { place ->
+                        val payload = json.encodeToJsonElement(place.toArchivePlace()) as JsonObject
+                        val (createdAt, updatedAt) = input.placeSourceTimes.getValue(place.id)
+                        JsonObject(
+                            payload +
+                                mapOf(
+                                    "nativeCreatedAtMilliseconds" to JsonPrimitive(createdAt),
+                                    "nativeUpdatedAtMilliseconds" to JsonPrimitive(updatedAt),
+                                ),
+                        )
+                    },
+                )
             val samples =
                 input.locationHistory.map { item ->
                     val projected = json.encodeToJsonElement(item.toArchiveSample()) as JsonObject

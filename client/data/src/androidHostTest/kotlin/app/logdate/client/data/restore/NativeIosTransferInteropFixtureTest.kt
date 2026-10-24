@@ -15,6 +15,7 @@ import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
+import app.logdate.shared.model.Place
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.profile.LogDateProfile
 import kotlinx.coroutines.flow.Flow
@@ -50,6 +51,7 @@ class NativeIosTransferInteropFixtureTest {
                 val draftId = Uuid.parse("33333333-3333-3333-3333-333333333333")
                 val blockId = Uuid.parse("44444444-4444-4444-4444-444444444444")
                 val ownerId = "55555555-5555-5555-5555-555555555555"
+                val placeId = Uuid.parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
                 val timestamp = Instant.parse("2026-10-23T00:00:00Z")
                 NativeArchive3SnapshotWriter.write(
                     NativeArchive3SnapshotInput(
@@ -107,7 +109,18 @@ class NativeIosTransferInteropFixtureTest {
                                     ownerBound = false,
                                 ),
                         profile = LogDateProfile(),
-                        places = emptyList(),
+                        places =
+                            listOf(
+                                Place.UserDefined(
+                                    id = placeId,
+                                    displayName = "Home",
+                                    lat = 36.1699,
+                                    lng = -115.1398,
+                                    radiusMeters = 120.0,
+                                    description = "Our place",
+                                ),
+                            ),
+                        placeSourceTimes = mapOf(placeId to (1_700_000_000_123L to 1_700_000_500_456L)),
                         locationHistory = emptyList(),
                         originals = emptyList(),
                         unsupportedPopulatedCategories = emptySet(),
@@ -129,8 +142,8 @@ class NativeIosTransferInteropFixtureTest {
                 assertEquals("true", journal.getValue("favorite").jsonPrimitive.content)
                 assertEquals(1, bundle.notes.size)
                 assertEquals(2, bundle.drafts.size)
-                assertEquals("8afc024b45e765545a4adea0605799cf12bc743c2c27e180b374437d41a338f1", bundle.checksumsSha256)
-                assertEquals("9c80a5b98b08373ce0642fe68535c8c820c85e2e3c31853f8b25f6e6377a5f9e", bundle.manifestSha256)
+                assertEquals("e55241eba74daed76db58b9fdcac51d5315b8bbe64f8ad5d35f65df9ba9f1cc0", bundle.checksumsSha256)
+                assertEquals("b99019111b117b80f48079e4c197c6fd1cbe071be884f857eb1b52a31024566d", bundle.manifestSha256)
                 val custody = File(root, ".logdate-os-private/custody-v1.json")
                 assertTrue(custody.parentFile!!.mkdirs())
                 val emptyStorage =
@@ -168,7 +181,7 @@ class NativeIosTransferInteropFixtureTest {
                     )
                 record.withEncodedBytes { custody.writeBytes(it) }
                 assertEquals(
-                    "81b66d3001bd14c37c343d7f7ab2b5d6abb9523ed2f71d85ec32804dd57ee2b9",
+                    "af0392eb88a6f70631130e025b6d53bd7a3c4211407e2219917a720214b3c0e2",
                     MessageDigest.getInstance("SHA-256").digest(custody.readBytes()).joinToString("") { "%02x".format(it) },
                 )
                 val emitted = mutableListOf<String>()
