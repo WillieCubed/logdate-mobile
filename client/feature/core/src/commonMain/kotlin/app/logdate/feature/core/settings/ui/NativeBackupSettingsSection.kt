@@ -5,6 +5,7 @@ package app.logdate.feature.core.settings.ui
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudQueue
 import androidx.compose.material.icons.rounded.Devices
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -69,7 +70,7 @@ internal fun NativeBackupSettingsSection(
                     title = stringResource(Res.string.native_backup_recovering_title),
                     description = stringResource(Res.string.native_backup_recovering_detail),
                     onClick = onRetryRecovery,
-                    action = {},
+                    action = { Icon(Icons.Rounded.Refresh, contentDescription = null) },
                 )
             NativeRestoreCustodyStatus.NEEDS_TRANSFER ->
                 SettingsNavigationItem(
