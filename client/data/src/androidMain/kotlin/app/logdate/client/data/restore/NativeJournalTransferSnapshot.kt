@@ -240,7 +240,8 @@ internal class NativeJournalTransferSnapshot(
         val preferences = runBlocking { createAndroidMainDataStore(context).data.first() }
         check(
             NativeArchive3SourceCensus.unsupportedPreferences(preferences).isEmpty() &&
-                !NativeArchive3SourceCensus.hasPreDatabaseIosContent(preferences),
+                !NativeArchive3SourceCensus.hasPreDatabaseIosContent(preferences) &&
+                NativeArchive3SourceCensus.hasOnlyEmptyDraftState(preferences),
         ) { "Database-free source contains content that cannot be skipped" }
         checkNoDatabaseSourceUnchanged(noDatabasePreferencesChecksum, noDatabaseDraftChecksum)
         return true

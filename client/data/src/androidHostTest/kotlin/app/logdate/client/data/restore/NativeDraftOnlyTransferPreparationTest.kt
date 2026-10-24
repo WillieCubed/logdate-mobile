@@ -5,6 +5,7 @@ import android.content.ContextWrapper
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
+import app.logdate.client.data.journals.ArchiveDraftStorageState
 import app.logdate.client.datastore.createAndroidMainDataStore
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.shared.model.EditorDraft
@@ -82,6 +83,28 @@ class NativeDraftOnlyTransferPreparationTest {
             runBlocking {
                 createAndroidMainDataStore(fixture.context).edit { preferences ->
                     preferences[stringPreferencesKey("theme_preference")] = "dark"
+                }
+            }
+            val emitted = mutableListOf<File>()
+            assertFailsWith<IllegalStateException> {
+                runBlocking {
+                    NativeIosTransferSender(fixture.context, NativeJournalTransferSnapshot(fixture.context))
+                        .send(9, emitted::add)
+                }
+            }
+
+            assertTrue(emitted.isEmpty())
+            assertFalse(fixture.database.exists())
+        }
+    }
+
+    @Test
+    fun `database-free draft deletion receipt is not silently skipped`() {
+        Fixture().use { fixture ->
+            runBlocking {
+                createAndroidMainDataStore(fixture.context).edit { preferences ->
+                    preferences[stringPreferencesKey("editor_drafts_anonymous")] =
+                        ArchiveDraftStorageState(localDeletionIds = setOf(Uuid.random().toString())).encode(Json)
                 }
             }
             val emitted = mutableListOf<File>()

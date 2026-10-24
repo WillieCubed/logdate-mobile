@@ -21,6 +21,23 @@ import kotlin.uuid.Uuid
 @RunWith(RobolectricTestRunner::class)
 class NativeArchive3SourceCensusTest {
     @Test
+    fun `only recognized empty draft state permits an empty source`() {
+        val key = stringPreferencesKey("editor_drafts_anonymous")
+        assertTrue(NativeArchive3SourceCensus.hasOnlyEmptyDraftState(preferencesOf(key to "[]")))
+        assertFalse(
+            NativeArchive3SourceCensus.hasOnlyEmptyDraftState(
+                preferencesOf(key to """{"localDeletionIds":["22222222-2222-2222-2222-222222222222"]}"""),
+            ),
+        )
+        assertFalse(NativeArchive3SourceCensus.hasOnlyEmptyDraftState(preferencesOf(key to """{"futureReceipt":true}""")))
+        assertFalse(
+            NativeArchive3SourceCensus.hasOnlyEmptyDraftState(
+                preferencesOf(stringPreferencesKey("editor_drafts_native_unparsed_1") to "unreadable"),
+            ),
+        )
+    }
+
+    @Test
     fun `a note linked to a deleted semantic place remains fail closed`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val helper =

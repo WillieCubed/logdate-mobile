@@ -2,11 +2,13 @@ package app.logdate.client.data.restore
 
 import androidx.datastore.preferences.core.Preferences
 import androidx.sqlite.db.SupportSQLiteDatabase
+import app.logdate.client.data.journals.ArchiveDraftStorageState
 import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.location.LocationCapturePipeline
 import app.logdate.client.repository.location.LocationCaptureSource
 import app.logdate.shared.model.PhotoPresentation
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -30,6 +32,27 @@ internal object NativeArchive3SourceCensus {
             key.name in profilePreferences ||
                 key.name == "identity.canonical_owner_id" ||
                 (key.name == "identity.canonical_owner_bound" && value == "true")
+        }
+
+    /** An empty installation cannot discard draft custody or an unrecognized draft payload. */
+    fun hasOnlyEmptyDraftState(preferences: Preferences): Boolean =
+        preferences.asMap().all { (key, value) ->
+            when {
+                key.name == "entry_drafts" || isRetainedDraftStorageKey(key.name) -> {
+                    val state =
+                        (value as? String)
+                            ?.let { runCatching { ArchiveDraftStorageState.decode(Json, it) }.getOrNull() }
+                            ?: return@all false
+                    state.drafts.isEmpty() &&
+                        state.appliedRecoveries.isEmpty() &&
+                        state.localDeletionIds.isEmpty() &&
+                        state.custodyCopies.isEmpty() &&
+                        state.pendingMutations.isEmpty()
+                }
+                key.name == "editor_drafts_legacy_owner" || key.name.endsWith("_legacy_copied") -> true
+                key.name.startsWith("editor_drafts") -> false
+                else -> true
+            }
         }
 
     // Source columns were reviewed against the exported Room 58 schema before claiming complete scope.
