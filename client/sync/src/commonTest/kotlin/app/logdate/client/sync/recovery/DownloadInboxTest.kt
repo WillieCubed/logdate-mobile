@@ -167,6 +167,20 @@ class DownloadInboxTest {
             rows.add(row)
         }
 
+        override suspend fun deleteReceipt(
+            owner: String,
+            origin: String,
+            type: String,
+            id: String,
+        ) {
+            rows.removeAll {
+                it.ownerId == owner &&
+                    it.serverOrigin == origin &&
+                    it.entityType == type &&
+                    it.entityId == id
+            }
+        }
+
         override suspend fun checkpoint(
             owner: String,
             origin: String,

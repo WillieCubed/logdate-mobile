@@ -18,7 +18,7 @@ class IdentityAccountRecoveryTest {
     private val phrase = List(12) { "word$it" }
 
     @Test
-    fun `an account without a registered phrase needs setup, which registers this one`() =
+    fun `an account without a registered phrase needs setup and registers this one`() =
         runTest {
             val identity = FakeIdentity(registered = null)
             val recovery = IdentityAccountRecovery(identity, flowOf(true))
@@ -32,7 +32,7 @@ class IdentityAccountRecoveryTest {
         }
 
     @Test
-    fun `a phrase from another device needs setup, which replaces it with this one`() =
+    fun `a phrase from another device needs setup and replaces it with this one`() =
         runTest {
             val identity = FakeIdentity(registered = "did:key:zOther")
             val recovery = IdentityAccountRecovery(identity, flowOf(true))
