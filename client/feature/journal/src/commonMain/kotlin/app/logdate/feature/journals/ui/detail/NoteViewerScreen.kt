@@ -140,12 +140,14 @@ fun NoteViewerScreen(
         NoteViewerUiState.Loading -> {
             NoteViewerLoadingContent(modifier = modifier.then(sharedBoundsModifier))
         }
+
         is NoteViewerUiState.Error -> {
             NoteViewerErrorContent(
                 message = state.message.asString(),
                 modifier = modifier.then(sharedBoundsModifier),
             )
         }
+
         is NoteViewerUiState.AudioContent -> {
             AudioNoteViewerEntry(
                 noteId = state.shared.noteId,
@@ -153,6 +155,7 @@ fun NoteViewerScreen(
                 modifier = modifier.then(sharedBoundsModifier),
             )
         }
+
         is NoteViewerUiState.TextContent -> {
             NoteViewerScaffoldContent(
                 shared = state.shared,
@@ -170,6 +173,7 @@ fun NoteViewerScreen(
                 )
             }
         }
+
         is NoteViewerUiState.ImageContent -> {
             NoteViewerScaffoldContent(
                 shared = state.shared,
@@ -186,6 +190,7 @@ fun NoteViewerScreen(
                 )
             }
         }
+
         is NoteViewerUiState.VideoContent -> {
             NoteViewerScaffoldContent(
                 shared = state.shared,
@@ -684,11 +689,17 @@ private fun NoteLocationCard(
     val title = location.displayName ?: stringResource(Res.string.pinned_location)
     val subtitle =
         when {
-            coordinates != null ->
+            coordinates != null -> {
                 "${coordinates.latitude.formatCoordinate()}, ${coordinates.longitude.formatCoordinate()}"
-            placeCenter != null ->
+            }
+
+            placeCenter != null -> {
                 "${placeCenter.first.formatCoordinate()}, ${placeCenter.second.formatCoordinate()}"
-            else -> ""
+            }
+
+            else -> {
+                ""
+            }
         }
 
     Card(

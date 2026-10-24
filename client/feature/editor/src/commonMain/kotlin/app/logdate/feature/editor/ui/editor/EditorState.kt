@@ -241,5 +241,6 @@ private fun EntryBlockUiState.supportsPickerReturnTransition(): Boolean =
         is AudioBlockUiState,
         is CameraBlockUiState,
         -> true
+
         is VideoBlockUiState -> false
     }
