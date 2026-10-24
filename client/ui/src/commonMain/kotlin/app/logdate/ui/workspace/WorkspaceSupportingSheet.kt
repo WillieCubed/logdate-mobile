@@ -169,9 +169,13 @@ fun WorkspaceSupportingSheet(
                                         if (drag < -24.dp.toPx()) {
                                             extent =
                                                 when (extent) {
-                                                    SupportingExtent.Peek ->
+                                                    SupportingExtent.Peek -> {
                                                         if (anchors.canOverlay) SupportingExtent.Browsing else SupportingExtent.Focused
-                                                    else -> SupportingExtent.Expanded
+                                                    }
+
+                                                    else -> {
+                                                        SupportingExtent.Expanded
+                                                    }
                                                 }
                                         }
                                         if (drag > 24.dp.toPx()) {
@@ -201,10 +205,17 @@ fun WorkspaceSupportingSheet(
                                             IconButton(onClick = {
                                                 extent =
                                                     when (extent) {
-                                                        SupportingExtent.Peek ->
+                                                        SupportingExtent.Peek -> {
                                                             if (anchors.canOverlay) SupportingExtent.Browsing else SupportingExtent.Focused
-                                                        SupportingExtent.Browsing -> SupportingExtent.Expanded
-                                                        else -> SupportingExtent.Peek
+                                                        }
+
+                                                        SupportingExtent.Browsing -> {
+                                                            SupportingExtent.Expanded
+                                                        }
+
+                                                        else -> {
+                                                            SupportingExtent.Peek
+                                                        }
                                                     }
                                             }) {
                                                 Icon(
