@@ -244,7 +244,10 @@ class AndroidMediaManager(
             awaitClose { contentResolver.unregisterContentObserver(observer) }
         }.conflate()
 
-    override suspend fun deleteOwnedMedia(uri: String): Boolean = canonicalMediaStore.deleteOwned(localUri(uri).toString())
+    // A note can claim the same content-addressed object after a reference check and before
+    // deletion. Until all writers share a durable claim lifecycle, no caller can unlink it safely.
+    @Suppress("UNUSED_PARAMETER")
+    override suspend fun deleteOwnedMedia(uri: String): Boolean = false
 
     override suspend fun exists(mediaId: String): Boolean {
         val parsedUri = localUri(mediaId)

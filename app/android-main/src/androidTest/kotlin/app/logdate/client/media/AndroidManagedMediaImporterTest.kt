@@ -19,7 +19,6 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Rule
@@ -79,7 +78,12 @@ class AndroidManagedMediaImporterTest {
     fun tearDown() {
         publishedUris.forEach { uri ->
             if (Uri.parse(uri).scheme == "file") {
-                runBlocking { mediaManager.deleteOwnedMedia(uri) }
+                // Test-owned fixture, not a production reference-aware deletion path.
+                Uri
+                    .parse(uri)
+                    .path
+                    ?.let(::File)
+                    ?.delete()
             } else {
                 context.contentResolver.delete(Uri.parse(uri), null, null)
             }
@@ -139,22 +143,27 @@ class AndroidManagedMediaImporterTest {
         }
 
     @Test
-    fun `cancellation after destination is created discards the managed copy and staging file`() =
+    fun `cancelled duplicate import after manager reconstruction preserves the existing original`() =
         runTest {
             val sourceBytes = byteArrayOf(1, 2, 3, 4)
+            val existingUri =
+                mediaManager
+                    .saveMedia(MediaPayload("existing.png", "image/png", sourceBytes.size.toLong(), sourceBytes))
+                    .also(publishedUris::add)
+            val restartedManager = AndroidMediaManager(context.contentResolver, context, Dispatchers.Unconfined)
             val sourceUri =
                 insertRealMediaStoreImage("cancel-source-${Uuid.random()}.png", sourceBytes)
                     .also(publishedUris::add)
             lateinit var importJob: Job
             var capturedManagedUri: String? = null
             val cancelAfterSaveMediaManager =
-                object : MediaManager by mediaManager {
+                object : MediaManager by restartedManager {
                     override suspend fun saveMediaFromFile(
                         sourceFilePath: String,
                         fileName: String,
                         mimeType: String,
                     ): String {
-                        val managedUri = mediaManager.saveMediaFromFile(sourceFilePath, fileName, mimeType)
+                        val managedUri = restartedManager.saveMediaFromFile(sourceFilePath, fileName, mimeType)
                         capturedManagedUri = managedUri
                         importJob.cancel(CancellationException("Editor left after destination creation"))
                         return managedUri
@@ -164,7 +173,7 @@ class AndroidManagedMediaImporterTest {
                 ManagedMediaImporter(
                     mediaManager = cancelAfterSaveMediaManager,
                     source = AndroidManagedMediaImportSource(context, Dispatchers.Unconfined),
-                    discardManagedMedia = AndroidManagedMediaDiscarder(context, mediaManager, Dispatchers.Unconfined)::discard,
+                    discardManagedMedia = AndroidManagedMediaDiscarder(context, restartedManager, Dispatchers.Unconfined)::discard,
                 )
 
             try {
@@ -177,10 +186,8 @@ class AndroidManagedMediaImporterTest {
 
                 assertTrue(importJob.isCancelled)
                 val managedUri = checkNotNull(capturedManagedUri) { "Destination copy never ran" }
-                assertFalse(
-                    mediaManager.deleteOwnedMedia(managedUri),
-                    "Cancellation must have already discarded the managed copy",
-                )
+                assertEquals(existingUri, managedUri)
+                assertContentEquals(sourceBytes, mediaManager.readMedia(existingUri).data)
                 assertStagingIsEmpty()
             } finally {
                 context.contentResolver.delete(Uri.parse(sourceUri), null, null)

@@ -1,17 +1,16 @@
 package app.logdate.client.media
 
 /**
- * Deletes media files owned by the editor (audio recordings, captured photos/videos)
- * when their owning draft or block is discarded.
+ * Cleans disposable editor-owned files when their owning draft or block is discarded.
  *
  * The contract is best-effort: implementations log and continue rather than throwing
- * if a path is missing, the file is already gone, or the platform doesn't support
- * the URI scheme. The editor's draft-discard path calls this AFTER it has identified
- * paths that are unreferenced — never on paths still owned by a persisted entry.
+ * if a path is missing, the file is already gone, or the platform cannot prove the
+ * file is disposable. Android retains persisted originals and recordings until a
+ * serialized, reference-aware collector can prove that no writer still owns them.
  */
 interface MediaCleaner {
     /**
-     * Deletes the file referenced by [path], if it exists.
+     * Deletes the file referenced by [path] only when the platform can prove it is disposable.
      *
      * @param path Either an absolute filesystem path or a `file://` URI. Other URI
      *   schemes (content://, http://, etc.) are ignored.
