@@ -198,6 +198,7 @@ actual val dataModule: Module =
                 transcriptionRepository = get(),
                 mediaReferences = get(),
                 mediaReclamation = get<MediaReclamationJournal>(),
+                mediaClaimFence = get<MediaClaimFence>(),
                 draftSnapshots = { get<EntryDraftRecoveryRepository>().getDraftSnapshotsForRecovery() },
                 journalCoverUris = { get<app.logdate.client.database.dao.JournalDao>().getAll().map { it.coverImageUri } },
                 currentRecoveryScope = {
