@@ -513,12 +513,37 @@ def selected_database_snapshot(payload):
     return {"bytes": len(contents), "sha256": hashlib.sha256(contents).hexdigest()}
 
 
+def assert_cloud_backup_contents(payload):
+    """A cloud partial-delivery fixture must start with the live journal and its recovery key."""
+    full_backup_name = f"1/_full/{PACKAGE}"
+    file_prefix = f"apps/{PACKAGE}/f/"
+    required = {
+        f"apps/{PACKAGE}/db/logdate",
+        file_prefix + "db_recovery/passphrase_backup",
+    }
+    excluded_roots = (
+        file_prefix + "native_journal_transfer/current/",
+        file_prefix + "archive_recovery/sources/",
+        *(file_prefix + path for path in ("media/", "user_media/", "audio_notes/", "camera-captures/")),
+    )
+    with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as transport:
+        full_backup_item = next((item for item in transport.getmembers() if item.name == full_backup_name and item.isfile()), None)
+        full_backup = transport.extractfile(full_backup_item) if full_backup_item else None
+        if full_backup is None:
+            raise RuntimeError("cloud backup did not contain the LogDate full backup")
+        with tarfile.open(fileobj=io.BytesIO(full_backup.read()), mode="r:") as app_backup:
+            present = {item.name for item in app_backup.getmembers() if item.isfile() and item.size > 0}
+    if not required.issubset(present):
+        raise RuntimeError("cloud backup omitted the journal database or its live recovery key")
+    if any(path.startswith(excluded_roots) for path in present):
+        raise RuntimeError("cloud backup included device-transfer data or original media")
+
+
 def credentials_only_from_full_backup(payload):
     """Model a partial delivery of portable credentials without journal content."""
     app_prefix = f"apps/{PACKAGE}"
     prefix = app_prefix + "/f/"
     database_key = prefix + "db_recovery/passphrase_backup"
-    selected_key = prefix + "native_journal_transfer/current/files/db_recovery/passphrase_backup"
     owner_preferences = prefix + "logdate.preferences_pb"
     manifest = app_prefix + "/_manifest"
     identity_keys = {
@@ -526,7 +551,7 @@ def credentials_only_from_full_backup(payload):
         prefix + "identity_recovery/account_key_backup",
         prefix + "identity_recovery/media_key_backup",
     }
-    retained = {manifest, owner_preferences, *identity_keys}
+    retained = {manifest, owner_preferences, database_key, *identity_keys}
     retained_directories = {
         app_prefix + "/f",
         prefix + "db_recovery",
@@ -538,7 +563,7 @@ def credentials_only_from_full_backup(payload):
         if manifest not in files:
             raise RuntimeError("credentials-only fixture is missing Android's app backup manifest")
         has_identity_key = any(path in files for path in identity_keys - {prefix + "identity_recovery/media_key_backup"})
-        if selected_key not in files or prefix + "identity_recovery/media_key_backup" not in files or not has_identity_key:
+        if database_key not in files or prefix + "identity_recovery/media_key_backup" not in files or not has_identity_key:
             raise RuntimeError("credentials-only fixture is missing required portable recovery keys")
         preferences_item = files.get(owner_preferences)
         preferences = source.extractfile(preferences_item) if preferences_item else None
@@ -557,18 +582,13 @@ def credentials_only_from_full_backup(payload):
                 if item.isdir() and item.name.rstrip("/") in retained_directories and item.name.rstrip("/") not in emitted_directories:
                     filtered.addfile(copy.copy(item))
                     emitted_directories.add(item.name.rstrip("/"))
-                elif item.name == selected_key:
-                    if prefix + "db_recovery" not in emitted_directories:
+                elif item.name in retained:
+                    if item.name == database_key and prefix + "db_recovery" not in emitted_directories:
                         directory = tarfile.TarInfo(prefix + "db_recovery/")
                         directory.type = tarfile.DIRTYPE
                         directory.mode = 0o700
                         filtered.addfile(directory)
                         emitted_directories.add(prefix + "db_recovery")
-                    renamed = copy.copy(item)
-                    renamed.name = database_key
-                    renamed.pax_headers = {}
-                    filtered.addfile(renamed, source.extractfile(item))
-                elif item.name in retained:
                     retained_item = copy.copy(item)
                     retained_item.pax_headers = {}
                     if item.name == owner_preferences:
@@ -673,7 +693,7 @@ def ensure_emulator_setup_complete(serial):
         raise RuntimeError("Android setup is incomplete; native backup is unavailable")
 
 
-def prepare(serial, allow_existing=False, allow_preinstalled_empty=False):
+def prepare(serial, allow_existing=False, allow_preinstalled_empty=False, cloud_backup=False):
     if adb(serial, "shell", "getprop", "ro.kernel.qemu").strip() != b"1":
         raise RuntimeError("target did not identify itself as an emulator")
     wait_for_package_manager(serial)
@@ -695,7 +715,7 @@ def prepare(serial, allow_existing=False, allow_preinstalled_empty=False):
     adb(serial, "shell", "bmgr", "enable", "true")
     select_local_transport(serial)
     adb(serial, "shell", "settings", "put", "secure", "backup_local_transport_parameters",
-        "is_encrypted=true,is_device_transfer=true")
+        "is_encrypted=true,is_device_transfer=false" if cloud_backup else "is_encrypted=true,is_device_transfer=true")
 
 
 def radio_state(serial):
@@ -1209,7 +1229,11 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
     payload = adb(source, "exec-out", "tar", "-C", TRANSPORT_FILES, "-cf", "-", "1")
     original_payload = payload
     private_file(output / "native-transport-original.tar", original_payload)
-    selected_source_files = {**source_files, "databases/logdate": selected_database_snapshot(original_payload)}
+    if exercise_credentials_only:
+        assert_cloud_backup_contents(original_payload)
+        selected_source_files = source_files
+    else:
+        selected_source_files = {**source_files, "databases/logdate": selected_database_snapshot(original_payload)}
     missing_media_path = None
     if exercise_missing_keys:
         payload = without_portable_recovery_keys(payload)
@@ -1410,8 +1434,9 @@ def main():
         options.source,
         allow_existing=options.resume_seeded_source or options.snapshot_existing_source,
         allow_preinstalled_empty=options.seed_empty_source,
+        cloud_backup=options.exercise_credentials_only,
     )
-    prepare(options.destination, allow_preinstalled_empty=True)
+    prepare(options.destination, allow_preinstalled_empty=True, cloud_backup=options.exercise_credentials_only)
     transfer(
         options.source,
         options.destination,

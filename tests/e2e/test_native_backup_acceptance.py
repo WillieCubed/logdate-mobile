@@ -885,12 +885,59 @@ class MissingPrivacyBackupFilterTest(unittest.TestCase):
 
 
 class CredentialsOnlyBackupFilterTest(unittest.TestCase):
-    def test_credentials_only_emits_one_recovery_directory_when_source_orders_it_after_selected_key(self):
+    def test_credentials_only_prepares_an_encrypted_cloud_transport(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        calls = []
+
+        def adb(serial, *arguments, **kwargs):
+            calls.append(arguments)
+            if arguments == ("shell", "getprop", "ro.kernel.qemu"):
+                return b"1"
+            if arguments == ("shell", "id", "-u"):
+                return b"0"
+            return b""
+
+        with patch.object(harness, "adb", side_effect=adb), patch.object(harness, "wait_for_package_manager"), patch.object(
+            harness, "ensure_emulator_setup_complete"
+        ), patch.object(harness, "select_local_transport"):
+            harness.prepare("emulator-5554", cloud_backup=True)
+
+        self.assertIn(
+            ("shell", "settings", "put", "secure", "backup_local_transport_parameters",
+             "is_encrypted=true,is_device_transfer=false"),
+            calls,
+        )
+
+    def test_cloud_source_archive_requires_journal_and_live_recovery_key(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        prefix = f"apps/{harness.PACKAGE}"
+        entries = [
+            (prefix + "/_manifest", b"manifest"),
+            (prefix + "/db/logdate", b"encrypted journal"),
+            (prefix + "/f/db_recovery/passphrase_backup", b"cloud key"),
+        ]
+        full_backup_name = f"1/_full/{harness.PACKAGE}"
+
+        def outer(items):
+            return self.make_tar([(full_backup_name, self.make_tar(items)), ("1/@pm@", b"metadata")])
+
+        harness.assert_cloud_backup_contents(outer(entries))
+        for missing in (entries[1][0], entries[2][0]):
+            with self.subTest(missing=missing), self.assertRaisesRegex(RuntimeError, "cloud backup"):
+                harness.assert_cloud_backup_contents(outer([item for item in entries if item[0] != missing]))
+        for forbidden in (
+            prefix + "/f/native_journal_transfer/current/database/logdate",
+            prefix + "/f/media/objects/original.jpg",
+        ):
+            with self.subTest(forbidden=forbidden), self.assertRaisesRegex(RuntimeError, "cloud backup included"):
+                harness.assert_cloud_backup_contents(outer([*entries, (forbidden, b"must not be cloud backed up")]))
+
+    def test_credentials_only_preserves_one_recovery_directory_when_source_orders_it_after_key(self):
         harness = NATIVE_BACKUP_ACCEPTANCE
         prefix = f"apps/{harness.PACKAGE}"
         full_backup = self.make_tar([
             (prefix + "/_manifest", b"manifest"),
-            (prefix + "/f/native_journal_transfer/current/files/db_recovery/passphrase_backup", b"db-key"),
+            (prefix + "/f/db_recovery/passphrase_backup", b"db-key"),
             (prefix + "/f/db_recovery/", b""),
             (prefix + "/f/identity_recovery/phrase_backup", b"identity-key"),
             (prefix + "/f/identity_recovery/media_key_backup", b"media-key"),
@@ -910,13 +957,13 @@ class CredentialsOnlyBackupFilterTest(unittest.TestCase):
         prefix = f"apps/{harness.PACKAGE}"
         full_backup = self.make_tar([
             (prefix + "/_manifest", b"manifest"),
-            (prefix + "/f/native_journal_transfer/current/files/db_recovery/passphrase_backup", b"db-key"),
+            (prefix + "/f/db_recovery/passphrase_backup", b"db-key"),
             (prefix + "/f/identity_recovery/phrase_backup", b"identity-key"),
             (prefix + "/f/identity_recovery/media_key_backup", b"media-key"),
             (prefix + "/f/logdate.preferences_pb", harness.length_delimited_field(
                 1, self.preference_entry("identity.canonical_owner_id", "native-test-owner")
             )),
-            (prefix + "/f/native_journal_transfer/current/database/logdate", b"selected journal"),
+            (prefix + "/db/logdate", b"encrypted journal"),
         ])
         outer = self.make_tar([(f"1/_full/{harness.PACKAGE}", full_backup), ("1/@pm@", b"metadata")])
 
@@ -927,7 +974,7 @@ class CredentialsOnlyBackupFilterTest(unittest.TestCase):
             with tarfile.open(fileobj=io.BytesIO(transport.extractfile(f"1/_full/{harness.PACKAGE}").read()), mode="r:") as app_backup:
                 names = {member.name for member in app_backup.getmembers()}
                 self.assertIn(prefix + "/f/db_recovery/passphrase_backup", names)
-                self.assertNotIn(prefix + "/f/native_journal_transfer/current/database/logdate", names)
+                self.assertNotIn(prefix + "/db/logdate", names)
 
     def test_preserves_android_manifest_directories_and_only_portable_credentials(self):
         package = NATIVE_BACKUP_ACCEPTANCE.PACKAGE
@@ -938,8 +985,8 @@ class CredentialsOnlyBackupFilterTest(unittest.TestCase):
             (prefix + "/f/db_recovery/", b""),
             (prefix + "/f/identity_recovery/", b""),
             (prefix + "/f/media/", b""),
-            (prefix + "/f/native_journal_transfer/current/files/db_recovery/passphrase_backup", b"db-key"),
-            (prefix + "/f/native_journal_transfer/current/database/logdate", b"selected journal"),
+            (prefix + "/f/db_recovery/passphrase_backup", b"db-key"),
+            (prefix + "/db/logdate", b"encrypted journal"),
             (prefix + "/f/identity_recovery/phrase_backup", b"identity-key"),
             (prefix + "/f/identity_recovery/media_key_backup", b"media-key"),
             (
@@ -954,7 +1001,6 @@ class CredentialsOnlyBackupFilterTest(unittest.TestCase):
                 ),
             ),
             (prefix + "/f/media/photo.png", b"original"),
-            (prefix + "/db/logdate", b"journal"),
         ]
         backup = self.make_tar(entries)
 
@@ -970,7 +1016,6 @@ class CredentialsOnlyBackupFilterTest(unittest.TestCase):
         self.assertIn(prefix + "/f/db_recovery/passphrase_backup", members)
         self.assertEqual(b"db-key", database_key)
         self.assertNotIn(prefix + "/f/native_journal_transfer/current/files/db_recovery/passphrase_backup", members)
-        self.assertNotIn(prefix + "/f/native_journal_transfer/current/database/logdate", members)
         self.assertIn(prefix + "/f/identity_recovery/phrase_backup", members)
         self.assertIn(prefix + "/f/identity_recovery/media_key_backup", members)
         self.assertIn(prefix + "/f/logdate.preferences_pb", members)
@@ -988,7 +1033,7 @@ class CredentialsOnlyBackupFilterTest(unittest.TestCase):
         prefix = f"apps/{package}"
         backup = self.make_tar(
             [
-                (prefix + "/f/native_journal_transfer/current/files/db_recovery/passphrase_backup", b"db-key"),
+                (prefix + "/f/db_recovery/passphrase_backup", b"db-key"),
                 (prefix + "/f/identity_recovery/phrase_backup", b"identity-key"),
                 (prefix + "/f/identity_recovery/media_key_backup", b"media-key"),
                 (
@@ -1004,12 +1049,12 @@ class CredentialsOnlyBackupFilterTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "missing Android's app backup manifest"):
             NATIVE_BACKUP_ACCEPTANCE.credentials_only_from_full_backup(backup)
 
-    def test_rejects_credentials_only_archive_without_selected_database_key(self):
+    def test_rejects_credentials_only_archive_without_cloud_database_key(self):
         package = NATIVE_BACKUP_ACCEPTANCE.PACKAGE
         prefix = f"apps/{package}"
         backup = self.make_tar([
             (prefix + "/_manifest", b"manifest"),
-            (prefix + "/f/db_recovery/passphrase_backup", b"excluded stale live key"),
+            (prefix + "/f/native_journal_transfer/current/files/db_recovery/passphrase_backup", b"selected D2D key"),
             (prefix + "/f/identity_recovery/phrase_backup", b"identity-key"),
             (prefix + "/f/identity_recovery/media_key_backup", b"media-key"),
             (prefix + "/f/logdate.preferences_pb", NATIVE_BACKUP_ACCEPTANCE.length_delimited_field(

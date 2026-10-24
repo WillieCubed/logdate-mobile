@@ -365,7 +365,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         prefix = f"apps/{HARNESS.PACKAGE}"
         files = {
             prefix + "/_manifest": b"android app backup manifest",
-            prefix + "/f/native_journal_transfer/current/files/db_recovery/passphrase_backup": b"database recovery key",
+            prefix + "/f/db_recovery/passphrase_backup": b"database recovery key",
             prefix + "/f/identity_recovery/phrase_backup": b"identity recovery phrase",
             prefix + "/f/identity_recovery/media_key_backup": b"media recovery key",
             prefix + "/f/logdate.preferences_pb": HARNESS.length_delimited_field(
@@ -1163,7 +1163,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         self.assertFalse(HARNESS.contains_media_files({"files/datastore/preferences": {"bytes": 1}}))
 
     def test_credentials_only_fixture_rejects_missing_database_recovery_key(self):
-        database_key = f"apps/{HARNESS.PACKAGE}/f/native_journal_transfer/current/files/db_recovery/passphrase_backup"
+        database_key = f"apps/{HARNESS.PACKAGE}/f/db_recovery/passphrase_backup"
         full_backup = self.credentials_backup(omit=(database_key,))
 
         with self.assertRaisesRegex(RuntimeError, "missing required portable recovery keys"):
