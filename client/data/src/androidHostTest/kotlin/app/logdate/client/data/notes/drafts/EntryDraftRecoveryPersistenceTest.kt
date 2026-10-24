@@ -101,6 +101,23 @@ class EntryDraftRecoveryPersistenceTest {
             assertEquals(edited, store.getDraft(original.id))
         }
 
+    @Test
+    fun `native transfer tombstone survives edits and deletion`() =
+        runTest {
+            val store = AndroidLocalEntryDraftStore(RecoveryPreferences())
+            val original = draft()
+            val transferMarker = original.id.toString()
+
+            assertTrue(store.insertForNativeTransferRecovery(original, transferMarker) { true })
+            assertTrue(store.isNativeTransferRecoveryAdmitted(original.id, transferMarker))
+            store.saveDraft(original.copy(markId = "later user edit"))
+            assertTrue(store.isNativeTransferRecoveryAdmitted(original.id, transferMarker))
+            assertTrue(store.deleteDraft(original.id))
+
+            assertTrue(store.isNativeTransferRecoveryAdmitted(original.id, transferMarker))
+            assertEquals(null, store.getDraft(original.id))
+        }
+
     private fun draft(): EntryDraft {
         val time = Instant.fromEpochMilliseconds(1234)
         return EntryDraft(

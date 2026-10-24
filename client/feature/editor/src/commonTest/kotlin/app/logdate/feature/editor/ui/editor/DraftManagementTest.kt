@@ -23,6 +23,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.PendingMediaRecord
 import app.logdate.client.repository.journals.PendingMediaType
 import app.logdate.client.text.UiText
+import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.feature.editor.ui.editor.delegate.ContentLoader
 import app.logdate.feature.editor.ui.editor.delegate.DraftManager
 import app.logdate.feature.editor.ui.editor.fakes.FakeActivityTimelineRepository
@@ -1311,6 +1312,28 @@ class DraftManagementTest {
                     .single()
 
             assertNull(recovered.timeZoneId)
+        }
+
+    @Test
+    fun `camera target is durable before capture and reopens in the same draft block`() =
+        testScope.runTest {
+            val block = viewModel.createNewBlock(BlockType.CAMERA) as CameraBlockUiState
+            advanceUntilIdle()
+            val target = "/data/user/0/studio.hypertext.logdate/files/camera-captures/capture.jpg.tmp"
+
+            assertTrue(viewModel.persistCameraCaptureTarget(block.id, target, CapturedMediaType.PHOTO))
+
+            val saved = entryDraftRepository.getDrafts().first().single()
+            assertEquals(PendingMediaType.CAMERA_PHOTO, saved.pendingMedia.single().mediaType)
+            assertEquals(target, saved.pendingMedia.single().filePath)
+            val reopened =
+                draftManager
+                    .loadDraft(saved.id)
+                    .getOrThrow()
+                    .blocks
+                    .single() as CameraBlockUiState
+            assertEquals(block.id, reopened.id)
+            assertEquals(target, reopened.pendingFilePath)
         }
 
     @Test

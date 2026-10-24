@@ -125,11 +125,11 @@ class CameraViewModel(
     /**
      * Captures a photo or toggles video recording based on current mode.
      */
-    fun capture() {
+    fun capture(onPrepareTarget: suspend (String, CapturedMediaType) -> Boolean = { _, _ -> false }) {
         viewModelScope.launch {
             when (_uiState.value.captureMode) {
-                CaptureMode.PHOTO -> capturePhoto()
-                CaptureMode.VIDEO -> toggleVideoRecording()
+                CaptureMode.PHOTO -> capturePhoto(onPrepareTarget)
+                CaptureMode.VIDEO -> toggleVideoRecording(onPrepareTarget)
             }
         }
     }
@@ -137,10 +137,10 @@ class CameraViewModel(
     /**
      * Captures a photo.
      */
-    private suspend fun capturePhoto() {
+    private suspend fun capturePhoto(onPrepareTarget: suspend (String, CapturedMediaType) -> Boolean) {
         _uiState.update { it.copy(isCapturing = true) }
 
-        val uri = cameraCaptureManager.capturePhoto()
+        val uri = cameraCaptureManager.capturePhoto { path -> onPrepareTarget(path, CapturedMediaType.PHOTO) }
 
         _uiState.update {
             it.copy(
@@ -158,7 +158,7 @@ class CameraViewModel(
     /**
      * Toggles video recording on/off.
      */
-    private suspend fun toggleVideoRecording() {
+    private suspend fun toggleVideoRecording(onPrepareTarget: suspend (String, CapturedMediaType) -> Boolean) {
         if (_uiState.value.isRecording) {
             val uri = cameraCaptureManager.stopVideoRecording()
             _uiState.update {
@@ -168,7 +168,7 @@ class CameraViewModel(
                 )
             }
         } else {
-            cameraCaptureManager.startVideoRecording()
+            cameraCaptureManager.startVideoRecording { path -> onPrepareTarget(path, CapturedMediaType.VIDEO) }
         }
     }
 

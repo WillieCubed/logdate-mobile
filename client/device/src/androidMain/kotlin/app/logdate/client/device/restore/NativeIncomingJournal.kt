@@ -24,6 +24,7 @@ class NativeIncomingJournal(
         val file: File,
         val complete: Boolean,
         val expectedSize: Long,
+        val cohortId: String? = null,
     )
 
     @Serializable
@@ -175,7 +176,7 @@ class NativeIncomingJournal(
                 updateInventory(digest, record)
                 count++
                 result += Triple(entry.path, entry.expectedSize, entry.sha256) to
-                    Payload(entry.path, File(record, "payload"), entry.size == entry.expectedSize, entry.expectedSize)
+                    Payload(entry.path, File(record, "payload"), entry.size == entry.expectedSize, entry.expectedSize, id)
             }
             check(count == manifest.recordCount && digestHex(digest) == manifest.inventorySha256)
             result.distinctBy { it.first }.map { it.second }

@@ -210,11 +210,19 @@ class AndroidCameraCaptureManager(
             }
         }
 
-    override suspend fun capturePhoto(): String? = captureOutput.capturePhoto { imageCapture }
+    override suspend fun capturePhoto(): String? = captureOutput.capturePhoto(imageCapture = { imageCapture })
+
+    override suspend fun capturePhoto(onTargetPrepared: suspend (String) -> Boolean): String? =
+        captureOutput.capturePhoto({ imageCapture }, onTargetPrepared)
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     override suspend fun startVideoRecording() {
         captureOutput.startVideoRecording(videoCapture)
+    }
+
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
+    override suspend fun startVideoRecording(onTargetPrepared: suspend (String) -> Boolean) {
+        captureOutput.startVideoRecording(videoCapture, onTargetPrepared)
     }
 
     override suspend fun stopVideoRecording(): String? = captureOutput.stopVideoRecording()

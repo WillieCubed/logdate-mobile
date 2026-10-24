@@ -28,6 +28,7 @@ import logdate.client.feature.editor.generated.resources.captured_photo
 import logdate.client.feature.editor.generated.resources.delete_media
 import logdate.client.feature.editor.generated.resources.play_video
 import org.jetbrains.compose.resources.stringResource
+import kotlin.uuid.Uuid
 
 /**
  * Editor component for camera-captured media blocks.
@@ -44,6 +45,7 @@ fun CameraBlockEditor(
     block: CameraBlockUiState,
     onBlockUpdated: (CameraBlockUiState) -> Unit,
     onDeleteRequested: () -> Unit,
+    onPersistCaptureTarget: suspend (Uuid, String, CapturedMediaType) -> Boolean = { _, _, _ -> false },
     modifier: Modifier = Modifier,
 ) {
     val hasExistingMedia = block.uri != null
@@ -65,10 +67,13 @@ fun CameraBlockEditor(
         )
     } else {
         CameraCaptureContent(
+            pendingFilePath = block.pendingFilePath,
+            onPrepareCaptureTarget = { path, type -> onPersistCaptureTarget(block.id, path, type) },
             onMediaCaptured = { uri, mediaType, durationMs ->
                 onBlockUpdated(
                     block.copy(
                         uri = uri,
+                        pendingFilePath = null,
                         mediaType = mediaType,
                         durationMs = durationMs,
                     ),
@@ -170,6 +175,8 @@ private fun formatDuration(durationMs: Long): String = formatMediaDuration(durat
 expect fun CameraCaptureContent(
     onMediaCaptured: (uri: String, mediaType: CapturedMediaType, durationMs: Long) -> Unit,
     onClose: () -> Unit,
+    pendingFilePath: String? = null,
+    onPrepareCaptureTarget: suspend (String, CapturedMediaType) -> Boolean = { _, _ -> false },
     modifier: Modifier = Modifier,
     remoteControl: CameraRemoteControl = CameraRemoteControl.None,
     initialCaptureMode: CaptureMode = CaptureMode.PHOTO,

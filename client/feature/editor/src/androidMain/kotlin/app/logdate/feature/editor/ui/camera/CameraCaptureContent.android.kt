@@ -85,6 +85,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import app.logdate.client.media.MediaManager
 import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.asSystemControlledSelection
@@ -101,6 +102,7 @@ import coil3.video.videoFramePercent
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -149,6 +151,8 @@ private const val CAMERA_SWITCH_PREVIEW_TIMEOUT_MS = 2_000L
 actual fun CameraCaptureContent(
     onMediaCaptured: (uri: String, mediaType: CapturedMediaType, durationMs: Long) -> Unit,
     onClose: () -> Unit,
+    pendingFilePath: String?,
+    onPrepareCaptureTarget: suspend (String, CapturedMediaType) -> Boolean,
     modifier: Modifier,
     remoteControl: CameraRemoteControl,
     initialCaptureMode: CaptureMode,
@@ -168,6 +172,26 @@ actual fun CameraCaptureContent(
     val uiState by viewModel.uiState.collectAsState()
     val currentOnClose by rememberUpdatedState(onClose)
     val currentOnMediaCaptured by rememberUpdatedState(onMediaCaptured)
+    val currentOnPrepareCaptureTarget by rememberUpdatedState(onPrepareCaptureTarget)
+    val mediaManager: MediaManager = koinInject()
+    val context = LocalContext.current
+
+    LaunchedEffect(pendingFilePath) {
+        val path = pendingFilePath ?: return@LaunchedEffect
+        val recovered =
+            try {
+                AndroidPendingCameraCaptureRecovery(
+                    context.filesDir,
+                    save = { sourcePath, name, mime -> mediaManager.saveMediaFromFile(sourcePath, name, mime) },
+                ).recover(path)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Napier.w("Could not recover a pending camera capture", error)
+                null
+            }
+        recovered?.let { currentOnMediaCaptured(it.uri, it.type, 0L) }
+    }
 
     val cameraPermissions =
         rememberMultiplePermissionsState(
@@ -203,7 +227,7 @@ actual fun CameraCaptureContent(
     LaunchedEffect(remoteControl.commands, viewModel) {
         remoteControl.commands.collect { command ->
             when (command) {
-                CameraRemoteCommand.Capture -> viewModel.capture()
+                CameraRemoteCommand.Capture -> viewModel.capture(currentOnPrepareCaptureTarget)
                 CameraRemoteCommand.Close -> currentOnClose()
                 is CameraRemoteCommand.SelectCameraCategory -> {
                     val deviceId =
@@ -247,6 +271,7 @@ actual fun CameraCaptureContent(
         InlineCameraCapture(
             viewModel = viewModel,
             uiState = uiState,
+            onPrepareCaptureTarget = currentOnPrepareCaptureTarget,
             modifier = modifier,
         )
     }
@@ -563,6 +588,7 @@ private fun MediaReviewContent(
 private fun InlineCameraCapture(
     viewModel: CameraViewModel,
     uiState: CameraUiState,
+    onPrepareCaptureTarget: suspend (String, CapturedMediaType) -> Boolean,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -840,7 +866,7 @@ private fun InlineCameraCapture(
                         if (uiState.captureMode == CaptureMode.PHOTO) {
                             showFlash = true
                         }
-                        viewModel.capture()
+                        viewModel.capture(onPrepareCaptureTarget)
                     },
                 )
 

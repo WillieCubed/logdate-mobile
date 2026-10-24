@@ -5,6 +5,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.feature.editor.ui.editor.BlockType
 import app.logdate.feature.editor.ui.editor.EditorState
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
@@ -27,6 +28,7 @@ class BlocksUiState(
     val onCreateBlock: (BlockType, Uuid) -> EntryBlockUiState,
     val onDeleteBlock: (Uuid) -> Unit,
     val onPersistAudioRecordingTarget: suspend (Uuid, String, String?) -> Boolean = { _, _, _ -> true },
+    val onPersistCameraCaptureTarget: suspend (Uuid, String, CapturedMediaType) -> Boolean = { _, _, _ -> false },
 ) {
     val hasContent get() = blocks.any { it.hasContent() }
 }
@@ -40,12 +42,13 @@ fun rememberBlocksUiState(
     onDeleteBlock: (Uuid) -> Unit,
     onUpdateJournalSelection: (List<Uuid>) -> Unit,
     onPersistAudioRecordingTarget: suspend (Uuid, String, String?) -> Boolean = { _, _, _ -> true },
+    onPersistCameraCaptureTarget: suspend (Uuid, String, CapturedMediaType) -> Boolean = { _, _, _ -> false },
 ): BlocksUiState {
     val hasContent by remember(editorState.blocks) {
         derivedStateOf { editorState.blocks.isNotEmpty() }
     }
 
-    return remember(editorState, hasContent, onPersistAudioRecordingTarget) {
+    return remember(editorState, hasContent, onPersistAudioRecordingTarget, onPersistCameraCaptureTarget) {
         BlocksUiState(
             blocks = editorState.blocks,
             expandedBlockId = editorState.expandedBlockId,
@@ -57,6 +60,7 @@ fun rememberBlocksUiState(
             onCreateBlock = onCreateBlock,
             onDeleteBlock = onDeleteBlock,
             onPersistAudioRecordingTarget = onPersistAudioRecordingTarget,
+            onPersistCameraCaptureTarget = onPersistCameraCaptureTarget,
         )
     }
 }

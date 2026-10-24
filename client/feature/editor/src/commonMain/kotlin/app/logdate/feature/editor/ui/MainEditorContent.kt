@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import app.logdate.feature.editor.ui.audio.AudioBlockEditor
 import app.logdate.feature.editor.ui.blocks.EntryMemorySequence
 import app.logdate.feature.editor.ui.camera.CameraBlockEditor
+import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.feature.editor.ui.content.EmptyEditorStateContent
 import app.logdate.feature.editor.ui.content.matchingPickerTileIdsFor
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
@@ -222,6 +223,7 @@ fun MainEditorContent(
                                             onBlockDeleted = uiState.onDeleteBlock,
                                             onAudioResolverReady = onAudioResolverReady,
                                             onPersistAudioRecordingTarget = uiState.onPersistAudioRecordingTarget,
+                                            onPersistCameraCaptureTarget = uiState.onPersistCameraCaptureTarget,
                                             modifier = Modifier.fillMaxSize(),
                                         )
                                     }
@@ -269,6 +271,7 @@ private fun BlockContentInner(
     onBlockDeleted: (Uuid) -> Unit,
     onAudioResolverReady: (Uuid, PendingAudioResolver) -> Unit = { _, _ -> },
     onPersistAudioRecordingTarget: suspend (Uuid, String, String?) -> Boolean = { _, _, _ -> true },
+    onPersistCameraCaptureTarget: suspend (Uuid, String, CapturedMediaType) -> Boolean = { _, _, _ -> false },
     modifier: Modifier = Modifier,
 ) {
     when (block) {
@@ -305,6 +308,7 @@ private fun BlockContentInner(
                 block = block,
                 onBlockUpdated = onBlockUpdated,
                 onDeleteRequested = { onBlockDeleted(block.id) },
+                onPersistCaptureTarget = onPersistCameraCaptureTarget,
                 modifier = modifier,
             )
 

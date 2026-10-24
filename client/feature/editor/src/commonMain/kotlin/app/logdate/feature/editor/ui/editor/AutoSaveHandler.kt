@@ -367,6 +367,7 @@ internal fun getEditorDraftFingerprint(state: EditorState): String =
                         appendFingerprintField("camera")
                         appendCommonBlockFields(block)
                         appendFingerprintField(block.uri)
+                        appendFingerprintField(block.pendingFilePath)
                         appendFingerprintField(block.caption)
                         appendFingerprintField(block.mediaType)
                         appendFingerprintField(block.durationMs)

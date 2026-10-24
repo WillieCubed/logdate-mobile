@@ -125,7 +125,7 @@ private fun validNativeMediaInventoryPath(
     allowStaging: Boolean = false,
 ): Boolean {
     val relative = path.removePrefix("files/")
-    if (relative == path || MEDIA_ROOTS.none { relative.startsWith("$it/") }) return false
+    if (relative == path || (MEDIA_ROOTS + SELECTED_STAGING_ROOTS).none { relative.startsWith("$it/") }) return false
     val parts = relative.split('/')
     if (relative.length > 1024 ||
         parts.any { part ->
@@ -134,7 +134,15 @@ private fun validNativeMediaInventoryPath(
     ) {
         return false
     }
-    if (!allowStaging && (relative.startsWith("audio_notes/staging/") || relative.startsWith("media/staging/"))) return false
+    if (!allowStaging &&
+        (
+            relative.startsWith("audio_notes/staging/") ||
+                relative.startsWith("media/staging/") ||
+                SELECTED_STAGING_ROOTS.any { relative.startsWith("$it/") }
+        )
+    ) {
+        return false
+    }
     return !relative.startsWith("media/objects/sha256/") || retainedCanonicalMediaDigest(path) != null
 }
 
@@ -145,6 +153,7 @@ private fun retainedCanonicalMediaDigest(path: String): String? {
 
 const val NATIVE_MEDIA_INVENTORY_PATH = "files/db_recovery/native_media_inventory.json"
 private val MEDIA_ROOTS = listOf("media", "user_media", "audio_notes")
+private val SELECTED_STAGING_ROOTS = listOf("camera-captures")
 private val CANONICAL_MEDIA =
     Regex("files/media/objects/sha256/([a-f0-9]{2})/([a-f0-9]{64})(?:\\.retained-[1-9][0-9]*)?\\.[^/.]+", RegexOption.IGNORE_CASE)
 private val SHA256 = Regex("[a-f0-9]{64}")

@@ -10,8 +10,10 @@ import app.logdate.client.repository.journals.EntryEditBase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.PendingMediaRecord
 import app.logdate.client.repository.journals.PendingMediaType
+import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.AudioCaptureState
+import app.logdate.feature.editor.ui.editor.CameraBlockUiState
 import app.logdate.feature.editor.ui.editor.DraftState
 import app.logdate.feature.editor.ui.editor.EditorState
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
@@ -69,6 +71,9 @@ class DraftManager(
                 block.toJournalNote()?.let(notes::add)
             }
             if (block is AudioBlockUiState) {
+                block.toPendingMediaRecord(position)?.let(pendingMedia::add)
+            }
+            if (block is CameraBlockUiState && block.uri == null) {
                 block.toPendingMediaRecord(position)?.let(pendingMedia::add)
             }
         }
@@ -252,6 +257,19 @@ private fun AudioBlockUiState.toPendingMediaRecord(position: Int): PendingMediaR
     )
 }
 
+private fun CameraBlockUiState.toPendingMediaRecord(position: Int): PendingMediaRecord? {
+    val path = pendingFilePath ?: return null
+    return PendingMediaRecord(
+        blockId = id,
+        mediaType = if (mediaType == CapturedMediaType.PHOTO) PendingMediaType.CAMERA_PHOTO else PendingMediaType.CAMERA_VIDEO,
+        createdAt = timestamp,
+        filePath = path,
+        timeZoneId = timeZoneId,
+        position = position,
+        caption = caption,
+    )
+}
+
 /**
  * Reconstructs an [EntryBlockUiState] from a [PendingMediaRecord].
  *
@@ -268,6 +286,17 @@ private fun PendingMediaRecord.toBlock(): EntryBlockUiState? =
                 captureState = AudioCaptureState.Stopping(filePath = filePath, fallbackFilePath = fallbackFilePath),
                 caption = caption,
                 transcription = transcription,
+                timeZoneId = timeZoneId,
+            )
+        PendingMediaType.CAMERA_PHOTO,
+        PendingMediaType.CAMERA_VIDEO,
+        ->
+            CameraBlockUiState(
+                id = blockId,
+                timestamp = createdAt,
+                pendingFilePath = filePath,
+                caption = caption,
+                mediaType = if (mediaType == PendingMediaType.CAMERA_PHOTO) CapturedMediaType.PHOTO else CapturedMediaType.VIDEO,
                 timeZoneId = timeZoneId,
             )
     }

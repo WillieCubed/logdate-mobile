@@ -221,6 +221,7 @@ internal fun EntryEditorViewModel.applyBlockChanges(
                 location = changed(existing.location, updated.location, base.location),
                 timeZoneId = changed(existing.timeZoneId, updated.timeZoneId, base.timeZoneId),
                 uri = changed(existing.uri, updated.uri, base.uri),
+                pendingFilePath = changed(existing.pendingFilePath, updated.pendingFilePath, base.pendingFilePath),
                 caption = changed(existing.caption, updated.caption, base.caption),
                 mediaType = changed(existing.mediaType, updated.mediaType, base.mediaType),
                 durationMs = changed(existing.durationMs, updated.durationMs, base.durationMs),

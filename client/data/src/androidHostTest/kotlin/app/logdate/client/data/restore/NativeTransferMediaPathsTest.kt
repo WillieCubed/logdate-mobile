@@ -111,6 +111,30 @@ class NativeTransferMediaPathsTest {
             )
         }
 
+    @Test
+    fun `pending camera draft selects its private original for device transfer`() =
+        fixture { files ->
+            val source =
+                "/data/user/0/studio.hypertext.logdate/files/camera-captures/LOGDATE_20261024_120000.jpg.00000000-0000-0000-0000-000000000001.tmp"
+            val now = Clock.System.now()
+            val draft =
+                EntryDraft(
+                    id = Uuid.random(),
+                    notes = emptyList(),
+                    createdAt = now,
+                    updatedAt = now,
+                    pendingMedia =
+                        listOf(PendingMediaRecord(Uuid.random(), PendingMediaType.CAMERA_PHOTO, now, filePath = source)),
+                )
+
+            val references = nativeTransferDraftMediaReferences(mutablePreferencesOf(), listOf(draft))
+
+            assertEquals(
+                setOf("files/camera-captures/${source.substringAfterLast('/')}"),
+                nativeTransferMediaPaths(references, "studio.hypertext.logdate", files),
+            )
+        }
+
     private fun fixture(block: (File) -> Unit) {
         val files = Files.createTempDirectory("native-transfer-media-paths-").toFile()
         try {

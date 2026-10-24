@@ -154,6 +154,7 @@ internal class NativeJournalTransferSnapshot(
                 pinnedPreferences,
                 mapOf("database/logdate" to target),
                 mediaInventory = mediaInventory,
+                entryDraftsFile = entryDraftFile,
             )
             val selectedPreferencesChecksum = nativeSnapshotChecksum(pinnedPreferences)
             requirePinnedNativeTransferFile(pinnedPreferences, selectedPreferencesChecksum)

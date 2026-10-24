@@ -68,9 +68,9 @@ private fun safeNativeMediaRelative(relative: String): Boolean =
     relative.length <= 1024 &&
         relative.split('/').let { parts ->
             parts.size >= 2 &&
-                parts.first() in setOf("media", "user_media", "audio_notes") &&
+                parts.first() in setOf("media", "user_media", "audio_notes", "camera-captures") &&
                 parts.none { it.isEmpty() || it == "." || it == ".." || '\\' in it || it.any { char -> char.code < 32 } }
         }
 
 private val APP_PRIVATE_MEDIA =
-    Regex("^/data/(?:data|user/\\d+|user_de/\\d+)/([^/]+)/files/((?:media|user_media|audio_notes)/.+)$")
+    Regex("^/data/(?:data|user/\\d+|user_de/\\d+)/([^/]+)/files/((?:media|user_media|audio_notes|camera-captures)/.+)$")

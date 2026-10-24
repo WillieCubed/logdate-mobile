@@ -24,6 +24,7 @@ data class NativeJournalSourceReceipt(
     val preferencesSha256: String,
     val databaseSha256: Map<String, String>,
     val mediaInventorySha256: String? = null,
+    val entryDraftsSha256: String? = null,
 )
 
 /** Caller owns the database and DataStore capture fences until these immutable bytes commit. */
@@ -33,6 +34,7 @@ fun writeNativeJournalSourceReceipt(
     preferencesFile: File,
     databaseFiles: Map<String, File>,
     mediaInventory: File? = null,
+    entryDraftsFile: File? = null,
 ) {
     require(
         databaseFiles.keys.isNotEmpty() && "database/logdate" in databaseFiles && databaseFiles.keys.all { it in NATIVE_DATABASE_PATHS },
@@ -47,9 +49,15 @@ fun writeNativeJournalSourceReceipt(
             verifyNativeJournalMediaInventory(file, digest)
             digest
         }
+    val entryDraftsSha256 = entryDraftsFile?.takeIf(File::isFile)?.let(::nativeSourceChecksum)
     val receipt =
         NativeJournalSourceReceipt(
-            version = if (mediaInventorySha256 == null) 2 else 3,
+            version =
+                when {
+                    entryDraftsSha256 != null -> 4
+                    mediaInventorySha256 != null -> 3
+                    else -> 2
+                },
             readState = "captured",
             canonicalOwnerId = checkNotNull(preferences[stringPreferencesKey("identity.canonical_owner_id")]),
             canonicalOwnerBound = preferences[stringPreferencesKey("identity.canonical_owner_bound")] ?: "false",
@@ -58,6 +66,7 @@ fun writeNativeJournalSourceReceipt(
             preferencesSha256 = nativeSourceChecksum(preferencesFile),
             databaseSha256 = databaseFiles.mapValues { nativeSourceChecksum(it.value) },
             mediaInventorySha256 = mediaInventorySha256,
+            entryDraftsSha256 = entryDraftsSha256,
         )
     validateNativeSourceReceiptMetadata(receipt)
     retainedJournalWriteAtomic(destination, Json.encodeToString(receipt))
@@ -116,7 +125,14 @@ private fun nativeSourceFromReceipt(
     fun selected(
         path: String,
         hash: String,
-    ): File? = complete.firstOrNull { it.path == prefix + path && nativeSourceChecksum(it.file) == hash }?.file
+        requireReceiptCohort: Boolean = false,
+    ): File? =
+        complete
+            .firstOrNull {
+                it.path == prefix + path &&
+                    (!requireReceiptCohort || it.cohortId == payload.cohortId) &&
+                    nativeSourceChecksum(it.file) == hash
+            }?.file
     val preferences = selected("files/logdate.preferences_pb", receipt.preferencesSha256) ?: return null
     val databases =
         receipt.databaseSha256.mapValues { (path, hash) -> selected(path, hash) ?: return null }
@@ -127,9 +143,34 @@ private fun nativeSourceFromReceipt(
     )}-${digest.substring(8, 12)}-${digest.substring(12, 16)}-${digest.substring(16, 20)}-${digest.substring(20, 32)}"
     val inventory =
         receipt.mediaInventorySha256?.let { expected ->
-            selected(NATIVE_MEDIA_INVENTORY_PATH, expected)?.also { verifyNativeJournalMediaInventory(it, expected) }
+            selected(NATIVE_MEDIA_INVENTORY_PATH, expected, requireReceiptCohort = true)
+                ?.also { verifyNativeJournalMediaInventory(it, expected) }
         }
-    val accepted = databases + ("files/logdate.preferences_pb" to preferences) + ("source_scope.json" to payload.file)
+    val entryDrafts =
+        receipt.entryDraftsSha256?.let {
+            selected("files/datastore/entry_drafts.preferences_pb", it, requireReceiptCohort = true)
+        }
+    if (receipt.entryDraftsSha256 != null && entryDrafts == null) return null
+    val cameraFiles =
+        inventory
+            ?.takeIf { entryDrafts != null }
+            ?.let { inventoryFile ->
+                val inventoryData =
+                    runCatching {
+                        val expected = checkNotNull(receipt.mediaInventorySha256)
+                        verifyNativeJournalMediaInventory(inventoryFile, expected)
+                    }.getOrNull() ?: return null
+                inventoryData.files
+                    .filter { it.path.startsWith("files/camera-captures/") }
+                    .mapNotNull { entry ->
+                        selected(entry.path, entry.sha256, requireReceiptCohort = true)
+                            ?.takeIf { it.length() == entry.size }
+                            ?.let { entry.path to it }
+                    }.toMap()
+            }.orEmpty()
+    val accepted =
+        databases + ("files/logdate.preferences_pb" to preferences) + ("source_scope.json" to payload.file) +
+            listOfNotNull(entryDrafts?.let { "files/datastore/entry_drafts.preferences_pb" to it }).toMap() + cameraFiles
     return id to if (inventory == null) accepted else accepted + (NATIVE_MEDIA_INVENTORY_PATH to inventory)
 }
 
@@ -142,9 +183,17 @@ private fun readNativeJournalSourceReceipt(file: File): NativeJournalSourceRecei
 }
 
 private fun validateNativeSourceReceiptMetadata(receipt: NativeJournalSourceReceipt) {
-    check(receipt.version in 2..3 && receipt.readState == "captured")
-    check((receipt.version == 2) == (receipt.mediaInventorySha256 == null))
+    check(receipt.version in 2..4 && receipt.readState == "captured")
+    check(
+        when (receipt.version) {
+            2 -> receipt.mediaInventorySha256 == null && receipt.entryDraftsSha256 == null
+            3 -> receipt.mediaInventorySha256 != null && receipt.entryDraftsSha256 == null
+            4 -> receipt.entryDraftsSha256 != null
+            else -> false
+        },
+    )
     receipt.mediaInventorySha256?.let { check(it.matches(NATIVE_SOURCE_DIGEST)) }
+    receipt.entryDraftsSha256?.let { check(it.matches(NATIVE_SOURCE_DIGEST)) }
     Uuid.parse(receipt.canonicalOwnerId)
     check(receipt.canonicalOwnerBound in setOf("true", "false"))
     check(receipt.originProvenance in setOf("stored-backend-url", "default-at-capture"))
