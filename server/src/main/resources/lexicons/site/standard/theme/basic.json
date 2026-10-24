@@ -3,31 +3,48 @@
   "id": "site.standard.theme.basic",
   "defs": {
     "main": {
-      "type": "object",
-      "description": "A simplified theme definition for publications, providing basic color customization for content display across different platforms and applications.",
-      "required": ["background", "foreground", "accent", "accentForeground"],
-      "properties": {
-        "accent": {
-          "type": "union",
-          "description": "Color used for links and button backgrounds.",
-          "refs": ["site.standard.theme.color#rgb"]
-        },
-        "accentForeground": {
-          "type": "union",
-          "description": "Color used for button text.",
-          "refs": ["site.standard.theme.color#rgb"]
-        },
-        "background": {
-          "type": "union",
-          "description": "Color used for content background.",
-          "refs": ["site.standard.theme.color#rgb"]
-        },
-        "foreground": {
-          "type": "union",
-          "description": "Color used for content text.",
-          "refs": ["site.standard.theme.color#rgb"]
+      "key": "tid",
+      "type": "record",
+      "record": {
+        "type": "object",
+        "required": [
+          "background",
+          "foreground",
+          "accent",
+          "accentForeground"
+        ],
+        "properties": {
+          "accent": {
+            "refs": [
+              "site.standard.theme.color#rgb"
+            ],
+            "type": "union",
+            "description": "Color used for links and button backgrounds."
+          },
+          "background": {
+            "refs": [
+              "site.standard.theme.color#rgb"
+            ],
+            "type": "union",
+            "description": "Color used for content background."
+          },
+          "foreground": {
+            "refs": [
+              "site.standard.theme.color#rgb"
+            ],
+            "type": "union",
+            "description": "Color used for content text."
+          },
+          "accentForeground": {
+            "refs": [
+              "site.standard.theme.color#rgb"
+            ],
+            "type": "union",
+            "description": "Color used for button text."
+          }
         }
-      }
+      },
+      "description": "A simplified theme definition for publications, providing basic color customization for content display across different platforms and applications."
     }
   }
 }

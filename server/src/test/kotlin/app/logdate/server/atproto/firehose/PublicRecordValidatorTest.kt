@@ -66,6 +66,11 @@ class PublicRecordValidatorTest {
             "name" to JsonPrimitive("Lake days"),
             "url" to JsonPrimitive("https://lena.logdate.app"),
             "icon" to blob(),
+            "labels" to
+                buildJsonObject {
+                    put("\$type", "com.atproto.label.defs#selfLabels")
+                    put("values", buildJsonArray { })
+                },
             "basicTheme" to
                 buildJsonObject {
                     listOf("accent", "accentForeground", "background", "foreground").forEach { name ->
@@ -89,6 +94,21 @@ class PublicRecordValidatorTest {
             "path" to JsonPrimitive("/lake-day"),
             "tags" to buildJsonArray { add(JsonPrimitive("lake")) },
             "coverImage" to blob(),
+            "contributors" to
+                buildJsonArray {
+                    add(
+                        buildJsonObject {
+                            put("did", "did:plc:ewvi7nxzyoun6zhxrhs64oiz")
+                            put("role", "editor")
+                            put("displayName", "Sam")
+                        },
+                    )
+                },
+            "labels" to
+                buildJsonObject {
+                    put("\$type", "com.atproto.label.defs#selfLabels")
+                    put("values", buildJsonArray { add(buildJsonObject { put("val", "porn") }) })
+                },
             "content" to
                 buildJsonObject {
                     put("\$type", "com.example.markdown")
@@ -208,6 +228,27 @@ class PublicRecordValidatorTest {
             "tags[0]: longer than 128 graphemes",
         )
         rejects(document, validDocument().record().with("content", JsonPrimitive("plain text")), "content: expected an object")
+        rejects(
+            document,
+            validDocument().record().with("contributors", buildJsonArray { add(buildJsonObject { put("role", "editor") }) }),
+            "contributors[0].did: required field is missing",
+        )
+        rejects(
+            document,
+            validDocument().record().with("contributors", buildJsonArray { add(buildJsonObject { put("did", "not a did") }) }),
+            "contributors[0].did: not a valid did",
+        )
+        rejects(
+            document,
+            validDocument().record().with(
+                "labels",
+                buildJsonObject {
+                    put("\$type", "com.atproto.label.defs#selfLabels")
+                    put("values", buildJsonArray { add(buildJsonObject { put("val", "x".repeat(129)) }) })
+                },
+            ),
+            "labels.values[0].val",
+        )
         rejects(
             document,
             validDocument().record().with(
