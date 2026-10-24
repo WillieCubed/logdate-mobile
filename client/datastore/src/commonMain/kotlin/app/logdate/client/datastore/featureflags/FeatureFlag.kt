@@ -119,28 +119,26 @@ enum class FeatureFlag(
      * Sync through the account's sealed personal space, as LogDate schema records, instead of the
      * per-kind sync endpoints.
      *
-     * Off by default while each kind of data gains its record mapping. Even when on, a device only
-     * uses the personal space when the server offers it and the account is stored there.
+     * A device only uses the personal space when the server offers it and the account is stored
+     * there.
      */
-    PERSONAL_SPACE(key = "personal_space_enabled", defaultEnabled = false),
+    PERSONAL_SPACE(key = "personal_space_enabled", defaultEnabled = true),
 
     /**
      * Move an existing journal from the per-kind sync endpoints into the account's sealed personal
      * space, from this device, once it has synced everything; and show the move in Data settings.
      *
-     * Off by default while the move is rehearsed. It takes effect only together with
-     * [PERSONAL_SPACE], since a moved journal syncs through its personal space, and only on a server
-     * that offers the move.
+     * It takes effect only together with [PERSONAL_SPACE], since a moved journal syncs through its
+     * personal space, and only on a server that offers the move.
      */
-    PERSONAL_SPACE_MIGRATION(key = "personal_space_migration_enabled", defaultEnabled = false),
+    PERSONAL_SPACE_MIGRATION(key = "personal_space_migration_enabled", defaultEnabled = true),
 
     /**
-     * A recovery key the person holds for their identity, derived from their recovery phrase and
-     * ranked above the server's key. Account shows it only when the connected server supports it.
-     *
-     * Off by default until it has been tried against a server with recovery keys turned on.
+     * Confirming the recovery phrase also registers a key derived from it on the account's identity,
+     * so the phrase can move the account to another server. It is offered only when the connected
+     * server supports it and this device can confirm with a passkey.
      */
-    IDENTITY_RECOVERY_KEY(key = "identity_recovery_key_enabled", defaultEnabled = false),
+    IDENTITY_RECOVERY_KEY(key = "identity_recovery_key_enabled", defaultEnabled = true),
     ;
 
     companion object {

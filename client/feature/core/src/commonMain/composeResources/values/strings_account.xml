@@ -125,14 +125,14 @@
 
     <!-- Recovery phrase -->
     <string name="recovery_phrase_title">Recovery phrase</string>
-    <string name="recovery_phrase_verify_action">Verify recovery phrase</string>
-    <string name="recovery_phrase_verify_prompt">Put the phrase away, then enter its 12 words in order to enable Cloud backup.</string>
-    <string name="recovery_phrase_verify_label">Recovery phrase</string>
-    <string name="recovery_phrase_verify_failed">Those words did not match this journal. Reveal the phrase and try again.</string>
+    <string name="recovery_phrase_verify_failed">Couldn’t finish saving your recovery phrase on this device. Show it again to retry.</string>
+    <string name="recovery_phrase_write_down">Write them down in this order, or copy them into a password manager.</string>
+    <string name="recovery_phrase_saved_action">I’ve saved my recovery phrase</string>
     <string name="recovery_phrase_verified">Saved and confirmed. Your journal can now back up.</string>
-    <string name="recovery_phrase_intro">These 12 words unlock your synced journal on a new device. Anyone who has them can read it, so keep them somewhere private, like a password manager.</string>
+    <string name="recovery_phrase_intro">These 12 words are the only way to read your journal on a new device, and LogDate can’t see or recover them. They’re everyday words rather than a long code, so they’re easy to write down without mistakes.</string>
     <string name="recovery_phrase_show">Show recovery phrase</string>
-    <string name="recovery_phrase_hide">Hide recovery phrase</string>
+    <string name="recovery_phrase_copy">Copy</string>
+    <string name="recovery_phrase_hide">Hide</string>
     <string name="recovery_phrase_prompt_title">Show recovery phrase</string>
     <string name="recovery_phrase_prompt_subtitle">Confirm it’s you to see your recovery phrase</string>
     <string name="recovery_phrase_missing_title">This device doesn’t have your recovery phrase</string>

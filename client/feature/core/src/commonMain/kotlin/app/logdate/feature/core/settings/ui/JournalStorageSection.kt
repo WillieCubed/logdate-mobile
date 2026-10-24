@@ -2,7 +2,6 @@
 
 package app.logdate.feature.core.settings.ui
 
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -16,6 +15,7 @@ import androidx.compose.ui.platform.testTag
 import app.logdate.client.sync.space.migration.JournalDataKind
 import app.logdate.client.sync.space.migration.JournalMoveProblem
 import app.logdate.client.sync.space.migration.JournalMoveState
+import app.logdate.ui.common.AlertDialog
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.SimpleSettingsItem
 import app.logdate.util.formatDateLocalized

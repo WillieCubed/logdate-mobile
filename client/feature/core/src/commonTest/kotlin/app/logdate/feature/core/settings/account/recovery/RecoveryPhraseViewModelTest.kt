@@ -124,7 +124,7 @@ class RecoveryPhraseViewModelTest {
         }
 
     @Test
-    fun `correct reentry verifies recovery and wrong words do not`() =
+    fun `saving the shown phrase confirms it, and nothing is confirmed before it is shown`() =
         runTest {
             var confirmed = false
             var backupRequests = 0
@@ -140,17 +140,30 @@ class RecoveryPhraseViewModelTest {
                     onVerified = { backupRequests++ },
                 )
 
-            viewModel.reveal(prompt)
-            viewModel.verify("incorrect words")
-            assertEquals(RecoveryPhraseUiState.VerificationFailed, viewModel.state.value)
+            viewModel.confirmSaved()
             assertEquals(false, confirmed)
             assertEquals(0, backupRequests)
 
             viewModel.reveal(prompt)
-            viewModel.verify(phrase.joinToString(" "))
+            viewModel.confirmSaved()
             assertEquals(RecoveryPhraseUiState.Verified, viewModel.state.value)
             assertEquals(true, confirmed)
             assertEquals(1, backupRequests)
+        }
+
+    @Test
+    fun `a phrase confirmed earlier is shown without asking for words again`() =
+        runTest {
+            val viewModel =
+                RecoveryPhraseViewModel(
+                    gatekeeper = ScriptedGatekeeper(AppAuthState.AUTHENTICATED),
+                    loadPhrase = { phrase },
+                    isPhraseVerified = { true },
+                )
+
+            viewModel.reveal(prompt)
+
+            assertEquals(RecoveryPhraseUiState.Revealed(phrase, confirmed = true), viewModel.state.value)
         }
 
     @Test
@@ -196,7 +209,7 @@ class RecoveryPhraseViewModelTest {
                 )
 
             viewModel.reveal(prompt)
-            viewModel.verify(phrase.joinToString(" "))
+            viewModel.confirmSaved()
 
             assertEquals(1, recovery.setups)
             assertEquals(AccountRecoveryUiState.Ready, viewModel.accountRecovery.value)
