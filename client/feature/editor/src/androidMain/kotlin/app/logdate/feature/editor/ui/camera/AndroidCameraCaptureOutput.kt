@@ -13,6 +13,7 @@ import androidx.camera.video.VideoRecordEvent
 import androidx.core.content.ContextCompat
 import app.logdate.client.device.restore.admitNativeContent
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.storage.AndroidMediaPublicationTickets
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -34,6 +35,7 @@ internal class AndroidCameraCaptureOutput(
     private val context: Context,
     private val mediaManager: MediaManager,
     private val state: MutableStateFlow<CameraCaptureState>,
+    private val publicationTickets: AndroidMediaPublicationTickets,
 ) {
     private val appContext = context.applicationContext
     private var currentRecording: Recording? = null
@@ -69,10 +71,12 @@ internal class AndroidCameraCaptureOutput(
             val capturedPath = awaitPhotoCapture(capture, outputOptions, sourceFile)
             capturedPath ?: return@withContext null
             try {
+                val ticket = publicationTickets.reserve("camera-capture", capturedPath)
                 val uri =
                     withContext(Dispatchers.IO) {
                         mediaManager.saveMediaFromFile(capturedPath, fileName, "image/jpeg")
                     }
+                publicationTickets.publish(ticket.id, uri)
                 state.update {
                     it.copy(
                         lastCapturedUri = uri,
@@ -213,11 +217,13 @@ internal class AndroidCameraCaptureOutput(
             val uri =
                 if (!event.hasError() && file != null) {
                     runCatching {
-                        mediaManager.saveMediaFromFile(
-                            sourceFilePath = file.absolutePath,
-                            fileName = fileName,
-                            mimeType = "video/mp4",
-                        )
+                        val ticket = publicationTickets.reserve("camera-capture", file.absolutePath)
+                        mediaManager
+                            .saveMediaFromFile(
+                                sourceFilePath = file.absolutePath,
+                                fileName = fileName,
+                                mimeType = "video/mp4",
+                            ).also { publicationTickets.publish(ticket.id, it) }
                     }.onFailure { error ->
                         Napier.e("Failed to persist video capture", error)
                     }.getOrNull()

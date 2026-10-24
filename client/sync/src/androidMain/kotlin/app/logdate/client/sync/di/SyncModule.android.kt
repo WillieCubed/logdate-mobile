@@ -58,7 +58,7 @@ actual val syncModule: Module =
         single { SyncUpgradeResumption(get()) }
         single<SyncTransactionManager> {
             val database = get<LogDateDatabase>()
-            RoomSyncTransactionManager(database)
+            RoomSyncTransactionManager(database, get<app.logdate.client.media.storage.MediaClaimFence>())
         }
         single<JournalStorageMove> { get<DefaultSyncManager>().journalStorageMove }
         single<DefaultSyncManager> {
@@ -110,6 +110,9 @@ actual val syncModule: Module =
                 spaceSync = get(),
                 spaceMigration = get(),
                 syncRouteStore = KeyValueSyncRouteStore(get()),
+                publicationCustody =
+                    getOrNull<app.logdate.client.media.ManagedMediaPublicationCustody>()
+                        ?: app.logdate.client.media.ManagedMediaPublicationCustody.None,
                 deviceEnrollment = {
                     check(get<DefaultDeviceManager>().registerWithCloud().getOrThrow()) {
                         "Device registration was not accepted"

@@ -10,6 +10,9 @@ import app.logdate.client.media.audio.transcription.AndroidTranscriptionManager
 import app.logdate.client.media.audio.transcription.TranscriptionManager
 import app.logdate.client.media.display.OnDemandRemoteDisplayManager
 import app.logdate.client.media.display.RemoteDisplayManager
+import app.logdate.client.media.storage.AndroidMediaClaimFence
+import app.logdate.client.media.storage.AndroidMediaPublicationTickets
+import app.logdate.client.media.storage.MediaClaimFence
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.media.storage.MediaReclamationJournal
 import app.logdate.client.media.storage.StoredMediaReferences
@@ -31,10 +34,28 @@ actual val mediaModule: Module =
         single<ContentResolver> { androidContext().contentResolver }
         single { androidMediaFileResolver(androidContext()) }
         single<StoredMediaReferences> { get<MediaFileResolver>() }
+        single<MediaClaimFence> { AndroidMediaClaimFence(androidContext().noBackupFilesDir) }
+        single { AndroidMediaPublicationTickets(androidContext().noBackupFilesDir, get()) }
+        single<app.logdate.client.media.ManagedMediaPublicationCustody> {
+            app.logdate.client.media
+                .AndroidManagedMediaPublicationCustody(get())
+        }
         // Candidate recording remains gated until every media writer and the collector share a claim fence.
         single<MediaReclamationJournal> { MediaReclamationJournal.None }
         single<MediaManager> {
-            AndroidPhotoLibraryMediaManager(AndroidMediaManager(get(), get(), mediaFiles = get()), androidContext())
+            AndroidPhotoLibraryMediaManager(
+                AndroidMediaManager(
+                    get(),
+                    get(),
+                    canonicalMediaStore =
+                        app.logdate.client.media.storage.AndroidCanonicalMediaStore(
+                            androidContext().filesDir,
+                            publicationTickets = get(),
+                        ),
+                    mediaFiles = get(),
+                ),
+                androidContext(),
+            )
         }
         single<MediaCleaner> { AndroidMediaCleaner(get()) }
         factory {
@@ -42,9 +63,11 @@ actual val mediaModule: Module =
             app.logdate.client.media.ManagedMediaImporter(
                 manager,
                 app.logdate.client.media
-                    .AndroidManagedMediaImportSource(androidContext()),
+                    .AndroidManagedMediaImportSource(androidContext(), stagingParent = androidContext().filesDir),
                 app.logdate.client.media
                     .AndroidManagedMediaDiscarder(androidContext(), manager)::discard,
+                app.logdate.client.media
+                    .AndroidManagedMediaPublicationCustody(get()),
             )
         }
 

@@ -287,6 +287,7 @@ class RestoreWorker(
                         archive.root,
                         getKoin().get(),
                         archive.mediaIntegrity,
+                        getKoin().get(),
                     ),
                 onProgress = { phase ->
                     check(currentArchiveRecoveryScope(getKoin()) == attempt.scope) { "Archive recovery account changed" }

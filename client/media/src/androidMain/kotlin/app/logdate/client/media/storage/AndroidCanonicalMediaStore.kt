@@ -30,6 +30,7 @@ import kotlin.uuid.Uuid
 class AndroidCanonicalMediaStore(
     private val filesDir: File,
     private val syncFile: (File) -> Unit = ::syncExistingFile,
+    private val publicationTickets: AndroidMediaPublicationTickets? = null,
     private val syncDirectory: (File) -> Unit = ::syncDirectoryOnAndroid,
 ) {
     private val objectsDirectory = File(filesDir, "media/objects/sha256")
@@ -46,7 +47,7 @@ class AndroidCanonicalMediaStore(
         admitNativeContent(File(filesDir, "media"))
         ensurePrivateDirectory(stagingDirectory)
         ensurePrivateDirectory(objectsDirectory)
-        removeStaleStagingFiles()
+        // Age alone cannot prove a staging file is abandoned: Android may suspend a writer mid-stream.
         val stagingFile = File(stagingDirectory, "${Uuid.random()}.tmp")
 
         try {
@@ -91,8 +92,15 @@ class AndroidCanonicalMediaStore(
                             if (!canCommit()) throw CancellationException("Media store commit is no longer valid")
                             val name = if (variant == 0L) "$hexDigest.$extension" else "$hexDigest.retained-$variant.$extension"
                             val destination = File(destinationDirectory, name)
+                            val ticket =
+                                publicationTickets?.reserve(
+                                    destination = "canonical-media",
+                                    sourcePath = stagingFile.absolutePath,
+                                    reference = destination.toURI().toString(),
+                                )
                             if (Files.exists(destination.toPath(), LinkOption.NOFOLLOW_LINKS)) {
                                 if (isVerifiedObject(destination, hexDigest, copiedBytes)) {
+                                    ticket?.let { publicationTickets.publish(it.id, destination.toURI().toString()) }
                                     syncFile(destination)
                                     syncDirectory(destinationDirectory)
                                     currentCoroutineContext().ensureActive()
@@ -109,6 +117,7 @@ class AndroidCanonicalMediaStore(
                                 // Another process claimed this path. Recheck it under the lock.
                                 continue
                             }
+                            ticket?.let { publicationTickets.publish(it.id, destination.toURI().toString()) }
                             syncDirectory(destinationDirectory)
                             currentCoroutineContext().ensureActive()
                             return@withLock destination.toURI().toString()
@@ -136,11 +145,7 @@ class AndroidCanonicalMediaStore(
      */
     suspend fun deleteOwned(uri: String): Boolean =
         withContext(Dispatchers.IO) {
-            val target =
-                runCatching { File(URI(uri)) }
-                    .getOrNull()
-                    ?.takeIf { it.isFile }
-                    ?: return@withContext false
+            val target = ownedTarget(uri)?.takeIf { it.isFile } ?: return@withContext false
 
             val objectsRoot =
                 runCatching { objectsDirectory.canonicalFile.toPath() }.getOrNull()
@@ -151,9 +156,35 @@ class AndroidCanonicalMediaStore(
 
             if (!resolved.startsWith(objectsRoot)) return@withContext false
             if (Files.isSymbolicLink(target.toPath())) return@withContext false
+            if (hasSymlinkInOwnedParents(target)) return@withContext false
 
             target.delete()
         }
+
+    private fun hasSymlinkInOwnedParents(target: File): Boolean {
+        val root = objectsDirectory.toPath().toAbsolutePath().normalize()
+        var parent =
+            target
+                .toPath()
+                .toAbsolutePath()
+                .normalize()
+                .parent
+        while (parent != null && parent.startsWith(root)) {
+            if (Files.isSymbolicLink(parent)) return true
+            if (parent == root) break
+            parent = parent.parent
+        }
+        return false
+    }
+
+    private fun ownedTarget(reference: String): File? {
+        val ref = LocalMediaRef.parse(reference)
+        if (ref != null) {
+            if (ref.collection != MediaCollection.Library || !ref.path.startsWith("objects/sha256/")) return null
+            return File(File(filesDir, "media"), ref.path)
+        }
+        return runCatching { File(URI(reference)) }.getOrNull()
+    }
 
     private fun isVerifiedObject(
         file: File,
@@ -173,21 +204,6 @@ class AndroidCanonicalMediaStore(
             }
             digest.digest().toHex() == expectedDigest
         }
-    }
-
-    private fun removeStaleStagingFiles() {
-        val cutoffMillis = System.currentTimeMillis() - STAGING_FILE_MAX_AGE_MILLIS
-        stagingDirectory
-            .listFiles()
-            ?.filter { file ->
-                file.isFile &&
-                    file.lastModified() <= cutoffMillis &&
-                    STAGING_FILE_PATTERN.matches(file.name)
-            }?.forEach { file ->
-                if (!file.delete()) {
-                    Napier.w("Unable to remove stale private media staging file")
-                }
-            }
     }
 
     private suspend fun publishIntoPlace(
@@ -262,10 +278,6 @@ class AndroidCanonicalMediaStore(
 
     private companion object {
         private val publicationLock = Mutex()
-        const val STAGING_FILE_MAX_AGE_MILLIS: Long = 24 * 60 * 60 * 1_000L
-
-        // Older versions used .corrupt for displaced user bytes. Never expire those files.
-        val STAGING_FILE_PATTERN = Regex("[0-9a-fA-F-]{36}\\.tmp")
 
         fun syncExistingFile(file: File) {
             FileChannel.open(file.toPath(), StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS).use { channel ->

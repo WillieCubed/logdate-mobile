@@ -160,7 +160,15 @@ class RetainedJournalReconciliationJobService : JobService() {
                     )
                 }
             },
-            block = { repositories -> if (repositories == null) false else reconcileLocked(repositories) },
+            block = { repositories ->
+                if (repositories == null) {
+                    false
+                } else {
+                    app.logdate.client.media.storage.AndroidMediaClaimFence(noBackupFilesDir).withClaim {
+                        reconcileLocked(repositories)
+                    }
+                }
+            },
         )
     }
 

@@ -7,6 +7,7 @@ import app.logdate.client.domain.restore.ArchiveMediaIntegrity
 import app.logdate.client.domain.restore.MediaImporter
 import app.logdate.client.domain.restore.copyArchiveMedia
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.storage.AndroidMediaPublicationTickets
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.media.storage.isRecoveredOriginal
 import io.github.aakira.napier.Napier
@@ -24,6 +25,7 @@ internal class AndroidArchiveMediaImporter(
     private val root: String,
     private val references: StoredMediaReferences,
     private val integrity: Map<String, ArchiveMediaIntegrity>?,
+    private val publicationTickets: AndroidMediaPublicationTickets,
 ) : MediaImporter {
     override suspend fun isAvailable(reference: String): Boolean = mediaManager.isRecoveredOriginal(reference, references)
 
@@ -68,6 +70,7 @@ internal class AndroidArchiveMediaImporter(
                     }
                     else -> fromExtension
                 }
+            val ticket = publicationTickets.reserve("archive-restore:$normalizedPath", tempFile.absolutePath)
             val savedPath =
                 if (mimeType.startsWith("audio/")) {
                     saveAudioToInternalStorage(tempFile, fileName)
@@ -78,6 +81,7 @@ internal class AndroidArchiveMediaImporter(
                         mimeType = mimeType,
                     )
                 }
+            publicationTickets.publish(ticket.id, savedPath)
             Napier.d("Restore attachment imported")
             return savedPath
         } catch (cancelled: CancellationException) {

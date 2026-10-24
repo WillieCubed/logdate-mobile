@@ -22,6 +22,7 @@ import androidx.camera.view.PreviewView
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.storage.AndroidMediaPublicationTickets
 import app.logdate.client.text.toUiText
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +45,7 @@ import java.util.concurrent.TimeUnit
 class AndroidCameraCaptureManager(
     private val context: Context,
     mediaManager: MediaManager,
+    publicationTickets: AndroidMediaPublicationTickets,
 ) : CameraCaptureManager {
     private val deviceSelection = AndroidCameraDeviceSelection(context)
     private val _state = MutableStateFlow(CameraCaptureState())
@@ -65,7 +67,7 @@ class AndroidCameraCaptureManager(
     private var previewView: PreviewView? = null
     private var previewStreamObserver: Observer<PreviewView.StreamState>? = null
 
-    private val captureOutput = AndroidCameraCaptureOutput(context, mediaManager, _state)
+    private val captureOutput = AndroidCameraCaptureOutput(context, mediaManager, _state, publicationTickets)
 
     /**
      * Sets the lifecycle owner for camera binding.

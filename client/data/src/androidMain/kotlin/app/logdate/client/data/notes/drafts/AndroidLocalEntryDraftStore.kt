@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import app.logdate.client.device.restore.admitNativeContent
+import app.logdate.client.media.storage.MediaClaimFence
 import app.logdate.client.repository.journals.EntryDraft
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
@@ -25,9 +26,13 @@ private val Context.entryDraftDataStore by preferencesDataStore(name = "entry_dr
 class AndroidLocalEntryDraftStore internal constructor(
     private val dataStore: DataStore<Preferences>,
     private val admitContent: suspend () -> Unit = {},
+    private val claimFence: MediaClaimFence = MediaClaimFence.Disabled,
 ) : LocalEntryDraftStore,
     RecoveryEntryDraftStore {
-    constructor(context: Context) : this(context.entryDraftDataStore, { admitNativeContent(File(context.filesDir, "datastore")) })
+    constructor(
+        context: Context,
+        claimFence: MediaClaimFence = MediaClaimFence.Disabled,
+    ) : this(context.entryDraftDataStore, { admitNativeContent(File(context.filesDir, "datastore")) }, claimFence)
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -42,26 +47,27 @@ class AndroidLocalEntryDraftStore internal constructor(
         val expectedJson = completeJson.encodeToJsonElement(expected)
         val replacementJson = completeJson.encodeToJsonElement(replacement)
         var applied = false
-        dataStore.edit { preferences ->
-            if (!canCommit()) return@edit
-            val current = preferences[key]?.let { decodeDraft(it, expected.id.toString()) }
-            if (current != expected) return@edit
-            if (!canCommit()) return@edit
-            val raw = json.parseToJsonElement(requireNotNull(preferences[key]))
-            preferences[key] = patchDraftRecoveryJson(raw, expectedJson, replacementJson).toString()
-            if (!canCommit()) throw CancellationException("Draft recovery authority changed")
-            applied = true
+        claimFence.withClaim {
+            dataStore.edit { preferences ->
+                if (!canCommit()) return@edit
+                val current = preferences[key]?.let { decodeDraft(it, expected.id.toString()) }
+                if (current != expected) return@edit
+                if (!canCommit()) return@edit
+                val raw = json.parseToJsonElement(requireNotNull(preferences[key]))
+                preferences[key] = patchDraftRecoveryJson(raw, expectedJson, replacementJson).toString()
+                if (!canCommit()) throw CancellationException("Draft recovery authority changed")
+                applied = true
+            }
         }
         return applied
     }
 
     override suspend fun saveDraft(draft: EntryDraft) {
         admitContent()
-        val key = stringPreferencesKey(draft.id.toString())
-        val serializedDraft = json.encodeToString(draft)
-
-        dataStore.edit { preferences ->
-            preferences[key] = serializedDraft
+        claimFence.withClaim {
+            val key = stringPreferencesKey(draft.id.toString())
+            val serializedDraft = json.encodeToString(draft)
+            dataStore.edit { preferences -> preferences[key] = serializedDraft }
         }
     }
 
@@ -86,10 +92,12 @@ class AndroidLocalEntryDraftStore internal constructor(
         val key = stringPreferencesKey(id.toString())
         var deleted = false
 
-        dataStore.edit { preferences ->
-            if (preferences.contains(key)) {
-                preferences.remove(key)
-                deleted = true
+        claimFence.withClaim {
+            dataStore.edit { preferences ->
+                if (preferences.contains(key)) {
+                    preferences.remove(key)
+                    deleted = true
+                }
             }
         }
 
@@ -97,9 +105,7 @@ class AndroidLocalEntryDraftStore internal constructor(
     }
 
     override suspend fun clearAllDrafts() {
-        dataStore.edit { preferences ->
-            preferences.clear()
-        }
+        claimFence.withClaim { dataStore.edit { preferences -> preferences.clear() } }
     }
 
     private fun decodeDraft(

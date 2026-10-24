@@ -21,44 +21,45 @@ class AttachPhotoToMarkUseCase(
         caption: String? = null,
     ): Boolean {
         if (marks.getMark(id)?.state != MarkState.OPEN) return false
-        val managed = importer.import(sourceUri)
-        return transactions.withTransaction {
-            val mark = marks.getMark(id) ?: return@withTransaction false
-            if (mark.state != MarkState.OPEN) return@withTransaction false
-            val now = Clock.System.now()
-            val note =
-                JournalNote.Image(
-                    creationTimestamp = mark.capturedAt,
-                    lastUpdated = now,
-                    mediaRef = managed,
-                    timeZoneId = mark.timeZoneId,
-                    capturedDuring = mark.capturedDuring,
-                    location =
-                        mark.location?.let {
-                            app.logdate.client.repository.journals.NoteLocation(
-                                coordinates =
-                                    app.logdate.client.repository.journals
-                                        .NoteCoordinates(it.latitude, it.longitude),
-                            )
-                        },
-                )
-            val text = (caption ?: mark.caption).trim()
-            val savedIds = mutableSetOf(notes.create(note))
-            if (text.isNotEmpty()) {
-                savedIds +=
-                    notes.create(
-                        JournalNote.Text(
-                            creationTimestamp = mark.capturedAt,
-                            lastUpdated = now,
-                            content = text,
-                            timeZoneId = mark.timeZoneId,
-                            location = note.location,
-                            capturedDuring = mark.capturedDuring,
-                        ),
+        return importer.importAndClaim("mark/$id", sourceUri) { managed ->
+            transactions.withTransaction {
+                val mark = marks.getMark(id) ?: return@withTransaction false
+                if (mark.state != MarkState.OPEN) return@withTransaction false
+                val now = Clock.System.now()
+                val note =
+                    JournalNote.Image(
+                        creationTimestamp = mark.capturedAt,
+                        lastUpdated = now,
+                        mediaRef = managed,
+                        timeZoneId = mark.timeZoneId,
+                        capturedDuring = mark.capturedDuring,
+                        location =
+                            mark.location?.let {
+                                app.logdate.client.repository.journals.NoteLocation(
+                                    coordinates =
+                                        app.logdate.client.repository.journals
+                                            .NoteCoordinates(it.latitude, it.longitude),
+                                )
+                            },
                     )
+                val text = (caption ?: mark.caption).trim()
+                val savedIds = mutableSetOf(notes.create(note))
+                if (text.isNotEmpty()) {
+                    savedIds +=
+                        notes.create(
+                            JournalNote.Text(
+                                creationTimestamp = mark.capturedAt,
+                                lastUpdated = now,
+                                content = text,
+                                timeZoneId = mark.timeZoneId,
+                                location = note.location,
+                                capturedDuring = mark.capturedDuring,
+                            ),
+                        )
+                }
+                check(marks.fill(id, text, savedIds, now)) { "Marked moment could not be filled" }
+                true
             }
-            check(marks.fill(id, text, savedIds, now)) { "Marked moment could not be filled" }
-            true
         }
     }
 }

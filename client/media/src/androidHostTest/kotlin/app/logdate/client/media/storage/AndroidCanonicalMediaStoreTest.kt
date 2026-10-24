@@ -20,6 +20,52 @@ import kotlin.test.assertTrue
 
 class AndroidCanonicalMediaStoreTest {
     @Test
+    fun `stale staging cleanup preserves a publication that is still being written`() =
+        withStore { store, root ->
+            val bytes = "slow original publication".encodeToByteArray()
+            val writerStarted = CountDownLatch(1)
+            val resumeWriter = CountDownLatch(1)
+            val input =
+                object : java.io.ByteArrayInputStream(bytes) {
+                    private var paused = false
+
+                    override fun read(
+                        buffer: ByteArray,
+                        offset: Int,
+                        length: Int,
+                    ): Int {
+                        if (!paused) {
+                            paused = true
+                            writerStarted.countDown()
+                            check(resumeWriter.await(5, TimeUnit.SECONDS))
+                        }
+                        return super.read(buffer, offset, length)
+                    }
+                }
+
+            coroutineScope {
+                val slowWrite =
+                    async(Dispatchers.IO) {
+                        store.store(input, "image/jpeg", bytes.size.toLong())
+                    }
+                try {
+                    assertTrue(writerStarted.await(5, TimeUnit.SECONDS))
+                    val activeStagingFile =
+                        checkNotNull(File(root, "media/staging").listFiles()).single { it.extension == "tmp" }
+                    activeStagingFile.setLastModified(0L)
+
+                    store.store("unrelated import".byteInputStream(), "image/png", 16)
+                    assertTrue(activeStagingFile.exists(), "A second writer must not scavenge an active staging file by age")
+
+                    resumeWriter.countDown()
+                    assertContentEquals(bytes, File(java.net.URI(slowWrite.await())).readBytes())
+                } finally {
+                    resumeWriter.countDown()
+                }
+            }
+        }
+
+    @Test
     fun `identical bytes deduplicate to an app-private MIME-derived object`() =
         withStore { store, root ->
             val bytes = "a private journal photo".encodeToByteArray()
@@ -206,7 +252,7 @@ class AndroidCanonicalMediaStoreTest {
         }
 
     @Test
-    fun `starting a new import removes stale staging files but preserves unrelated files`() =
+    fun `starting a new import preserves stale-looking staging files and unrelated files`() =
         withStore { store, root ->
             val staging = File(root, "media/staging").apply { mkdirs() }
             val staleTemp =
@@ -219,7 +265,7 @@ class AndroidCanonicalMediaStoreTest {
 
             store.store(bytes.inputStream(), "image/jpeg", bytes.size.toLong())
 
-            assertTrue(!staleTemp.exists())
+            assertTrue(staleTemp.exists(), "Age alone cannot prove that a staging file has no active publisher")
             assertTrue(unrelated.exists())
         }
 
