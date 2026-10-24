@@ -69,3 +69,6 @@ tmp/
 
 # Node tooling
 node_modules/
+/.hypertext/formatter-tools/runtime.json
+/.hypertext/formatter-tools/bin/
+/.hypertext/formatter-tools/__pycache__/

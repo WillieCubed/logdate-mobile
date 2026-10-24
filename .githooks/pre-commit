@@ -4,7 +4,7 @@
 # Checks:
 # 1. Sensitive file guard (reject secrets, keystores, credentials)
 # 2. Sensitive content scan in staged additions
-# 3. Kotlin lint via ktlint on affected modules
+# 3. Native formatting of the exact staged snapshot
 
 set -euo pipefail
 
@@ -19,7 +19,7 @@ errors=()
 staged_files="$(git diff --cached --name-only --diff-filter=ACMR)"
 
 if [[ -z "$staged_files" ]]; then
-    exit 0
+  exit 0
 fi
 
 # ============================================================================
@@ -28,23 +28,23 @@ fi
 
 sensitive_found=()
 while IFS= read -r file; do
-    [[ -n "$file" ]] && is_sensitive_path "$file" && sensitive_found+=("$file")
+  [[ -n "$file" ]] && is_sensitive_path "$file" && sensitive_found+=("$file")
 done <<< "$staged_files"
 
 if [[ ${#sensitive_found[@]} -gt 0 ]]; then
-    sensitive_found_sorted="$(printf '%s\n' "${sensitive_found[@]}" | uniq_non_empty_lines)"
-    sensitive_found=()
-    while IFS= read -r f; do
-        [[ -n "$f" ]] && sensitive_found+=("$f")
-    done <<< "$sensitive_found_sorted"
+  sensitive_found_sorted="$(printf '%s\n' "${sensitive_found[@]}" | uniq_non_empty_lines)"
+  sensitive_found=()
+  while IFS= read -r f; do
+    [[ -n "$f" ]] && sensitive_found+=("$f")
+  done <<< "$sensitive_found_sorted"
 fi
 
 if [[ ${#sensitive_found[@]} -gt 0 ]]; then
-    errors+=("SENSITIVE FILES: The following files may contain secrets and should not be committed:")
-    for f in "${sensitive_found[@]}"; do
-        errors+=("  - $f")
-    done
-    errors+=("  If intentional, add to .gitignore or use git update-index --assume-unchanged")
+  errors+=("SENSITIVE FILES: The following files may contain secrets and should not be committed:")
+  for f in "${sensitive_found[@]}"; do
+    errors+=("  - $f")
+  done
+  errors+=("  If intentional, add to .gitignore or use git update-index --assume-unchanged")
 fi
 
 # ============================================================================
@@ -53,65 +53,34 @@ fi
 
 secret_hits=()
 while IFS= read -r file; do
-    [[ -z "$file" ]] && continue
-    skips_content_scan "$file" && continue
+  [[ -z "$file" ]] && continue
+  skips_content_scan "$file" && continue
 
-    added_lines="$(git diff --cached --no-color -U0 -- "$file" | grep -E '^\+[^+]' | sed 's/^+//' || true)"
-    [[ -z "$added_lines" ]] && continue
+  added_lines="$(git diff --cached --no-color -U0 -- "$file" | grep -E '^\+[^+]' | sed 's/^+//' || true)"
+  [[ -z "$added_lines" ]] && continue
 
-    text_has_secret "$added_lines" && secret_hits+=("$file")
+  text_has_secret "$added_lines" && secret_hits+=("$file")
 done <<< "$staged_files"
 
 if [[ ${#secret_hits[@]} -gt 0 ]]; then
-    secret_hits_sorted="$(printf '%s\n' "${secret_hits[@]}" | uniq_non_empty_lines)"
-    errors+=("SENSITIVE CONTENT: Potential secrets found in staged additions:")
-    while IFS= read -r f; do
-        [[ -n "$f" ]] && errors+=("  - $f")
-    done <<< "$secret_hits_sorted"
+  secret_hits_sorted="$(printf '%s\n' "${secret_hits[@]}" | uniq_non_empty_lines)"
+  errors+=("SENSITIVE CONTENT: Potential secrets found in staged additions:")
+  while IFS= read -r f; do
+    [[ -n "$f" ]] && errors+=("  - $f")
+  done <<< "$secret_hits_sorted"
 fi
 
 # ============================================================================
-# 3. Kotlin lint (ktlint) on affected modules
+# 3. Format the exact staged snapshot without re-staging working-tree edits
 # ============================================================================
 
-# Collect Kotlin/KTS files
-kt_files="$(echo "$staged_files" | grep -E '\.(kt|kts)$' || true)"
-
-if [[ -n "$kt_files" ]]; then
-    resolved_modules="$(modules_from_files "$kt_files")"
-    modules=()
-    while IFS= read -r module; do
-        [[ -n "$module" ]] && modules+=("$module")
-    done <<< "$resolved_modules"
-
-    if [[ ${#modules[@]} -gt 0 ]]; then
-        ktlint_tasks=()
-        mod=""
-        for mod in "${modules[@]}"; do
-            ktlint_tasks+=("${mod}:ktlintFormat")
-        done
-
-        if [[ ${#ktlint_tasks[@]} -gt 0 ]]; then
-            echo "Running ktlint on affected modules: ${modules[*]}"
-            ./gradlew "${ktlint_tasks[@]}" --quiet 2>&1 || true
-            # Re-stage files that ktlintFormat may have modified
-            echo "$kt_files" | xargs git add
-            # Verify no remaining lint violations after auto-fix
-            ktlint_check_tasks=()
-            for mod in "${modules[@]}"; do
-                ktlint_check_tasks+=("${mod}:ktlintCheck")
-            done
-            if ! ./gradlew "${ktlint_check_tasks[@]}" --quiet 2>&1; then
-                errors+=("KTLINT: Kotlin lint check failed even after auto-fix.")
-                errors+=("  If a module is missing ktlintCheck, run: ./scripts/verify-ktlint-task-coverage.sh")
-            fi
-        fi
-    fi
+if ! python3 .hypertext/formatting/commit.py; then
+  errors+=("FORMATTING: Staged formatting failed; resolve the reported conflict or tool setup issue.")
 fi
 
 if [[ ${#errors[@]} -gt 0 ]]; then
-    print_error_report "PRE-COMMIT VALIDATION FAILED"
-    exit 1
+  print_error_report "PRE-COMMIT VALIDATION FAILED"
+  exit 1
 fi
 
 exit 0
