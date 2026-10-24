@@ -7,6 +7,7 @@ import app.logdate.client.data.account.NativeRestoreAccountPolicy
 import app.logdate.client.database.requirePortableCloudBackupKey
 import app.logdate.client.device.restore.NativeBackupAgent
 import app.logdate.client.device.restore.PostRestoreDetector
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.io.File
@@ -17,7 +18,9 @@ class NativeAccountBackupAgent : NativeBackupAgent() {
     private val journalRestore by lazy { NativeJournalTransferRestore(this, ::restoreNativeJournalPreferences) }
 
     override fun onCreate() {
-        NativeIosTransferSender(this, journalTransfer).discardAbandoned()
+        discardAbandonedForProviderStart {
+            NativeIosTransferSender(this, journalTransfer).discardAbandoned()
+        }
         super.onCreate()
     }
 
@@ -105,3 +108,13 @@ class NativeAccountBackupAgent : NativeBackupAgent() {
         }
     }
 }
+
+/** A stale iOS export must not prevent ordinary Android provider callbacks from starting. */
+internal fun discardAbandonedForProviderStart(cleanup: () -> Unit): Boolean =
+    try {
+        cleanup()
+        true
+    } catch (error: Exception) {
+        Napier.w("Native iOS transfer cleanup remains pending", error)
+        false
+    }

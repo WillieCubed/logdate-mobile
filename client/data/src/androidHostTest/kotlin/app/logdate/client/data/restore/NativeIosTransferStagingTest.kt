@@ -1,6 +1,7 @@
 package app.logdate.client.data.restore
 
 import android.content.ContextWrapper
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.nio.channels.FileChannel
 import java.nio.file.Files
@@ -66,6 +67,34 @@ class NativeIosTransferStagingTest {
             }
             sender.discardAbandoned()
             assertFalse(custody.exists())
+        } finally {
+            check(sandbox.deleteRecursively())
+        }
+    }
+
+    @Test
+    fun `failed cleanup does not block ordinary provider start but iOS export fails closed`() {
+        val sandbox = Files.createTempDirectory("native-ios-cleanup-failure-").toFile()
+        try {
+            val files = File(sandbox, "files").apply { mkdirs() }
+            val noBackup = File(sandbox, "no_backup").apply { writeText("blocked directory") }
+            val context =
+                object : ContextWrapper(null) {
+                    override fun getFilesDir(): File = files
+
+                    override fun getNoBackupFilesDir(): File = noBackup
+                }
+            val sender = NativeIosTransferSender(context, NativeJournalTransferSnapshot(context))
+            val custody = File(files, "logdate-os-transfer/.logdate-os-private/custody-v1.json")
+            custody.parentFile!!.mkdirs()
+            custody.writeText("private fixture")
+
+            assertFalse(discardAbandonedForProviderStart(sender::discardAbandoned))
+            assertTrue(custody.exists())
+            assertFailsWith<Exception> {
+                runBlocking { sender.send(0) { error("Must never emit") } }
+            }
+            assertTrue(custody.exists())
         } finally {
             check(sandbox.deleteRecursively())
         }

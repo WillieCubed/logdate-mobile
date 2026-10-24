@@ -31,33 +31,10 @@ def included(domain, path, *, modern, transfer, encrypted=True):
     return allowed and not any(matches(rule, domain, path) for rule in section.findall("exclude"))
 
 
-def ios_included(domain, path):
-    section = ET.parse(RULES / "data_extraction_rules.xml").getroot().find("cross-platform-transfer")
-    return any(matches(rule, domain, path) for rule in section.findall("include")) and not any(
-        matches(rule, domain, path) for rule in section.findall("exclude")
-    )
-
-
 class NativeBackupPolicyTest(unittest.TestCase):
-    def test_ios_transfer_pairs_canonical_app_and_only_private_bundle(self):
+    def test_default_build_does_not_advertise_ios_transfer(self):
         section = ET.parse(RULES / "data_extraction_rules.xml").getroot().find("cross-platform-transfer")
-        self.assertEqual(section.get("platform"), "ios")
-        self.assertEqual(
-            [rule.attrib for rule in section.findall("include")],
-            [{"domain": "file", "path": "logdate-os-transfer/"}],
-        )
-        self.assertEqual(section.find("platform-specific-params").attrib, {
-            "bundleId": "studio.hypertext.apps.logdate",
-            "teamId": "T95VDD3A4W",
-            "contentVersion": "logdate-private-resources-v2",
-        })
-        self.assertTrue(ios_included("file", "logdate-os-transfer/archive/manifest.json"))
-        self.assertTrue(ios_included("file", "logdate-os-transfer/.logdate-os-private/custody-v1.json"))
-        for domain, path in (("database", "logdate"), ("file", "logdate.preferences_pb"),
-                             ("file", "db_recovery/passphrase_backup"), ("file", "identity_recovery/phrase_backup"),
-                             ("sharedpref", "logdate_secure_storage.xml"), ("file", "native_journal_transfer/current/database/logdate")):
-            with self.subTest(path=path):
-                self.assertFalse(ios_included(domain, path))
+        self.assertIsNone(section)
 
     def test_private_ios_staging_never_enters_android_backup_or_transfer(self):
         for modern in (False, True):

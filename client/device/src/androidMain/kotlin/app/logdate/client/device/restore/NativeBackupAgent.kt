@@ -12,6 +12,8 @@ import android.system.OsConstants
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import app.logdate.client.datastore.createAndroidMainDataStore
+import app.logdate.client.datastore.featureflags.DataStoreFeatureFlagStore
+import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.device.crypto.AndroidCryptoManager
 import app.logdate.client.device.crypto.AndroidIdentityKeyBackupStore
 import app.logdate.client.device.crypto.IdentityKeyManager
@@ -69,7 +71,13 @@ open class NativeBackupAgent : BackupAgent() {
 
     override fun onFullBackup(data: FullBackupDataOutput) {
         if (data.transportFlags and FLAG_CROSS_PLATFORM_DATA_TRANSFER_IOS != 0) {
-            requireNativeIosExport(data.transportFlags)
+            val enabled =
+                FeatureFlag.IOS_SYSTEM_TRANSFER.availableForLaunch &&
+                    runBlocking(Dispatchers.IO) {
+                        DataStoreFeatureFlagStore(createAndroidMainDataStore(this@NativeBackupAgent))
+                            .isEnabled(FeatureFlag.IOS_SYSTEM_TRANSFER)
+                    }
+            requireNativeIosExport(data.transportFlags, enabled)
             runBlocking {
                 AndroidNativeRestoreDeliveryGate.withLock {
                     requireRetainedJournalBackupReady(this@NativeBackupAgent, deviceTransfer = true)
