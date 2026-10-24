@@ -132,15 +132,17 @@ fun SignInMethodsContent(
         snackbarHostState = snackbarHostState,
     ) {
         when (state) {
-            SignInMethodsUiState.Loading ->
+            SignInMethodsUiState.Loading -> {
                 item {
                     Box(modifier = Modifier.fillMaxWidth().padding(Spacing.xl), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
                 }
+            }
 
-            is SignInMethodsUiState.Failed ->
+            is SignInMethodsUiState.Failed -> {
                 item { LoadFailed(reason = state.reason, onRetry = onRetry) }
+            }
 
             is SignInMethodsUiState.Loaded -> {
                 item {
@@ -226,14 +228,18 @@ private fun PasskeyItem(
         },
         trailingContent = {
             when {
-                isRemoving -> CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                passkey.canRemove ->
+                isRemoving -> {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                }
+
+                passkey.canRemove -> {
                     IconButton(onClick = onRemove) {
                         Icon(
                             Icons.Outlined.Delete,
                             contentDescription = stringResource(Res.string.sign_in_methods_remove_passkey_action, name),
                         )
                     }
+                }
             }
         },
     )
@@ -304,13 +310,17 @@ private fun LinkedProviderItem(provider: LinkedProviderRow) {
         }
     val supporting =
         when {
-            provider.email != null && lastSignIn != null ->
+            provider.email != null && lastSignIn != null -> {
                 stringResource(
                     Res.string.sign_in_methods_detail_pair,
                     provider.email,
                     lastSignIn,
                 )
-            else -> provider.email ?: lastSignIn
+            }
+
+            else -> {
+                provider.email ?: lastSignIn
+            }
         }
     SettingsRow(
         leadingContent = { Icon(Icons.Outlined.AccountCircle, contentDescription = null) },
@@ -372,11 +382,16 @@ private fun relativeDay(
 
 private suspend fun SignInMethodsEvent.message(): String =
     when (this) {
-        is SignInMethodsEvent.PasskeyAdded ->
+        is SignInMethodsEvent.PasskeyAdded -> {
             deviceName?.let { getString(Res.string.sign_in_methods_passkey_added_for, it) }
                 ?: getString(Res.string.sign_in_methods_passkey_added)
-        SignInMethodsEvent.PasskeyRemoved -> getString(Res.string.sign_in_methods_passkey_removed)
-        is SignInMethodsEvent.AddPasskeyFailed ->
+        }
+
+        SignInMethodsEvent.PasskeyRemoved -> {
+            getString(Res.string.sign_in_methods_passkey_removed)
+        }
+
+        is SignInMethodsEvent.AddPasskeyFailed -> {
             getString(
                 when (reason) {
                     AddPasskeyFailure.ALREADY_ON_THIS_DEVICE -> Res.string.sign_in_methods_add_failed_already_here
@@ -386,7 +401,9 @@ private suspend fun SignInMethodsEvent.message(): String =
                     AddPasskeyFailure.SERVER -> Res.string.sign_in_methods_add_failed_server
                 },
             )
-        is SignInMethodsEvent.RemovePasskeyFailed ->
+        }
+
+        is SignInMethodsEvent.RemovePasskeyFailed -> {
             getString(
                 when (reason) {
                     RemovePasskeyFailure.LAST_SIGN_IN_METHOD -> Res.string.sign_in_methods_remove_failed_last
@@ -394,6 +411,7 @@ private suspend fun SignInMethodsEvent.message(): String =
                     RemovePasskeyFailure.SERVER -> Res.string.sign_in_methods_remove_failed_server
                 },
             )
+        }
     }
 
 @Preview
