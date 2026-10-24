@@ -11,6 +11,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -33,6 +34,36 @@ import kotlin.time.Instant
 
 @OptIn(ExperimentalTestApi::class)
 class ArchiveSettingsNavigationTest {
+    @Test
+    fun tabletArchiveOptionsOpenInACenteredDialog() =
+        runDesktopComposeUiTest(width = 1280, height = 800) {
+            setContent {
+                LogDateTheme {
+                    ExportSettingsContent(
+                        onBack = {},
+                        exportState = ExportState.Configuring(counts = ExportCounts(1, 2, 1, 3)),
+                        onShowExportOptions = {},
+                        onUpdateExportOptions = {},
+                        onConfirmExport = {},
+                        onCancelExport = {},
+                        onRetryExport = {},
+                        onDismissExport = {},
+                        restoreState = RestoreState.Idle,
+                        onShowRestoreSheet = {},
+                        onSelectRestoreFile = {},
+                        onUpdateImportOptions = {},
+                        onConfirmImport = {},
+                        onCancelRestore = {},
+                        onRetryRestore = {},
+                        onDismissRestore = {},
+                        snackbarHostState = SnackbarHostState(),
+                    )
+                }
+            }
+            onAllNodes(isDialog()).assertCountEquals(1)
+            onNodeWithText("Export your data").assertIsDisplayed()
+        }
+
     @Test
     fun dataSettingsHasExactlyOneExportActionWithAndroidCoverageVisible() =
         runDesktopComposeUiTest(width = 411, height = 1600) {

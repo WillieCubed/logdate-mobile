@@ -134,11 +134,12 @@ The export date-range form uses connected choices in two rows on ordinary phone
 widths, one row on wide sheets, and full `SettingsChoiceItem` rows when text is
 enlarged or the available width cannot hold two complete labels. Keep all four
 choices available without abbreviating their date units.
-Export and import sheets share `DataTransferSheetScrollContent`. Its bounded
-scroll area leaves the destination visible on wide, short windows and keeps
-options reachable when content grows on compact or enlarged-text screens. Keep
+Export and import use the shared `DataTransferModal`: a centered, 640dp-wide
+dialog on spacious windows (at least 840×600dp), and a bottom sheet on compact
+or short windows. Both use `DataTransferSheetScrollContent`. Its bounded scroll
+area keeps options reachable when content grows or text is enlarged. Keep
 confirmation actions in its padded footer, outside the scrolling options, so
-they remain fully visible at the bottom edge.
+they remain visible at the bottom edge.
 
 `checkSettingsUiContract` parses Kotlin and rejects layout wrappers around multiple
 known settings rows. It runs with the core module's `check` and `ktlintCheck` tasks.

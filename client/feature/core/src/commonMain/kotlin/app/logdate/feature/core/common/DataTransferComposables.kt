@@ -5,39 +5,50 @@ package app.logdate.feature.core.common
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
+import app.logdate.ui.common.Dialog
 import app.logdate.ui.common.MaterialCard
 import app.logdate.ui.platform.PlatformIcons
+import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.data_transfer_counts_summary
@@ -53,6 +64,56 @@ import logdate.client.ui.generated.resources.common_dismiss
 import logdate.client.ui.generated.resources.common_retry
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun DataTransferModal(
+    onDismiss: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        if (maxWidth >= 840.dp && maxHeight >= 600.dp) {
+            if (LocalInspectionMode.current) {
+                Box(
+                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    DataTransferDialogSurface(content)
+                }
+            } else {
+                Dialog(
+                    onDismissRequest = onDismiss,
+                    properties = DialogProperties(usePlatformDefaultWidth = false),
+                ) {
+                    DataTransferDialogSurface(content)
+                }
+            }
+        } else {
+            PlatformSheet(
+                onDismissRequest = onDismiss,
+                modifier = Modifier.widthIn(max = BottomSheetDefaults.SheetMaxWidth),
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            ) {
+                content()
+            }
+        }
+    }
+}
+
+@Composable
+private fun DataTransferDialogSurface(content: @Composable () -> Unit) {
+    Surface(
+        modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 3.dp,
+    ) {
+        Column {
+            Spacer(Modifier.height(Spacing.lg))
+            content()
+        }
+    }
+}
 
 @Composable
 internal fun DataTransferSheetScrollContent(
