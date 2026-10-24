@@ -453,7 +453,9 @@ internal fun validateNativeJournalTransfer(context: Context): Map<String, File>?
         runBlocking {
             checkNotNull(readRetainedJournalSourceScope(preferences, receipt, scratch, mapOf("database/logdate" to database)))
         }
-    val key = listOf("passphrase_backup", "working_passphrase_backup").mapNotNull { files["files/db_recovery/$it"] }.single()
+    val selectedKeys = listOf("passphrase_backup", "working_passphrase_backup").mapNotNull { files["files/db_recovery/$it"] }
+    if (selectedKeys.isEmpty()) throw MissingNativeJournalTransferKeyException()
+    val key = selectedKeys.single()
     val decoded = Base64.decode(key.readText().trim())
     try {
         check(
