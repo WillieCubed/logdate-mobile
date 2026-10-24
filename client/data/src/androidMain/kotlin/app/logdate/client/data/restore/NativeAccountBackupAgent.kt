@@ -8,12 +8,18 @@ import app.logdate.client.database.requirePortableCloudBackupKey
 import app.logdate.client.device.restore.NativeBackupAgent
 import app.logdate.client.device.restore.PostRestoreDetector
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import java.io.File
 
 /** The restricted callback retains a nonsecret request; the system job performs authentication. */
 class NativeAccountBackupAgent : NativeBackupAgent() {
     private val journalTransfer by lazy { NativeJournalTransferSnapshot(this) }
     private val journalRestore by lazy { NativeJournalTransferRestore(this, ::restoreNativeJournalPreferences) }
+
+    override fun onCreate() {
+        NativeIosTransferSender(this, journalTransfer).discardAbandoned()
+        super.onCreate()
+    }
 
     override val retainedPreferenceNames: Set<String> = setOf("logdate_widget_instances")
 
@@ -26,6 +32,14 @@ class NativeAccountBackupAgent : NativeBackupAgent() {
     override fun prepareNativeJournalTransferBackup() = journalTransfer.prepare()
 
     override fun backupSelectedNativeMedia(data: FullBackupDataOutput) = journalTransfer.backupSelectedMedia { fullBackupFile(it, data) }
+
+    override fun backupNativeIosTransfer(data: FullBackupDataOutput) {
+        runBlocking {
+            NativeIosTransferSender(this@NativeAccountBackupAgent, journalTransfer).send(data.transportFlags) { file ->
+                fullBackupFile(file, data)
+            }
+        }
+    }
 
     override fun finishNativeJournalTransferBackup() = journalTransfer.finish()
 

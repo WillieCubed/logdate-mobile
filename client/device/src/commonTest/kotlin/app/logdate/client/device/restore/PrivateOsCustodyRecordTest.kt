@@ -122,6 +122,47 @@ class PrivateOsCustodyRecordTest {
         }
 
     @Test
+    fun `verified text only local journal carries no invented identity or media key`() =
+        runTest {
+            val record =
+                assertNotNull(
+                    PrivateOsCustodyRecord.prepareRootlessPlaintext(
+                        9,
+                        transferId,
+                        generation,
+                        ExistingCanonicalOwner(ownerId, false),
+                        "a".repeat(64),
+                        "b".repeat(64),
+                    ) { true },
+                )
+            val document = record.withEncodedBytes { Json.parseToJsonElement(it.decodeToString()).jsonObject }
+            assertEquals("verifiedRootlessPlaintext", document.getValue("sourceClassification").jsonPrimitive.content)
+            assertEquals(
+                "absentUnencrypted",
+                document
+                    .getValue("owner")
+                    .jsonObject
+                    .getValue("rootState")
+                    .jsonPrimitive
+                    .content,
+            )
+            assertEquals(
+                setOf("version", "purpose", "transferID", "sourceGeneration", "owner", "sourceClassification", "archive"),
+                document.keys,
+            )
+            assertNull(
+                PrivateOsCustodyRecord.prepareRootlessPlaintext(
+                    8,
+                    transferId,
+                    generation,
+                    ExistingCanonicalOwner(ownerId, false),
+                    "a".repeat(64),
+                    "b".repeat(64),
+                ) { error("Rootless observation must not run") },
+            )
+        }
+
+    @Test
     fun `media provenance preserves cached retained and derived existing-root selections`() =
         runTest {
             val selections =

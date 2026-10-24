@@ -12,7 +12,7 @@ import kotlin.io.encoding.Base64
 import kotlin.uuid.Uuid
 
 /** Bounded private record encoding does not authorize system delivery or key installation. */
-internal class PrivateOsCustodyRecord private constructor(
+class PrivateOsCustodyRecord private constructor(
     private val bytes: ByteArray,
 ) {
     fun <T> withEncodedBytes(block: (ByteArray) -> T): T = block(bytes.copyOf())
@@ -74,6 +74,55 @@ internal class PrivateOsCustodyRecord private constructor(
                         put("identityKey", encode(root))
                         put("mediaKey", encode(media))
                         put("mediaSelection", selected)
+                    }
+                val bytes = document.toString().encodeToByteArray()
+                require(bytes.size in 1..4096)
+                return PrivateOsCustodyRecord(bytes)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                throw PrivateOsCustodyUnavailable()
+            }
+        }
+
+        /** Used only after a complete archive proves it has no media originals. */
+        suspend fun prepareRootlessPlaintext(
+            transportFlags: Int,
+            transferId: Uuid,
+            sourceGeneration: ByteArray,
+            owner: ExistingCanonicalOwner,
+            checksumsFileSha256: String,
+            manifestSha256: String,
+            verifyRootless: suspend () -> Boolean,
+        ): PrivateOsCustodyRecord? {
+            if (transportFlags and REQUIRED_TRANSPORT_FLAGS != REQUIRED_TRANSPORT_FLAGS || owner.isBound) return null
+            try {
+                require(sourceGeneration.size == 32 && owner.rawId.length == 36)
+                Uuid.parse(owner.rawId)
+                require(isDigest(checksumsFileSha256) && isDigest(manifestSha256))
+                if (!verifyRootless()) return null
+                val document =
+                    buildJsonObject {
+                        put("version", 1)
+                        put("purpose", "logdate-os-private-custody")
+                        put("transferID", transferId.toString())
+                        put("sourceGeneration", encode(sourceGeneration))
+                        put(
+                            "owner",
+                            buildJsonObject {
+                                put("kind", "localCanonical")
+                                put("canonicalOwnerIDRaw", owner.rawId)
+                                put("rootState", "absentUnencrypted")
+                            },
+                        )
+                        put("sourceClassification", "verifiedRootlessPlaintext")
+                        put(
+                            "archive",
+                            buildJsonObject {
+                                put("checksumsFileSHA256", checksumsFileSha256)
+                                put("manifestSHA256", manifestSha256)
+                            },
+                        )
                     }
                 val bytes = document.toString().encodeToByteArray()
                 require(bytes.size in 1..4096)

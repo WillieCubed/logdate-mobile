@@ -33,6 +33,7 @@
         <exclude domain="file" path="identity_recovery/phrase_backup.part"/>
         <exclude domain="file" path="identity_recovery/account_key_backup.part"/>
         <exclude domain="file" path="identity_recovery/media_key_backup.part"/>
+        <exclude domain="file" path="logdate-os-transfer/"/>
     </cloud-backup>
     <device-transfer>
         <include domain="sharedpref" path="logdate_widget_instances.xml"/>
@@ -51,5 +52,11 @@
         <exclude domain="file" path="identity_recovery/phrase_backup.part"/>
         <exclude domain="file" path="identity_recovery/account_key_backup.part"/>
         <exclude domain="file" path="identity_recovery/media_key_backup.part"/>
+        <exclude domain="file" path="logdate-os-transfer/"/>
     </device-transfer>
+    <cross-platform-transfer platform="ios">
+        <include domain="file" path="logdate-os-transfer/"/>
+        <platform-specific-params bundleId="studio.hypertext.apps.logdate"
+            teamId="T95VDD3A4W" contentVersion="logdate-private-resources-v2"/>
+    </cross-platform-transfer>
 </data-extraction-rules>

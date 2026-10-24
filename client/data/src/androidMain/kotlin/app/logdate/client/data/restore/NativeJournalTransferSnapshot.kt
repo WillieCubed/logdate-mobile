@@ -58,6 +58,7 @@ import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
+import java.security.MessageDigest
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -309,6 +310,14 @@ internal class NativeJournalTransferSnapshot(
             databaseKey.fill(0)
             passphrase.fill(0)
         }
+    }
+
+    fun pinnedSourceIdentity(): Pair<NativeJournalSourceReceipt, ByteArray> {
+        check(prepared && !noDatabaseSource)
+        val receiptFile = checkNotNull(validateNativeJournalTransfer(context))[NATIVE_SOURCE_RECEIPT_PATH]
+        val bytes = checkNotNull(receiptFile).readBytes()
+        return Json.decodeFromString<NativeJournalSourceReceipt>(bytes.decodeToString()) to
+            MessageDigest.getInstance("SHA-256").digest(bytes)
     }
 
     private fun checkPinnedPreferencesUnchanged() {

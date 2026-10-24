@@ -31,7 +31,42 @@ def included(domain, path, *, modern, transfer, encrypted=True):
     return allowed and not any(matches(rule, domain, path) for rule in section.findall("exclude"))
 
 
+def ios_included(domain, path):
+    section = ET.parse(RULES / "data_extraction_rules.xml").getroot().find("cross-platform-transfer")
+    return any(matches(rule, domain, path) for rule in section.findall("include")) and not any(
+        matches(rule, domain, path) for rule in section.findall("exclude")
+    )
+
+
 class NativeBackupPolicyTest(unittest.TestCase):
+    def test_ios_transfer_pairs_canonical_app_and_only_private_bundle(self):
+        section = ET.parse(RULES / "data_extraction_rules.xml").getroot().find("cross-platform-transfer")
+        self.assertEqual(section.get("platform"), "ios")
+        self.assertEqual(
+            [rule.attrib for rule in section.findall("include")],
+            [{"domain": "file", "path": "logdate-os-transfer/"}],
+        )
+        self.assertEqual(section.find("platform-specific-params").attrib, {
+            "bundleId": "studio.hypertext.apps.logdate",
+            "teamId": "T95VDD3A4W",
+            "contentVersion": "logdate-private-resources-v2",
+        })
+        self.assertTrue(ios_included("file", "logdate-os-transfer/archive/manifest.json"))
+        self.assertTrue(ios_included("file", "logdate-os-transfer/.logdate-os-private/custody-v1.json"))
+        for domain, path in (("database", "logdate"), ("file", "logdate.preferences_pb"),
+                             ("file", "db_recovery/passphrase_backup"), ("file", "identity_recovery/phrase_backup"),
+                             ("sharedpref", "logdate_secure_storage.xml"), ("file", "native_journal_transfer/current/database/logdate")):
+            with self.subTest(path=path):
+                self.assertFalse(ios_included(domain, path))
+
+    def test_private_ios_staging_never_enters_android_backup_or_transfer(self):
+        for modern in (False, True):
+            for transfer in (False, True):
+                for path in ("logdate-os-transfer/archive/manifest.json",
+                             "logdate-os-transfer/.logdate-os-private/custody-v1.json"):
+                    with self.subTest(modern=modern, transfer=transfer, path=path):
+                        self.assertFalse(included("file", path, modern=modern, transfer=transfer))
+
     def test_cloud_preserves_actual_owner_preferences_and_database_keys(self):
         for modern in (False, True):
             for domain, path in (("file", "logdate.preferences_pb"), ("database", "logdate"),
@@ -47,11 +82,11 @@ class NativeBackupPolicyTest(unittest.TestCase):
                 with self.subTest(modern=modern, path=path):
                     self.assertFalse(included("file", path, modern=modern, transfer=False, encrypted=False))
 
-    def test_direct_transfer_preserves_committed_original_media(self):
+    def test_direct_transfer_media_is_selected_by_backup_agent_not_xml_traversal(self):
         for modern in (False, True):
             for path in ("audio_notes/accepted.m4a", "media/objects/photo.jpg", "media/objects/movie.mp4"):
                 with self.subTest(modern=modern, path=path):
-                    self.assertTrue(included("file", path, modern=modern, transfer=True))
+                    self.assertFalse(included("file", path, modern=modern, transfer=True))
 
     def test_direct_transfer_excludes_unfinished_camera_capture_outputs(self):
         for modern in (False, True):

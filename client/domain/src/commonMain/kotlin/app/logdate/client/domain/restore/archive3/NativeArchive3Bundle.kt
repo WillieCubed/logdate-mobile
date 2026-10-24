@@ -19,11 +19,11 @@ import okio.use
 
 /**
  * Lossless, verified native wire content. Owner/key authorization and atomic database application are
- * separate requirements. Public export/restore and framework callbacks do not admit this format yet.
+ * separate requirements. Public export/restore still do not admit this format.
  */
-internal class NativeArchive3Bundle private constructor(
+class NativeArchive3Bundle private constructor(
     private val resources: Map<String, Resource>,
-    val journals: List<NativeArchive3JournalRecord>,
+    internal val journals: List<NativeArchive3JournalRecord>,
     val notes: JsonArray,
     val drafts: JsonArray,
     val places: JsonArray,

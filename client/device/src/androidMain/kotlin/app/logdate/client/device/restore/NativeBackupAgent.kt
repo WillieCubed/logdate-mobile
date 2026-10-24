@@ -68,6 +68,16 @@ open class NativeBackupAgent : BackupAgent() {
     ) = Unit
 
     override fun onFullBackup(data: FullBackupDataOutput) {
+        if (data.transportFlags and FLAG_CROSS_PLATFORM_DATA_TRANSFER_IOS != 0) {
+            requireNativeIosExport(data.transportFlags)
+            runBlocking {
+                AndroidNativeRestoreDeliveryGate.withLock {
+                    requireRetainedJournalBackupReady(this@NativeBackupAgent, deviceTransfer = true)
+                    backupNativeIosTransfer(data)
+                }
+            }
+            return
+        }
         requireNativeAndroidExport(data.transportFlags)
         runBlocking {
             AndroidNativeRestoreDeliveryGate.withLock {
@@ -426,6 +436,9 @@ open class NativeBackupAgent : BackupAgent() {
     protected open fun prepareNativeJournalTransferBackup() = Unit
 
     protected open fun backupSelectedNativeMedia(data: FullBackupDataOutput) = Unit
+
+    /** The iOS payload is selected and emitted independently of Android Auto Backup traversal. */
+    protected open fun backupNativeIosTransfer(data: FullBackupDataOutput): Unit = throw IOException("Native iOS transfer is unavailable")
 
     protected open fun finishNativeJournalTransferBackup() = Unit
 
