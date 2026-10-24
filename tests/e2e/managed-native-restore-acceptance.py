@@ -105,10 +105,10 @@ def scenario_command(mode, source, destination, app, probe, output, arguments, *
     return command + arguments
 
 
-def managed_environment(sdk, inherited):
+def managed_environment(sdk, inherited, package):
     return dict(inherited, ANDROID_HOME=str(sdk), ANDROID_SDK_ROOT=str(sdk),
                 GRADLE_USER_HOME=str(Path.home() / ".gradle"), JAVA_TOOL_OPTIONS="-Djava.awt.headless=true",
-                LOGDATE_NATIVE_ACCEPTANCE_PACKAGE="studio.hypertext.logdate.debug")
+                LOGDATE_NATIVE_ACCEPTANCE_PACKAGE=package)
 
 
 def pinned_install_arguments(app, probe):
@@ -231,6 +231,30 @@ def require_outer_results(directory):
         raise RuntimeError("Expected exactly one completed waiting driver on each managed device")
 
 
+def assemble_candidate_apks(output, package, *, root=ROOT, run=subprocess.run):
+    if not re.fullmatch(r"studio\.hypertext\.logdate(?:\.[a-z][a-z0-9_]*)*\.debug", package):
+        raise ValueError("Native acceptance requires the matching LogDate debug application ID")
+    application_id = package.removesuffix(".debug")
+    arguments = ["./gradlew", ":app:android-main:assembleDebug", ":app:android-main:assembleDebugAndroidTest"]
+    if application_id != "studio.hypertext.logdate":
+        arguments.append(f"-Plogdate.applicationId={application_id}")
+    arguments.extend(("--no-daemon", "--max-workers=2", "--console=plain"))
+    output.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with (output / "candidate-build.log").open("wb") as log:
+        run(arguments, cwd=root, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=1800)
+
+
+def verify_pinned_packages(sdk, app, probe, package, *, execute=None):
+    execute = execute or command
+    versions = sorted((sdk / "build-tools").glob("*/aapt2"), reverse=True)
+    if not versions:
+        raise RuntimeError("Android SDK has no aapt2 to verify pinned APK identities")
+    for apk, expected in ((app, package), (probe, f"{package}.test")):
+        actual = execute(str(versions[0]), "dump", "packagename", str(apk)).stdout.decode().strip()
+        if actual != expected:
+            raise RuntimeError(f"Pinned {apk.name} has application ID {actual!r}; expected {expected!r}")
+
+
 def run(options):
     validate_native_arguments(options.native_arguments)
     if options.mode != "transfer" and options.native_arguments:
@@ -246,11 +270,13 @@ def run(options):
     nonce = str(uuid.uuid4())
     sdk = options.sdk.resolve()
     adb = str(sdk / "platform-tools/adb")
+    package = os.environ.get("LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.debug")
+    assemble_candidate_apks(output, package)
     app = ROOT / "app/android-main/build/outputs/apk/debug/android-main-debug.apk"
     probe = ROOT / "app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk"
     for apk in (app, probe):
         if not apk.is_file():
-            raise RuntimeError("Assemble LogDate and its probe APK before starting the managed pair")
+            raise RuntimeError("Candidate build did not produce LogDate and probe APKs")
     # Both Gradle's initial installation and later native reinstallation use these
     # immutable copies; another build cannot replace the attested candidate.
     artifacts = output / "apks"
@@ -262,6 +288,7 @@ def run(options):
         destination.chmod(0o400)
         pinned.append(destination)
     app, probe = pinned
+    verify_pinned_packages(sdk, app, probe, package)
     initial_app, initial_probe, frozen_fixture = initial_installation(
         options.mode, app, probe, options.fixture_environment, output)
     hashes = [hashlib.sha256(apk.read_bytes()).hexdigest() for apk in (initial_app, initial_probe)]
@@ -278,7 +305,7 @@ def run(options):
         raise RuntimeError("The installed emulator must support cold boots of managed instances")
     managed_sdk = EMULATOR["create_managed_sdk"](sdk, output / "managed-sdk", avd, nonce)
     verify_managed_emulator(managed_sdk, output)
-    env = managed_environment(managed_sdk, os.environ)
+    env = managed_environment(managed_sdk, os.environ, package)
     env["LOGDATE_NATIVE_ACCEPTANCE_TIMEOUT_SECONDS"] = str(budget["native"])
     initial_processes = command("ps", "-axo", "pid,args").stdout.decode().splitlines()
     capacity = TARGET["managed_device_capacity"](initial_processes)

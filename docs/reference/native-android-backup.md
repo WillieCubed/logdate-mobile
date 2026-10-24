@@ -763,10 +763,10 @@ WorkManager request. A generic request without a native delivery cannot satisfy 
 
 `tests/e2e/native-device-enrollment-acceptance.py` combines a populated two-emulator native
 transfer with the real account/device API and an isolated PostgreSQL server. Build
-`:app:android-main:assembleDebug`, `:app:android-main:assembleDebugAndroidTest`, and
 `:integration:server-client-e2e:writeAndroidHistoryHarnessClasspath`, then use the managed controller
 with the generated classpath, a private database environment file, and a new output directory.
-The controller owns both fresh emulator instances and pins the APKs for the duration of the run.
+The controller builds and pins the matching app and instrumentation APKs before starting its two
+fresh emulator instances.
 Enrollment has a bounded 30-minute native phase shared with its local server; the driver also
 covers boot, requested follow-ups, and teardown, with a 90-minute upper limit:
 

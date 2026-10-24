@@ -15,6 +15,52 @@ MODULE = runpy.run_path(str(Path(__file__).with_name("managed-native-restore-acc
 
 
 class ManagedDriverControllerTest(unittest.TestCase):
+    def test_candidate_apks_are_assembled_before_the_managed_pair_starts(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            build = Mock(return_value=subprocess.CompletedProcess([], 0))
+            MODULE["assemble_candidate_apks"](
+                root / "evidence", "studio.hypertext.logdate.transfer.debug", root=root, run=build
+            )
+            arguments = build.call_args.args[0]
+            self.assertIn(":app:android-main:assembleDebug", arguments)
+            self.assertIn(":app:android-main:assembleDebugAndroidTest", arguments)
+            self.assertIn("-Plogdate.applicationId=studio.hypertext.logdate.transfer", arguments)
+            self.assertEqual(root, build.call_args.kwargs["cwd"])
+            self.assertTrue((root / "evidence/candidate-build.log").is_file())
+
+    def test_candidate_build_rejects_unrelated_or_non_debug_package(self):
+        with tempfile.TemporaryDirectory() as folder:
+            build = Mock()
+            for package in ("studio.hypertext.other.debug", "studio.hypertext.logdate", "bad;command.debug"):
+                with self.subTest(package=package), self.assertRaises(ValueError):
+                    MODULE["assemble_candidate_apks"](Path(folder), package, run=build)
+            build.assert_not_called()
+
+    def test_default_candidate_build_uses_the_production_base_application_id(self):
+        with tempfile.TemporaryDirectory() as folder:
+            build = Mock(return_value=subprocess.CompletedProcess([], 0))
+            MODULE["assemble_candidate_apks"](
+                Path(folder), "studio.hypertext.logdate.debug", root=Path(folder), run=build
+            )
+            self.assertFalse(any(argument.startswith("-Plogdate.applicationId=") for argument in build.call_args.args[0]))
+
+    def test_pinned_app_and_probe_must_match_the_selected_package(self):
+        with tempfile.TemporaryDirectory() as folder:
+            sdk = Path(folder)
+            aapt2 = sdk / "build-tools/36.1.0/aapt2"
+            aapt2.parent.mkdir(parents=True)
+            aapt2.touch()
+            app, probe = sdk / "app.apk", sdk / "probe.apk"
+            package = "studio.hypertext.logdate.transfer.debug"
+            execute = Mock(side_effect=[subprocess.CompletedProcess([], 0, package.encode()),
+                                        subprocess.CompletedProcess([], 0, f"{package}.test".encode())])
+            MODULE["verify_pinned_packages"](sdk, app, probe, package, execute=execute)
+            self.assertEqual(str(aapt2), execute.call_args_list[0].args[0])
+            mismatch = Mock(return_value=subprocess.CompletedProcess([], 0, b"studio.hypertext.logdate.debug"))
+            with self.assertRaisesRegex(RuntimeError, "Pinned app.apk has application ID"):
+                MODULE["verify_pinned_packages"](sdk, app, probe, package, execute=mismatch)
+
     def test_cleanup_diagnostics_preserve_a_failure_on_python_without_exception_notes(self):
         class LegacyFailure(RuntimeError):
             def __getattribute__(self, name):
@@ -357,8 +403,11 @@ class ManagedDriverControllerTest(unittest.TestCase):
         self.assertEqual({0, 1}, set(shards))
 
     def test_driver_and_harness_use_the_same_package_despite_inherited_overrides(self):
-        environment = MODULE["managed_environment"](Path("/sdk"), {"LOGDATE_NATIVE_ACCEPTANCE_PACKAGE": "other.debug"})
-        self.assertEqual("studio.hypertext.logdate.debug", environment["LOGDATE_NATIVE_ACCEPTANCE_PACKAGE"])
+        environment = MODULE["managed_environment"](
+            Path("/sdk"), {"LOGDATE_NATIVE_ACCEPTANCE_PACKAGE": "other.debug"},
+            "studio.hypertext.logdate.transfer.debug"
+        )
+        self.assertEqual("studio.hypertext.logdate.transfer.debug", environment["LOGDATE_NATIVE_ACCEPTANCE_PACKAGE"])
 
     def test_native_arguments_cannot_override_owned_devices_or_attested_apks(self):
         for arguments in (["--source", "physical"], ["--app-apk", "/other.apk"], ["--test-apk=/other.apk"],
