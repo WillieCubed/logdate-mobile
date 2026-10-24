@@ -42,6 +42,7 @@ import logdate.client.feature.core.generated.resources.restore_resuming_title
 import logdate.client.feature.core.generated.resources.restore_unreadable_description
 import logdate.client.feature.core.generated.resources.restore_unreadable_title
 import logdate.client.ui.generated.resources.common_done
+import logdate.client.ui.generated.resources.common_retry
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
 
@@ -167,6 +168,7 @@ internal fun RestoreFailureCard(
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    actionLabel: String? = null,
 ) {
     OperationFailureCard(
         title = stringResource(Res.string.restore_failed_title),
@@ -174,5 +176,6 @@ internal fun RestoreFailureCard(
         onRetry = onRetry,
         onDismiss = onDismiss,
         modifier = modifier,
+        actionLabel = actionLabel ?: stringResource(UiRes.string.common_retry),
     )
 }

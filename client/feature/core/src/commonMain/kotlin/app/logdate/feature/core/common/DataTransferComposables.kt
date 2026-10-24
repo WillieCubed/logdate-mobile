@@ -375,6 +375,7 @@ internal fun OperationFailureCard(
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    actionLabel: String = stringResource(UiRes.string.common_retry),
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -422,7 +423,7 @@ internal fun OperationFailureCard(
                     onClick = onRetry,
                     modifier = Modifier.padding(start = Spacing.sm),
                 ) {
-                    Text(stringResource(UiRes.string.common_retry))
+                    Text(actionLabel)
                 }
             }
         }

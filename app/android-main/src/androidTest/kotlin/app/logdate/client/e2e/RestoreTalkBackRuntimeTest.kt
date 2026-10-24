@@ -18,10 +18,16 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.logdate.client.domain.export.ExportSchemaVersion
 import app.logdate.client.domain.export.ExportStats
 import app.logdate.client.domain.restore.ArchivePreview
+import app.logdate.client.sync.SyncStatus
 import app.logdate.feature.core.export.ExportState
+import app.logdate.feature.core.restore.RestoreError
 import app.logdate.feature.core.restore.RestoreState
 import app.logdate.feature.core.restore.RestoreSummary
+import app.logdate.feature.core.settings.ui.CloudArchivePhase
+import app.logdate.feature.core.settings.ui.CloudArchiveStatus
 import app.logdate.feature.core.settings.ui.ExportSettingsContent
+import app.logdate.feature.core.settings.ui.StorageQuotaUi
+import app.logdate.feature.core.settings.ui.SyncSettingsContent
 import app.logdate.ui.theme.LogDateTheme
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
@@ -88,7 +94,6 @@ class RestoreTalkBackRuntimeTest {
         assertTrue(shell("pm path com.google.android.marvin.talkback").startsWith("package:"), "Managed image must include TalkBack")
         val clicked = AtomicInteger()
         val observedFontScale = AtomicReference(0f)
-        var notificationSetupHandled = false
         try {
             // The API 34 ARM image can show a Bluetooth crash dialog before the fixture starts.
             // Recovery sheets do not use Bluetooth; preserve the radio setting and disable it here.
@@ -160,6 +165,7 @@ class RestoreTalkBackRuntimeTest {
                         ),
                         "Import",
                     ),
+                    Scene("archive-access-lost", RestoreState.Failed(RestoreError.FILE_NOT_ACCESSIBLE), "Choose archive"),
                 )
             ActivityScenario.launch<ComponentActivity>(Intent(context, ComponentActivity::class.java)).use { activity ->
                 scenes.forEach { scene ->
@@ -202,24 +208,52 @@ class RestoreTalkBackRuntimeTest {
                                 .put("windowText", root?.let(::windowText))
                                 .put("observedFontScale", observedFontScale.get()),
                         )
-                        if (!notificationSetupHandled &&
-                            scene.name == "partial" &&
-                            root?.packageName?.toString() == "com.google.android.permissioncontroller" &&
-                            windowText(root).contains("to send you notifications?") &&
-                            (windowText(root).contains("TalkBack") || windowText(root).contains("Android Accessibility Suite"))
-                        ) {
-                            // Deny TalkBack's optional notification permission during service setup.
-                            notificationSetupHandled = root
-                                .findAccessibilityNodeInfosByViewId("com.android.permissioncontroller:id/permission_deny_button")
-                                .singleOrNull()
-                                ?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK) == true
-                        }
+                        dismissOptionalTalkBackNotificationPrompt()
                         root?.packageName?.toString() == context.packageName &&
                             observedFontScale.get() == fontScale.toFloat()
                     }
                     awaitTalkBackAction(scene.name, scene.action, observedFontScale.get()) { clicked.get() > 0 }
                     assertEquals(1, clicked.get(), "Double-tap must invoke the action once")
                 }
+                focus.clear()
+                clicked.set(0)
+                activity.onActivity {
+                    assertEquals(fontScale.toFloat(), it.resources.configuration.fontScale)
+                    it.setContent {
+                        val density = LocalDensity.current.fontScale
+                        SideEffect { observedFontScale.set(density) }
+                        LogDateTheme(dynamicColor = false) {
+                            SyncSettingsContent(
+                                onBack = {},
+                                syncStatus =
+                                    SyncStatus(
+                                        isEnabled = true,
+                                        lastSyncTime = null,
+                                        pendingUploads = 0,
+                                        isSyncing = false,
+                                        hasErrors = false,
+                                        unreadableCloudCount = 1,
+                                    ),
+                                cloudArchiveStatus = CloudArchiveStatus(CloudArchivePhase.CHECKING),
+                                isAuthenticated = true,
+                                onSyncNow = {},
+                                onNavigateToSignIn = {},
+                                onNavigateToRecoveryPhrase = { clicked.incrementAndGet() },
+                                quotaUsage = StorageQuotaUi(0, 0, 0f, formattedTotal = "0 GB", formattedUsed = "0 GB"),
+                                isQuotaAvailable = false,
+                                snackbarHostState = SnackbarHostState(),
+                            )
+                        }
+                    }
+                }
+                await {
+                    val root = automation.rootInActiveWindow
+                    root?.packageName?.toString() == context.packageName &&
+                        observedFontScale.get() == fontScale.toFloat() &&
+                        windowText(root).contains("Some cloud entries could not be opened")
+                }
+                awaitTalkBackAction("backup-journal-access", "Enter recovery phrase", observedFontScale.get()) { clicked.get() > 0 }
+                assertEquals(1, clicked.get(), "Backup recovery action must open exactly once")
             }
             StartupRecoveryTalkBackScenario(automation) { scene, action, activated ->
                 awaitTalkBackAction(scene, action, fontScale.toFloat(), activated)
@@ -304,7 +338,7 @@ class RestoreTalkBackRuntimeTest {
                 .put("phase", "passed")
                 .put("observedFontScale", observedFontScale.get())
                 .put("fontScale", fontScale)
-                .put("sceneCount", 7)
+                .put("sceneCount", 9)
                 .put("actualStartupKeyRecovery", true)
                 .put("syntheticLateKeyDelivery", true)
                 .put("lockedJournalSemanticsHidden", true)
@@ -319,6 +353,7 @@ class RestoreTalkBackRuntimeTest {
         activated: () -> Boolean,
     ) {
         focus.clear()
+        dismissOptionalTalkBackNotificationPrompt()
         persist(
             JSONObject()
                 .put(
@@ -330,6 +365,10 @@ class RestoreTalkBackRuntimeTest {
         )
         val deadline = SystemClock.elapsedRealtime() + 90_000
         while (!activated()) {
+            if (dismissOptionalTalkBackNotificationPrompt()) {
+                SystemClock.sleep(200)
+                continue
+            }
             val focused =
                 automation.rootInActiveWindow
                     ?.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
@@ -362,6 +401,20 @@ class RestoreTalkBackRuntimeTest {
             away != null && (away + 1 until labels.size).any { labels[it] == action },
             "Forward, backward, and return focus must precede activation: $labels",
         )
+    }
+
+    private fun dismissOptionalTalkBackNotificationPrompt(): Boolean {
+        val root = automation.rootInActiveWindow ?: return false
+        if (root.packageName?.toString() != "com.google.android.permissioncontroller") return false
+        val message = windowText(root)
+        if (!message.contains("to send you notifications?")) return false
+        if (!message.contains("TalkBack") && !message.contains("Android Accessibility Suite")) return false
+        val deny =
+            root
+                .findAccessibilityNodeInfosByViewId("com.android.permissioncontroller:id/permission_deny_button")
+                .singleOrNull() ?: return false
+        check(deny.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK))
+        return true
     }
 
     private fun persist(state: JSONObject) {

@@ -37,7 +37,7 @@
     <string name="importing">Importing...</string>
     <string name="restore_entries_from_a_logdate_export_archive">Import a LogDate archive</string>
     <string name="restoring_backup">Restoring backup...</string>
-    <string name="restore_choose_file">Choose file</string>
+    <string name="restore_choose_file">Choose archive</string>
     <string name="restore_confirm_description">Import entries alongside your existing journal.</string>
     <string name="restore_merge_info">Newer edits are kept.</string>
     <string name="restore_preview_description">Review what&apos;s in this archive.</string>
@@ -74,7 +74,7 @@
     <!-- Restore errors -->
     <string name="restore_error_invalid_archive">The selected file doesn&apos;t appear to be a valid LogDate export archive.</string>
     <string name="restore_error_missing_source">No file was selected for restore.</string>
-    <string name="restore_error_file_not_accessible">Unable to access the selected file.</string>
+    <string name="restore_error_file_not_accessible">LogDate couldn&apos;t open this archive. If access was removed, choose it again; otherwise choose another copy.</string>
     <string name="restore_error_file_picker_unavailable">A file picker is required to select a backup.</string>
     <string name="restore_error_file_picker_failed">Could not open the file picker.</string>
     <string name="restore_error_invalid_summary">Restore completed, but the result could not be read.</string>
