@@ -13,5 +13,11 @@ fun collectAndroidMediaOwnerReferences(query: (String) -> List<String?>): Set<St
             "SELECT uri FROM rewind_video_content",
             "SELECT photo_uri FROM people",
             "SELECT image_uri FROM stickers",
+            "SELECT source_photo_uri FROM stickers",
+            "SELECT mediaUri FROM transcriptions",
+            "SELECT contentUri FROM storage_metadata",
+            "SELECT uri FROM indexed_media_images",
+            "SELECT uri FROM indexed_media_videos",
+            "SELECT uri FROM media_images",
         ).forEach { sql -> query(sql).filterNotNull().forEach(::add) }
     }

@@ -12,16 +12,22 @@ class AndroidMediaOwnerCensusTest {
         val references =
             collectAndroidMediaOwnerReferences { sql ->
                 queries += sql
-                listOf("tombstoned:${sql.substringAfter("FROM ")}")
+                listOf("tombstoned:$sql")
             }
 
-        assertEquals(9, queries.size)
+        assertEquals(15, queries.size)
         assertTrue(queries.any { it == "SELECT contentUri FROM image_notes" })
         assertTrue(queries.any { it == "SELECT coverImageUri FROM journals" })
         assertTrue(queries.any { it == "SELECT cover_image_uri FROM events" })
         assertTrue(queries.any { it == "SELECT photo_uri FROM people" })
+        assertTrue(queries.any { it == "SELECT mediaUri FROM transcriptions" })
+        assertTrue(queries.any { it == "SELECT contentUri FROM storage_metadata" })
+        assertTrue(queries.any { it == "SELECT source_photo_uri FROM stickers" })
+        assertTrue(queries.any { it == "SELECT uri FROM indexed_media_images" })
+        assertTrue(queries.any { it == "SELECT uri FROM indexed_media_videos" })
+        assertTrue(queries.any { it == "SELECT uri FROM media_images" })
         assertTrue(queries.none { "WHERE" in it })
-        assertEquals(9, references.size)
+        assertEquals(15, references.size)
         assertFalse(references.isEmpty())
     }
 }
