@@ -59,40 +59,7 @@ fun summarizeDiagnostics(report: SyncDiagnosticReport): DiagnosticUiSummary {
         blocker?.let { event ->
             if (event.action != DiagnosticAction.NONE) event.action else recommendedDiagnosticAction(event.reason, event.outcome)
         } ?: DiagnosticAction.NONE
-    val retryCondition =
-        when {
-            blocker?.reason == DiagnosticReason.NETWORK_POLICY -> {
-                DiagnosticRetryCondition.AUTOMATIC
-            }
-
-            blocker?.reason == DiagnosticReason.OFFLINE -> {
-                DiagnosticRetryCondition.NETWORK
-            }
-
-            action == DiagnosticAction.FREE_SPACE -> {
-                DiagnosticRetryCondition.FREE_SPACE
-            }
-
-            blocker?.outcome == DiagnosticOutcome.RETRY_SCHEDULED -> {
-                DiagnosticRetryCondition.AUTOMATIC
-            }
-
-            else -> {
-                when (action) {
-                    DiagnosticAction.CONNECT -> DiagnosticRetryCondition.NETWORK
-                    DiagnosticAction.SIGN_IN -> DiagnosticRetryCondition.SIGN_IN
-                    DiagnosticAction.RECOVER_KEY -> DiagnosticRetryCondition.KEY_RECOVERY
-                    DiagnosticAction.FREE_SPACE -> DiagnosticRetryCondition.FREE_SPACE
-                    DiagnosticAction.MANAGE_STORAGE -> DiagnosticRetryCondition.MANAGE_STORAGE
-                    DiagnosticAction.REPLACE_MEDIA -> DiagnosticRetryCondition.REPLACE_MEDIA
-                    DiagnosticAction.UPDATE_APP -> DiagnosticRetryCondition.UPDATE_APP
-                    DiagnosticAction.UPDATE_SERVER -> DiagnosticRetryCondition.UPDATE_SERVER
-                    DiagnosticAction.REVIEW_CONFLICT -> DiagnosticRetryCondition.REVIEW_CONFLICT
-                    DiagnosticAction.RETRY -> DiagnosticRetryCondition.USER_RETRY
-                    else -> DiagnosticRetryCondition.UNKNOWN
-                }
-            }
-        }
+    val retryCondition = diagnosticRetryCondition(blocker, action)
     return DiagnosticUiSummary(
         lastAttemptPhase = report.events.lastOrNull()?.phase,
         lastAttemptOutcome = report.events.lastOrNull()?.outcome,
@@ -103,6 +70,44 @@ fun summarizeDiagnostics(report: SyncDiagnosticReport): DiagnosticUiSummary {
         nextAction = action,
     )
 }
+
+private fun diagnosticRetryCondition(
+    blocker: app.logdate.shared.model.diagnostics.SyncDiagnosticEvent?,
+    action: DiagnosticAction,
+): DiagnosticRetryCondition =
+    when {
+        blocker?.reason == DiagnosticReason.NETWORK_POLICY -> {
+            DiagnosticRetryCondition.AUTOMATIC
+        }
+
+        blocker?.reason == DiagnosticReason.OFFLINE -> {
+            DiagnosticRetryCondition.NETWORK
+        }
+
+        action == DiagnosticAction.FREE_SPACE -> {
+            DiagnosticRetryCondition.FREE_SPACE
+        }
+
+        blocker?.outcome == DiagnosticOutcome.RETRY_SCHEDULED -> {
+            DiagnosticRetryCondition.AUTOMATIC
+        }
+
+        else -> {
+            when (action) {
+                DiagnosticAction.CONNECT -> DiagnosticRetryCondition.NETWORK
+                DiagnosticAction.SIGN_IN -> DiagnosticRetryCondition.SIGN_IN
+                DiagnosticAction.RECOVER_KEY -> DiagnosticRetryCondition.KEY_RECOVERY
+                DiagnosticAction.FREE_SPACE -> DiagnosticRetryCondition.FREE_SPACE
+                DiagnosticAction.MANAGE_STORAGE -> DiagnosticRetryCondition.MANAGE_STORAGE
+                DiagnosticAction.REPLACE_MEDIA -> DiagnosticRetryCondition.REPLACE_MEDIA
+                DiagnosticAction.UPDATE_APP -> DiagnosticRetryCondition.UPDATE_APP
+                DiagnosticAction.UPDATE_SERVER -> DiagnosticRetryCondition.UPDATE_SERVER
+                DiagnosticAction.REVIEW_CONFLICT -> DiagnosticRetryCondition.REVIEW_CONFLICT
+                DiagnosticAction.RETRY -> DiagnosticRetryCondition.USER_RETRY
+                else -> DiagnosticRetryCondition.UNKNOWN
+            }
+        }
+    }
 
 private fun recommendedDiagnosticAction(
     reason: DiagnosticReason,

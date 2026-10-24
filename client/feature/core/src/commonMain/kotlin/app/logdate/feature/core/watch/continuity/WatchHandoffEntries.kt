@@ -73,11 +73,7 @@ fun EntryProviderScope<NavKey>.watchHandoffEntries(
 
                     "day" -> {
                         if (note != null) {
-                            val zone =
-                                note.timeZoneId?.let { zoneId ->
-                                    runCatching { TimeZone.of(zoneId) }.getOrNull()
-                                } ?: TimeZone.currentSystemDefault()
-                            onOpenDay(note.creationTimestamp.toLocalDateTime(zone).date)
+                            onOpenDay(note.creationDate())
                         } else {
                             state = WatchHandoffUiState.Missing
                         }
@@ -115,6 +111,14 @@ fun EntryProviderScope<NavKey>.watchHandoffEntries(
             }
         }
     }
+}
+
+private fun JournalNote.creationDate(): LocalDate {
+    val zone =
+        timeZoneId?.let { zoneId ->
+            runCatching { TimeZone.of(zoneId) }.getOrNull()
+        } ?: TimeZone.currentSystemDefault()
+    return creationTimestamp.toLocalDateTime(zone).date
 }
 
 private suspend fun handoffArrived(
