@@ -136,6 +136,61 @@ class OfflineFirstEntryDraftRepository(
         }
     }
 
+    override suspend fun insertDraftIfAbsentForRecovery(
+        draft: EntryDraft,
+        canCommit: () -> Boolean,
+        scopeFence: suspend (commit: suspend () -> Boolean) -> Boolean,
+    ): Boolean {
+        initializationComplete.await()
+        return mutationMutex.withLock {
+            if (!canCommit() || draftsFlow.value.containsKey(draft.id)) return@withLock false
+            val recoveryStore = draftStore as? RecoveryEntryDraftStore ?: error("Draft store cannot commit guarded recovery")
+            val inserted = scopeFence { recoveryStore.insertIfAbsentForRecovery(draft, canCommit) }
+            if (inserted) {
+                draftsFlow.value = draftsFlow.value + (draft.id to draft)
+                true
+            } else {
+                val stored = draftStore.getDraft(draft.id)
+                if (stored != null) draftsFlow.value = draftsFlow.value + (draft.id to stored)
+                stored == draft
+            }
+        }
+    }
+
+    override suspend fun isNativeTransferDraftAdmitted(
+        draftId: Uuid,
+        transferMarker: String,
+    ): Boolean {
+        initializationComplete.await()
+        return mutationMutex.withLock {
+            val recoveryStore = draftStore as? RecoveryEntryDraftStore ?: return@withLock false
+            recoveryStore.isNativeTransferRecoveryAdmitted(draftId, transferMarker)
+        }
+    }
+
+    override suspend fun insertNativeTransferDraftIfAbsent(
+        draft: EntryDraft,
+        transferMarker: String,
+        canCommit: () -> Boolean,
+        scopeFence: suspend (commit: suspend () -> Boolean) -> Boolean,
+    ): Boolean {
+        initializationComplete.await()
+        return mutationMutex.withLock {
+            val recoveryStore = draftStore as? RecoveryEntryDraftStore ?: error("Draft store cannot commit guarded recovery")
+            if (recoveryStore.isNativeTransferRecoveryAdmitted(draft.id, transferMarker)) return@withLock true
+            if (!canCommit() || draftsFlow.value.containsKey(draft.id)) return@withLock false
+            val commit: suspend () -> Boolean = {
+                recoveryStore.insertForNativeTransferRecovery(draft, transferMarker, canCommit)
+            }
+            val admitted = scopeFence(commit)
+            if (admitted) {
+                val stored = draftStore.getDraft(draft.id)
+                if (stored != null) draftsFlow.value = draftsFlow.value + (draft.id to stored)
+            }
+            admitted
+        }
+    }
+
     private suspend fun reconcileStoredDraft(id: Uuid) =
         withContext(NonCancellable) {
             val stored = draftStore.getDraft(id)

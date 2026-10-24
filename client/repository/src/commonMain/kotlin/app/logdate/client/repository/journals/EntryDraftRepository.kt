@@ -222,10 +222,12 @@ data class QuietSaveOutcome(
     val blockId: String? = null,
 )
 
-/** Type of pending media. Currently only audio is wired; camera/video will follow. */
+/** Type of pending media awaiting finalization or a durable destination claim. */
 @Serializable
 enum class PendingMediaType {
     AUDIO,
+    CAMERA_PHOTO,
+    CAMERA_VIDEO,
 }
 
 /**

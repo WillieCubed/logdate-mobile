@@ -2,6 +2,7 @@ package app.logdate.feature.editor.ui.editor
 
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.text.toUiText
+import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.update
@@ -94,6 +95,38 @@ internal suspend fun EntryEditorViewModel.persistAudioRecordingTargetImpl(
         if (currentBlock?.captureState == targetState) {
             updateBlockImpl(currentBlock.copy(captureState = block.captureState))
         }
+    }
+    return persisted
+}
+
+/** Persists the camera file target before CameraX may write an original to it. */
+internal suspend fun EntryEditorViewModel.persistCameraCaptureTargetImpl(
+    blockId: Uuid,
+    filePath: String,
+    mediaType: CapturedMediaType,
+): Boolean {
+    if (filePath.isBlank()) return false
+    val initial = mutableEditorState.value
+    val block = initial.blocks.firstOrNull { it.id == blockId } as? CameraBlockUiState ?: return false
+    if (initial.isReadOnly(blockId) || initial.shouldExit || initial.isSaving || initial.isEditingLocked) return false
+
+    val target = block.copy(pendingFilePath = filePath, mediaType = mediaType)
+    updateBlockImpl(target)
+    val current = mutableEditorState.value.blocks.firstOrNull { it.id == blockId } as? CameraBlockUiState
+    if (current?.pendingFilePath != filePath) return false
+    val snapshot = currentDraftPersistenceState(mutableEditorState.value)
+    val persisted =
+        try {
+            draftPersistenceMutex.withLock { persistLatestDraftUntilStable(snapshot) != null }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            Napier.e("Could not save the camera target to its draft", error)
+            false
+        }
+    if (!persisted) {
+        val latest = mutableEditorState.value.blocks.firstOrNull { it.id == blockId } as? CameraBlockUiState
+        if (latest?.pendingFilePath == filePath) updateBlockImpl(latest.copy(pendingFilePath = block.pendingFilePath))
     }
     return persisted
 }

@@ -15,6 +15,7 @@ import app.logdate.client.device.restore.admitNativeContent
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.storage.AndroidMediaPublicationTickets
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -52,9 +53,13 @@ internal class AndroidCameraCaptureOutput(
      */
     private val captureStagingDirectory =
         java.io.File(appContext.filesDir, "camera-captures")
+    private val stagingStore by lazy { CameraCaptureStagingStore(captureStagingDirectory) }
     private val timestampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
 
-    suspend fun capturePhoto(imageCapture: () -> ImageCapture?): String? =
+    suspend fun capturePhoto(
+        imageCapture: () -> ImageCapture?,
+        onTargetPrepared: suspend (String) -> Boolean = { false },
+    ): String? =
         withContext(Dispatchers.Main) {
             val capture =
                 imageCapture() ?: run {
@@ -66,7 +71,20 @@ internal class AndroidCameraCaptureOutput(
             val timeStamp = timestampFormat.format(Date())
             val fileName = "LOGDATE_$timeStamp.jpg"
             admitNativeContent(captureStagingDirectory)
-            val sourceFile = java.io.File.createTempFile("logdate-camera-", ".jpg", captureStagingDirectory)
+            val sourceFile = stagingStore.create(fileName)
+            val prepared =
+                try {
+                    onTargetPrepared(sourceFile.absolutePath)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (error: Exception) {
+                    Napier.e("Could not prepare the camera draft", error)
+                    false
+                }
+            if (!prepared) {
+                state.update { it.copy(error = CameraCaptureError.CaptureFailed) }
+                return@withContext null
+            }
             val outputOptions = ImageCapture.OutputFileOptions.Builder(sourceFile).build()
             val capturedPath = awaitPhotoCapture(capture, outputOptions, sourceFile)
             capturedPath ?: return@withContext null
@@ -88,8 +106,6 @@ internal class AndroidCameraCaptureOutput(
                 Napier.e("Failed to persist photo capture", exception)
                 state.update { it.copy(error = CameraCaptureError.CaptureFailed) }
                 null
-            } finally {
-                java.io.File(capturedPath).delete()
             }
         }
 
@@ -122,7 +138,6 @@ internal class AndroidCameraCaptureOutput(
                     override fun onError(exception: ImageCaptureException) {
                         Napier.e("Photo capture failed", exception)
                         state.update { it.copy(error = CameraCaptureError.CaptureFailed) }
-                        sourceFile.delete()
                         continuation.resume(null)
                     }
                 },
@@ -130,7 +145,10 @@ internal class AndroidCameraCaptureOutput(
         }
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
-    suspend fun startVideoRecording(videoCapture: VideoCapture<Recorder>?) {
+    suspend fun startVideoRecording(
+        videoCapture: VideoCapture<Recorder>?,
+        onTargetPrepared: suspend (String) -> Boolean = { false },
+    ) {
         val capture =
             videoCapture ?: run {
                 Napier.e("VideoCapture is not initialized")
@@ -147,7 +165,20 @@ internal class AndroidCameraCaptureOutput(
         val fileName = "LOGDATE_$timeStamp.mp4"
 
         admitNativeContent(captureStagingDirectory)
-        val outputFile = java.io.File.createTempFile("logdate-camera-", ".mp4", captureStagingDirectory)
+        val outputFile = stagingStore.create(fileName)
+        val prepared =
+            try {
+                onTargetPrepared(outputFile.absolutePath)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Napier.e("Could not prepare the video draft", error)
+                false
+            }
+        if (!prepared) {
+            state.update { it.copy(error = CameraCaptureError.RecordingFailed) }
+            return
+        }
         val outputOptions = FileOutputOptions.Builder(outputFile).build()
 
         val deferred = CompletableDeferred<String?>()
@@ -165,14 +196,12 @@ internal class AndroidCameraCaptureOutput(
         } catch (e: SecurityException) {
             Napier.e("Audio permission required for video recording", e)
             state.update { it.copy(error = CameraCaptureError.PermissionDenied) }
-            outputFile.delete()
             recordingFile = null
             deferred.complete(null)
             recordingDeferred = null
         } catch (e: Exception) {
             Napier.e("Failed to start video recording", e)
             state.update { it.copy(error = CameraCaptureError.RecordingFailed) }
-            outputFile.delete()
             recordingFile = null
             deferred.complete(null)
             recordingDeferred = null
@@ -231,7 +260,6 @@ internal class AndroidCameraCaptureOutput(
                     Napier.e("Video recording failed with error: ${event.error}")
                     null
                 }
-            file?.delete()
             withContext(Dispatchers.Main.immediate) {
                 state.update {
                     it.copy(

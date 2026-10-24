@@ -30,6 +30,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -345,6 +347,64 @@ class RetainedJournalReconciliationJobService : JobService() {
                 )
             val result = merger.merge()
             if (result.coverageComplete) {
+                val receiptFile = files["source_scope.json"]
+                if (receiptFile != null) {
+                    val receipt =
+                        runCatching {
+                            Json.decodeFromString<app.logdate.client.device.restore.NativeJournalSourceReceipt>(receiptFile.readText())
+                        }.getOrNull() ?: return NativeSourceOutcome(true, false)
+                    val job = currentCoroutineContext()[Job]
+                    val dataStore = createAndroidMainDataStore(this)
+                    val isCurrent = {
+                        job?.isActive != false &&
+                            repositories.database.isOpen &&
+                            normalizeBackendOrigin(repositories.backendOrigin()) ==
+                            normalizeBackendOrigin(repositories.expectedScope.serverOrigin)
+                    }
+
+                    suspend fun requireSourceCurrent() {
+                        check(isCurrent()) { "Native pending camera delivery changed" }
+                        val current = dataStore.data.first()
+                        val actual = RetainedJournalSourceScope.from(current, sourceScope.backendOrigin)
+                        check(
+                            actual != null &&
+                                sourceScope.matchesCurrentOrAdopted(actual, current) &&
+                                sourceScope.matchesRepositoryScope(
+                                    repositories.expectedScope.ownerId,
+                                    repositories.expectedScope.serverOrigin,
+                                ),
+                        ) { "Native pending camera owner or backend changed" }
+                    }
+                    val importer =
+                        NativePendingCameraDraftImporter(
+                            filesDir,
+                            packageName,
+                            repositories.media,
+                            repositories.entryDrafts,
+                            isCurrent,
+                            ::requireSourceCurrent,
+                        ) { commit ->
+                            var applied = false
+                            dataStore.updateData { current ->
+                                check(isCurrent()) { "Native pending camera delivery changed" }
+                                val actual = RetainedJournalSourceScope.from(current, sourceScope.backendOrigin)
+                                check(
+                                    actual != null &&
+                                        sourceScope.matchesCurrentOrAdopted(actual, current) &&
+                                        sourceScope.matchesRepositoryScope(
+                                            repositories.expectedScope.ownerId,
+                                            repositories.expectedScope.serverOrigin,
+                                        ),
+                                ) { "Native pending camera owner or backend changed" }
+                                applied = commit()
+                                current
+                            }
+                            applied
+                        }
+                    if (!importer.import(generation, files, receipt.mediaInventorySha256)) {
+                        return NativeSourceOutcome(true, false)
+                    }
+                }
                 admitMergedSource(generation, opened.keyFile)
             }
             return NativeSourceOutcome(result.mediaPending > 0, result.coverageComplete)

@@ -31,6 +31,8 @@ import org.jetbrains.compose.resources.stringResource
 actual fun CameraCaptureContent(
     onMediaCaptured: (uri: String, mediaType: CapturedMediaType, durationMs: Long) -> Unit,
     onClose: () -> Unit,
+    pendingFilePath: String?,
+    onPrepareCaptureTarget: suspend (String, CapturedMediaType) -> Boolean,
     modifier: Modifier,
     remoteControl: CameraRemoteControl,
     initialCaptureMode: CaptureMode,

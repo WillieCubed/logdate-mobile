@@ -36,10 +36,15 @@ interface CameraCaptureManager {
      */
     suspend fun capturePhoto(): String?
 
+    /** Android persists this target in its draft before CameraX receives it. */
+    suspend fun capturePhoto(onTargetPrepared: suspend (String) -> Boolean): String? = capturePhoto()
+
     /**
      * Starts video recording.
      */
     suspend fun startVideoRecording()
+
+    suspend fun startVideoRecording(onTargetPrepared: suspend (String) -> Boolean) = startVideoRecording()
 
     /**
      * Stops video recording.

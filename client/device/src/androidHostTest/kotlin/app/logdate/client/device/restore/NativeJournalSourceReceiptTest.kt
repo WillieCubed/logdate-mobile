@@ -2,6 +2,7 @@ package app.logdate.client.device.restore
 
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -36,6 +37,58 @@ class NativeJournalSourceReceiptTest {
             }
         }
     }
+
+    @Test
+    fun `pending camera draft store and originals require one receipt-bound cohort`() =
+        fixture { source, workspace ->
+            val draftStore = File(source.root, "entry-drafts").apply { writeText("bound pending draft bytes") }
+            val camera =
+                File(source.root, "camera-captures/camera.jpg.tmp").apply {
+                    check(parentFile!!.mkdirs())
+                    writeText("selected pending capture")
+                }
+            val inventory = File(source.root, "inventory.json")
+            writeNativeJournalMediaInventory(inventory, source.root, setOf("files/camera-captures/camera.jpg.tmp"))
+            writeNativeJournalSourceReceipt(
+                source.receipt,
+                mutablePreferencesOf(
+                    stringPreferencesKey("identity.canonical_owner_id") to "347c6231-19f4-49fa-bd1d-58ed34b9be03",
+                    stringPreferencesKey("identity.canonical_owner_bound") to "true",
+                    stringPreferencesKey("backend_url") to "https://cloud.example",
+                ),
+                source.preferences,
+                mapOf("database/logdate" to source.database),
+                mediaInventory = inventory,
+                entryDraftsFile = draftStore,
+            )
+            val id = workspace.beginIncomingDelivery(Uuid.random().toString())
+            source.files.forEach { (path, file) -> capture(workspace, id, path, file) }
+            capture(workspace, id, PREFIX + "files/datastore/entry_drafts.preferences_pb", draftStore)
+            capture(workspace, id, PREFIX + NATIVE_MEDIA_INVENTORY_PATH, inventory)
+            capture(workspace, id, PREFIX + "files/camera-captures/camera.jpg.tmp", camera)
+            workspace.finishIncomingDelivery()
+
+            val admitted = verifiedNativeJournalSources(workspace.incomingPayloads().values.flatten()).values.single()
+            assertEquals(draftStore.readText(), admitted.getValue("files/datastore/entry_drafts.preferences_pb").readText())
+            assertEquals(camera.readText(), admitted.getValue("files/camera-captures/camera.jpg.tmp").readText())
+
+            val otherCore = workspace.beginIncomingDelivery(Uuid.random().toString())
+            source.files.forEach { (path, file) -> capture(workspace, otherCore, path, file) }
+            workspace.finishIncomingDelivery()
+            val otherAuxiliary = workspace.beginIncomingDelivery(Uuid.random().toString())
+            capture(workspace, otherAuxiliary, PREFIX + "files/datastore/entry_drafts.preferences_pb", draftStore)
+            capture(workspace, otherAuxiliary, PREFIX + NATIVE_MEDIA_INVENTORY_PATH, inventory)
+            capture(workspace, otherAuxiliary, PREFIX + "files/camera-captures/camera.jpg.tmp", camera)
+            workspace.finishIncomingDelivery()
+            val splitCohorts =
+                workspace
+                    .incomingPayloads()
+                    .values
+                    .flatten()
+                    .filter { it.cohortId in setOf(otherCore, otherAuxiliary) }
+            assertTrue(verifiedNativeJournalSources(splitCohorts).isEmpty())
+            assertEquals(1, verifiedNativeJournalSources(workspace.incomingPayloads().values.flatten()).size)
+        }
 
     @Test
     fun `interrupted delivery can use later identical complete bytes but never another revision`() =
@@ -118,6 +171,34 @@ class NativeJournalSourceReceiptTest {
         fixture { source, _ ->
             assertFailsWith<IllegalArgumentException> {
                 source.writeReceipt(mapOf("database/another-database" to source.database))
+            }
+        }
+
+    @Test
+    fun `version four may bind entry drafts when no media inventory exists`() =
+        fixture { source, _ ->
+            val draftStore = File(source.root, "entry-drafts-without-media").apply { writeText("empty draft store") }
+            writeNativeJournalSourceReceipt(
+                source.receipt,
+                mutablePreferencesOf(
+                    stringPreferencesKey("identity.canonical_owner_id") to "347c6231-19f4-49fa-bd1d-58ed34b9be03",
+                    stringPreferencesKey("identity.canonical_owner_bound") to "true",
+                    stringPreferencesKey("backend_url") to "https://cloud.example",
+                ),
+                source.preferences,
+                mapOf("database/logdate" to source.database),
+                entryDraftsFile = draftStore,
+            )
+            assertEquals(4, Json.decodeFromString<NativeJournalSourceReceipt>(source.receipt.readText()).version)
+        }
+
+    @Test
+    fun `version three requires its media inventory`() =
+        fixture { source, _ ->
+            val receipt = Json.decodeFromString<NativeJournalSourceReceipt>(source.receipt.readText())
+            source.receipt.writeText(Json.encodeToString(receipt.copy(version = 3)))
+            assertFailsWith<IllegalStateException> {
+                verifyNativeJournalSourceReceipt(source.receipt, source.preferences, mapOf("database/logdate" to source.database))
             }
         }
 

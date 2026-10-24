@@ -66,7 +66,7 @@ class NativeJournalStagedSourceIndex(
                                 cohortId(it.file) == receiptCohort &&
                                 nativeSnapshotChecksum(it.file) == expected
                         }
-                    if (path !in AUXILIARY_PATHS && matching == null) missingCore = true
+                    if (!isStagedAuxiliaryPath(path) && matching == null) missingCore = true
                     matching?.let { path to it.file }
                 }.toMap()
         if (missingCore) {
@@ -122,8 +122,8 @@ class NativeJournalStagedSourceIndex(
         return Metadata(
             nativeSnapshotChecksum(receiptFile),
             hashes,
-            physicalPaths.filterKeys { it in AUXILIARY_PATHS },
-            physicalPaths.filterKeys { it !in AUXILIARY_PATHS },
+            physicalPaths.filterKeys(::isStagedAuxiliaryPath),
+            physicalPaths.filterKeys { !isStagedAuxiliaryPath(it) },
         )
     }
 
@@ -135,9 +135,9 @@ class NativeJournalStagedSourceIndex(
     ) {
         val existingRecord = read(destination)
         val existing = existingRecord.pathSha256
-        check(existing.filterKeys { it !in AUXILIARY_PATHS } == metadata.pathSha256.filterKeys { it !in AUXILIARY_PATHS })
+        check(existing.filterKeys { !isStagedAuxiliaryPath(it) } == metadata.pathSha256.filterKeys { !isStagedAuxiliaryPath(it) })
         val compatibleAuxiliary =
-            metadata.pathSha256.filter { (path, hash) -> path in AUXILIARY_PATHS && (existing[path] == null || existing[path] == hash) }
+            metadata.pathSha256.filter { (path, hash) -> isStagedAuxiliaryPath(path) && (existing[path] == null || existing[path] == hash) }
         val combined =
             (existingRecord.stagedAuxiliaryPhysicalPaths.keys + compatibleAuxiliary.keys).associateWith { path ->
                 val paths =
@@ -285,7 +285,7 @@ class NativeJournalStagedSourceIndex(
             .filter { payload ->
                 payload.complete &&
                     (payload.path.startsWith(NATIVE_JOURNAL_TRANSFER_PREFIX) || payload.path in RAW_AUXILIARY_PATHS) &&
-                    payload.path.removePrefix(NATIVE_JOURNAL_TRANSFER_PREFIX) in AUXILIARY_PATHS
+                    isStagedAuxiliaryPath(payload.path.removePrefix(NATIVE_JOURNAL_TRANSFER_PREFIX))
             }.mapNotNull { payload ->
                 val path = payload.path.removePrefix(NATIVE_JOURNAL_TRANSFER_PREFIX)
                 val expected =
@@ -370,6 +370,9 @@ class NativeJournalStagedSourceIndex(
                 NATIVE_MEDIA_INVENTORY_PATH,
                 "sender_owner",
             )
+
+        private fun isStagedAuxiliaryPath(path: String): Boolean = path in AUXILIARY_PATHS || path.startsWith("files/camera-captures/")
+
         val RAW_AUXILIARY_PATHS =
             setOf("files/db_recovery/passphrase_backup", "files/db_recovery/working_passphrase_backup", NATIVE_MEDIA_INVENTORY_PATH)
     }

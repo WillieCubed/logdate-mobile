@@ -6,6 +6,7 @@ import app.logdate.client.domain.editor.ObserveEditorDataUseCase
 import app.logdate.client.domain.editor.SaveEntryUseCase
 import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.feature.editor.navigation.EditorLaunchMode
+import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.feature.editor.ui.editor.delegate.AudioBlockFinalizer
 import app.logdate.feature.editor.ui.editor.delegate.ContentLoader
 import app.logdate.feature.editor.ui.editor.delegate.DraftManager
@@ -228,6 +229,12 @@ class EntryEditorViewModel(
         filePath: String,
         fallbackFilePath: String? = null,
     ): Boolean = persistAudioRecordingTargetImpl(blockId, filePath, fallbackFilePath)
+
+    suspend fun persistCameraCaptureTarget(
+        blockId: Uuid,
+        filePath: String,
+        mediaType: CapturedMediaType,
+    ): Boolean = persistCameraCaptureTargetImpl(blockId, filePath, mediaType)
 
     suspend fun saveAsDraft(state: EditorState): Boolean = saveAsDraftImpl(state)
 

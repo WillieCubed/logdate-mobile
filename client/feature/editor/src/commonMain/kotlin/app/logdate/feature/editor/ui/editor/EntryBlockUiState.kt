@@ -89,6 +89,7 @@ data class CameraBlockUiState(
     override val timestamp: Instant = Clock.System.now(),
     override val location: Location? = null,
     override val uri: String? = null,
+    val pendingFilePath: String? = null,
     override val caption: String = "",
     val mediaType: CapturedMediaType = CapturedMediaType.PHOTO,
     val durationMs: Long = 0,

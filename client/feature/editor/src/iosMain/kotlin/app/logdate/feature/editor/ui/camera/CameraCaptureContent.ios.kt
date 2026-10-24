@@ -75,6 +75,8 @@ import logdate.client.ui.generated.resources.Res as UiRes
 actual fun CameraCaptureContent(
     onMediaCaptured: (uri: String, mediaType: CapturedMediaType, durationMs: Long) -> Unit,
     onClose: () -> Unit,
+    pendingFilePath: String?,
+    onPrepareCaptureTarget: suspend (String, CapturedMediaType) -> Boolean,
     modifier: Modifier,
     remoteControl: CameraRemoteControl,
     initialCaptureMode: CaptureMode,
