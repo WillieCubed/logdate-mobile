@@ -45,6 +45,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
@@ -178,13 +179,32 @@ class NativeBackgroundCredentialCallbackTest {
                 "API 36.1+ must provide FullRestoreDataInput for native full restore",
             )
 
-        val content = "modern Android full restore callback".encodeToByteArray()
-        val source = File(folder, "modern-restore-source").apply { writeBytes(content) }
-        val destination = context.getDatabasePath("logdate")
+        for (flags in listOf(0, 1, 2, 3)) verifyFreshModernDelivery(inputType, flags)
+    }
+
+    private fun verifyFreshModernDelivery(
+        inputType: Class<*>,
+        flags: Int,
+    ) {
+        val freshRoot = File(folder, "modern-restore-$flags").apply { check(mkdirs()) }
+        val fresh =
+            object : ContextWrapper(context) {
+                override fun getApplicationContext(): Context = this
+
+                override fun getFilesDir() = File(freshRoot, "files").apply { mkdirs() }
+
+                override fun getNoBackupFilesDir() = File(freshRoot, "private").apply { mkdirs() }
+
+                override fun getCacheDir() = File(freshRoot, "cache").apply { mkdirs() }
+
+                override fun getDatabasePath(name: String) = File(freshRoot, "databases/$name")
+            }
+        val content = "modern Android full restore callback flags=$flags".encodeToByteArray()
+        val source = File(folder, "modern-restore-source-$flags").apply { writeBytes(content) }
+        val destination = fresh.getDatabasePath("logdate")
         destination.parentFile?.mkdirs()
         val descriptor = ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY)
-        val input = nativeModernRestoreInput(inputType, descriptor, destination, content.size.toLong(), 0x1A4L)
-
+        val input = nativeModernRestoreInput(inputType, descriptor, destination, content.size.toLong(), 0x1A4L, flags)
         var accountRecoveryStarted = false
         val agent =
             object : NativeBackupAgent() {
@@ -192,7 +212,7 @@ class NativeBackgroundCredentialCallbackTest {
                     accountRecoveryStarted = true
                 }
             }
-        agent.initialize(context)
+        agent.initialize(fresh)
         try {
             NativeBackupAgent::class.java.getDeclaredMethod("onRestoreFile", inputType).invoke(agent, input)
         } finally {
@@ -201,8 +221,9 @@ class NativeBackgroundCredentialCallbackTest {
         agent.onRestoreFinished()
 
         assertEquals(content.toList(), destination.readBytes().toList())
-        assertEquals(PostRestoreType.CONTENT_RESTORED, PostRestoreDetector(context).detect(true))
+        assertEquals(PostRestoreType.CONTENT_RESTORED, PostRestoreDetector(fresh).detect(true))
         assertTrue(accountRecoveryStarted)
+        agent.onDestroy()
     }
 
     @Test
@@ -390,7 +411,16 @@ class NativeBackgroundCredentialCallbackTest {
             val live =
                 app.logdate.client.datastore
                     .createAndroidMainDataStore(context)
-            live.edit { it[stringPreferencesKey("security_level")] = "NONE" }
+            val cached =
+                app.logdate.client.datastore
+                    .LogdatePreferencesDataSource(live)
+                    .userData
+                    .first()
+            assertEquals(app.logdate.shared.model.user.AppSecurityLevel.NONE, cached.securityLevel)
+            assertFalse(
+                File(context.filesDir, "logdate.preferences_pb").exists(),
+                "Reading defaults must not create an occupied restore destination",
+            )
             val agent = object : NativeBackupAgent() {}.also { it.initialize(context) }
             deliverPreferences(agent, incomingPreferences("BIOMETRIC"))
             agent.onRestoreFinished()
@@ -406,7 +436,6 @@ class NativeBackgroundCredentialCallbackTest {
                     .createAndroidMainDataStore(context)
             val agent = object : NativeBackupAgent() {}.also { it.initialize(context) }
             deliverPreferences(agent, incomingPreferences(null))
-            agent.onRestoreFinished()
             val guard =
                 app.logdate.client.device.restore
                     .NativeRestorePrivacyGuard(context, live)

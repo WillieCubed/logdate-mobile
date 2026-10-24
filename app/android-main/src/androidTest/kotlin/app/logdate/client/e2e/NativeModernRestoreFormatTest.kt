@@ -19,6 +19,7 @@ import app.logdate.client.device.crypto.AccountIdentityBackup
 import app.logdate.client.device.crypto.AndroidIdentityKeyBackupStore
 import app.logdate.client.device.crypto.MediaIdentityBackup
 import app.logdate.client.device.restore.NativeBackupAgent
+import app.logdate.client.device.restore.NativeJournalReplayCustody
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.restore.PostRestoreType
 import kotlinx.coroutines.flow.first
@@ -96,25 +97,30 @@ class NativeModernRestoreFormatTest {
         }
 
     @Test
-    fun explicitNativeTransportFlagsRecoverOnANewAgent() {
+    fun explicitNativeTransportFlagsRetainIncomingWithoutOverwritingWorkingJournal() {
         for (flags in listOf(0, 1, 2, 3)) {
             withFixture {
+                val initialState = PostRestoreDetector(context).detect(true)
+                assertEquals(PostRestoreType.CONTENT_MISSING, initialState)
                 val rejected = agent()
                 rejectModern(rejected, database, 8, "")
                 rejected.onRestoreFinished()
                 rejected.onDestroy()
+                assertEquals(initialState, PostRestoreDetector(context).detect(true))
                 val updated = File(folder, "updated-journal")
                 createJournal(updated, "Accepted native journal")
                 val native = agent()
                 deliverModern(native, database, updated, flags, "")
                 deliverModern(native, preferencesFile, incoming, flags, "")
                 native.onRestoreFinished()
-                verifyRetainedJournal("Accepted native journal")
-                assertEquals(PostRestoreType.CONTENT_RESTORED, PostRestoreDetector(context).detect(true))
-                assertEquals(1, accountRecoveries)
+                verifyRetainedJournal()
+                assertEquals(PostRestoreType.RECOVERY_REQUIRED, PostRestoreDetector(context).detect(true))
+                assertEquals(0, accountRecoveries)
+                verifyCaptured(database, updated)
+                verifyCaptured(preferencesFile, incoming)
                 runBlocking {
                     assertEquals("BIOMETRIC", createAndroidMainDataStore(context).data.first()[stringPreferencesKey("security_level")])
-                    assertEquals(null, createAndroidMainDataStore(context).data.first()[stringPreferencesKey("device.id")])
+                    assertEquals("destination-device", createAndroidMainDataStore(context).data.first()[stringPreferencesKey("device.id")])
                 }
             }
         }
@@ -135,7 +141,8 @@ class NativeModernRestoreFormatTest {
                 deliverModern(native, preferencesFile, incoming, 2, "")
                 native.onRestoreFinished()
                 verifyRetainedJournal()
-                assertEquals(1, accountRecoveries)
+                verifyCaptured(preferencesFile, incoming)
+                assertEquals(0, accountRecoveries)
             }
         }
         withFixture {
@@ -178,7 +185,8 @@ class NativeModernRestoreFormatTest {
             native.onRestoreFinished()
             assertEquals(installationId, installation.readText())
             verifyRetainedJournal()
-            assertEquals(2, accountRecoveries)
+            verifyCaptured(preferencesFile, incoming)
+            assertEquals(1, accountRecoveries)
         }
     }
 
@@ -364,6 +372,23 @@ class NativeModernRestoreFormatTest {
                     it.execSQL("CREATE TABLE retained_entries (content TEXT NOT NULL)")
                     it.execSQL("INSERT INTO retained_entries VALUES (?)", arrayOf(content))
                 }
+        }
+
+        fun verifyCaptured(
+            destination: File,
+            source: File,
+        ) {
+            val path =
+                if (destination ==
+                    database
+                ) {
+                    "database/logdate"
+                } else {
+                    "files/" + destination.relativeTo(context.filesDir).invariantSeparatorsPath
+                }
+            val retained = NativeJournalReplayCustody(context).sealedPayloads().single { it.path == path }
+            assertTrue(retained.complete)
+            assertEquals(source.readBytes().toList(), retained.file.readBytes().toList())
         }
 
         fun verifyRetainedJournal(expected: String = "Retained encrypted journal") {

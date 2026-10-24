@@ -105,6 +105,7 @@ class ArchiveMediaRecoveryE2ETest {
                 mode in
                     setOf(
                         "seed",
+                        "source-before-backup",
                         "repair",
                         "automatic",
                         "waiting",
@@ -122,6 +123,21 @@ class ArchiveMediaRecoveryE2ETest {
             when (mode) {
                 "seed" -> {
                     seed(recoverableSource = arguments.getString("archiveCancellationAcceptance") == "true")
+                }
+
+                "source-before-backup" -> {
+                    val state = JSONObject(fixture.readText())
+                    val manager = WorkManager.getInstance(context)
+                    kotlinx.coroutines.withTimeout(30_000) {
+                        while (manager
+                                .getWorkInfosForUniqueWork("archive_media_recovery_${state.getString("recoveryId")}")
+                                .get()
+                                .any { !it.state.isFinished }
+                        ) {
+                            kotlinx.coroutines.delay(100)
+                        }
+                    }
+                    verifyRetainedWaitingState()
                 }
 
                 "repair" -> {

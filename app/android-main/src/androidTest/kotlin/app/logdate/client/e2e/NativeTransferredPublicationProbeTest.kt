@@ -146,7 +146,7 @@ class NativeTransferredPublicationProbeTest : CloudArchiveWorkerFixture() {
         assertNull(koin.get<SecureStorage>().getString(sentinel), "The source vault must not transfer")
         val oldPeer = PeerDeliveryContext(source.getString("link"), source.getString("device"), peer, LinkMode.PAIR)
         val manifests = koin.get<WindowManifestStore>()
-        assertEquals(3L, manifests.revision(oldPeer), "The native payload must deliver the old scoped counter")
+        assertEquals(0L, manifests.revision(oldPeer), "A replacement installation must not inherit source publication counters")
         val links = koin.get<PhoneWatchLinkStore>()
         val keys = koin.get<PairKeyVault>()
         if (replay || receipt.exists()) {
@@ -187,7 +187,7 @@ class NativeTransferredPublicationProbeTest : CloudArchiveWorkerFixture() {
         val completed = JSONObject(receipt.readText()).put("published", true)
         writeReceipt(completed)
         assertNull(koin.get<SessionStorage>().getSession(), "The capture transport must not install authentication")
-        assertEquals(3L, manifests.revision(oldPeer))
+        assertEquals(0L, manifests.revision(oldPeer))
     }
 
     private suspend fun verifyOutgoingArchive(current: JSONObject) {
