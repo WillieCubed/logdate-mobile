@@ -173,7 +173,7 @@ class ExportUserDataUseCase(
                 val exportNotes =
                     notes.map { note ->
                         when (note) {
-                            is JournalNote.Text ->
+                            is JournalNote.Text -> {
                                 ExportNote(
                                     id = note.uid.toString(),
                                     type = "text",
@@ -185,7 +185,9 @@ class ExportUserDataUseCase(
                                     capturedOn = note.capturedOn?.wireName,
                                     capturedDuring = note.capturedDuring?.wireName,
                                 )
-                            is JournalNote.Image ->
+                            }
+
+                            is JournalNote.Image -> {
                                 ExportNote(
                                     id = note.uid.toString(),
                                     type = "image",
@@ -199,7 +201,9 @@ class ExportUserDataUseCase(
                                     capturedOn = note.capturedOn?.wireName,
                                     capturedDuring = note.capturedDuring?.wireName,
                                 )
-                            is JournalNote.Audio ->
+                            }
+
+                            is JournalNote.Audio -> {
                                 ExportNote(
                                     id = note.uid.toString(),
                                     type = "audio",
@@ -214,7 +218,9 @@ class ExportUserDataUseCase(
                                     capturedOn = note.capturedOn?.wireName,
                                     capturedDuring = note.capturedDuring?.wireName,
                                 )
-                            is JournalNote.Video ->
+                            }
+
+                            is JournalNote.Video -> {
                                 ExportNote(
                                     id = note.uid.toString(),
                                     type = "video",
@@ -227,6 +233,7 @@ class ExportUserDataUseCase(
                                     capturedOn = note.capturedOn?.wireName,
                                     capturedDuring = note.capturedDuring?.wireName,
                                 )
+                            }
                         }
                     }
 
@@ -633,7 +640,7 @@ data class ExportMediaFile(
 
 private fun Place.toExportPlaceOrNull(): ExportPlace? =
     when (this) {
-        is Place.UserDefined ->
+        is Place.UserDefined -> {
             ExportPlace(
                 id = id.toString(),
                 displayName = displayName,
@@ -642,6 +649,7 @@ private fun Place.toExportPlaceOrNull(): ExportPlace? =
                 radiusMeters = radiusMeters,
                 description = description,
             )
+        }
     }
 
 private fun LocationHistoryItem.toExportLocationHistoryItem(): ExportLocationHistoryItem =
@@ -701,38 +709,69 @@ private fun MutableList<ExportIssue>.record(
 
 private fun ExportIssue.describe(): String =
     when (code) {
-        ExportIssueCode.JOURNALS_UNAVAILABLE ->
+        ExportIssueCode.JOURNALS_UNAVAILABLE -> {
             "Journals could not be loaded. The export used an empty journals section."
-        ExportIssueCode.NOTES_UNAVAILABLE ->
+        }
+
+        ExportIssueCode.NOTES_UNAVAILABLE -> {
             "Notes could not be loaded. The export used an empty notes section."
-        ExportIssueCode.DRAFTS_UNAVAILABLE ->
+        }
+
+        ExportIssueCode.DRAFTS_UNAVAILABLE -> {
             "Drafts could not be loaded. The export used an empty drafts section."
-        ExportIssueCode.APP_INFO_UNAVAILABLE ->
+        }
+
+        ExportIssueCode.APP_INFO_UNAVAILABLE -> {
             "App version metadata could not be read. Default export metadata was written instead."
-        ExportIssueCode.DEVICE_ID_UNAVAILABLE ->
+        }
+
+        ExportIssueCode.DEVICE_ID_UNAVAILABLE -> {
             "Device ID metadata could not be read. A fallback device identifier was written instead."
-        ExportIssueCode.USER_ID_UNAVAILABLE ->
+        }
+
+        ExportIssueCode.USER_ID_UNAVAILABLE -> {
             "User identity metadata could not be read. A fallback user identifier was written instead."
-        ExportIssueCode.PROFILE_UNAVAILABLE ->
+        }
+
+        ExportIssueCode.PROFILE_UNAVAILABLE -> {
             "Profile data could not be loaded. The export omitted the profile section."
-        ExportIssueCode.PLACES_UNAVAILABLE ->
+        }
+
+        ExportIssueCode.PLACES_UNAVAILABLE -> {
             "Places could not be loaded. The export omitted the places section."
-        ExportIssueCode.LOCATION_HISTORY_UNAVAILABLE ->
+        }
+
+        ExportIssueCode.LOCATION_HISTORY_UNAVAILABLE -> {
             "Location history could not be loaded. The export omitted the location history section."
-        ExportIssueCode.ASSOCIATIONS_UNAVAILABLE ->
+        }
+
+        ExportIssueCode.ASSOCIATIONS_UNAVAILABLE -> {
             "Journal associations could not be loaded. The export wrote an empty journal_notes section."
-        ExportIssueCode.MEDIA_MANIFEST_UNAVAILABLE ->
+        }
+
+        ExportIssueCode.MEDIA_MANIFEST_UNAVAILABLE -> {
             "Media manifest preparation failed. Media entries may be incomplete."
-        ExportIssueCode.MEDIA_RECOVERED_NORMALIZED_PATH ->
+        }
+
+        ExportIssueCode.MEDIA_RECOVERED_NORMALIZED_PATH -> {
             "Recovered media by normalizing a stale file path${sourceSuffix(source)}"
-        ExportIssueCode.MEDIA_RECOVERED_APP_PRIVATE_AUDIO ->
+        }
+
+        ExportIssueCode.MEDIA_RECOVERED_APP_PRIVATE_AUDIO -> {
             "Recovered audio from app-private recording storage${sourceSuffix(source)}"
-        ExportIssueCode.MEDIA_RECOVERED_APP_PRIVATE_MEDIA ->
+        }
+
+        ExportIssueCode.MEDIA_RECOVERED_APP_PRIVATE_MEDIA -> {
             "Recovered media from app-private storage${sourceSuffix(source)}"
-        ExportIssueCode.MEDIA_RECOVERED_MEDIA_STORE ->
+        }
+
+        ExportIssueCode.MEDIA_RECOVERED_MEDIA_STORE -> {
             "Recovered media from MediaStore${sourceSuffix(source)}"
-        ExportIssueCode.MEDIA_BYTES_MISSING ->
+        }
+
+        ExportIssueCode.MEDIA_BYTES_MISSING -> {
             "Media bytes could not be exported${sourceSuffix(source)}"
+        }
     }
 
 private fun sourceSuffix(source: String?): String =

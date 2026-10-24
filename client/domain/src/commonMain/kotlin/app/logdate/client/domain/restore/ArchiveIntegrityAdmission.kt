@@ -53,14 +53,21 @@ internal object ArchiveIntegrityAdmission {
         }
         for ((role, bytes) in contents) {
             when (role) {
-                ArchiveRole.README, ArchiveRole.CHECKSUMS, ArchiveRole.READABLE_INDEX -> Unit
-                ArchiveRole.LOCATION_HISTORY ->
+                ArchiveRole.README, ArchiveRole.CHECKSUMS, ArchiveRole.READABLE_INDEX -> {
+                    Unit
+                }
+
+                ArchiveRole.LOCATION_HISTORY -> {
                     bytes
                         .archiveText()
                         .lineSequence()
                         .filter { it.isNotBlank() }
                         .forEach { ArchiveJsonKeyValidation.requireUnique(it) }
-                else -> ArchiveJsonKeyValidation.requireUnique(bytes.archiveText())
+                }
+
+                else -> {
+                    ArchiveJsonKeyValidation.requireUnique(bytes.archiveText())
+                }
             }
         }
         val inventory =
