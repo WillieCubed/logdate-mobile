@@ -189,6 +189,10 @@ class NativeBackupTransferProbeTest {
                     )
                     assertNull(sessions.getSession(), "Native backup unexpectedly created a source account session")
                 }
+                val sourceFixture = NativeJournalFixture(koin.get(), koin.get(), koin.get(), koin.get(), koin.get())
+                sourceFixture.verifyFixture()
+                verifyRecordingTransferFixture(context, inPlace = true)
+                sourceFixture.verifyUnfinishedCameraCapture(context, inPlace = true)
                 return@runBlocking
             }
             if (mode == "missing-keys") {
