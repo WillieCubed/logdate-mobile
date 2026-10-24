@@ -139,11 +139,12 @@ internal fun verifyRecordingTransferFixture(
             inFlight.readBytes(),
             "In-place restore must retain excluded source data",
         )
-        assertContentEquals(
-            "unfinished remux".encodeToByteArray(),
-            remux.readBytes(),
-            "In-place restore must retain the unfinished remux",
+        assertEquals(
+            "v1:${inFlight.length()}",
+            File(inFlight.parentFile, "${inFlight.name}.ready").readText(),
+            "The raw recording lost its completion marker",
         )
+        assertFalse(remux.exists(), "Startup recovery must clear the interrupted remux output")
     } else {
         assertFalse(inFlight.exists(), "An interrupted raw recording must not transfer as committed audio")
         assertFalse(remux.exists(), "An unfinished remux temporary must not transfer")
