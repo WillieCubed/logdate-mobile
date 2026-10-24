@@ -56,9 +56,15 @@ internal object NativeArchive3SourceCensus {
             }
         }
         val unsupported = unsupportedPopulatedTables(rows).toMutableSet()
+        unsupported += deletedSourceRows(database)
         if ("journal_notes" in unsupported && legacyJournalLinksCovered(database)) unsupported.remove("journal_notes")
         return unsupported
     }
+
+    fun deletedSourceRows(database: SupportSQLiteDatabase): Set<String> =
+        setOf("text_notes", "image_notes", "audio_notes", "video_notes", "journal_content_links").filterTo(mutableSetOf()) { table ->
+            database.query("SELECT 1 FROM $table WHERE deletedAt IS NOT NULL LIMIT 1").use { it.moveToFirst() }
+        }
 
     fun reviewedRoomIdentity(identity: String?): Boolean = identity == REVIEWED_ROOM_IDENTITY
 

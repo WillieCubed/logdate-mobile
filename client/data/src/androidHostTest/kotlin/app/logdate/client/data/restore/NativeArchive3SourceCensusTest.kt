@@ -93,6 +93,44 @@ class NativeArchive3SourceCensusTest {
     }
 
     @Test
+    fun `deleted notes and journal links cannot be exported as active records`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val helper =
+            FrameworkSQLiteOpenHelperFactory().create(
+                SupportSQLiteOpenHelper.Configuration
+                    .builder(context)
+                    .name("native-archive3-deleted-source-${System.nanoTime()}.db")
+                    .callback(
+                        object : SupportSQLiteOpenHelper.Callback(1) {
+                            override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                                for (table in listOf("text_notes", "image_notes", "audio_notes", "video_notes", "journal_content_links")) {
+                                    db.execSQL("CREATE TABLE $table (deletedAt INTEGER)")
+                                }
+                            }
+
+                            override fun onUpgrade(
+                                db: androidx.sqlite.db.SupportSQLiteDatabase,
+                                oldVersion: Int,
+                                newVersion: Int,
+                            ) = Unit
+                        },
+                    ).build(),
+            )
+        try {
+            val database = helper.writableDatabase
+            database.execSQL("INSERT INTO text_notes VALUES (NULL)")
+            database.execSQL("INSERT INTO image_notes VALUES (123)")
+            database.execSQL("INSERT INTO journal_content_links VALUES (456)")
+            assertEquals(
+                setOf("image_notes", "journal_content_links"),
+                NativeArchive3SourceCensus.deletedSourceRows(database),
+            )
+        } finally {
+            helper.close()
+        }
+    }
+
+    @Test
     fun `unreviewed source schema cannot claim a complete archive`() {
         assertEquals(true, NativeArchive3SourceCensus.reviewedRoomIdentity("d8b23ded9a1a82c49e39b8df9ef25e35"))
         assertEquals(false, NativeArchive3SourceCensus.reviewedRoomIdentity("a future schema"))
