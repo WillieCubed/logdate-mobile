@@ -15,6 +15,7 @@ import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.media.storage.MediaReclamationJournal
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.media.storage.UnavailableMediaReferences
 import app.logdate.client.repository.journals.EntryDraft
@@ -732,6 +733,32 @@ class OfflineFirstJournalNotesRepositoryTest {
         )
 
     @Test
+    fun `media candidate is durable before a note is deleted`() =
+        runTest {
+            val recorded = mutableListOf<String>()
+            val journal = MediaReclamationJournal { reference -> recorded += reference }
+            val local = createRepository(mediaReclamation = journal)
+            val note = createTestImageNote().copy(mediaRef = "file:///data/user/0/studio.hypertext.logdate/files/media/owned.jpg")
+            imageNoteDao.addNote(note.toEntity())
+
+            local.remove(note)
+
+            assertEquals(listOf(note.mediaRef), recorded)
+        }
+
+    @Test
+    fun `failed media candidate write prevents note deletion`() =
+        runTest {
+            val local = createRepository(mediaReclamation = MediaReclamationJournal { error("Candidate storage failed") })
+            val note = createTestImageNote().copy(mediaRef = "file:///data/user/0/studio.hypertext.logdate/files/media/owned.jpg")
+            imageNoteDao.addNote(note.toEntity())
+
+            assertFailsWith<IllegalStateException> { local.remove(note) }
+
+            assertEquals(note, local.getNoteById(note.uid))
+        }
+
+    @Test
     fun `removing a note removes the media it was the last to reference`() =
         runTest {
             val repository = createRepository()
@@ -927,6 +954,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         imageNoteDao: ImageNoteDao = this.imageNoteDao,
         transactionManager: SyncTransactionManager = PassthroughTransactionManager,
         mediaReferences: StoredMediaReferences = StoredMediaReferences.Unchanged,
+        mediaReclamation: MediaReclamationJournal = MediaReclamationJournal.None,
     ) = OfflineFirstJournalNotesRepository(
         textNoteDao = textNoteDao,
         imageNoteDao = imageNoteDao,
@@ -944,6 +972,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         draftSnapshots = { draftSnapshots },
         journalCoverUris = { coverUris },
         mediaReferences = mediaReferences,
+        mediaReclamation = mediaReclamation,
     )
 
     private class FakeNotePlaceResolver(

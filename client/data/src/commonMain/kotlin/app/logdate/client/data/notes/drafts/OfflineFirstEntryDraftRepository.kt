@@ -1,11 +1,14 @@
 package app.logdate.client.data.notes.drafts
 
+import app.logdate.client.media.storage.MediaReclamationJournal
+import app.logdate.client.media.storage.MediaReference
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRecoveryRepository
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.PendingMediaRecord
+import app.logdate.client.repository.journals.mediaRefOrNull
 import app.logdate.shared.model.location.VisitMemoryContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -33,6 +36,7 @@ class OfflineFirstEntryDraftRepository(
     private val draftStore: LocalEntryDraftStore,
     coroutineScope: CoroutineScope,
     private val journalRepository: JournalRepository? = null,
+    private val mediaReclamation: MediaReclamationJournal = MediaReclamationJournal.None,
 ) : EntryDraftRepository,
     EntryDraftRecoveryRepository {
     override suspend fun checkpointRecording(
@@ -78,6 +82,7 @@ class OfflineFirstEntryDraftRepository(
     }
 
     private suspend fun saveRecordingDraft(draft: EntryDraft): Uuid {
+        draftsFlow.value[draft.id]?.let { recordReclamationCandidates(it) }
         draftStore.saveDraft(draft)
         draftsFlow.value = draftsFlow.value + (draft.id to draft)
         return draft.id
@@ -110,6 +115,7 @@ class OfflineFirstEntryDraftRepository(
         return mutationMutex.withLock {
             if (!canCommit() || draftsFlow.value[expected.id] != expected) return@withLock false
             val recoveryStore = draftStore as? RecoveryEntryDraftStore ?: error("Draft store cannot commit guarded recovery")
+            recordReclamationCandidates(expected)
             try {
                 val applied = scopeFence { recoveryStore.compareAndSetForRecovery(expected, replacement, canCommit) }
                 if (applied) {
@@ -188,6 +194,7 @@ class OfflineFirstEntryDraftRepository(
                     updatedAt = Clock.System.now(),
                     selectedJournalIds = resolveSelection(draft.selectedJournalIds),
                 )
+            existing?.let { recordReclamationCandidates(it) }
             draftStore.saveDraft(saved)
             draftsFlow.value = draftsFlow.value + (saved.id to saved)
             saved.id
@@ -240,6 +247,7 @@ class OfflineFirstEntryDraftRepository(
                 )
 
             // The store is authoritative: expose the draft only after its complete snapshot is durable.
+            existing?.let { recordReclamationCandidates(it) }
             draftStore.saveDraft(draft)
             draftsFlow.value = draftsFlow.value + (uid to draft)
             uid
@@ -324,12 +332,20 @@ class OfflineFirstEntryDraftRepository(
 
     override suspend fun deleteDraft(uid: Uuid) =
         mutationMutex.withLock {
+            if (mediaReclamation !== MediaReclamationJournal.None) {
+                findDraft(uid)?.let { recordReclamationCandidates(it) }
+            }
             draftStore.deleteDraft(uid)
             draftsFlow.value = draftsFlow.value - uid
         }
 
     override suspend fun deleteAllDrafts() =
         mutationMutex.withLock {
+            if (mediaReclamation !== MediaReclamationJournal.None) {
+                (draftStore.getAllDrafts() + draftsFlow.value.values)
+                    .distinctBy(EntryDraft::id)
+                    .forEach { recordReclamationCandidates(it) }
+            }
             draftStore.clearAllDrafts()
             draftsFlow.value = emptyMap()
         }
@@ -347,7 +363,10 @@ class OfflineFirstEntryDraftRepository(
                     .filter { now - it.updatedAt > maxAge }
                     .map { it.id }
 
-            expiredIds.forEach { id -> draftStore.deleteDraft(id) }
+            expiredIds.forEach { id ->
+                knownDrafts.first { it.id == id }.let { recordReclamationCandidates(it) }
+                draftStore.deleteDraft(id)
+            }
             draftsFlow.value = draftsFlow.value - expiredIds.toSet()
             expiredIds.size
         }
@@ -384,8 +403,28 @@ class OfflineFirstEntryDraftRepository(
                     markId = markId,
                 ),
             )
+        recordReclamationCandidates(existingDraft)
         draftStore.saveDraft(updatedDraft)
         draftsFlow.value = draftsFlow.value + (existingDraft.id to updatedDraft)
         return existingDraft.id
+    }
+
+    private suspend fun recordReclamationCandidates(draft: EntryDraft) {
+        if (mediaReclamation === MediaReclamationJournal.None) return
+        val references =
+            buildSet {
+                draft.notes.mapNotNullTo(this, JournalNote::mediaRefOrNull)
+                draft.editBase
+                    ?.original
+                    ?.mediaRefOrNull()
+                    ?.let(::add)
+                draft.pendingMedia.forEach { pending ->
+                    pending.filePath?.let(::add)
+                    pending.fallbackFilePath?.let(::add)
+                }
+            }
+        references.forEach { reference ->
+            if (MediaReference.parse(reference) !is MediaReference.External) mediaReclamation.recordCandidate(reference)
+        }
     }
 }
