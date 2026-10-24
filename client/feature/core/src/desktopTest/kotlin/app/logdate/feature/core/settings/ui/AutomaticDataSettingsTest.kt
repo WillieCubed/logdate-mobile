@@ -67,7 +67,6 @@ class AutomaticDataSettingsTest {
                         onCancelExport = {},
                         onRetryExport = {},
                         onDismissExport = {},
-                        onBrowseExport = {},
                         restoreState = RestoreState.Idle,
                         onShowRestoreSheet = { imports++ },
                         onSelectRestoreFile = {},

@@ -78,6 +78,7 @@ internal class ArchiveRecoveryLauncher(
         commit: (() -> Unit) -> Unit,
         complete: (RestoreOutcome) -> Unit,
     ) {
+        val operationContext = currentCoroutineContext()
         val scope = currentArchiveRecoveryScope(koin)
         val manager = WorkManager.getInstance(context)
         val active =
@@ -88,23 +89,23 @@ internal class ArchiveRecoveryLauncher(
                     it.id != completedWorkId && it.state in setOf(WorkInfo.State.ENQUEUED, WorkInfo.State.RUNNING, WorkInfo.State.BLOCKED)
                 }
         if (currentArchiveRecoveryScope(koin) != scope) return
-        currentCoroutineContext().ensureActive()
         if (active != null) {
-            begin(active.id)
+            commitArchiveResumeRequest(operationContext, commit) { begin(active.id) }
             return
         }
         val store = context.archiveRecoveryStore()
         val record = store.pending(scope).lastOrNull() ?: return
         if (currentArchiveRecoveryScope(koin) != scope) return
-        currentCoroutineContext().ensureActive()
-        if (!record.pausedByUser) ArchiveRecoveryScheduler.enqueue(context, record)
-        complete(
-            RestoreOutcome.Success(
-                record.recoverySummary(
-                    record.pausedByUser && record.canResumeFromRetainedSource(scope, store.source(record.id).isFile),
+        commitArchiveResumeRequest(operationContext, commit) {
+            if (!record.pausedByUser) ArchiveRecoveryScheduler.enqueue(context, record)
+            complete(
+                RestoreOutcome.Success(
+                    record.recoverySummary(
+                        record.pausedByUser && record.canResumeFromRetainedSource(scope, store.source(record.id).isFile),
+                    ),
                 ),
-            ),
-        )
+            )
+        }
     }
 }
 

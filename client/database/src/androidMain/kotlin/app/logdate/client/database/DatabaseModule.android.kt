@@ -5,6 +5,9 @@ import app.logdate.client.database.encryption.PassphraseBackupStore
 import app.logdate.client.device.restore.NativeRestoreDeliveryGate
 import app.logdate.client.device.restore.NativeRestorePrivacyGuard
 import app.logdate.client.device.restore.PostRestoreDetector
+import app.logdate.client.device.restore.retainedJournalPassphraseFile
+import app.logdate.client.device.restore.retainedJournalWorkingKeyName
+import app.logdate.client.device.restore.retainedJournalWorkspace
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
@@ -14,9 +17,9 @@ import org.koin.dsl.module
 
 actual val databaseModule: Module =
     module {
-        single { PassphraseBackupStore(androidContext()) }
+        single { PassphraseBackupStore(androidContext()) { retainedJournalPassphraseFile(androidContext()) } }
         single {
-            DatabasePassphraseProvider(get(), get()) {
+            DatabasePassphraseProvider(get(), get(), storageKey = { retainedJournalWorkingKeyName(androidContext()) }) {
                 retainedDatabaseNeedsExistingKey(androidContext().getDatabasePath(DATABASE_NAME))
             }
         }
@@ -34,6 +37,10 @@ actual val databaseModule: Module =
                         deliveryGate = get<NativeRestoreDeliveryGate>(),
                         restoreInProgress = { !PostRestoreDetector(context).isNativeRestoreDeliveryComplete() },
                     ) {
+                        val workspace = retainedJournalWorkspace(context).resume()
+                        if (workspace != null && !context.getDatabasePath(DATABASE_NAME).exists()) {
+                            PostRestoreDetector(context).recordRetainedJournalRecovery(workspace.id)
+                        }
                         val passphraseProvider = get<DatabasePassphraseProvider>()
                         val candidates = runBlocking { passphraseProvider.getPassphraseCandidates() }
                         migratePlaintextDatabaseIfNeeded(context, candidates.first())
@@ -67,6 +74,7 @@ actual val databaseModule: Module =
                                 get<NativeRestorePrivacyGuard>().verifyBeforeContent {
                                     opened.database.integrityDao().hasRetainedJournalContent()
                                 }
+                                retainedJournalWorkspace(context).recordWorkingJournalOpened()
                             }
                         } catch (error: Exception) {
                             opened.database.close()

@@ -78,6 +78,22 @@ interface DraftRepository {
         return true
     }
 
+    /** Automatic retained restores may not reverse a user's settled local deletion. */
+    suspend fun compareAndSetDraftForRetainedRestore(
+        sourceId: Uuid,
+        targetId: Uuid,
+        expected: EditorDraft?,
+        replacement: EditorDraft?,
+        recoveryScope: DraftRecoveryScope? = null,
+        recoveryId: String? = null,
+    ): Boolean = false
+
+    suspend fun hasLocalDeletionForRetainedRestore(
+        sourceId: Uuid,
+        targetId: Uuid,
+        recoveryScope: DraftRecoveryScope?,
+    ): Boolean = false
+
     /**
      * Delete a draft
      */

@@ -11,6 +11,11 @@ import kotlinx.coroutines.flow.first
 class NativeAccountBackupAgent : NativeBackupAgent() {
     override val retainedPreferenceNames: Set<String> = setOf("logdate_widget_instances")
 
+    override fun scheduleRetainedJournalReconciliation() {
+        app.logdate.client.data.restore
+            .scheduleRetainedJournalReconciliation(this)
+    }
+
     override suspend fun retainAccountRecoveryBeforeCompletion(
         preferences: DataStore<Preferences>,
         deliveryId: String,

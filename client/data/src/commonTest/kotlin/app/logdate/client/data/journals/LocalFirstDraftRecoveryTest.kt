@@ -26,6 +26,129 @@ import kotlin.uuid.Uuid
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class LocalFirstDraftRecoveryTest {
     @Test
+    fun `settled local draft deletion blocks retained restore until explicit save`() =
+        runTest {
+            val storage = DataStoreKeyValueStorage(RecoveryPreferences())
+            val scope = DraftStorageScope("owner", "https://example.test")
+            val repository = LocalFirstDraftRepository(storage, Json, currentScope = { scope })
+            val draft = EditorDraft()
+            repository.saveDraft(draft)
+            repository.deleteDraft(draft.id)
+            assertTrue(
+                repository.hasLocalDeletionForRetainedRestore(
+                    draft.id,
+                    draft.id,
+                    repository.getDraftRecoveryScope(),
+                ),
+            )
+
+            assertFalse(
+                repository.compareAndSetDraftForRetainedRestore(
+                    draft.id,
+                    draft.id,
+                    null,
+                    draft,
+                    repository.getDraftRecoveryScope(),
+                    "later-generation",
+                ),
+            )
+            assertEquals(null, repository.getDraftForRestore(draft.id))
+            val variant = draft.copy(id = Uuid.random())
+            assertFalse(
+                repository.compareAndSetDraftForRetainedRestore(
+                    draft.id,
+                    variant.id,
+                    null,
+                    variant,
+                    repository.getDraftRecoveryScope(),
+                    "later-generation",
+                ),
+                "A conflict variant must remain tied to the deleted source ID",
+            )
+            assertEquals(null, repository.getDraftForRestore(variant.id))
+
+            repository.saveDraft(draft)
+            val explicitlySaved = repository.getDraftForRestore(draft.id)
+            assertTrue(explicitlySaved != null)
+            assertFalse(
+                repository.hasLocalDeletionForRetainedRestore(
+                    draft.id,
+                    draft.id,
+                    repository.getDraftRecoveryScope(),
+                ),
+            )
+            assertTrue(
+                repository.compareAndSetDraftForRetainedRestore(
+                    draft.id,
+                    draft.id,
+                    explicitlySaved,
+                    explicitlySaved,
+                    repository.getDraftRecoveryScope(),
+                    "explicit-save-generation",
+                ),
+            )
+        }
+
+    @Test
+    fun `clear all drafts retains deletion decisions across repository restart`() =
+        runTest {
+            val storage = DataStoreKeyValueStorage(RecoveryPreferences())
+            val scope = DraftStorageScope("owner", "https://example.test")
+            val repository = LocalFirstDraftRepository(storage, Json, currentScope = { scope })
+            val first = EditorDraft()
+            val second = EditorDraft()
+            repository.saveDraft(first)
+            repository.saveDraft(second)
+            repository.clearAllDrafts()
+
+            val restarted = LocalFirstDraftRepository(storage, Json, currentScope = { scope })
+            assertFalse(
+                restarted.compareAndSetDraftForRetainedRestore(
+                    first.id,
+                    first.id,
+                    null,
+                    first,
+                    restarted.getDraftRecoveryScope(),
+                    "later-generation",
+                ),
+            )
+            assertFalse(
+                restarted.compareAndSetDraftForRetainedRestore(
+                    second.id,
+                    second.id,
+                    null,
+                    second,
+                    restarted.getDraftRecoveryScope(),
+                    "later-generation",
+                ),
+            )
+            assertTrue(restarted.getAllDrafts().isEmpty())
+        }
+
+    @Test
+    fun `authoritative sync re-create clears a settled draft deletion`() =
+        runTest {
+            val repository = LocalFirstDraftRepository(DataStoreKeyValueStorage(RecoveryPreferences()), Json)
+            val draft = EditorDraft()
+            repository.deleteDraft(draft.id)
+            assertTrue(repository.hasLocalDeletionForRetainedRestore(draft.id, draft.id, null))
+
+            repository.saveDraftFromSync(draft)
+
+            assertFalse(repository.hasLocalDeletionForRetainedRestore(draft.id, draft.id, null))
+            assertTrue(
+                repository.compareAndSetDraftForRetainedRestore(
+                    draft.id,
+                    draft.id,
+                    draft,
+                    draft,
+                    null,
+                    "later-generation",
+                ),
+            )
+        }
+
+    @Test
     fun `a skipped pending draft deletion remains skipped after settling`() =
         runTest {
             val drafts = LocalFirstDraftRepository(DataStoreKeyValueStorage(RecoveryPreferences()), Json)

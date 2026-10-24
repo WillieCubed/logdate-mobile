@@ -120,7 +120,7 @@ def instrument_failure_cleanup(serial, log, failure, failure_diagnostics):
             failure.add_note("Instrument force-stop cleanup failed: " + type(error).__name__)
 
 
-def instrument(serial, selector, log, extras=(), release_network=None, status_actions=None, timeout=120, failure_diagnostics=None):
+def instrument(serial, selector, log, extras=(), release_network=None, status_actions=None, timeout=120, failure_diagnostics=None, expected_tests=1):
     safe_target(serial)
     command = shlex.join(["am", "instrument", "-w", "-r", "-e", "class", selector, *extras, RUNNER])
     process = subprocess.Popen(managed_adb_command(serial, ["shell", command]), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -144,7 +144,7 @@ def instrument(serial, selector, log, extras=(), release_network=None, status_ac
                 release_network()
                 released = True
         code = process.wait()
-        if code != 0 or not instrumentation_passed(output) or release_network and not released or pending_actions:
+        if code != 0 or not instrumentation_passed(output, expected_tests) or release_network and not released or pending_actions:
             raise RuntimeError(f"Emulator acceptance failed; see {log}")
     except BaseException as failure:
         primary = failure

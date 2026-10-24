@@ -32,9 +32,12 @@ internal class JournalLocalMutations(
 
     suspend fun create(journal: Journal): Uuid {
         transaction {
+            val scope = currentScope()
             check(resolve(journal.id) == journal.id) { "Journal was merged" }
             journalDao.create(journal.toEntity())
             metadata.enqueuePending(journal.id.toString(), EntityType.JOURNAL, PendingOperation.CREATE)
+            receipts.clearLocalDeletion(scope, LocalDeletionType.JOURNAL, journal.id.toString())
+            check(currentScope() == scope) { "Journal creation account changed" }
         }
         changed()
         return journal.id
@@ -51,9 +54,12 @@ internal class JournalLocalMutations(
 
     suspend fun delete(id: Uuid) {
         transaction {
+            val scope = currentScope()
             if (resolve(id) != id) return@transaction
+            receipts.recordLocalDeletion(scope, LocalDeletionType.JOURNAL, id.toString())
             journalDao.delete(id)
             metadata.enqueuePending(id.toString(), EntityType.JOURNAL, PendingOperation.DELETE)
+            check(currentScope() == scope) { "Journal deletion account changed" }
         }
         changed()
     }
@@ -63,6 +69,8 @@ internal class JournalLocalMutations(
         replacement: Journal,
         scope: JournalMergeScope?,
         recoveryId: String?,
+        retainedSource: Boolean = false,
+        sourceId: Uuid = replacement.id,
     ): Boolean {
         val saved =
             transaction {
@@ -71,6 +79,17 @@ internal class JournalLocalMutations(
                     recoveryId != null &&
                     receipts.contains(scope, "JOURNAL", recoveryId, replacement.id.toString())
                 ) {
+                    return@transaction false
+                }
+                if (retainedSource &&
+                    scope != null &&
+                    (
+                        receipts.containsLocalDeletion(scope, LocalDeletionType.JOURNAL, sourceId.toString()) ||
+                            receipts.containsLocalDeletion(scope, LocalDeletionType.JOURNAL, replacement.id.toString())
+                    )
+                ) {
+                    if (recoveryId != null) receipts.record(scope, "JOURNAL", recoveryId, replacement.id.toString())
+                    check(recoveryScope() == scope) { "Journal recovery account changed" }
                     return@transaction false
                 }
                 if (resolve(replacement.id) != replacement.id ||
@@ -97,6 +116,9 @@ internal class JournalLocalMutations(
                     if (scope != null && recoveryId != null) receipts.record(scope, "JOURNAL", recoveryId, replacement.id.toString())
                     check(recoveryScope() == scope) { "Recovery account changed" }
                     return@transaction false
+                }
+                if (!retainedSource && expected == null && scope != null) {
+                    receipts.clearLocalDeletion(scope, LocalDeletionType.JOURNAL, replacement.id.toString())
                 }
                 if (expected == null) journalDao.create(replacement.toEntity()) else journalDao.update(replacement.toEntity())
                 if (scope != null && recoveryId != null) receipts.record(scope, "JOURNAL", recoveryId, replacement.id.toString())

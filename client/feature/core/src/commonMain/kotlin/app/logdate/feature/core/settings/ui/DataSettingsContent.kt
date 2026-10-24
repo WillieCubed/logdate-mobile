@@ -44,7 +44,6 @@ fun DataSettingsContent(
     onCancelExport: () -> Unit,
     onRetryExport: () -> Unit,
     onDismissExport: () -> Unit,
-    onBrowseExport: (String) -> Unit,
     restoreState: RestoreState,
     isRestoreSheetVisible: Boolean = restoreState !is RestoreState.Idle,
     onShowRestoreSheet: () -> Unit,
@@ -77,7 +76,6 @@ fun DataSettingsContent(
             onCancel = onCancelExport,
             onRetry = onRetryExport,
             onDismiss = onDismissExport,
-            onBrowse = onBrowseExport,
         )
     }
 
@@ -210,7 +208,6 @@ private fun DataSettingsScreenPreview() {
         onCancelExport = {},
         onRetryExport = {},
         onDismissExport = {},
-        onBrowseExport = {},
         restoreState = RestoreState.Idle,
         onShowRestoreSheet = {},
         onSelectRestoreFile = {},

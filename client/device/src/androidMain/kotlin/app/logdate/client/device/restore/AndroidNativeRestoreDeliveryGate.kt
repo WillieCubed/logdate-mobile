@@ -1,5 +1,8 @@
 package app.logdate.client.device.restore
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -9,6 +12,8 @@ import kotlin.concurrent.withLock as withLifecycleLock
 /** Coordinates BackupAgent callbacks with the worker that reconciles restored media identities. */
 internal object AndroidNativeRestoreDeliveryGate : NativeRestoreDeliveryGate {
     private val mutex = Mutex()
+    private val completedDeliveries = MutableStateFlow(0L)
+    val completions: StateFlow<Long> = completedDeliveries.asStateFlow()
     private val lifecycleLock = ReentrantLock()
     private val callbacksIdle = lifecycleLock.newCondition()
     private var restoreOwner: Any? = null
@@ -46,6 +51,7 @@ internal object AndroidNativeRestoreDeliveryGate : NativeRestoreDeliveryGate {
             restoreOwner = null
             completionStarted = false
             runBlocking { mutex.unlock(owner) }
+            completedDeliveries.value = completedDeliveries.value + 1
             callbacksIdle.signalAll()
         }
 
@@ -56,3 +62,6 @@ internal object AndroidNativeRestoreDeliveryGate : NativeRestoreDeliveryGate {
         restoreOwner = owner
     }
 }
+
+/** An ended callback batch is a retry hint; database, key and privacy guards remain authoritative. */
+fun nativeRestoreDeliveryCompletions(): StateFlow<Long> = AndroidNativeRestoreDeliveryGate.completions

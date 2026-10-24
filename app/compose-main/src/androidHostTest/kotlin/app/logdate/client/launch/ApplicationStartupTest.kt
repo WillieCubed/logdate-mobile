@@ -8,6 +8,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -242,6 +243,45 @@ class ApplicationStartupTest {
             runCurrent()
             assertTrue(startup.awaitReady())
             assertEquals(2, attempts)
+        }
+
+    @Test
+    fun `native restore completion during loading retries missing-key startup automatically`() =
+        runTest {
+            val completionCount = MutableStateFlow(0L)
+            val firstAttempt = CompletableDeferred<Unit>()
+            var keyDelivered = false
+            var attempts = 0
+            var reconciliations = 0
+            val startup =
+                ApplicationStartup(backgroundScope) {
+                    attempts++
+                    if (attempts == 1) {
+                        firstAttempt.await()
+                        throw DatabaseKeyRecoveryRequiredException()
+                    }
+                    check(keyDelivered)
+                }
+            val observer =
+                observeNativeRestoreDeliveryCompletions(
+                    backgroundScope,
+                    completionCount,
+                    startup,
+                ) { reconciliations++ }
+
+            startup.start()
+            runCurrent()
+            assertIs<ApplicationStartupState.Loading>(startup.state.value)
+            keyDelivered = true
+            completionCount.value++
+            runCurrent()
+            firstAttempt.complete(Unit)
+            runCurrent()
+
+            assertTrue(startup.awaitReady())
+            assertEquals(2, attempts, "The completion token must survive the original Loading attempt")
+            assertEquals(0, reconciliations, "A successful retry uses normal startup work")
+            observer.cancel()
         }
 
     @Test

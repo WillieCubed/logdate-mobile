@@ -11,6 +11,7 @@
     <string name="database_update_required_action">Update LogDate</string>
     <string name="database_update_link_copied">Update link copied. Open it in a browser to update LogDate.</string>
     <string name="database_key_recovery_title">Finish restoring your journal</string>
-    <string name="database_key_recovery_message">LogDate can’t read the encryption key needed to open your journal. Keep LogDate installed on both devices. On your original device, update LogDate and open your journal, then repeat the Android transfer or restore a complete device backup. After the transfer finishes, tap Try again.</string>
+    <string name="database_key_recovery_message">Recover from LogDate Cloud or an archive. LogDate keeps the encrypted journal protected on this device.</string>
     <string name="native_privacy_metadata_recovery_message">Your journal is here, but its privacy settings weren’t restored. LogDate has kept it protected. Update LogDate on your original device, then repeat the Android transfer or restore a complete device backup. When it finishes, tap Try again.</string>
+    <string name="database_key_recovery_backup_action">Recover from backup</string>
 </resources>

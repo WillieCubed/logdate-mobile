@@ -16,6 +16,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.logdate.client.data.restore.NativeAccountBackupAgent
+import app.logdate.client.database.encryption.DatabaseKeyRecoveryRequiredException
 import app.logdate.client.datastore.DataStoreKeyValueStorage
 import app.logdate.client.datastore.NativeRestorePolicy
 import app.logdate.client.datastore.createAndroidMainDataStore
@@ -24,12 +25,20 @@ import app.logdate.client.device.restore.NativeRestorePrivacyGuard
 import app.logdate.client.device.restore.NativeRestorePrivacyMetadataRequiredException
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.restore.PostRestoreType
+import app.logdate.client.device.restore.nativeRestoreDeliveryCompletions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.runner.RunWith
 import java.io.File
 import kotlin.test.AfterTest
@@ -59,6 +68,8 @@ class NativeBackgroundCredentialCallbackTest {
     private val context =
         // The test APK has no backup include list restricting this isolated fixture to the real database path.
         object : ContextWrapper(InstrumentationRegistry.getInstrumentation().context) {
+            override fun getApplicationContext(): Context = this
+
             override fun getCacheDir(): File = File(folder, "cache").apply { mkdirs() }
 
             override fun getFilesDir(): File = File(folder, "files").apply { mkdirs() }
@@ -78,6 +89,75 @@ class NativeBackgroundCredentialCallbackTest {
         val info = application.packageManager.getApplicationInfo(application.packageName, 0)
         assertEquals(NativeAccountBackupAgent::class.java.name, info.backupAgentName)
     }
+
+    @Test
+    fun `native backup delivery retries failed key startup and opens restored content without user retry`() =
+        runBlocking {
+            val keyFile = File(context.filesDir, "db_recovery/passphrase_backup")
+            val source = File(folder, "late-native-key").apply { writeText("restored-key-material") }
+            val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            val deliveries = nativeRestoreDeliveryCompletions()
+            val baseline = deliveries.value
+            val testDeliveries =
+                deliveries.map { it - baseline }.stateIn(startupScope, SharingStarted.Eagerly, 0L)
+            var openedContent: String? = null
+            val initialize: suspend () -> Unit = {
+                if (!keyFile.isFile) throw DatabaseKeyRecoveryRequiredException()
+                openedContent = keyFile.readText()
+            }
+            // The application implementation belongs to compose-main, a separate Kotlin module.
+            // Reflection exercises its internal coordinator without exposing a production test API.
+            val startupType = Class.forName("app.logdate.client.launch.ApplicationStartup")
+            val startup =
+                startupType.declaredConstructors
+                    .single { it.parameterCount == 3 }
+                    .newInstance(startupScope, null, initialize)
+            val state = startupType.getDeclaredMethod("getState").invoke(startup) as StateFlow<*>
+            val reconcile: suspend () -> Unit = {}
+            val observer =
+                Class
+                    .forName("app.logdate.client.launch.ApplicationStartupKt")
+                    .declaredMethods
+                    .single { it.name == "observeNativeRestoreDeliveryCompletions" }
+                    .invoke(
+                        null,
+                        startupScope,
+                        testDeliveries,
+                        startup,
+                        reconcile,
+                    ) as Job
+            val agent = object : NativeBackupAgent() {}.also { it.initialize(context) }
+            try {
+                startupType.getDeclaredMethod("start").invoke(startup)
+                withTimeout(5_000) { state.first { it?.javaClass?.simpleName == "Failed" } }
+
+                keyFile.parentFile?.mkdirs()
+                ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+                    agent.onRestoreFile(
+                        descriptor,
+                        source.length(),
+                        keyFile,
+                        BackupAgent.TYPE_FILE,
+                        0x180L,
+                        1L,
+                    )
+                }
+                assertEquals(baseline, deliveries.value)
+                assertEquals("Failed", state.value?.javaClass?.simpleName)
+                agent.onRestoreFinished()
+                assertTrue(deliveries.value > baseline, "The actual native completion must trigger the retry")
+
+                withTimeout(10_000) { state.first { it?.javaClass?.simpleName == "Ready" } }
+                assertEquals("restored-key-material", openedContent)
+            } finally {
+                try {
+                    agent.onDestroy()
+                } finally {
+                    observer.cancelAndJoin()
+                    startupScope.cancel()
+                }
+            }
+        }
 
     @Test
     fun modernFullRestoreCallbackCopiesFileAndCompletesRecoveryWhenAvailable() {

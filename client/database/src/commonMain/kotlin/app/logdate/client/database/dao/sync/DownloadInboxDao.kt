@@ -69,6 +69,16 @@ interface DownloadInboxDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun put(row: DownloadInboxEntity)
 
+    @Query(
+        "DELETE FROM sync_download_inbox WHERE ownerId = :owner AND serverOrigin = :origin AND entityType = :type AND entityId = :id",
+    )
+    suspend fun deleteReceipt(
+        owner: String,
+        origin: String,
+        type: String,
+        id: String,
+    )
+
     @Query("SELECT * FROM sync_download_checkpoints WHERE ownerId = :owner AND serverOrigin = :origin AND entityType = :type")
     suspend fun checkpoint(
         owner: String,

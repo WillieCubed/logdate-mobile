@@ -70,11 +70,71 @@ abstract class HistoryOwnerAdoptionDao {
     )
 
     @Query(
-        "UPDATE pending_uploads SET ownerId = :newOwner WHERE ownerId = :oldOwner AND serverOrigin = :origin AND entityType = 'JOURNAL_MERGE'",
+        "UPDATE pending_uploads SET ownerId = :newOwner WHERE ownerId = :oldOwner AND serverOrigin = " +
+            ":origin AND entityType = 'JOURNAL_MERGE'",
     )
     abstract suspend fun moveJournalMergeUploads(
         oldOwner: String,
         newOwner: String,
+        origin: String,
+    )
+
+    @Query(
+        "SELECT COUNT(*) FROM sync_download_inbox WHERE ownerId = :oldOwner AND serverOrigin = :origin " +
+            "AND entityType IN ('LOCAL_DELETE_NOTE', 'LOCAL_DELETE_JOURNAL', 'LOCAL_DELETE_ASSOCIATION', 'LOCAL_DELETE_TRANSCRIPTION') " +
+            "AND state = 'APPLIED' AND (deleted != 1 OR operationId != 'local-delete-v1' " +
+            "OR version != 0 OR payload != '' OR attempts != 0 OR nextAttemptAt != 0 OR reason != 'NONE')",
+    )
+    abstract suspend fun malformedLocalDeletions(
+        oldOwner: String,
+        origin: String,
+    ): Int
+
+    @Query(
+        "SELECT COUNT(*) FROM sync_download_inbox source JOIN sync_download_inbox target " +
+            "ON target.ownerId = :newOwner AND target.serverOrigin = source.serverOrigin " +
+            "AND target.entityType = source.entityType AND target.entityId = source.entityId " +
+            "WHERE source.ownerId = :oldOwner AND source.serverOrigin = :origin " +
+            "AND source.entityType IN ('LOCAL_DELETE_NOTE', 'LOCAL_DELETE_JOURNAL', " +
+            "'LOCAL_DELETE_ASSOCIATION', 'LOCAL_DELETE_TRANSCRIPTION') " +
+            "AND source.state = 'APPLIED' AND source.deleted = 1 AND source.operationId = 'local-delete-v1' " +
+            "AND source.version = 0 AND source.payload = '' AND source.attempts = 0 AND " +
+            "source.nextAttemptAt = 0 AND source.reason = 'NONE' " +
+            "AND (target.state != 'APPLIED' OR target.deleted != 1 OR target.operationId != 'local-delete-v1' " +
+            "OR target.version != 0 OR target.payload != '' OR target.attempts != 0 OR target.nextAttemptAt " +
+            "!= 0 OR target.reason != 'NONE')",
+    )
+    abstract suspend fun conflictingLocalDeletions(
+        oldOwner: String,
+        newOwner: String,
+        origin: String,
+    ): Int
+
+    @Query(
+        "INSERT OR IGNORE INTO sync_download_inbox " +
+            "(ownerId, serverOrigin, entityType, entityId, version, deleted, payload, operationId, state, " +
+            "attempts, nextAttemptAt, reason) " +
+            "SELECT :newOwner, serverOrigin, entityType, entityId, version, deleted, payload, operationId, " +
+            "state, attempts, nextAttemptAt, reason " +
+            "FROM sync_download_inbox WHERE ownerId = :oldOwner AND serverOrigin = :origin " +
+            "AND entityType IN ('LOCAL_DELETE_NOTE', 'LOCAL_DELETE_JOURNAL', 'LOCAL_DELETE_ASSOCIATION', 'LOCAL_DELETE_TRANSCRIPTION') " +
+            "AND state = 'APPLIED' AND deleted = 1 AND operationId = 'local-delete-v1' " +
+            "AND version = 0 AND payload = '' AND attempts = 0 AND nextAttemptAt = 0 AND reason = 'NONE'",
+    )
+    abstract suspend fun copyLocalDeletions(
+        oldOwner: String,
+        newOwner: String,
+        origin: String,
+    )
+
+    @Query(
+        "DELETE FROM sync_download_inbox WHERE ownerId = :oldOwner AND serverOrigin = :origin " +
+            "AND entityType IN ('LOCAL_DELETE_NOTE', 'LOCAL_DELETE_JOURNAL', 'LOCAL_DELETE_ASSOCIATION', 'LOCAL_DELETE_TRANSCRIPTION') " +
+            "AND state = 'APPLIED' AND deleted = 1 AND operationId = 'local-delete-v1' " +
+            "AND version = 0 AND payload = '' AND attempts = 0 AND nextAttemptAt = 0 AND reason = 'NONE'",
+    )
+    abstract suspend fun removeLocalDeletions(
+        oldOwner: String,
         origin: String,
     )
 
@@ -87,6 +147,10 @@ abstract class HistoryOwnerAdoptionDao {
         transform: (HistoryRecordEntity) -> HistoryRecordEntity,
     ) {
         if (oldOwner == newOwner) return
+        check(malformedLocalDeletions(oldOwner, origin) == 0) { "History owner adoption has unrecognized deletion custody" }
+        check(conflictingLocalDeletions(oldOwner, newOwner, origin) == 0) { "History owner adoption has conflicting deletion custody" }
+        copyLocalDeletions(oldOwner, newOwner, origin)
+        removeLocalDeletions(oldOwner, origin)
         while (true) {
             val page = historyPage(oldOwner, origin)
             if (page.isEmpty()) break

@@ -33,6 +33,14 @@ open class NativeBackupAgent : BackupAgent() {
             PostRestoreDetector(this).beginNativeRestoreSession(retainPreferences = retainedPreferenceNames.isNotEmpty())
             retainOptionalPreferences { begin(retainedPreferenceNames) }
         }
+    private var incomingGeneration: String? = null
+    private val incomingRestoreSession =
+        NativeRestoreSessionBoundary {
+            incomingGeneration =
+                kotlin.uuid.Uuid
+                    .random()
+                    .toString()
+        }
     private val callbackLock = Any()
     private val restoreFormat = NativeRestoreFormatGuard { noBackupFilesDir }
     private var restoreCompletionRecorded = false
@@ -56,31 +64,51 @@ open class NativeBackupAgent : BackupAgent() {
     ) = Unit
 
     override fun onFullBackup(data: FullBackupDataOutput) {
-        try {
-            runBlocking {
-                IdentityKeyManager(
-                    createAndroidSecureStorage(this@NativeBackupAgent),
-                    AndroidCryptoManager(),
-                    AndroidIdentityKeyBackupStore(this@NativeBackupAgent),
-                ).ensureExistingIdentityBackup()
+        requireNativeAndroidExport(data.transportFlags)
+        runBlocking {
+            AndroidNativeRestoreDeliveryGate.withLock {
+                requireRetainedJournalBackupReady(
+                    this@NativeBackupAgent,
+                    deviceTransfer = data.transportFlags and FLAG_DEVICE_TO_DEVICE_TRANSFER != 0,
+                )
+                try {
+                    runBlocking {
+                        IdentityKeyManager(
+                            createAndroidSecureStorage(this@NativeBackupAgent),
+                            AndroidCryptoManager(),
+                            AndroidIdentityKeyBackupStore(this@NativeBackupAgent),
+                        ).ensureExistingIdentityBackup()
+                    }
+                } catch (error: Exception) {
+                    throw IOException("Native encryption recovery material could not be prepared", error)
+                }
+                // Backup may run before the first normal launch after an upgrade.
+                if (PostRestoreDetector(
+                        this@NativeBackupAgent,
+                    ).hasMissingNativePrivacyPayload()
+                ) {
+                    throw NativeRestorePrivacyMetadataRequiredException()
+                }
+                runBlocking(Dispatchers.IO) {
+                    NativeRestorePrivacyPolicy.prepareBackup(createAndroidMainDataStore(this@NativeBackupAgent)) { snapshot ->
+                        canEstablishNativePrivacyDefaults(this@NativeBackupAgent, snapshot)
+                    }
+                }
+                super.onFullBackup(data)
             }
-        } catch (error: Exception) {
-            throw IOException("Native encryption recovery material could not be prepared", error)
         }
-        // Backup may run before the first normal launch after an upgrade.
-        if (PostRestoreDetector(this).hasMissingNativePrivacyPayload()) throw NativeRestorePrivacyMetadataRequiredException()
-        runBlocking(Dispatchers.IO) {
-            NativeRestorePrivacyPolicy.prepareBackup(createAndroidMainDataStore(this@NativeBackupAgent)) { snapshot ->
-                canEstablishNativePrivacyDefaults(this@NativeBackupAgent, snapshot)
-            }
-        }
-        super.onFullBackup(data)
     }
 
     override fun onRestoreFinished() {
         AndroidNativeRestoreDeliveryGate.beginRestoreCompletion()
         try {
             if (synchronized(callbackLock) { restoreFormat.isRejected() }) {
+                super.onRestoreFinished()
+                return
+            }
+            if (finishRetainedNativeDelivery()) {
+                // A late delivery must not reset the accepted working installation or its account.
+                scheduleRetainedJournalReconciliationSafely()
                 super.onRestoreFinished()
                 return
             }
@@ -124,9 +152,16 @@ open class NativeBackupAgent : BackupAgent() {
             }
         } finally {
             nativeRestoreSession.finish()
+            incomingRestoreSession.finish()
             AndroidNativeRestoreDeliveryGate.endRestore()
         }
     }
+
+    private fun finishRetainedNativeDelivery(): Boolean =
+        synchronized(callbackLock) {
+            val workspace = retainedJournalWorkspace(this)
+            workspace.prepareNativeDelivery().also { if (it) workspace.finishIncomingDelivery() }
+        }
 
     override fun onRestoreFile(
         data: ParcelFileDescriptor,
@@ -136,7 +171,7 @@ open class NativeBackupAgent : BackupAgent() {
         mode: Long,
         mtime: Long,
     ) {
-        restoreNativeFile(destination, data, size) { descriptor, target ->
+        restoreNativeFile(destination, data, size, fileType = type) { descriptor, target ->
             super.onRestoreFile(descriptor, size, target, type, mode, mtime)
         }
     }
@@ -147,6 +182,7 @@ open class NativeBackupAgent : BackupAgent() {
             data.destination,
             data.data,
             data.size,
+            fileType = data.type,
             nativeFormat =
                 data.transportFlags and FLAG_CROSS_PLATFORM_DATA_TRANSFER_IOS == 0 && data.contentVersion.isEmpty(),
         ) { descriptor, target ->
@@ -159,6 +195,7 @@ open class NativeBackupAgent : BackupAgent() {
         data: ParcelFileDescriptor,
         size: Long,
         nativeFormat: Boolean? = null,
+        fileType: Int = TYPE_FILE,
         restore: (ParcelFileDescriptor, File) -> Unit,
     ) {
         AndroidNativeRestoreDeliveryGate.beginRestoreCallback()
@@ -167,6 +204,18 @@ open class NativeBackupAgent : BackupAgent() {
                 restoreFormat.requireNativeFile(nativeFormat)
                 restoreCompletionRecorded = false
                 installationStateReset = false
+                val workspace = retainedJournalWorkspace(this)
+                if (workspace.prepareNativeDelivery()) {
+                    if (fileType == TYPE_DIRECTORY) return@synchronized
+                    if (fileType != TYPE_FILE) throw IOException("Native journal delivery must contain regular files")
+                    incomingRestoreSession.beginIfNeeded()
+                    val cohort = workspace.beginIncomingDelivery(checkNotNull(incomingGeneration))
+                    ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.dup(data.fileDescriptor)).use { input ->
+                        workspace.captureIncomingFile(cohort, retainedNativeDestination(this, destination), size, input)
+                    }
+                    scheduleRetainedJournalReconciliationSafely()
+                    return@synchronized
+                }
                 beginNativeRestoreSessionOnce()
                 val preferenceDelivered =
                     restoredPreferences().restore(
@@ -222,9 +271,16 @@ open class NativeBackupAgent : BackupAgent() {
     }
 
     override fun onDestroy() {
-        nativeRestoreSession.finish()
-        AndroidNativeRestoreDeliveryGate.endRestore()
-        super.onDestroy()
+        finishNativeRestoreAgent(
+            schedule = {
+                if (retainedJournalWorkspace(this).canStageNativeDelivery()) {
+                    scheduleRetainedJournalReconciliationSafely()
+                }
+            },
+            finishNativeSession = nativeRestoreSession::finish,
+            finishIncomingSession = incomingRestoreSession::finish,
+            destroy = { super.onDestroy() },
+        )
     }
 
     private fun beginNativeRestoreSessionOnce(resumeFinalization: Boolean = false) =
@@ -260,6 +316,16 @@ open class NativeBackupAgent : BackupAgent() {
         prepareNativeRestoredInstallationState(this, preferences)
         synchronized(callbackLock) { installationStateReset = true }
     }
+
+    private fun scheduleRetainedJournalReconciliationSafely() {
+        try {
+            scheduleRetainedJournalReconciliation()
+        } catch (_: Exception) {
+            Napier.w("Retained journal reconciliation remains pending")
+        }
+    }
+
+    protected open fun scheduleRetainedJournalReconciliation() = Unit
 
     protected open suspend fun retainAccountRecoveryBeforeCompletion(
         preferences: DataStore<Preferences>,

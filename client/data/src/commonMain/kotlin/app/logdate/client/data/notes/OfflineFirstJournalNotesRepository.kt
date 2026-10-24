@@ -1,6 +1,7 @@
 package app.logdate.client.data.notes
 
 import app.logdate.client.data.journals.ArchiveRecoveryReceipts
+import app.logdate.client.data.journals.LocalDeletionType
 import app.logdate.client.database.dao.AudioNoteDao
 import app.logdate.client.database.dao.ImageNoteDao
 import app.logdate.client.database.dao.MediaCaptionDao
@@ -275,89 +276,41 @@ class OfflineFirstJournalNotesRepository(
     }
 
     override suspend fun remove(note: JournalNote) {
-        val journalIds = journalContentDao.getJournalsForContent(note.uid).first()
-
-        when (note) {
-            is JournalNote.Text -> {
-                textNoteDao.removeNote(note.uid)
-            }
-
-            is JournalNote.Image -> {
-                imageNoteDao.removeNote(note.uid)
-                mediaCaptionDao.deleteCaption(note.uid)
-                deleteMediaIfUnreferenced(note.mediaRef)
-            }
-
-            is JournalNote.Audio -> {
-                transcriptionRepository?.deleteTranscription(note.uid)
-                audioNoteDao.removeNote(note.uid)
-                mediaCaptionDao.deleteCaption(note.uid)
-                deleteMediaIfUnreferenced(note.mediaRef)
-            }
-
-            is JournalNote.Video -> {
-                videoNoteDao.removeNote(note.uid)
-                mediaCaptionDao.deleteCaption(note.uid)
-                deleteMediaIfUnreferenced(note.mediaRef)
-            }
-        }
-
-        journalIds.forEach { journalId ->
-            syncMetadataService.enqueuePending(
-                entityId = AssociationPendingKey(journalId, note.uid).toPendingId(),
-                entityType = EntityType.ASSOCIATION,
-                operation = PendingOperation.DELETE,
-            )
-        }
-
-        journalContentDao.removeContentFromAllJournals(note.uid)
-
-        syncMetadataService.enqueuePending(
-            entityId = note.uid.toString(),
-            entityType = EntityType.NOTE,
-            operation = PendingOperation.DELETE,
-        )
-
-        triggerContentSync()
-        if (journalIds.isNotEmpty()) {
-            triggerAssociationSync()
-        }
+        removeLocalNote(note.uid)
     }
 
     override suspend fun removeById(noteId: Uuid) {
-        val journalIds = journalContentDao.getJournalsForContent(noteId).first()
-        // Read before deleting: once the rows are gone there is no way back to the media.
-        val mediaRef = runCatching { getNoteById(noteId) }.getOrNull()?.mediaRefOrNull()
+        removeLocalNote(noteId)
+    }
 
-        textNoteDao.removeNote(noteId)
-        imageNoteDao.removeNote(noteId)
-        transcriptionRepository?.deleteTranscription(noteId)
-        audioNoteDao.removeNote(noteId)
-        videoNoteDao.removeNote(noteId)
-        mediaCaptionDao.deleteCaption(noteId)
-
-        deleteMediaIfUnreferenced(mediaRef)
-
-        journalIds.forEach { journalId ->
-            syncMetadataService.enqueuePending(
-                entityId = AssociationPendingKey(journalId, noteId).toPendingId(),
-                entityType = EntityType.ASSOCIATION,
-                operation = PendingOperation.DELETE,
-            )
-        }
-
-        journalContentDao.removeContentFromAllJournals(noteId)
-
-        syncMetadataService.enqueuePending(
-            entityId = noteId.toString(),
-            entityType = EntityType.NOTE,
-            operation = PendingOperation.DELETE,
-        )
-
+    private suspend fun removeLocalNote(noteId: Uuid) {
+        val journalIds =
+            transactionManager.withTransaction {
+                val scope = currentRecoveryScope()
+                val affectedJournals = journalContentDao.getJournalsForContent(noteId).first()
+                val mediaRef = getNoteById(noteId)?.mediaRefOrNull()
+                if (scope != null) {
+                    recoveryReceipts.recordLocalDeletion(scope, LocalDeletionType.NOTE, noteId.toString())
+                }
+                textNoteDao.removeNote(noteId)
+                imageNoteDao.removeNote(noteId)
+                transcriptionRepository?.deleteTranscription(noteId)
+                audioNoteDao.removeNote(noteId)
+                videoNoteDao.removeNote(noteId)
+                mediaCaptionDao.deleteCaption(noteId)
+                affectedJournals.forEach { journalId ->
+                    val key = AssociationPendingKey(journalId, noteId).toPendingId()
+                    if (scope != null) recoveryReceipts.recordLocalDeletion(scope, LocalDeletionType.ASSOCIATION, key)
+                    syncMetadataService.enqueuePending(key, EntityType.ASSOCIATION, PendingOperation.DELETE)
+                }
+                journalContentDao.removeContentFromAllJournals(noteId)
+                syncMetadataService.enqueuePending(noteId.toString(), EntityType.NOTE, PendingOperation.DELETE)
+                transactionManager.afterCommit { deleteMediaIfUnreferenced(mediaRef) }
+                check(currentRecoveryScope() == scope) { "Note deletion account changed" }
+                affectedJournals
+            }
         triggerContentSync()
-        if (journalIds.isNotEmpty()) {
-            triggerAssociationSync()
-        }
+        if (journalIds.isNotEmpty()) triggerAssociationSync()
     }
 
     override suspend fun create(
@@ -367,17 +320,29 @@ class OfflineFirstJournalNotesRepository(
         val storedNote = note.withStoredMediaRef(mediaReferences)
         val pendingMediaIndex = buildPendingMediaIndex(storedNote)
         transactionManager.withTransaction {
+            val scope = currentRecoveryScope()
+            scope?.let {
+                recoveryReceipts.clearLocalDeletion(it, LocalDeletionType.NOTE, note.uid.toString())
+            }
             createNoteRecord(
                 note = storedNote,
                 pendingMediaIndex = pendingMediaIndex,
             )
             val destination = journalRepository.resolveJournalId(journalId)
             journalContentDao.addContentToJournal(JournalContentEntityLink(destination, note.uid))
+            scope?.let {
+                recoveryReceipts.clearLocalDeletion(
+                    it,
+                    LocalDeletionType.ASSOCIATION,
+                    AssociationPendingKey(destination, note.uid).toPendingId(),
+                )
+            }
             syncMetadataService.enqueuePending(
                 entityId = AssociationPendingKey(destination, note.uid).toPendingId(),
                 entityType = EntityType.ASSOCIATION,
                 operation = PendingOperation.CREATE,
             )
+            check(currentRecoveryScope() == scope) { "Note creation account changed" }
         }
 
         triggerContentSync()
@@ -388,14 +353,18 @@ class OfflineFirstJournalNotesRepository(
         noteId: Uuid,
         journalId: Uuid,
     ) {
-        if (journalRepository.resolveJournalId(journalId) != journalId) return
-        journalContentDao.removeContentFromJournal(journalId, noteId)
-
-        syncMetadataService.enqueuePending(
-            entityId = AssociationPendingKey(journalId, noteId).toPendingId(),
-            entityType = EntityType.ASSOCIATION,
-            operation = PendingOperation.DELETE,
-        )
+        val removed =
+            transactionManager.withTransaction {
+                if (journalRepository.resolveJournalId(journalId) != journalId) return@withTransaction false
+                val capturedScope = currentRecoveryScope()
+                val key = AssociationPendingKey(journalId, noteId).toPendingId()
+                if (capturedScope != null) recoveryReceipts.recordLocalDeletion(capturedScope, LocalDeletionType.ASSOCIATION, key)
+                journalContentDao.removeContentFromJournal(journalId, noteId)
+                syncMetadataService.enqueuePending(key, EntityType.ASSOCIATION, PendingOperation.DELETE)
+                check(currentRecoveryScope() == capturedScope) { "Membership deletion account changed" }
+                true
+            }
+        if (!removed) return
 
         triggerAssociationSync()
     }
@@ -433,6 +402,14 @@ class OfflineFirstJournalNotesRepository(
         scope: app.logdate.client.repository.journals.JournalMergeScope?,
         recoveryId: String?,
     ): Boolean = recovery.compareAndSet(expected, replacement, scope, recoveryId)
+
+    override suspend fun compareAndSetNoteForRetainedRestore(
+        sourceId: Uuid,
+        expected: JournalNote?,
+        replacement: JournalNote,
+        scope: app.logdate.client.repository.journals.JournalMergeScope?,
+        recoveryId: String?,
+    ): Boolean = recovery.compareAndSet(expected, replacement, scope, recoveryId, retainedSource = true, sourceId = sourceId)
 
     override suspend fun createFromSync(note: JournalNote) = recovery.createFromSync(note)
 

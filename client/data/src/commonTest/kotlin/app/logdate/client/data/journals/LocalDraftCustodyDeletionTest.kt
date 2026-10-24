@@ -5,11 +5,85 @@ import app.logdate.client.sync.metadata.PendingUpload
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import okio.ByteString.Companion.encodeUtf8
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.uuid.Uuid
 
 class LocalDraftCustodyDeletionTest {
+    @Test
+    fun `late legacy custody alias stays hidden when mapped destination was deleted`() =
+        runTest {
+            val f = CustodyFixture()
+            f.signIn()
+            val source = custodyDraft("Source remains retained behind a deleted alias")
+            val mappedId = Uuid.random()
+            val fingerprint =
+                Json
+                    .encodeToString(source)
+                    .encodeUtf8()
+                    .sha256()
+                    .hex()
+            val copy =
+                DraftCustodyCopy(
+                    sourceKey = "editor_drafts_anonymous",
+                    sourceId = source.id.toString(),
+                    sourceFingerprint = fingerprint,
+                    destinationId = mappedId.toString(),
+                )
+            val sourceJson =
+                ArchiveDraftStorageState(
+                    drafts = listOf(source),
+                    custodyCopies = listOf(copy),
+                ).encode(Json)
+            f.storage.putStringOrThrow("editor_drafts_anonymous", sourceJson)
+            f.storage.putStringOrThrow(
+                scopeKey(),
+                ArchiveDraftStorageState(
+                    localDeletionIds = setOf(mappedId.toString()),
+                    custodyCopies = listOf(copy),
+                ).encode(Json),
+            )
+            f.metadata.pending += PendingUpload(source.id.toString(), PendingOperation.UPDATE, scope = f.scope)
+
+            assertTrue(f.repository().getAllDrafts().isEmpty())
+            assertEquals(sourceJson, f.storage.getStringOrThrow("editor_drafts_anonymous"))
+            assertTrue(
+                ArchiveDraftStorageState
+                    .decode(Json, f.storage.getStringOrThrow(scopeKey()))
+                    .localDeletionIds
+                    .contains(mappedId.toString()),
+            )
+        }
+
+    @Test
+    fun `late anonymous source cannot reappear after its scoped draft was deleted`() =
+        runTest {
+            val f = CustodyFixture()
+            f.signIn()
+            val draft = custodyDraft("Late source remains private after local deletion")
+            f.repository().saveDraft(draft)
+            f.repository().deleteDraft(draft.id)
+            f.metadata.pending += PendingUpload(draft.id.toString(), PendingOperation.UPDATE, scope = f.scope)
+            f.seedAnonymous(draft)
+
+            assertTrue(f.repository().getAllDrafts().isEmpty())
+            assertTrue(
+                ArchiveDraftStorageState
+                    .decode(Json, f.storage.getStringOrThrow(scopeKey()))
+                    .localDeletionIds
+                    .contains(draft.id.toString()),
+            )
+            assertTrue(
+                f.storage
+                    .getStringOrThrow("editor_drafts_anonymous")
+                    .orEmpty()
+                    .contains("Late source remains private"),
+            )
+        }
+
     @Test
     fun `completed transfer and explicit deletion leave no hidden snapshot content`() =
         runTest {

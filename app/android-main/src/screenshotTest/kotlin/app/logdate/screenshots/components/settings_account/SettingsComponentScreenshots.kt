@@ -139,7 +139,6 @@ fun DataSettings() {
             onCancelExport = {},
             onRetryExport = {},
             onDismissExport = {},
-            onBrowseExport = {},
             restoreState = RestoreState.Idle,
             onShowRestoreSheet = {},
             onSelectRestoreFile = {},

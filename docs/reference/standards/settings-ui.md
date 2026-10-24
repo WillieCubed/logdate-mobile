@@ -170,6 +170,39 @@ composed last can cover the entire sheet in screenshots. The real-touch overlay
 regression in `ArchiveSettingsNavigationTest` renders `ExportSettingsContent`
 with inspection enabled and confirms both sheets remain above their background.
 
+## Archive result hierarchy
+
+Export and import completion share a sheet-level result hierarchy: a status icon
+and `headlineSmall` title, followed by a `bodyLarge` explanation. Keep the
+archive name, metadata and one compact category-count summary subordinate to
+the outcome. Recovery actions appear before archive details when the user needs
+to continue work. Do not nest a result card inside the sheet, split the same
+counts into stat tiles, or repeat them in a second sentence. The import preview
+uses that same archive summary instead of an archive card plus four stat tiles.
+The archive name wraps fully so a long filename keeps its distinguishing suffix.
+An export confirmation offers only Done after the system file picker has saved
+the archive; do not add an Open action without a wired file opener.
+
+The icon must describe the actual result. A finished, complete archive may use a
+success icon; paused work uses pause, active recovery uses history, and missing
+or unavailable content uses information. When metadata is still incomplete
+while media is recovering, describe the active recovery first. Preserve its
+resume/recovery action and never label a partial result as complete.
+
+```kotlin
+DataTransferResultHeader(
+    title = stringResource(resultTitle),
+    description = stringResource(resultDescription),
+    icon = statusIcon,
+    iconTint = statusTint,
+)
+DataTransferArchiveSummary(
+    fileName = archiveName,
+    fileDetails = localizedMetadata,
+    countsSummary = localizedCounts,
+)
+```
+
 ## Use theme roles and tokens
 
 Use `Spacing` for padding and gaps, and `MaterialTheme.typography` for text roles.

@@ -9,8 +9,6 @@ import androidx.lifecycle.Observer
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import app.logdate.client.domain.export.ExportFormat
-import app.logdate.client.domain.restore.RestoreArchiveReader
-import app.logdate.client.domain.restore.ZipSignature
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,12 +21,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
-import java.io.File
-import java.io.FileOutputStream
-import java.io.InputStream
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.zip.ZipFile
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -61,6 +55,7 @@ class AndroidRestoreLauncher(
 ) : RestoreLauncher,
     org.koin.core.component.KoinComponent {
     private val json = Json { ignoreUnknownKeys = true }
+    private val metadataReader = ArchiveMetadataReader(context)
 
     /**
      * Scope for metadata extraction coroutines. Lives for the lifetime of this singleton;
@@ -85,6 +80,7 @@ class AndroidRestoreLauncher(
 
     /** The active metadata extraction job, if any. Cancelled before starting a new one. */
     private var metadataExtractionJob: Job? = null
+    private val pickerRequests = ArchivePickerRequestGate()
 
     private var lastSelectedUri: Uri? = null
     private var selectedRecoveryId: String? = null
@@ -165,8 +161,9 @@ class AndroidRestoreLauncher(
     }
 
     override fun setRestoreCompletionCallback(callback: (RestoreOutcome) -> Unit) {
-        completionCallback = callback
         synchronized(workCompletionLock) {
+            invalidateArchiveSelection()
+            completionCallback = callback
             reconnectJob?.cancel()
             reconnectJob =
                 launcherScope.launch {
@@ -198,7 +195,10 @@ class AndroidRestoreLauncher(
     }
 
     override fun setFileSelectedCallback(callback: (ArchiveFileInfo?) -> Unit) {
-        fileSelectedCallback = callback
+        synchronized(workCompletionLock) {
+            invalidateArchiveSelection()
+            fileSelectedCallback = callback
+        }
     }
 
     override fun updateProgress(info: RestoreProgressInfo) {
@@ -245,7 +245,9 @@ class AndroidRestoreLauncher(
 
     override fun selectArchiveForMediaRecovery(recoveryId: String) {
         synchronized(workCompletionLock) {
+            invalidateArchiveSelection()
             selectedRecoveryId = recoveryId
+            reconnectJob?.cancel()
             enqueueJob?.cancel()
             enqueueJob =
                 launcherScope.launch {
@@ -283,7 +285,16 @@ class AndroidRestoreLauncher(
     }
 
     override fun startFileSelection() {
-        selectedRecoveryId = null
+        synchronized(workCompletionLock) {
+            reconnectJob?.cancel()
+            enqueueJob?.cancel()
+            invalidateArchiveSelection()
+            selectedRecoveryId = null
+            pickerRequests.beginSelection()?.let(::launchArchivePicker)
+        }
+    }
+
+    private fun launchArchivePicker(request: Long) {
         val intent =
             Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
@@ -293,12 +304,20 @@ class AndroidRestoreLauncher(
 
         try {
             openDocumentLauncher?.launch(intent) ?: run {
+                pickerRequests.launchFailed(request)
                 Napier.w("No document launcher available for restore")
-                completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.FILE_PICKER_UNAVAILABLE))
+                if (pickerRequests.isCurrent(request)) {
+                    completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.FILE_PICKER_UNAVAILABLE))
+                }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
+            pickerRequests.launchFailed(request)
             Napier.e("Error launching restore file picker")
-            completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.FILE_PICKER_FAILED))
+            if (pickerRequests.isCurrent(request)) {
+                completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.FILE_PICKER_FAILED))
+            }
         }
     }
 
@@ -321,6 +340,7 @@ class AndroidRestoreLauncher(
             enqueueJob?.cancel()
             enqueueJob =
                 launcherScope.launch {
+                    val operationContext = currentCoroutineContext()
                     try {
                         ArchiveRecoveryLauncher(
                             context,
@@ -330,7 +350,9 @@ class AndroidRestoreLauncher(
                         throw cancelled
                     } catch (error: Exception) {
                         Napier.w("Could not enqueue archive recovery")
-                        completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
+                        commitArchiveResumeRequest(operationContext, ::commitRestoreWork) {
+                            completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED, recoveryId))
+                        }
                     }
                 }
         }
@@ -342,9 +364,7 @@ class AndroidRestoreLauncher(
             reconnectJob = null
             enqueueJob?.cancel()
             enqueueJob = null
-            metadataExtractionJob?.cancel()
-            metadataExtractionJob = null
-            lastSelectedUri = null
+            invalidateArchiveSelection()
             val activeId = activeWorkId?.toString()
             val store = context.archiveRecoveryStore()
             runCatching {
@@ -378,128 +398,65 @@ class AndroidRestoreLauncher(
      * info and an [RestoreOutcome.Failure] to the completion callback.
      */
     fun onRestoreSourceSelected(uri: Uri?) {
-        if (uri == null) {
-            Napier.i("User cancelled restore source selection")
-            fileSelectedCallback?.invoke(null)
-            return
+        synchronized(workCompletionLock) {
+            when (val result = pickerRequests.consumeResult()) {
+                ArchivePickerResult.Ignored -> Unit
+                is ArchivePickerResult.Launch -> launchArchivePicker(result.request)
+                is ArchivePickerResult.Selected -> {
+                    if (uri == null) {
+                        Napier.i("User cancelled restore source selection")
+                        lastSelectedUri = null
+                        fileSelectedCallback?.invoke(null)
+                    } else {
+                        readSelectedArchive(result.request, uri)
+                    }
+                }
+            }
         }
+    }
 
-        try {
-            context.contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION,
-            )
-        } catch (e: Exception) {
-            Napier.e("Failed to take persistent URI permission")
-            completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.FILE_NOT_ACCESSIBLE))
-            return
-        }
-
-        lastSelectedUri = uri
-        val displayName = context.contentResolver.resolveDisplayName(uri) ?: uri.lastPathSegment ?: "archive"
-
+    private fun readSelectedArchive(
+        request: Long,
+        uri: Uri,
+    ) {
         metadataExtractionJob?.cancel()
         metadataExtractionJob =
             launcherScope.launch {
-                val metadataJson = extractMetadata(uri)
-                ensureActive()
-                if (metadataJson == null) {
-                    Napier.w("Could not extract metadata from selected archive")
-                    fileSelectedCallback?.invoke(null)
-                    completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.INVALID_ARCHIVE))
-                    return@launch
-                }
-
-                fileSelectedCallback?.invoke(
-                    ArchiveFileInfo(
-                        displayName = displayName,
-                        uri = uri.toString(),
-                        metadataJson = metadataJson,
-                    ),
-                )
-            }
-    }
-
-    /**
-     * Reads only the v2 manifest or v1 metadata entry from the archive for preview.
-     *
-     * The ZIP is read through its central directory, so the entries stored before
-     * the preview entry are never read, and archives whose entries use data descriptors (as the
-     * iOS writer's do) stay readable. Returns `null` if the entry is missing or the archive
-     * cannot be read.
-     */
-    private suspend fun extractMetadata(uri: Uri): String? =
-        try {
-            withRandomAccessZip(uri) { zip ->
-                val entryNames = zip.entries().toList().map { it.name }
-                RestoreArchiveReader.previewJson(entryNames) { entryName ->
-                    val entry = zip.getEntry(entryName) ?: return@previewJson null
-                    zip.getInputStream(entry).use { it.bufferedReader(Charsets.UTF_8).readText() }
+                val operationContext = currentCoroutineContext()
+                try {
+                    context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    operationContext.ensureActive()
+                    val displayName = context.contentResolver.resolveDisplayName(uri) ?: uri.lastPathSegment ?: "archive"
+                    operationContext.ensureActive()
+                    val metadataJson = metadataReader.read(uri)
+                    commitArchiveSelectionRequest(operationContext, request, pickerRequests, ::commitRestoreWork) {
+                        if (metadataJson == null) {
+                            lastSelectedUri = null
+                            Napier.w("Could not extract metadata from selected archive")
+                            fileSelectedCallback?.invoke(null)
+                            completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.INVALID_ARCHIVE))
+                        } else {
+                            lastSelectedUri = uri
+                            fileSelectedCallback?.invoke(ArchiveFileInfo(displayName, uri.toString(), metadataJson))
+                        }
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    commitArchiveSelectionRequest(operationContext, request, pickerRequests, ::commitRestoreWork) {
+                        lastSelectedUri = null
+                        Napier.w("Could not read the selected archive")
+                        completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.FILE_NOT_ACCESSIBLE))
+                    }
                 }
             }
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (e: Exception) {
-            Napier.e("Failed to extract metadata from archive")
-            null
-        }
-
-    /**
-     * Runs [block] on [uri] opened as a [ZipFile], which needs random access.
-     *
-     * Providers backed by local files hand out a seekable descriptor, opened in place through
-     * `/proc/self/fd` so a multi-gigabyte archive is not copied. Streaming providers such as
-     * cloud drives return a pipe that cannot be seeked; the archive is copied to the cache for
-     * the duration of [block] instead, unless it does not start like a zip at all.
-     */
-    private suspend fun <T> withRandomAccessZip(
-        uri: Uri,
-        block: (ZipFile) -> T?,
-    ): T? {
-        context.contentResolver.openFileDescriptor(uri, "r")?.use { descriptor ->
-            val inPlace = runCatching { ZipFile(File("/proc/self/fd/${descriptor.fd}")) }.getOrNull()
-            if (inPlace != null) return inPlace.use(block)
-        }
-
-        val cached = File.createTempFile("logdate_preview", ".zip", context.cacheDir)
-        try {
-            val copied = context.contentResolver.openInputStream(uri)?.use { copyIfZip(it, cached) } ?: return null
-            if (!copied) return null
-            return ZipFile(cached).use(block)
-        } finally {
-            cached.delete()
-        }
     }
 
-    /** Copies [input] to [target] and returns true, or returns false without copying when it does not start like a zip. */
-    private suspend fun copyIfZip(
-        input: InputStream,
-        target: File,
-    ): Boolean {
-        val header = ByteArray(ZipSignature.LENGTH)
-        var filled = 0
-        while (filled < header.size) {
-            val read = input.read(header, filled, header.size - filled)
-            if (read == -1) break
-            filled += read
-        }
-        if (!ZipSignature.isZip(header.copyOf(filled))) return false
-
-        FileOutputStream(target).use { output ->
-            output.write(header, 0, filled)
-            val buffer = ByteArray(COPY_BUFFER_BYTES)
-            while (true) {
-                currentCoroutineContext().ensureActive()
-                val read = input.read(buffer)
-                if (read == -1) break
-                output.write(buffer, 0, read)
-            }
-        }
-        return true
-    }
-
-    private companion object {
-        const val COPY_BUFFER_BYTES = 64 * 1024
+    private fun invalidateArchiveSelection() {
+        pickerRequests.invalidate()
+        metadataExtractionJob?.cancel()
+        metadataExtractionJob = null
+        lastSelectedUri = null
     }
 }
 

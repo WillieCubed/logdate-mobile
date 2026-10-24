@@ -1,5 +1,6 @@
 package app.logdate.client.data.notes
 
+import app.logdate.client.data.journals.LocalDeletionType
 import app.logdate.client.database.dao.AudioNoteDao
 import app.logdate.client.database.dao.ImageNoteDao
 import app.logdate.client.database.dao.MediaCaptionDao
@@ -41,6 +42,8 @@ internal class JournalNoteRecoveryPersistence(
         replacement: JournalNote,
         scope: JournalMergeScope?,
         recoveryId: String?,
+        retainedSource: Boolean = false,
+        sourceId: Uuid = replacement.uid,
     ): Boolean {
         require(expected == null || expected.uid == replacement.uid)
         val saved =
@@ -50,6 +53,16 @@ internal class JournalNoteRecoveryPersistence(
                     recoveryId != null &&
                     receipts.contains(scope, "NOTE", recoveryId, replacement.uid.toString())
                 ) {
+                    return@withTransaction false
+                }
+                if (retainedSource &&
+                    scope != null &&
+                    (
+                        receipts.containsLocalDeletion(scope, LocalDeletionType.NOTE, sourceId.toString()) ||
+                            receipts.containsLocalDeletion(scope, LocalDeletionType.NOTE, replacement.uid.toString())
+                    )
+                ) {
+                    recordDecision(scope, recoveryId, replacement.uid)
                     return@withTransaction false
                 }
                 val current = getNoteById(replacement.uid)
@@ -69,11 +82,14 @@ internal class JournalNoteRecoveryPersistence(
                     recordDecision(scope, recoveryId, replacement.uid)
                     return@withTransaction false
                 }
+                if (!retainedSource && expected == null && scope != null) {
+                    receipts.clearLocalDeletion(scope, LocalDeletionType.NOTE, replacement.uid.toString())
+                }
                 val note = replacement.withStoredMediaRef(mediaReferences)
                 if (expected == null) {
                     createFromSync(note, preserveSourcePlace = true)
                 } else {
-                    updateForRestore(expected, note)
+                    updateForRestore(expected, note, retainedSource)
                 }
                 indexAvailableMedia(note)
                 recordDecision(scope, recoveryId, note.uid)
@@ -86,6 +102,7 @@ internal class JournalNoteRecoveryPersistence(
     private suspend fun updateForRestore(
         expected: JournalNote,
         note: JournalNote,
+        retainedSource: Boolean,
     ) {
         val sourceLocation = if (expected.location == note.location) storedNoteRecord(note) else null
         val linkedPlaceId =
@@ -125,7 +142,9 @@ internal class JournalNoteRecoveryPersistence(
                 val previous = (expected as JournalNote.Audio).mediaRef
                 if (previous != note.mediaRef) transcriptionRepository?.rebindMediaReference(note.uid, previous, note.mediaRef)
                 mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
-                note.persistTranscript(transcriptionRepository)
+                if (!retainedSource || (expected as JournalNote.Audio).transcript != note.transcript) {
+                    note.persistTranscript(transcriptionRepository)
+                }
             }
         }
     }
@@ -152,6 +171,7 @@ internal class JournalNoteRecoveryPersistence(
         preserveSourcePlace: Boolean = false,
     ) {
         transactionManager.withTransaction {
+            val scope = currentScope()
             val storedNote = note.withStoredMediaRef(mediaReferences)
             val linkedPlaceId =
                 storedNote.location
@@ -174,16 +194,23 @@ internal class JournalNoteRecoveryPersistence(
                     mediaCaptionDao.upsertCaption(MediaCaptionEntity(storedNote.uid, storedNote.caption))
                 }
             }
+            if (scope != null) receipts.clearLocalDeletion(scope, LocalDeletionType.NOTE, storedNote.uid.toString())
+            check(currentScope() == scope) { "Note sync account changed" }
         }
     }
 
     suspend fun deleteFromSync(noteId: Uuid) {
-        textNoteDao.removeNote(noteId)
-        imageNoteDao.removeNote(noteId)
-        transcriptionRepository?.deleteTranscription(noteId)
-        audioNoteDao.removeNote(noteId)
-        videoNoteDao.removeNote(noteId)
-        mediaCaptionDao.deleteCaption(noteId)
+        transactionManager.withTransaction {
+            val scope = currentScope()
+            if (scope != null) receipts.recordLocalDeletion(scope, LocalDeletionType.NOTE, noteId.toString())
+            textNoteDao.removeNote(noteId)
+            imageNoteDao.removeNote(noteId)
+            transcriptionRepository?.deleteTranscription(noteId)
+            audioNoteDao.removeNote(noteId)
+            videoNoteDao.removeNote(noteId)
+            mediaCaptionDao.deleteCaption(noteId)
+            check(currentScope() == scope) { "Note deletion account changed" }
+        }
     }
 
     suspend fun updateSyncMetadata(

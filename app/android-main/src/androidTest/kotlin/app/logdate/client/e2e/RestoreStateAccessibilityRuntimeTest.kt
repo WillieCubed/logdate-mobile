@@ -107,7 +107,6 @@ class RestoreStateAccessibilityRuntimeTest {
                     onCancelExport = {},
                     onRetryExport = {},
                     onDismissExport = {},
-                    onBrowseExport = {},
                     restoreState = scene.value.state,
                     onShowRestoreSheet = {},
                     onSelectRestoreFile = {},

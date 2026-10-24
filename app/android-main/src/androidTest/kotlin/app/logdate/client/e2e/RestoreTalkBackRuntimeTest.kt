@@ -180,7 +180,6 @@ class RestoreTalkBackRuntimeTest {
                                     onCancelExport = {},
                                     onRetryExport = {},
                                     onDismissExport = {},
-                                    onBrowseExport = {},
                                     restoreState = scene.state,
                                     onShowRestoreSheet = {},
                                     onSelectRestoreFile = {},

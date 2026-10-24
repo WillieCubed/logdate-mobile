@@ -87,7 +87,6 @@ class ArchiveSettingsNavigationTest {
                                 onCancelExport = {},
                                 onRetryExport = {},
                                 onDismissExport = {},
-                                onBrowseExport = {},
                                 restoreState =
                                     if (importing) {
                                         RestoreState.Previewing(
@@ -137,7 +136,6 @@ internal fun ArchiveSettingsDataFixture(onExport: () -> Unit = {}) {
         onCancelExport = {},
         onRetryExport = {},
         onDismissExport = {},
-        onBrowseExport = {},
         restoreState = RestoreState.Idle,
         onShowRestoreSheet = {},
         onSelectRestoreFile = {},

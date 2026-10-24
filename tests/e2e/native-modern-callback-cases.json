@@ -1,6 +1,7 @@
 {
   "app.logdate.client.e2e.NativeBackgroundCredentialCallbackTest": [
     "manifest selects the account-capable native backup agent",
+    "native backup delivery retries failed key startup and opens restored content without user retry",
     "modernFullRestoreCallbackCopiesFileAndCompletesRecoveryWhenAvailable",
     "callback resets installation identity before bounded account recovery",
     "duplicate framework restore callbacks retain one delivery ticket",

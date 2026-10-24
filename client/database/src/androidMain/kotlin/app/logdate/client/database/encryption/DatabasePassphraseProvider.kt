@@ -27,12 +27,13 @@ class DatabaseKeyRecoveryRequiredException(
 class DatabasePassphraseProvider(
     private val secureStorage: SecureStorage,
     private val backupStore: PassphraseBackupStore,
+    private val storageKey: () -> String = { DB_KEY_STORAGE_KEY },
     private val hasExistingDatabase: () -> Boolean = { false },
 ) {
     suspend fun getPassphraseCandidates(): List<ByteArray> {
         val primary =
             try {
-                secureStorage.getString(DB_KEY_STORAGE_KEY)
+                secureStorage.getString(storageKey())
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
@@ -55,7 +56,7 @@ class DatabasePassphraseProvider(
         Napier.i("Generating new database passphrase (no existing key found)")
         val generated = generateDatabaseKey(KEY_LENGTH_BYTES)
         backupStore.write(generated)
-        secureStorage.putString(DB_KEY_STORAGE_KEY, Base64.encode(generated))
+        secureStorage.putString(storageKey(), Base64.encode(generated))
         return listOf(generated)
     }
 
@@ -63,11 +64,11 @@ class DatabasePassphraseProvider(
     suspend fun confirmOpenedDatabasePassphrase(passphrase: ByteArray) {
         require(passphrase.size == KEY_LENGTH_BYTES) { "Database passphrase has an invalid length" }
         backupStore.write(passphrase)
-        secureStorage.putString(DB_KEY_STORAGE_KEY, Base64.encode(passphrase))
+        secureStorage.putString(storageKey(), Base64.encode(passphrase))
     }
 
     suspend fun clearPassphrase() {
-        secureStorage.remove(DB_KEY_STORAGE_KEY)
+        secureStorage.remove(storageKey())
         backupStore.clear()
     }
 

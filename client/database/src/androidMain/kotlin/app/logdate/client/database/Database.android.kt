@@ -25,9 +25,10 @@ import net.zetetic.database.sqlcipher.SQLiteDatabase as SQLCipherDatabase
 fun getDatabaseBuilder(
     context: Context,
     passphrase: ByteArray? = null,
+    databaseFile: File = context.applicationContext.getDatabasePath(DATABASE_NAME),
 ): RoomDatabase.Builder<LogDateDatabase> {
     val appContext = context.applicationContext
-    val dbFile = appContext.getDatabasePath(DATABASE_NAME)
+    val dbFile = databaseFile
     val builder =
         Room.databaseBuilder<LogDateDatabase>(
             context = appContext,
@@ -138,7 +139,13 @@ fun migratePlaintextDatabaseIfNeeded(
             android.database.sqlite.SQLiteDatabase.OPEN_READONLY,
         ).use { requireSupportedDatabaseVersion(it.version) }
     Napier.w("Detected plaintext SQLite DB. Starting one-time SQLCipher migration", tag = DB_MIGRATION_TAG)
+    migratePlaintextDatabaseFile(dbFile, passphrase)
+}
 
+private fun migratePlaintextDatabaseFile(
+    dbFile: File,
+    passphrase: ByteArray,
+) {
     val tempEncryptedFile = File(dbFile.parentFile, "$DATABASE_NAME.sqlcipher-migrating")
     val backupBase = File(dbFile.parentFile, "$DATABASE_NAME.plaintext-backup-${System.currentTimeMillis()}")
     var movedOriginal = false
@@ -383,3 +390,102 @@ private val SQLITE_FILE_HEADER =
         '3'.code.toByte(),
         0.toByte(),
     )
+
+/** Owns only an isolated recovery copy; its close never changes retained or working files. */
+class RetainedDatabaseCopy internal constructor(
+    val database: LogDateDatabase,
+    val directory: File,
+) : AutoCloseable {
+    override fun close() {
+        try {
+            database.close()
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+}
+
+/** A late key is accepted only when it opens and validates the actual preserved SQLCipher database. */
+fun openRetainedDatabaseCopy(
+    context: Context,
+    sourceFiles: Map<String, File>,
+    passphrases: List<ByteArray>,
+    scratchRoot: File,
+): RetainedDatabaseCopy? {
+    val allowed = setOf(DATABASE_NAME, "$DATABASE_NAME-wal", "$DATABASE_NAME-shm", "$DATABASE_NAME-journal")
+    require(sourceFiles.keys.all { it in allowed } && DATABASE_NAME in sourceFiles)
+    require(passphrases.size <= 128)
+    sourceFiles.values.forEach { require(Files.isRegularFile(it.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS)) }
+    check(scratchRoot.mkdirs() || scratchRoot.isDirectory)
+    System.loadLibrary("sqlcipher")
+    for (candidate in passphrases) {
+        if (candidate.size != 32) continue
+        val directory = Files.createTempDirectory(scratchRoot.toPath(), "retained-db-").toFile()
+        var opened: LogDateDatabase? = null
+        var accepted = false
+        try {
+            sourceFiles.forEach { (name, source) ->
+                val target = File(directory, name)
+                source.inputStream().use { input ->
+                    java.io.FileOutputStream(target).use { output ->
+                        input.copyTo(output)
+                        output.fd.sync()
+                    }
+                }
+            }
+            val copy = File(directory, DATABASE_NAME)
+            val hook =
+                when {
+                    canOpenEncryptedDatabaseWithCurrentSettings(copy, candidate) -> null
+                    canOpenEncryptedDatabaseWithLegacySettings(copy, candidate) -> createLegacySqlCipherHook()
+                    else -> continue
+                }
+            requireSupportedDatabaseVersion(openAndPingEncryptedDatabase(copy, candidate, hook))
+            val validated =
+                SQLCipherDatabase.openDatabase(
+                    copy.absolutePath,
+                    candidate,
+                    null,
+                    SQLCipherDatabase.OPEN_READONLY,
+                    null,
+                    hook,
+                )
+            validated.use(::requireRetainedDatabaseIntegrity)
+            opened = getRoomDatabase(getDatabaseBuilder(context, candidate.copyOf(), copy), driver = null)
+            opened.openHelper.writableDatabase
+            accepted = true
+            return RetainedDatabaseCopy(opened, directory)
+        } catch (error: NewerDatabaseVersionException) {
+            throw error
+        } catch (_: Exception) {
+            Napier.w("Retained database candidate did not validate; original and working journals remain preserved")
+        } finally {
+            if (!accepted) {
+                opened?.close()
+                directory.deleteRecursively()
+            }
+        }
+    }
+    return null
+}
+
+private fun requireRetainedDatabaseIntegrity(database: SQLCipherDatabase) {
+    database.rawQuery("PRAGMA integrity_check", emptyArray<String>()).use { cursor ->
+        check(cursor.moveToFirst() && cursor.getString(0) == "ok" && !cursor.moveToNext())
+    }
+}
+
+/** Source-only portable key reads never select or persist the active database passphrase. */
+fun readRetainedDatabasePassphrases(files: List<File>): List<ByteArray> =
+    files
+        .mapNotNull { file ->
+            runCatching {
+                require(Files.isRegularFile(file.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS) && file.length() in 1..128)
+                kotlin.io.encoding.Base64
+                    .decode(file.readText().trim())
+                    .takeIf { it.size == 32 }
+            }.getOrNull()
+        }.distinctBy {
+            kotlin.io.encoding.Base64
+                .encode(it)
+        }

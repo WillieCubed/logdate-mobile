@@ -131,6 +131,16 @@ class LocalFirstDraftRepository(
     private fun ownerMarker(scope: DraftStorageScope): String =
         "${scope.ownerId.length}:${scope.ownerId}:${scope.serverOrigin.length}:${scope.serverOrigin}"
 
+    private fun sourceIdsFor(
+        state: ArchiveDraftStorageState,
+        destinationId: Uuid,
+    ): Set<Uuid> =
+        state.custodyCopies
+            .asSequence()
+            .filter { it.destinationId == destinationId.toString() }
+            .mapNotNull { runCatching { Uuid.parse(it.sourceId) }.getOrNull() }
+            .toSet()
+
     private fun decode(value: String?): List<EditorDraft> = ArchiveDraftStorageState.decode(json, value).drafts
 
     /** The owner marker is durable before copying; a failed copy resumes only for that owner. */
@@ -153,7 +163,13 @@ class LocalFirstDraftRepository(
         val receipts =
             ArchiveDraftStorageState.decode(json, legacy).appliedRecoveries +
                 ArchiveDraftStorageState.decode(json, keyValueStorage.getStringOrThrow(scopedKey(scope))).appliedRecoveries
-        keyValueStorage.putStringOrThrow(scopedKey(scope), ArchiveDraftStorageState(merged, receipts).encode(json))
+        val localDeletionIds =
+            ArchiveDraftStorageState.decode(json, legacy).localDeletionIds +
+                ArchiveDraftStorageState.decode(json, keyValueStorage.getStringOrThrow(scopedKey(scope))).localDeletionIds
+        keyValueStorage.putStringOrThrow(
+            scopedKey(scope),
+            ArchiveDraftStorageState(merged, receipts, localDeletionIds).encode(json),
+        )
         keyValueStorage.putBoolean(doneKey, true)
     }
 
@@ -174,10 +190,17 @@ class LocalFirstDraftRepository(
         scope: DraftStorageScope?,
         drafts: List<EditorDraft>,
         receipt: String? = null,
+        addLocalDeletionIds: Set<Uuid> = emptySet(),
+        clearLocalDeletionIds: Set<Uuid> = emptySet(),
+        recoveryScope: DraftRecoveryScope? = null,
     ) {
         check(accessAllowed() && selectedScope() == scope) { "Draft account changed during write" }
-        val state = ArchiveDraftStorageState.decode(json, keyValueStorage.getStringOrThrow(storageKey(scope)))
+        val original = keyValueStorage.getStringOrThrow(storageKey(scope))
+        val state = ArchiveDraftStorageState.decode(json, original)
         val receipts = state.appliedRecoveries + listOfNotNull(receipt)
+        val localDeletionIds =
+            (state.localDeletionIds - clearLocalDeletionIds.map { it.toString() }.toSet()) +
+                addLocalDeletionIds.map { it.toString() }
         val copies =
             if (scope == null) {
                 state.custodyCopies
@@ -186,10 +209,21 @@ class LocalFirstDraftRepository(
                     drafts.any { it.id.toString() == copy.destinationId }
                 }
             }
-        keyValueStorage.putStringOrThrow(
-            storageKey(scope),
-            state.copy(drafts = drafts, appliedRecoveries = receipts, custodyCopies = copies).encode(json),
-        )
+        val encoded =
+            state
+                .copy(
+                    drafts = drafts,
+                    appliedRecoveries = receipts,
+                    localDeletionIds = localDeletionIds,
+                    custodyCopies = copies,
+                ).encode(json)
+        if (canonicalOwner != null && recoveryScope != null) {
+            check(DraftRecoveryWriteFence(keyValueStorage).commit(storageKey(scope), original, encoded, recoveryScope)) {
+                "Draft recovery identity or snapshot changed before commit"
+            }
+        } else {
+            keyValueStorage.putStringOrThrow(storageKey(scope), encoded)
+        }
         check(accessAllowed() && selectedScope() == scope) { "Draft account changed during write" }
     }
 
@@ -205,7 +239,8 @@ class LocalFirstDraftRepository(
             val drafts = read(scope).toMutableList()
             val index = drafts.indexOfFirst { it.id == draft.id }
             if (index >= 0) drafts[index] = draft.copy(lastModifiedAt = Clock.System.now()) else drafts.add(draft)
-            write(scope, drafts)
+            val state = ArchiveDraftStorageState.decode(json, keyValueStorage.getStringOrThrow(storageKey(scope)))
+            write(scope, drafts, clearLocalDeletionIds = sourceIdsFor(state, draft.id) + draft.id)
             if (canonicalOwner != null && scope != null) custody.remove(scope, setOf(draft.id))
         }
     }
@@ -233,7 +268,15 @@ class LocalFirstDraftRepository(
             val operation = if (saved == null) PendingOperation.DELETE else PendingOperation.UPDATE
             val prepared =
                 mutations.prepare(
-                    state.copy(drafts = drafts.filterNot { it.id == id } + listOfNotNull(saved)),
+                    state.copy(
+                        drafts = drafts.filterNot { it.id == id } + listOfNotNull(saved),
+                        localDeletionIds =
+                            if (saved == null) {
+                                state.localDeletionIds + (sourceIdsFor(state, id) + id).map { it.toString() }
+                            } else {
+                                state.localDeletionIds - (sourceIdsFor(state, id) + id).map { it.toString() }.toSet()
+                            },
+                    ),
                     id,
                     operation,
                     scope,
@@ -252,7 +295,8 @@ class LocalFirstDraftRepository(
             val drafts = read(scope).toMutableList()
             val index = drafts.indexOfFirst { it.id == draft.id }
             if (index >= 0) drafts[index] = draft else drafts.add(draft)
-            write(scope, drafts)
+            val state = ArchiveDraftStorageState.decode(json, keyValueStorage.getStringOrThrow(storageKey(scope)))
+            write(scope, drafts, clearLocalDeletionIds = sourceIdsFor(state, draft.id) + draft.id)
         }
     }
 
@@ -323,27 +367,72 @@ class LocalFirstDraftRepository(
         replacement: EditorDraft?,
         recoveryScope: DraftRecoveryScope?,
         recoveryId: String?,
+    ): Boolean = compareAndSetDraft(id, id, expected, replacement, recoveryScope, recoveryId, retained = false)
+
+    override suspend fun compareAndSetDraftForRetainedRestore(
+        sourceId: Uuid,
+        targetId: Uuid,
+        expected: EditorDraft?,
+        replacement: EditorDraft?,
+        recoveryScope: DraftRecoveryScope?,
+        recoveryId: String?,
+    ): Boolean = compareAndSetDraft(sourceId, targetId, expected, replacement, recoveryScope, recoveryId, retained = true)
+
+    override suspend fun hasLocalDeletionForRetainedRestore(
+        sourceId: Uuid,
+        targetId: Uuid,
+        recoveryScope: DraftRecoveryScope?,
     ): Boolean =
         withStorage {
-            require(expected == null || expected.id == id)
-            require(replacement == null || replacement.id == id)
+            val scope = selectedScope()
+            check(recoveryScope == null || scope?.ownerId == recoveryScope.ownerId && scope?.serverOrigin == recoveryScope.serverOrigin) {
+                "Draft recovery account changed"
+            }
+            val state = ArchiveDraftStorageState.decode(json, keyValueStorage.getStringOrThrow(storageKey(scope)))
+            check(selectedScope() == scope) { "Draft recovery account changed" }
+            sourceId.toString() in state.localDeletionIds || targetId.toString() in state.localDeletionIds
+        }
+
+    private suspend fun compareAndSetDraft(
+        sourceId: Uuid,
+        targetId: Uuid,
+        expected: EditorDraft?,
+        replacement: EditorDraft?,
+        recoveryScope: DraftRecoveryScope?,
+        recoveryId: String?,
+        retained: Boolean,
+    ): Boolean =
+        withStorage {
+            require(expected == null || expected.id == targetId)
+            require(replacement == null || replacement.id == targetId)
             val scope = selectedScope()
             check(recoveryScope == null || scope?.ownerId == recoveryScope.ownerId && scope?.serverOrigin == recoveryScope.serverOrigin) {
                 "Draft recovery account changed"
             }
             val drafts = visible(scope)
             val scoped = read(scope)
-            val receipt = recoveryId?.let { "$it:$id" }
+            val receipt = recoveryId?.let { "$it:$targetId" }
             val state = ArchiveDraftStorageState.decode(json, keyValueStorage.getStringOrThrow(storageKey(scope)))
             if (receipt != null && receipt in state.appliedRecoveries) return@withStorage false
-            if (drafts.find { it.id == id } != expected) {
-                if (receipt != null) write(scope, scoped, receipt)
+            if (retained && (sourceId.toString() in state.localDeletionIds || targetId.toString() in state.localDeletionIds)) {
+                if (receipt != null) write(scope, scoped, receipt, recoveryScope = recoveryScope)
+                return@withStorage false
+            }
+            if (drafts.find { it.id == targetId } != expected) {
+                if (receipt != null) write(scope, scoped, receipt, recoveryScope = recoveryScope)
                 return@withStorage false
             }
             if (expected == replacement && receipt == null) return@withStorage true
-            val updated = if (expected == replacement) scoped else scoped.filterNot { it.id == id } + listOfNotNull(replacement)
-            write(scope, updated, receipt)
-            if (canonicalOwner != null && scope != null && expected != replacement) custody.remove(scope, setOf(id))
+            val updated = if (expected == replacement) scoped else scoped.filterNot { it.id == targetId } + listOfNotNull(replacement)
+            write(
+                scope,
+                updated,
+                receipt,
+                recoveryScope = recoveryScope,
+                addLocalDeletionIds = if (!retained && replacement == null) sourceIdsFor(state, targetId) + targetId else emptySet(),
+                clearLocalDeletionIds = if (!retained && replacement != null) sourceIdsFor(state, targetId) + targetId else emptySet(),
+            )
+            if (canonicalOwner != null && scope != null && expected != replacement) custody.remove(scope, setOf(targetId))
             true
         }
 
@@ -351,8 +440,9 @@ class LocalFirstDraftRepository(
         withStorage {
             val scope = selectedScope()
             visible(scope)
+            val state = ArchiveDraftStorageState.decode(json, keyValueStorage.getStringOrThrow(storageKey(scope)))
             val drafts = read(scope).filterNot { it.id == id }
-            write(scope, drafts)
+            write(scope, drafts, addLocalDeletionIds = sourceIdsFor(state, id) + id)
             if (canonicalOwner != null && scope != null) custody.remove(scope, setOf(id))
         }
     }
@@ -361,7 +451,9 @@ class LocalFirstDraftRepository(
         withStorage {
             val scope = selectedScope()
             val ids = visible(scope).map { it.id }.toSet()
-            write(scope, emptyList())
+            val state = ArchiveDraftStorageState.decode(json, keyValueStorage.getStringOrThrow(storageKey(scope)))
+            val sourceIds = ids.flatMap { sourceIdsFor(state, it) }.toSet()
+            write(scope, emptyList(), addLocalDeletionIds = ids + sourceIds)
             if (canonicalOwner != null && scope != null) custody.remove(scope, ids)
         }
     }

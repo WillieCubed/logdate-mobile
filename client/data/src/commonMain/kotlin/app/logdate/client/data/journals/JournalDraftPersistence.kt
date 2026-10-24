@@ -107,6 +107,17 @@ internal class JournalDraftPersistence(
         }
     }
 
+    private suspend fun requireRecoveryScope(scope: DraftRecoveryScope?) {
+        requireStorageScope(scope)
+        if (scope == null) return
+        val outbox = currentOutboxScope?.invoke() ?: return
+        check(
+            app.logdate.client.device.identity
+                .sameOwnerId(outbox.ownerId, scope.outboxOwnerId) &&
+                outbox.serverOrigin.trimEnd('/') == scope.outboxServerOrigin?.trimEnd('/'),
+        ) { "Draft recovery upload scope changed" }
+    }
+
     private fun uploadScope(scope: DraftRecoveryScope?): UploadScope? =
         scope?.outboxOwnerId?.let { owner -> scope.outboxServerOrigin?.let { UploadScope(owner, it) } }
 
@@ -116,17 +127,21 @@ internal class JournalDraftPersistence(
         id: Uuid,
         recoveryScope: DraftRecoveryScope?,
     ) {
-        requireStorageScope(recoveryScope)
-        if (drafts.getDraftForRestore(id) == null) return
-        requireStorageScope(recoveryScope)
-        val captured = uploadScope(recoveryScope)
-        if (captured == null) {
-            metadata.enqueueRepairIfAbsent(id.toString(), EntityType.DRAFT)
-        } else {
-            metadata.enqueueRepairForScopeIfAbsent(id.toString(), EntityType.DRAFT, captured)
-        }
-        requireStorageScope(recoveryScope)
-        changed()
+        val present =
+            transactions.withTransaction {
+                requireRecoveryScope(recoveryScope)
+                if (drafts.getDraftForRestore(id) == null) return@withTransaction false
+                requireRecoveryScope(recoveryScope)
+                val captured = uploadScope(recoveryScope)
+                if (captured == null) {
+                    metadata.enqueueRepairIfAbsent(id.toString(), EntityType.DRAFT)
+                } else {
+                    metadata.enqueueRepairForScopeIfAbsent(id.toString(), EntityType.DRAFT, captured)
+                }
+                requireRecoveryScope(recoveryScope)
+                true
+            }
+        if (present) changed()
     }
 
     suspend fun compareAndSet(
@@ -136,38 +151,92 @@ internal class JournalDraftPersistence(
         recoveryScope: DraftRecoveryScope? = null,
         enqueue: Boolean = true,
         recoveryId: String? = null,
+        retainedSourceId: Uuid? = null,
     ): Boolean {
         val applied =
             transactions.withTransaction {
-                requireStorageScope(recoveryScope)
+                requireRecoveryScope(recoveryScope)
                 if (recoveryId != null && drafts.hasArchiveRecoveryDecision(id, recoveryScope, recoveryId)) return@withTransaction false
                 val current = drafts.getDraftForRestore(id)
+                if (retainedSourceId != null && drafts.hasLocalDeletionForRetainedRestore(retainedSourceId, id, recoveryScope)) {
+                    requireRecoveryScope(recoveryScope)
+                    drafts.compareAndSetDraftForRetainedRestore(
+                        retainedSourceId,
+                        id,
+                        current,
+                        current,
+                        recoveryScope,
+                        recoveryId,
+                    )
+                    return@withTransaction false
+                }
                 if (current != expected) {
+                    requireRecoveryScope(recoveryScope)
                     drafts.compareAndSetDraftForRestore(id, current, current, recoveryScope, recoveryId)
                     return@withTransaction false
                 }
                 if (!enqueue || expected == replacement) {
-                    return@withTransaction drafts.compareAndSetDraftForRestore(id, expected, replacement, recoveryScope, recoveryId)
+                    return@withTransaction persistDraftDecision(
+                        id,
+                        expected,
+                        replacement,
+                        recoveryScope,
+                        recoveryId,
+                        retainedSourceId,
+                    )
                 }
-                val captured = uploadScope(recoveryScope)
-                val operation = if (replacement == null) PendingOperation.DELETE else PendingOperation.UPDATE
-                if (replacement != null) {
-                    if (!metadata.enqueueRestoreMutation(id.toString(), EntityType.DRAFT, operation, captured)) {
-                        drafts.compareAndSetDraftForRestore(id, current, current, recoveryScope, recoveryId)
-                        requireStorageScope(recoveryScope)
-                        return@withTransaction false
-                    }
-                } else if (captured == null) {
-                    metadata.enqueuePending(id.toString(), EntityType.DRAFT, operation)
-                } else {
-                    metadata.enqueuePendingForScope(id.toString(), EntityType.DRAFT, operation, captured)
+                if (!enqueueRecoveryMutation(id, replacement, recoveryScope)) {
+                    requireRecoveryScope(recoveryScope)
+                    drafts.compareAndSetDraftForRestore(id, current, current, recoveryScope, recoveryId)
+                    requireRecoveryScope(recoveryScope)
+                    return@withTransaction false
                 }
-                val stored = drafts.compareAndSetDraftForRestore(id, expected, replacement, recoveryScope, recoveryId)
+                val stored =
+                    persistDraftDecision(
+                        id,
+                        expected,
+                        replacement,
+                        recoveryScope,
+                        recoveryId,
+                        retainedSourceId,
+                    )
                 requireStorageScope(recoveryScope)
                 stored
             }
         if (applied && enqueue && expected != replacement) changed()
         return applied
+    }
+
+    private suspend fun enqueueRecoveryMutation(
+        id: Uuid,
+        replacement: EditorDraft?,
+        scope: DraftRecoveryScope?,
+    ): Boolean {
+        requireRecoveryScope(scope)
+        val captured = uploadScope(scope)
+        if (replacement != null) return metadata.enqueueRestoreMutation(id.toString(), EntityType.DRAFT, PendingOperation.UPDATE, captured)
+        if (captured == null) {
+            metadata.enqueuePending(id.toString(), EntityType.DRAFT, PendingOperation.DELETE)
+        } else {
+            metadata.enqueuePendingForScope(id.toString(), EntityType.DRAFT, PendingOperation.DELETE, captured)
+        }
+        return true
+    }
+
+    private suspend fun persistDraftDecision(
+        id: Uuid,
+        expected: EditorDraft?,
+        replacement: EditorDraft?,
+        scope: DraftRecoveryScope?,
+        recoveryId: String?,
+        retainedSourceId: Uuid?,
+    ): Boolean {
+        requireRecoveryScope(scope)
+        return if (retainedSourceId == null) {
+            drafts.compareAndSetDraftForRestore(id, expected, replacement, scope, recoveryId)
+        } else {
+            drafts.compareAndSetDraftForRetainedRestore(retainedSourceId, id, expected, replacement, scope, recoveryId)
+        }
     }
 }
 

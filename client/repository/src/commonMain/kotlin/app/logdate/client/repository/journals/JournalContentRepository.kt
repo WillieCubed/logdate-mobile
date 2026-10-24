@@ -42,6 +42,14 @@ interface JournalContentRepository {
         return true
     }
 
+    /** Automatic retained-source replay preserves a settled local membership deletion. */
+    suspend fun addContentToJournalForRetainedRestore(
+        contentId: Uuid,
+        journalId: Uuid,
+        scope: JournalMergeScope? = null,
+        recoveryId: String? = null,
+    ): Boolean = false
+
     /**
      * Adds the provided content to a journal without changing the source content or its other
      * journal memberships. Implementations return how many new associations were created.

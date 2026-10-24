@@ -403,7 +403,6 @@ fun A110_DataSettingsExportBookPosture() {
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = {},
-                onBrowseExport = {},
                 restoreState = RestoreState.Idle,
                 isRestoreSheetVisible = false,
                 onShowRestoreSheet = {},
@@ -446,7 +445,6 @@ fun A111_DataSettingsExportProgressBookPosture() {
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = {},
-                onBrowseExport = {},
                 restoreState = RestoreState.Idle,
                 isRestoreSheetVisible = false,
                 onShowRestoreSheet = {},
@@ -489,7 +487,6 @@ fun A112_DataSettingsRestorePreviewBookPosture() {
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = {},
-                onBrowseExport = {},
                 restoreState =
                     RestoreState.Previewing(
                         preview = auditArchivePreview,

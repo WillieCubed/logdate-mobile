@@ -6,6 +6,10 @@
             android:name="app.logdate.client.data.restore.NativeAccountRecoveryJobService"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+        <service
+            android:name="app.logdate.client.data.restore.RetainedJournalReconciliationJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
         <receiver
             android:name="app.logdate.client.data.restore.NativeAccountRecoveryRestartReceiver"
             android:exported="false">

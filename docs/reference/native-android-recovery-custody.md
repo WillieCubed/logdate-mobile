@@ -57,6 +57,82 @@ the root and media keys through the encrypted account-key envelope when its unlo
 available. That key-provisioning step is separate from accepting the account assertion. If every
 usable copy of a required key is lost, the encrypted content cannot be declared recovered.
 
+## Retained journals and a working recovery journal
+
+When no surviving key opens the existing SQLCipher database, an explicit Recover from backup
+operation retains the original database, SQLite sidecars, preferences, recovery material, and
+managed originals before opening a separate working journal. Retention must be durable and
+verified before detaching canonical database files. Interrupted preparation resumes through the
+same state machine. A readable working journal does not mean the original journal was recovered.
+The working passphrase has a separate secure alias and portable file; a later source key must
+never replace it merely because its length or encoding looks valid.
+
+Local recovery authority controls activation. A transferred WORKING marker alone cannot redirect
+a fresh destination's native files. Preserve an existing local working admission before replacing
+its authority token for another recovery generation. Native callbacks finish locally authorized
+pending retention before selecting a destination; an orphaned local intent must never permit raw
+writes over the original journal. Once a working journal is locally accepted, later native
+callbacks retain incoming bytes before preference replay, owner reset, or canonical writes. Each
+callback batch has its own generation. An abandoned partial batch and a later complete batch
+remain separate; database, WAL, SHM, and rollback journal files must come from one coherent batch.
+An unrelated truncated file must not hide complete, authenticated key candidates or canonical
+media objects in that batch. Keep competing revisions separate, validate keys against the actual
+SQLCipher source, and validate canonical media against its full digest. These independent inputs
+never authorize an incomplete database or sidecar cohort.
+
+Reconciliation opens a verified source copy with source-only key candidates, then uses scoped
+repository mutations to recover content. It preserves working edits, deletions, and outbox intent.
+Conflicting versions receive stable identities, and memberships follow those identities. Owner
+and normalized server origin must match the source anchor; a completed history-owner adoption
+is the only permitted bridge between different local and account owners. Missing media references
+remain unavailable until verified original bytes arrive. Cross-generation media recovery requires
+a canonical content digest and a matching byte checksum; matching filenames or existing URIs
+are insufficient.
+
+The reconciliation mutex serializes worker instances and scratch cleanup. Resolve and open the
+working database and its repository graph before taking the native delivery gate: database
+initialization takes that same non-reentrant gate. Admit the canonical media root before taking
+the gate as well; the first media save otherwise
+tries to acquire it recursively. After taking it, revalidate the workspace,
+owner, server, and open database before capturing sources or mutating content. Hold it across
+source capture and merge so recovery activation cannot detach a database beneath the worker.
+Release it before reporting job completion. Callback cleanup must release the delivery gate even
+when custody metadata is corrupt.
+
+Checkpoint records are atomic and bounded per entity, rather than one growing JSON object.
+Persist a target identity before its mutation and record application after durable success.
+An interrupted retry recognizes an already written target. Applied rows must not be resurrected
+or repeatedly reimported ahead of unfinished work. Attachment repair receipts identify the
+repaired projection, allowing separate arrivals to repair different attachments in one draft.
+A bounded worker timeout preserves work and requests another pass.
+
+Automatic retained recovery uses dedicated repository entry points. A pending DELETE is not
+lasting deletion evidence: sync can settle it before a late backup arrives. Record scoped deletion
+evidence with the row removal and outbox mutation, and check both the original and mapped target
+identities inside the recovery transaction. Deleting an association or draft follows the same
+rule. Keep explicit archive recovery separate so an intentional recovery can restore deleted work.
+Owned media cleanup runs after the outer transaction commits.
+Consented owner adoption carries deletion decisions for that exact origin before binding the
+account. Its durable transfer receipt must prevent a later retry from reintroducing a decision
+that an explicit save already cleared. Deletion intent does not authorize adopting draft bodies.
+
+Audio recovery preserves typed transcription rows and segments, including their original status,
+revision, timestamps, and speaker metadata. Create the audio row, transcription, segments, outbox
+mutation, and application receipt in one transaction. Do not first synthesize a normalized
+transcription through the ordinary note importer. A deleted transcription stays deleted until an
+explicit transcription request; conflicting transcripts require a stable separate audio identity.
+
+Retained custody remains available after a merge. Nonempty tables without typed recovery handlers
+prevent a complete-recovery claim. Cloud backup must not replace a complete older snapshot with
+an unresolved working-only journal. Direct transfer includes verified retained generations.
+
+Acceptance fixtures visit the real first-launch Activity before seeding a journal, so privacy
+initialization follows the production path. Never forge initialization or accepted-working
+receipts to make a test pass. A native callback test that shares a process with other callbacks
+must distinguish its new completion token from an earlier token. Policy tests, actual SQLCipher
+copy tests, scheduled-worker tests, rendered recovery, and cold-process verification establish
+different parts of this contract.
+
 ## Unfinished drafts across authentication changes
 
 Draft ownership follows the retained journal, independently of whether its account session is
