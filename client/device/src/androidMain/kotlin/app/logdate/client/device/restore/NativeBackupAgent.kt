@@ -120,7 +120,7 @@ open class NativeBackupAgent : BackupAgent() {
             finishCompletedNativeJournalCleanup()
             if (finishRetainedNativeDelivery()) {
                 // A late delivery must not reset the accepted working installation or its account.
-                repairRetainedNativePrivacyUnderDeliveryLock()
+                finishNativeRestoreAuxiliaryUnderDeliveryLock()
                 scheduleRetainedJournalReconciliationSafely()
                 super.onRestoreFinished()
                 return
@@ -134,7 +134,7 @@ open class NativeBackupAgent : BackupAgent() {
                     return
                 }
                 val replayComplete = completedReplay.finish()
-                repairRetainedNativePrivacyUnderDeliveryLock()
+                finishNativeRestoreAuxiliaryUnderDeliveryLock()
                 if (!replayComplete) scheduleRetainedJournalReconciliationSafely()
                 super.onRestoreFinished()
                 return
@@ -153,7 +153,7 @@ open class NativeBackupAgent : BackupAgent() {
                 }
             if (duplicateCompletion) {
                 val retainedCameraSource = finishNativeJournalTransferRestore()
-                repairRetainedNativePrivacyUnderDeliveryLock()
+                finishNativeRestoreAuxiliaryUnderDeliveryLock()
                 super.onRestoreFinished()
                 retryAccountRecovery()
                 if (retainedCameraSource && scheduleRetainedJournalReconciliationSafely()) {
@@ -190,7 +190,7 @@ open class NativeBackupAgent : BackupAgent() {
         }
         detector.recordRestoreCompletedUnderDeliveryLock()
         val retainedCameraSource = finishNativeJournalTransferRestore()
-        repairRetainedNativePrivacyUnderDeliveryLock()
+        finishNativeRestoreAuxiliaryUnderDeliveryLock()
         synchronized(callbackLock) { restoreCompletionRecorded = true }
         try {
             runBlocking(Dispatchers.IO) {
@@ -221,7 +221,7 @@ open class NativeBackupAgent : BackupAgent() {
         detector.markNativePrivacyPayloadReceived()
         detector.recordRestoreCompletedUnderDeliveryLock()
         synchronized(callbackLock) { restoreCompletionRecorded = true }
-        repairRetainedNativePrivacyUnderDeliveryLock()
+        finishNativeRestoreAuxiliaryUnderDeliveryLock()
         scheduleRetainedJournalReconciliationSafely()
     }
 
@@ -310,6 +310,15 @@ open class NativeBackupAgent : BackupAgent() {
                 completedReplay.capture(retainedNativeDestination(this, destination), size, input)
             }
             scheduleRetainedJournalReconciliationSafely()
+            return
+        }
+        NativeInitialSelectedMedia.destinationPath(this, destination)?.let { path ->
+            if (fileType == TYPE_DIRECTORY) return
+            check(fileType == TYPE_FILE) { "Selected native media must be a regular file" }
+            ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.dup(data.fileDescriptor)).use { input ->
+                NativeInitialSelectedMedia(this).capture(path, size, input)
+            }
+            PostRestoreDetector(this).markNativeRestorePayloadReceived(databaseDelivered = false)
             return
         }
         val frameworkDatabase =
@@ -428,6 +437,11 @@ open class NativeBackupAgent : BackupAgent() {
             Napier.w("Retained journal reconciliation remains pending")
             return false
         }
+    }
+
+    private fun finishNativeRestoreAuxiliaryUnderDeliveryLock() {
+        if (NativeInitialSelectedMedia(this).promoteCompleted()) scheduleRetainedJournalReconciliationSafely()
+        repairRetainedNativePrivacyUnderDeliveryLock()
     }
 
     /** Completion has sealed incoming cohorts and still owns the native delivery gate. */

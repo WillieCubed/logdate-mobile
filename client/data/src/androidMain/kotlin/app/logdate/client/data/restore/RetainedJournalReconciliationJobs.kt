@@ -13,6 +13,7 @@ import app.logdate.client.database.readRetainedDatabasePassphrases
 import app.logdate.client.datastore.createAndroidMainDataStore
 import app.logdate.client.device.restore.NATIVE_JOURNAL_TRANSFER_PREFIX
 import app.logdate.client.device.restore.NATIVE_SOURCE_RECEIPT_PATH
+import app.logdate.client.device.restore.NativeInitialSelectedMedia
 import app.logdate.client.device.restore.NativeJournalReplayCustody
 import app.logdate.client.device.restore.RetainedJournalWorkspace
 import app.logdate.client.device.restore.admitNativeContent
@@ -72,7 +73,7 @@ fun resumeRetainedJournalReconciliation(context: Context) {
     if (!context.getSystemService(UserManager::class.java).isUserUnlocked) return
     val workspace = retainedJournalWorkspace(context)
     if (runCatching { workspace.current()?.phase == RetainedJournalWorkspace.Phase.WORKING }.getOrDefault(false) ||
-        NativeJournalReplayCustody(context).hasInputs()
+        NativeJournalReplayCustody(context).hasInputs() || NativeInitialSelectedMedia(context).hasInputs()
     ) {
         scheduleRetainedJournalReconciliation(context)
     }
@@ -137,6 +138,7 @@ class RetainedJournalReconciliationJobService : JobService() {
                 return true
             }
         nativeRestoreDeliveryGate().withLock {
+            NativeInitialSelectedMedia(this).promoteCompleted()
             RetainedNativePrivacyRepair(this).repairUnderDeliveryLock()
         }
         return RetainedJournalReconciliationLock.prepareThenWithDeliveryGate(

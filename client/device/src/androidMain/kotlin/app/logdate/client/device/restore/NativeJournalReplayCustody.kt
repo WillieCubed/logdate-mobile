@@ -16,6 +16,29 @@ class NativeJournalReplayCustody(
     private val journal = NativeIncomingJournal(root)
     private var active: String? = null
 
+    /** A sealed first-delivery cohort moves atomically, without changing its recorded bytes. */
+    internal fun adoptInitialSelectedMedia(
+        id: String,
+        hash: String,
+    ) {
+        check(Uuid.parse(id).toString() == id)
+        val initialRoot = File(context.noBackupFilesDir, NativeInitialSelectedMedia.DIRECTORY)
+        val incoming = NativeIncomingJournal(initialRoot)
+        val payloads = incoming.verified(id, hash)
+        check(payloads.isNotEmpty() && payloads.all { it.complete && NativeInitialSelectedMedia.isSelectedMediaPath(it.path) })
+        check(!root.exists() || Files.isDirectory(root.toPath(), LinkOption.NOFOLLOW_LINKS))
+        if (!root.isDirectory) {
+            check(root.mkdir())
+            retainedJournalSyncDirectory(context.noBackupFilesDir)
+        }
+        val target = File(root, id)
+        check(!target.exists())
+        Files.move(File(initialRoot, id).toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
+        retainedJournalSyncDirectory(root)
+        retainedJournalSyncDirectory(initialRoot)
+        journal.verified(id, hash)
+    }
+
     fun capture(
         path: String,
         size: Long,
