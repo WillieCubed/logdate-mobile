@@ -97,11 +97,13 @@ internal class SyncMediaTransfer(
                 blocks =
                     draft.blocks.map { block ->
                         when (block) {
-                            is SerializableImageBlock ->
+                            is SerializableImageBlock -> {
                                 block.copy(
                                     uri = uploadDraftAsset(accessToken, draft.id, block.id, "image", block.uri, reusable),
                                 )
-                            is SerializableVideoBlock ->
+                            }
+
+                            is SerializableVideoBlock -> {
                                 block.copy(
                                     uri = uploadDraftAsset(accessToken, draft.id, block.id, "video", block.uri, reusable),
                                     thumbnailUri =
@@ -114,15 +116,23 @@ internal class SyncMediaTransfer(
                                             reusable,
                                         ),
                                 )
-                            is SerializableAudioBlock ->
+                            }
+
+                            is SerializableAudioBlock -> {
                                 block.copy(
                                     uri = uploadDraftAsset(accessToken, draft.id, block.id, "audio", block.uri, reusable),
                                 )
-                            is SerializableCameraBlock ->
+                            }
+
+                            is SerializableCameraBlock -> {
                                 block.copy(
                                     uri = uploadDraftAsset(accessToken, draft.id, block.id, "camera", block.uri, reusable),
                                 )
-                            else -> block
+                            }
+
+                            else -> {
+                                block
+                            }
                         }
                     },
             )
@@ -209,9 +219,11 @@ internal class SyncMediaTransfer(
             }
         draft.blocks.forEachIndexed { index, block ->
             when (block) {
-                is SerializableImageBlock ->
+                is SerializableImageBlock -> {
                     blocks[index] =
                         block.copy(uri = recoverAsset(block.id, "image", block.uri))
+                }
+
                 is SerializableVideoBlock -> {
                     val video = block.copy(uri = recoverAsset(block.id, "video", block.uri))
                     blocks[index] = video
@@ -221,13 +233,20 @@ internal class SyncMediaTransfer(
                                 recoverAsset(block.id, "thumbnail", block.thumbnailUri),
                         )
                 }
-                is SerializableAudioBlock ->
+
+                is SerializableAudioBlock -> {
                     blocks[index] =
                         block.copy(uri = recoverAsset(block.id, "audio", block.uri))
-                is SerializableCameraBlock ->
+                }
+
+                is SerializableCameraBlock -> {
                     blocks[index] =
                         block.copy(uri = recoverAsset(block.id, "camera", block.uri))
-                else -> Unit
+                }
+
+                else -> {
+                    Unit
+                }
             }
         }
         val updated = draft.copy(blocks = blocks)
@@ -399,7 +418,10 @@ internal class SyncMediaTransfer(
                 result.mapping?.let { mediaSyncRefStore.upsert(it) }
                 result.note
             }
-            is MediaHydrationResult.Pending -> throw MediaRecoveryException(result.reason)
+
+            is MediaHydrationResult.Pending -> {
+                throw MediaRecoveryException(result.reason)
+            }
         }
 
     suspend fun hydrate(

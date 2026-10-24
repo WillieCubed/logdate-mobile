@@ -357,6 +357,7 @@ internal class SyncDownloadEngine(
                                                     conflictsResolved++
                                                     Napier.d("Conflict resolved using remote version")
                                                 }
+
                                                 is ConflictResolution.KeepLocal -> {
                                                     outcome = RemoteOutcome.KEPT_LOCAL
                                                     // Keeping the local copy is only half the resolution:
@@ -371,6 +372,7 @@ internal class SyncDownloadEngine(
                                                     conflictsResolved++
                                                     Napier.d("Conflict resolved using local version")
                                                 }
+
                                                 is ConflictResolution.Merge -> {
                                                     outcome = RemoteOutcome.MERGED
                                                     strategy.applyReplace(existing, resolution.merged)
@@ -383,6 +385,7 @@ internal class SyncDownloadEngine(
                                                     conflictsResolved++
                                                     Napier.d("Conflict resolved by merging")
                                                 }
+
                                                 is ConflictResolution.RequiresManualResolution -> {
                                                     outcome = RemoteOutcome.DECLINED
                                                     Napier.w(
