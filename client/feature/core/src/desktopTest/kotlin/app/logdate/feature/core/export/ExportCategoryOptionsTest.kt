@@ -30,19 +30,47 @@ import app.logdate.client.domain.export.ExportCounts
 import app.logdate.ui.theme.LogDateTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class ExportCategoryOptionsTest {
     @Test
-    fun normalPhoneDateChoicesKeepTheirUnits() =
+    fun normalPhoneDateChoicesUseTwoCompactRowsWithFullLabels() =
         runDesktopComposeUiTest(width = 411, height = 900) {
             setContent {
                 LogDateTheme {
                     ExportConfigContent(ExportOptions(), null, {}, {}, {})
                 }
             }
-            onNodeWithText("Last 30 days").assertIsDisplayed()
-            onNodeWithText("Last 90 days").assertIsDisplayed()
+            val allTime = onNodeWithText("All time").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            val thirtyDays = onNodeWithText("Last 30 days").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            val ninetyDays = onNodeWithText("Last 90 days").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            val lastYear = onNodeWithText("Last year").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            assertEquals(allTime.top, thirtyDays.top)
+            assertEquals(ninetyDays.top, lastYear.top)
+            assertTrue(ninetyDays.top > allTime.bottom)
+        }
+
+    @Test
+    fun wideExportSheetKeepsContextVisibleAndFooterReachable() =
+        runDesktopComposeUiTest(width = 1280, height = 800) {
+            setContent {
+                LogDateTheme {
+                    ExportBottomSheet(
+                        exportState = ExportState.Configuring(counts = ExportCounts(4, 12, 3, 8)),
+                        onOptionsChanged = {},
+                        onConfirm = {},
+                        onCancel = {},
+                        onRetry = {},
+                        onDismiss = {},
+                    )
+                }
+            }
+            val title = onNodeWithText("Export your data").fetchSemanticsNode().boundsInRoot
+            assertTrue(title.top >= 200f, "The wide sheet should leave the destination visible above it")
+            val cancel = onNodeWithText("Cancel").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            val export = onNodeWithText("Export").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            assertTrue(cancel.bottom <= 784f && export.bottom <= 784f, "Actions should clear the bottom edge without scrolling")
         }
 
     @Test
@@ -166,7 +194,7 @@ class ExportCategoryOptionsTest {
                     }
                 }
             }
-            onNodeWithText("Export").performScrollTo().assertIsDisplayed()
+            onNodeWithText("Export").assertIsDisplayed()
             val layouts = mutableListOf<TextLayoutResult>()
             onNodeWithText("Export", useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) {
                 it(layouts)

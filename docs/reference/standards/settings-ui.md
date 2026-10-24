@@ -108,6 +108,11 @@ containers, per-row backgrounds or a new section API. `ServerSelectionCard` uses
 in account setup. Keep this composition when reusing preferences outside Settings;
 a local card around shared rows can introduce conflicting surfaces and lose their gaps.
 
+When a destination title already describes its only action group, use
+`MaterialContainer` with the shared rows directly instead of repeating the page
+title in a `SettingsSection`. Export & Import uses this for its export and import
+actions; the main Data Settings page keeps its Data Management section heading.
+
 ```kotlin
 SettingsSection(title = stringResource(Res.string.server)) {
     SettingsChoiceItem(
@@ -125,6 +130,15 @@ SettingsSection(title = stringResource(Res.string.server)) {
 
 A form with segmented choices, explanatory text or controls may still need its
 own layout inside a section. Radio preferences use `SettingsChoiceItem`.
+The export date-range form uses connected choices in two rows on ordinary phone
+widths, one row on wide sheets, and full `SettingsChoiceItem` rows when text is
+enlarged or the available width cannot hold two complete labels. Keep all four
+choices available without abbreviating their date units.
+Export and import sheets share `DataTransferSheetScrollContent`. Its bounded
+scroll area leaves the destination visible on wide, short windows and keeps
+options reachable when content grows on compact or enlarged-text screens. Keep
+confirmation actions in its padded footer, outside the scrolling options, so
+they remain fully visible at the bottom edge.
 
 `checkSettingsUiContract` parses Kotlin and rejects layout wrappers around multiple
 known settings rows. It runs with the core module's `check` and `ktlintCheck` tasks.
@@ -178,7 +192,8 @@ archive name, metadata and one compact category-count summary subordinate to
 the outcome. Recovery actions appear before archive details when the user needs
 to continue work. Do not nest a result card inside the sheet, split the same
 counts into stat tiles, or repeat them in a second sentence. The import preview
-uses that same archive summary instead of an archive card plus four stat tiles.
+contains that single shared archive summary in `MaterialCard`; result states use
+the same summary typography without a second enclosing result surface.
 The archive name wraps fully so a long filename keeps its distinguishing suffix.
 An export confirmation offers only Done after the system file picker has saved
 the archive; do not add an Open action without a wired file opener.

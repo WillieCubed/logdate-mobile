@@ -10,10 +10,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import app.logdate.client.domain.export.ExportSchemaVersion
@@ -22,10 +24,35 @@ import app.logdate.client.domain.restore.ArchivePreview
 import app.logdate.ui.theme.LogDateTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 @OptIn(ExperimentalTestApi::class)
 class RestorePreviewOptionsTest {
+    @Test
+    fun wideImportPreviewKeepsArchiveAndImportActionReachable() =
+        runDesktopComposeUiTest(width = 1280, height = 800) {
+            setContent {
+                LogDateTheme {
+                    RestoreBottomSheet(
+                        restoreState = RestoreState.Previewing(preview(3, 8), "LogDate-archive-2026-10-15.zip"),
+                        onSelectFile = {},
+                        onUpdateOptions = {},
+                        onConfirmImport = {},
+                        onCancel = {},
+                        onRetry = {},
+                        onDismiss = {},
+                    )
+                }
+            }
+            val title = onNodeWithText("Import backup").fetchSemanticsNode().boundsInRoot
+            assertTrue(title.top >= 88f, "The wide sheet should leave the destination visible above it")
+            onNodeWithText("LogDate-archive-2026-10-15.zip").assertIsDisplayed()
+            val cancel = onNodeWithText("Cancel").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            val importAction = onNodeWithText("Import").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            assertTrue(cancel.bottom <= 784f && importAction.bottom <= 784f, "Actions should clear the bottom edge without scrolling")
+        }
+
     @Test
     fun labelAndSwitchChangeOnlyTheirOwnImportOptionExactlyOnce() =
         runDesktopComposeUiTest(width = 411, height = 1200) {

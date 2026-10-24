@@ -12,12 +12,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.restore.ArchivePreview
 import app.logdate.feature.core.common.DataTransferArchiveSummary
 import app.logdate.feature.core.common.DataTransferIntroduction
+import app.logdate.feature.core.common.DataTransferSheetScrollContent
 import app.logdate.feature.core.common.archiveDetails
 import app.logdate.feature.core.common.dataTransferCountsSummary
 import app.logdate.ui.common.SettingsSection
@@ -85,13 +83,13 @@ internal fun RestoreBottomSheet(
         modifier = Modifier.widthIn(max = BottomSheetDefaults.SheetMaxWidth),
         sheetState = sheetState,
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = Spacing.lg)
-                    .navigationBarsPadding(),
+        DataTransferSheetScrollContent(
+            footer =
+                if (restoreState is RestoreState.Previewing) {
+                    { RestorePreviewActions(onConfirmImport, onDismiss) }
+                } else {
+                    null
+                },
         ) {
             AnimatedContent(
                 targetState = restoreState,
@@ -121,6 +119,7 @@ internal fun RestoreBottomSheet(
                             onOptionsChanged = onUpdateOptions,
                             onConfirmImport = onConfirmImport,
                             onDismiss = onDismiss,
+                            showActions = false,
                         )
                     }
                     is RestoreState.Restoring -> {
@@ -150,7 +149,9 @@ internal fun RestoreBottomSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(Spacing.lg))
+            if (restoreState !is RestoreState.Previewing) {
+                Spacer(modifier = Modifier.height(Spacing.lg))
+            }
         }
     }
 }
@@ -218,6 +219,7 @@ internal fun RestorePreviewContent(
     onOptionsChanged: (ImportOptions) -> Unit,
     onConfirmImport: () -> Unit,
     onDismiss: () -> Unit,
+    showActions: Boolean = true,
 ) {
     Column {
         DataTransferIntroduction(
@@ -237,6 +239,7 @@ internal fun RestorePreviewContent(
                     preview.stats.draftCount,
                     preview.stats.mediaCount,
                 ),
+            contained = true,
         )
 
         Spacer(modifier = Modifier.height(Spacing.lg))
@@ -291,22 +294,31 @@ internal fun RestorePreviewContent(
             )
         }
 
-        Spacer(modifier = Modifier.height(Spacing.xl))
+        if (showActions) {
+            Spacer(modifier = Modifier.height(Spacing.xl))
+            RestorePreviewActions(onConfirmImport, onDismiss)
+        }
+    }
+}
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
+@Composable
+private fun RestorePreviewActions(
+    onConfirmImport: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextButton(onClick = onDismiss) {
+            Text(stringResource(UiRes.string.common_cancel))
+        }
+        Button(
+            onClick = onConfirmImport,
+            modifier = Modifier.padding(start = Spacing.sm),
         ) {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(UiRes.string.common_cancel))
-            }
-            Button(
-                onClick = onConfirmImport,
-                modifier = Modifier.padding(start = Spacing.sm),
-            ) {
-                Text(stringResource(Res.string.restore_confirm_import))
-            }
+            Text(stringResource(Res.string.restore_confirm_import))
         }
     }
 }

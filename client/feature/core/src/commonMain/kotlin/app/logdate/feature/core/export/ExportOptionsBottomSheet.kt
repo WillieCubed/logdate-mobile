@@ -14,11 +14,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonGroupDefaults
@@ -37,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.export.ExportCounts
 import app.logdate.client.text.asString
 import app.logdate.feature.core.common.DataTransferIntroduction
+import app.logdate.feature.core.common.DataTransferSheetScrollContent
 import app.logdate.ui.common.SettingsChoiceItem
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
@@ -88,13 +86,30 @@ internal fun ExportBottomSheet(
         modifier = Modifier.widthIn(max = BottomSheetDefaults.SheetMaxWidth),
         sheetState = sheetState,
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = Spacing.lg)
-                    .navigationBarsPadding(),
+        DataTransferSheetScrollContent(
+            footer =
+                when (exportState) {
+                    is ExportState.Configuring -> {
+                        {
+                            ExportConfigActions(
+                                options = exportState.options,
+                                onConfirm = onConfirm,
+                                onDismiss = onDismiss,
+                            )
+                        }
+                    }
+                    is ExportState.Selecting -> {
+                        {
+                            ExportConfigActions(
+                                options = ExportOptions(),
+                                onConfirm = {},
+                                onDismiss = onDismiss,
+                                buttonsEnabled = false,
+                            )
+                        }
+                    }
+                    else -> null
+                },
         ) {
             AnimatedContent(
                 targetState = exportState,
@@ -110,6 +125,7 @@ internal fun ExportBottomSheet(
                             onOptionsChanged = onOptionsChanged,
                             onConfirm = onConfirm,
                             onDismiss = onDismiss,
+                            showActions = false,
                         )
                     }
                     is ExportState.Selecting -> {
@@ -121,6 +137,7 @@ internal fun ExportBottomSheet(
                             onConfirm = {},
                             onDismiss = onDismiss,
                             buttonsEnabled = false,
+                            showActions = false,
                         )
                     }
                     is ExportState.Exporting -> {
@@ -151,7 +168,9 @@ internal fun ExportBottomSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(Spacing.lg))
+            if (exportState !is ExportState.Configuring && exportState !is ExportState.Selecting) {
+                Spacer(modifier = Modifier.height(Spacing.lg))
+            }
         }
     }
 }
@@ -164,6 +183,7 @@ internal fun ExportConfigContent(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     buttonsEnabled: Boolean = true,
+    showActions: Boolean = true,
 ) {
     Column {
         DataTransferIntroduction(
@@ -213,32 +233,42 @@ internal fun ExportConfigContent(
             )
         }
 
-        Spacer(modifier = Modifier.height(Spacing.xl))
+        if (showActions) {
+            Spacer(modifier = Modifier.height(Spacing.xl))
+            ExportConfigActions(options, onConfirm, onDismiss, buttonsEnabled)
+        }
+    }
+}
 
-        // Actions
-        val hasAnySelected =
-            options.includeJournals ||
-                options.includeNotes ||
-                options.includeDrafts ||
-                options.includeMedia
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
+@Composable
+private fun ExportConfigActions(
+    options: ExportOptions,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    buttonsEnabled: Boolean = true,
+) {
+    val hasAnySelected =
+        options.includeJournals ||
+            options.includeNotes ||
+            options.includeDrafts ||
+            options.includeMedia
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextButton(
+            onClick = onDismiss,
+            enabled = buttonsEnabled,
         ) {
-            TextButton(
-                onClick = onDismiss,
-                enabled = buttonsEnabled,
-            ) {
-                Text(stringResource(UiRes.string.common_cancel))
-            }
-            Button(
-                onClick = onConfirm,
-                enabled = buttonsEnabled && hasAnySelected,
-                modifier = Modifier.padding(start = Spacing.sm),
-            ) {
-                Text(stringResource(Res.string.export))
-            }
+            Text(stringResource(UiRes.string.common_cancel))
+        }
+        Button(
+            onClick = onConfirm,
+            enabled = buttonsEnabled && hasAnySelected,
+            modifier = Modifier.padding(start = Spacing.sm),
+        ) {
+            Text(stringResource(Res.string.export))
         }
     }
 }
@@ -258,7 +288,8 @@ private fun DateRangeSelector(
         )
 
     BoxWithConstraints {
-        val expandedChoices = maxWidth < 420.dp || LocalDensity.current.fontScale >= 1.2f
+        val expandedChoices = maxWidth < 280.dp || LocalDensity.current.fontScale >= 1.2f
+        val compactColumns = if (maxWidth < 420.dp) 2 else 4
         Column(modifier = Modifier.animateContentSize()) {
             if (expandedChoices) {
                 SettingsSection(title = stringResource(Res.string.export_date_range_label)) {
@@ -282,6 +313,7 @@ private fun DateRangeSelector(
                     options = options,
                     selectedRange = dateRange,
                     onDateRangeChanged = onDateRangeChanged,
+                    columns = compactColumns,
                     enabled = enabled,
                 )
             }
@@ -314,26 +346,31 @@ private fun DateRangeButtonGroup(
     options: List<Pair<String, ExportDateRange>>,
     selectedRange: ExportDateRange,
     onDateRangeChanged: (ExportDateRange) -> Unit,
+    columns: Int,
     enabled: Boolean = true,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-    ) {
-        options.forEachIndexed { index, (label, range) ->
-            ToggleButton(
-                checked = selectedRange == range,
-                onCheckedChange = { onDateRangeChanged(range) },
-                modifier = Modifier.weight(1f),
-                enabled = enabled,
-                shapes =
-                    when (index) {
-                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                        options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                    },
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        options.chunked(columns).forEach { rowOptions ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
             ) {
-                Text(label, maxLines = 1)
+                rowOptions.forEachIndexed { index, (label, range) ->
+                    ToggleButton(
+                        checked = selectedRange == range,
+                        onCheckedChange = { onDateRangeChanged(range) },
+                        modifier = Modifier.weight(1f),
+                        enabled = enabled,
+                        shapes =
+                            when (index) {
+                                0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                                rowOptions.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                                else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                            },
+                    ) {
+                        Text(label, maxLines = 1)
+                    }
+                }
             }
         }
     }

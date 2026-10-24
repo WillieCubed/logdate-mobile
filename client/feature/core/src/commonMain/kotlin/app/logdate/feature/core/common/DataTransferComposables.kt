@@ -6,14 +6,20 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -30,6 +36,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.MaterialCard
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
@@ -46,6 +53,44 @@ import logdate.client.ui.generated.resources.common_dismiss
 import logdate.client.ui.generated.resources.common_retry
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
+
+@Composable
+internal fun DataTransferSheetScrollContent(
+    footer: (@Composable () -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val maxContentHeight = if (maxWidth >= 600.dp) 600.dp else 720.dp
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = maxContentHeight),
+        ) {
+            Column(
+                modifier =
+                    Modifier
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = Spacing.lg)
+                        .then(if (footer == null) Modifier.navigationBarsPadding() else Modifier),
+                content = content,
+            )
+            if (footer != null) {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.lg)
+                            .padding(top = Spacing.md, bottom = Spacing.md)
+                            .navigationBarsPadding(),
+                ) {
+                    footer()
+                }
+            }
+        }
+    }
+}
 
 @Composable
 internal fun DataTransferIntroduction(
@@ -173,6 +218,26 @@ internal fun DataTransferResultHeader(
 
 @Composable
 internal fun DataTransferArchiveSummary(
+    fileName: String,
+    fileDetails: String?,
+    countsSummary: String?,
+    modifier: Modifier = Modifier,
+    contained: Boolean = false,
+) {
+    if (contained) {
+        MaterialCard(
+            modifier = modifier,
+            contentPadding = Spacing.md,
+        ) {
+            ArchiveSummaryText(fileName, fileDetails, countsSummary)
+        }
+    } else {
+        ArchiveSummaryText(fileName, fileDetails, countsSummary, modifier)
+    }
+}
+
+@Composable
+private fun ArchiveSummaryText(
     fileName: String,
     fileDetails: String?,
     countsSummary: String?,
