@@ -75,40 +75,7 @@ internal class NativeIosTransferSender(
                     archiveFiles.map { it.relativeTo(archive).invariantSeparatorsPath },
                     { path -> File(archive, path).source() },
                 )
-            val (receipt, sourceGeneration) = journal.pinnedSourceIdentity()
-            val owner = ExistingCanonicalOwner(receipt.canonicalOwnerId, receipt.canonicalOwnerBound == "true")
-            val crypto = AndroidCryptoManager()
-            val identity =
-                IdentityKeyManager(
-                    createAndroidSecureStorage(context),
-                    crypto,
-                    AndroidIdentityKeyBackupStore(context),
-                )
-            val record =
-                PrivateOsCustodyRecord.prepare(
-                    transportFlags = transportFlags,
-                    transferId = Uuid.random(),
-                    sourceGeneration = sourceGeneration,
-                    owner = owner,
-                    checksumsFileSha256 = bundle.checksumsSha256,
-                    manifestSha256 = bundle.manifestSha256,
-                ) {
-                    identity.snapshotExistingKeys(owner.rawId.takeIf { owner.isBound }) { root ->
-                        KeyDerivation(crypto).deriveKey(root, "media_payload", "media_payload_v1")
-                    }
-                } ?: run {
-                    if (owner.isBound || archiveFiles.any { it.relativeTo(archive).invariantSeparatorsPath.startsWith("media/") }) {
-                        throw IOException("Native iOS transfer is unavailable")
-                    }
-                    PrivateOsCustodyRecord.prepareRootlessPlaintext(
-                        transportFlags,
-                        Uuid.random(),
-                        sourceGeneration,
-                        owner,
-                        bundle.checksumsSha256,
-                        bundle.manifestSha256,
-                    ) { identity.observeRootlessKeys() } ?: throw IOException("Native iOS transfer is unavailable")
-                }
+            val record = prepareCustodyRecord(transportFlags, archiveFiles, archive, bundle)
             val privateDirectory = File(root, ".logdate-os-private")
             check(privateDirectory.mkdir())
             val custody = File(privateDirectory, "custody-v1.json")
@@ -127,6 +94,49 @@ internal class NativeIosTransferSender(
                 journal.finish()
             }
         }
+    }
+
+    private suspend fun prepareCustodyRecord(
+        transportFlags: Int,
+        archiveFiles: List<File>,
+        archive: File,
+        bundle: NativeArchive3Bundle,
+    ): PrivateOsCustodyRecord {
+        val (receipt, sourceGeneration) = journal.pinnedSourceIdentity()
+        val owner = ExistingCanonicalOwner(receipt.canonicalOwnerId, receipt.canonicalOwnerBound == "true")
+        val crypto = AndroidCryptoManager()
+        val identity =
+            IdentityKeyManager(
+                createAndroidSecureStorage(context),
+                crypto,
+                AndroidIdentityKeyBackupStore(context),
+            )
+        val record =
+            PrivateOsCustodyRecord.prepare(
+                transportFlags = transportFlags,
+                transferId = Uuid.random(),
+                sourceGeneration = sourceGeneration,
+                owner = owner,
+                checksumsFileSha256 = bundle.checksumsSha256,
+                manifestSha256 = bundle.manifestSha256,
+            ) {
+                identity.snapshotExistingKeys(owner.rawId.takeIf { owner.isBound }) { root ->
+                    KeyDerivation(crypto).deriveKey(root, "media_payload", "media_payload_v1")
+                }
+            } ?: run {
+                if (owner.isBound || archiveFiles.any { it.relativeTo(archive).invariantSeparatorsPath.startsWith("media/") }) {
+                    throw IOException("Native iOS transfer is unavailable")
+                }
+                PrivateOsCustodyRecord.prepareRootlessPlaintext(
+                    transportFlags,
+                    Uuid.random(),
+                    sourceGeneration,
+                    owner,
+                    bundle.checksumsSha256,
+                    bundle.manifestSha256,
+                ) { identity.observeRootlessKeys() } ?: throw IOException("Native iOS transfer is unavailable")
+            }
+        return record
     }
 
     private fun discard() {

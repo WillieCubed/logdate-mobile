@@ -13,6 +13,7 @@ import app.logdate.shared.model.Place
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.profile.LogDateProfile
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -29,6 +30,41 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class NativeArchive3SnapshotWriterTest {
+    @Test
+    fun `semantic place rows survive without a saved place`() =
+        runBlocking {
+            val parent = Files.createTempDirectory("logdate-archive3-semantic-place").toFile()
+            try {
+                val root = parent.resolve("archive").absolutePath.toPath()
+                val place =
+                    Json
+                        .parseToJsonElement(
+                            """{"id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","name":"Trailhead","latitude":36.1,"longitude":-115.1,"radius":30.0,"units":"m","created":1700000000123,"last_updated":1700000000456,"sync_version":7,"deleted_at":1700000000999}""",
+                        ).jsonObject
+                NativeArchive3SnapshotWriter.write(
+                    NativeArchive3SnapshotInput(
+                        exportedAt = "2026-10-23T00:00:00Z",
+                        journals = emptyList(),
+                        notes = emptyList(),
+                        journalIdsByNote = emptyMap(),
+                        drafts = emptyList(),
+                        profile = LogDateProfile(),
+                        places = emptyList(),
+                        semanticPlaces = kotlinx.serialization.json.JsonArray(listOf(place)),
+                        locationHistory = emptyList(),
+                        originals = emptyList(),
+                        unsupportedPopulatedCategories = emptySet(),
+                        validateContext = {},
+                    ),
+                    StagingDirectoryArchiveContainer(FileSystem.SYSTEM, root),
+                )
+                val places = Json.parseToJsonElement(parent.resolve("archive/data/places.json").readText()).jsonObject
+                assertEquals(listOf(place), places.getValue("nativeAndroidSemanticPlaces").jsonArray.toList())
+            } finally {
+                parent.deleteRecursively()
+            }
+        }
+
     @Test
     fun `saved places without source timestamps are refused`() =
         runBlocking {

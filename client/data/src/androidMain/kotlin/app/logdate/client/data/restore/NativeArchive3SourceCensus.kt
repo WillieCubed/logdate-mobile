@@ -7,6 +7,9 @@ import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.location.LocationCapturePipeline
 import app.logdate.client.repository.location.LocationCaptureSource
 import app.logdate.shared.model.PhotoPresentation
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlin.uuid.Uuid
 
 /** A conservative inventory of user rows before claiming a complete Android-to-Apple export. */
@@ -24,6 +27,7 @@ internal object NativeArchive3SourceCensus {
             "media_captions",
             "location_logs",
             "user_places",
+            "places",
         )
     private val regenerable =
         setOf(
@@ -65,6 +69,7 @@ internal object NativeArchive3SourceCensus {
         unsupported += deletedSourceRows(database)
         unsupported += unrepresentedNoteFields(database)
         unsupported += unrepresentedLocationFields(database)
+        if (hasUnresolvedNotePlace(database)) unsupported += "unresolvedNotePlace"
         if (hasUnrepresentedJournalLinks(database)) unsupported += "journalContentWithoutNote"
         if (hasUnrepresentedMediaCaptions(database)) unsupported += "mediaCaptionWithoutMediaNote"
         if ("journal_notes" in unsupported && legacyJournalLinksCovered(database)) unsupported.remove("journal_notes")
@@ -113,6 +118,44 @@ internal object NativeArchive3SourceCensus {
             }
         }
 
+    /** Every persisted semantic place field is copied from the pinned database, including tombstones. */
+    fun semanticPlaceRows(database: SupportSQLiteDatabase): JsonArray {
+        val rows = mutableListOf<kotlinx.serialization.json.JsonObject>()
+        database
+            .query(
+                "SELECT id, name, latitude, longitude, altitude, accuracy, radius, units, description, ap_uri, created, last_updated, sync_version, last_synced, deleted_at FROM places ORDER BY id",
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    rows +=
+                        buildJsonObject {
+                            put("id", JsonPrimitive(cursor.getString(0)))
+                            put("name", JsonPrimitive(cursor.getString(1)))
+                            put("latitude", JsonPrimitive(cursor.getDouble(2)))
+                            put("longitude", JsonPrimitive(cursor.getDouble(3)))
+                            for (index in listOf(4, 5, 6)) {
+                                if (!cursor.isNull(index)) {
+                                    put(listOf("altitude", "accuracy", "radius")[index - 4], JsonPrimitive(cursor.getDouble(index)))
+                                }
+                            }
+                            put("units", JsonPrimitive(cursor.getString(7)))
+                            for ((index, name) in listOf(8 to "description", 9 to "ap_uri")) {
+                                if (!cursor.isNull(index)) put(name, JsonPrimitive(cursor.getString(index)))
+                            }
+                            for ((index, name) in listOf(
+                                10 to "created",
+                                11 to "last_updated",
+                                12 to "sync_version",
+                                13 to "last_synced",
+                                14 to "deleted_at",
+                            )) {
+                                if (!cursor.isNull(index)) put(name, JsonPrimitive(cursor.getLong(index)))
+                            }
+                        }
+                }
+            }
+        return JsonArray(rows)
+    }
+
     fun unrepresentedLocationFields(database: SupportSQLiteDatabase): Set<String> =
         buildSet {
             if (hasUnexpectedValue(database, "location_logs", "capture_pipeline", LocationCapturePipeline.entries.map { it.name }, false)) {
@@ -121,6 +164,15 @@ internal object NativeArchive3SourceCensus {
             if (hasUnexpectedValue(database, "location_logs", "capture_source", LocationCaptureSource.entries.map { it.name }, false)) {
                 add("locationCaptureSource")
             }
+        }
+
+    fun hasUnresolvedNotePlace(database: SupportSQLiteDatabase): Boolean =
+        listOf("text_notes", "image_notes", "audio_notes", "video_notes").any { table ->
+            database
+                .query(
+                    "SELECT 1 FROM $table AS note WHERE note.place_id IS NOT NULL " +
+                        "AND NOT EXISTS (SELECT 1 FROM places AS place WHERE place.id = note.place_id AND place.deleted_at IS NULL) LIMIT 1",
+                ).use { it.moveToFirst() }
         }
 
     private fun hasUnexpectedValue(

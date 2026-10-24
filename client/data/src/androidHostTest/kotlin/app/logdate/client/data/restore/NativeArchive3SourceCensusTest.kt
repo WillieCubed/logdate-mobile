@@ -7,6 +7,8 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.Test
@@ -18,6 +20,87 @@ import kotlin.uuid.Uuid
 
 @RunWith(RobolectricTestRunner::class)
 class NativeArchive3SourceCensusTest {
+    @Test
+    fun `a note linked to a deleted semantic place remains fail closed`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val helper =
+            FrameworkSQLiteOpenHelperFactory().create(
+                SupportSQLiteOpenHelper.Configuration
+                    .builder(context)
+                    .name("native-note-place-${System.nanoTime()}.db")
+                    .callback(
+                        object : SupportSQLiteOpenHelper.Callback(1) {
+                            override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                                db.execSQL("CREATE TABLE places (id TEXT, deleted_at INTEGER)")
+                                for (table in listOf("text_notes", "image_notes", "audio_notes", "video_notes")) {
+                                    db.execSQL("CREATE TABLE $table (place_id TEXT)")
+                                }
+                            }
+
+                            override fun onUpgrade(
+                                db: androidx.sqlite.db.SupportSQLiteDatabase,
+                                oldVersion: Int,
+                                newVersion: Int,
+                            ) = Unit
+                        },
+                    ).build(),
+            )
+        try {
+            val database = helper.writableDatabase
+            database.execSQL("INSERT INTO places VALUES ('place-1', NULL)")
+            database.execSQL("INSERT INTO text_notes VALUES ('place-1')")
+            assertFalse(NativeArchive3SourceCensus.hasUnresolvedNotePlace(database))
+            database.execSQL("UPDATE places SET deleted_at = 123")
+            assertTrue(NativeArchive3SourceCensus.hasUnresolvedNotePlace(database))
+        } finally {
+            helper.close()
+        }
+    }
+
+    @Test
+    fun `semantic places retain every persisted field including deletion`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val helper =
+            FrameworkSQLiteOpenHelperFactory().create(
+                SupportSQLiteOpenHelper.Configuration
+                    .builder(context)
+                    .name("native-semantic-places-${System.nanoTime()}.db")
+                    .callback(
+                        object : SupportSQLiteOpenHelper.Callback(1) {
+                            override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                                db.execSQL(
+                                    "CREATE TABLE places (id TEXT, name TEXT, latitude REAL, longitude REAL, " +
+                                        "altitude REAL, accuracy REAL, " +
+                                        "radius REAL, units TEXT, description TEXT, ap_uri TEXT, created INTEGER, last_updated INTEGER, " +
+                                        "sync_version INTEGER, last_synced INTEGER, deleted_at INTEGER)",
+                                )
+                            }
+
+                            override fun onUpgrade(
+                                db: androidx.sqlite.db.SupportSQLiteDatabase,
+                                oldVersion: Int,
+                                newVersion: Int,
+                            ) = Unit
+                        },
+                    ).build(),
+            )
+        try {
+            val database = helper.writableDatabase
+            database.execSQL(
+                "INSERT INTO places VALUES ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Trailhead', 36.1, -115.1, 620.5, 0.75, " +
+                    "30.0, 'm', 'The path', 'https://example.test/place', 1700000000123, 1700000500456, 7, 1700000550555, 1700000600789)",
+            )
+            val row = NativeArchive3SourceCensus.semanticPlaceRows(database).single().jsonObject
+            assertEquals(15, row.size)
+            assertEquals("1700000600789", row.getValue("deleted_at").jsonPrimitive.content)
+            assertEquals("https://example.test/place", row.getValue("ap_uri").jsonPrimitive.content)
+            assertEquals("0.75", row.getValue("accuracy").jsonPrimitive.content)
+            assertTrue("places" !in NativeArchive3SourceCensus.unsupportedPopulatedTables(mapOf("places" to 1L)))
+        } finally {
+            helper.close()
+        }
+    }
+
     @Test
     fun `content not represented by archive three blocks complete claim`() {
         val rows =

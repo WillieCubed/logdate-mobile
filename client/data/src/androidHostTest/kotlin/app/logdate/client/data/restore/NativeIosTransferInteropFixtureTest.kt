@@ -130,6 +130,11 @@ class NativeIosTransferInteropFixtureTest {
                                 ),
                             ),
                         placeSourceTimes = mapOf(placeId to (1_700_000_000_123L to 1_700_000_500_456L)),
+                        semanticPlaces =
+                            Json
+                                .parseToJsonElement(
+                                    """[{"id":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","name":"Trailhead","latitude":36.1,"longitude":-115.1,"radius":30.0,"units":"m","created":1700000000123,"last_updated":1700000500456,"sync_version":7,"deleted_at":1700000600789}]""",
+                                ).jsonArray,
                         locationHistory = emptyList(),
                         originals = emptyList(),
                         unsupportedPopulatedCategories = emptySet(),
@@ -151,8 +156,9 @@ class NativeIosTransferInteropFixtureTest {
                 assertEquals("true", journal.getValue("favorite").jsonPrimitive.content)
                 assertEquals(1, bundle.notes.size)
                 assertEquals(2, bundle.drafts.size)
-                assertEquals("adac218ddea82bcd7bf399c8b4e7c2508cd09accc06b668b8cac2872ac2717a7", bundle.checksumsSha256)
-                assertEquals("b99019111b117b80f48079e4c197c6fd1cbe071be884f857eb1b52a31024566d", bundle.manifestSha256)
+                assertEquals(1, bundle.semanticPlaces.size)
+                assertEquals("46c4f2fb71fb8eccb1e4513bf2f3684bd95d831da447de7908d2f76757334cdc", bundle.checksumsSha256)
+                assertEquals("b7d6ad07a9fab11de767769341e9c95b9f99b4ce63cb3ffecc897629747f32fd", bundle.manifestSha256)
                 val custody = File(root, ".logdate-os-private/custody-v1.json")
                 assertTrue(custody.parentFile!!.mkdirs())
                 val emptyStorage =
@@ -190,8 +196,12 @@ class NativeIosTransferInteropFixtureTest {
                     )
                 record.withEncodedBytes { custody.writeBytes(it) }
                 assertEquals(
-                    "1e5da6600e0277de66ec588cb37c205118e4a8ff3c72e4cc5062ed55697cd66b",
-                    MessageDigest.getInstance("SHA-256").digest(custody.readBytes()).joinToString("") { "%02x".format(it) },
+                    "c923fc0321a3cc1b3246b61de2f4a90f073f6cd430009d1fbfa1c29298b6c5ff",
+                    MessageDigest.getInstance("SHA-256").digest(custody.readBytes()).joinToString("") {
+                        "%02x".format(
+                            it.toInt() and 0xff,
+                        )
+                    },
                 )
                 val emitted = mutableListOf<String>()
                 emitNativeIosStagedFiles(root) { emitted += it.relativeTo(scratch).invariantSeparatorsPath }
