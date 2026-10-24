@@ -45,12 +45,41 @@ The server shows an account's repository only when all of these hold:
 For any other account every method below answers as it did before the stream existed: it asks the
 caller to sign in, and it never confirms that the account exists.
 
+An account that relays already know and that is no longer in good standing is reported, not hidden.
+`getRepoStatus` answers `active: false` with a `status` to anyone, with no sign-in, and a revision when
+the repository still exists:
+
+| Status | When |
+|---|---|
+| `deactivated` | The account is not active. |
+| `suspended` | The server's operators suspended the account. |
+| `takendown` | The server's operators took the account down. |
+| `deleted` | The account was deleted after relays heard of it. There is no revision. |
+
+`getRepo` and `getLatestCommit` answer such an account with the error the protocol names:
+`RepoDeactivated`, `RepoSuspended` or `RepoTakendown`, and `RepoNotFound` for a deleted one. Records,
+listings and blobs stop being served. Followers also hear an `#account` event with `active: false` and the
+status. Suspending, taking down and restoring go through `AccountModerationService`, which stores the
+decision in the `accounts.moderation` column and sends the event; restoring sends `active: true`.
+
 Showing individual records is not enough to show a whole repository. A repository exports as a tree
 that names the collection and key of every record it holds, so a tree with a single private record in
 it would reveal that record's name. The server therefore exports and announces a repository only while
 every record in its tree is in a public collection. If a private record gets in, the repository goes
 quiet instead of leaking, and the server refuses to write journal records into the repository of an
 account that keeps its journal in a personal space, so that cannot happen by accident.
+
+## Writing public records
+
+With the stream on, an account in a personal space writes public records through
+`com.atproto.repo.createRecord` and `putRecord`, and deletes them with `deleteRecord`. Each record is
+checked against its lexicon before it is stored: LogDate's own schemas for the profile and the sharing
+key, and the Standard.site schemas for publications and documents, which the server bundles under
+`lexicons/site/standard/`. A record with a missing required field, a value of the wrong type, text or a
+photo over a limit, or a malformed date is refused with `InvalidRequest`, naming each problem and the
+path of the value, and nothing is stored or announced. Fields the schema does not describe are accepted,
+so records written for a newer schema stay valid. A collection that was opened to apps and has no schema
+here is accepted as it is. The profile's key is always `self`.
 
 ## Methods
 
@@ -79,9 +108,9 @@ can ask for everything after it.
 | Event | When the server sends it |
 |---|---|
 | `#commit` | A shown repository changed. It lists the records that were created, updated or deleted, and carries the commit, the record tree and the new records as a CAR file, so a relay can check the change without asking for more. |
-| `#sync` | A relay must fetch the repository again, because a diff on top of a state it never saw would not verify. Sent when an account is first announced, when the commit before this one was never announced, and when a commit changes more than 200 records or its blocks exceed 2 MB. |
+| `#sync` | A relay must fetch the repository again, because a diff on top of a state it never saw would not verify. Sent when an account is first announced, when the commit before this one was never announced, and when a commit changes more than 200 records or its blocks exceed 2 MB. The event lexicon replaced its old `tooBig` flag with `#sync` and these limits, which is why a commit over them is announced this way. |
 | `#identity` | An account got an identity, or its handle or signing key changed. |
-| `#account` | An account is active, or was deleted. |
+| `#account` | An account became active, or stopped being active with a status: `deactivated`, `suspended`, `takendown` or `deleted`. |
 
 A `#commit` names the revision it follows in `since` and the tree root that revision had in
 `prevData`. The first commit of a repository has neither.
