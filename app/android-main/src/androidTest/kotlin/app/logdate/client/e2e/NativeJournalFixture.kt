@@ -158,8 +158,8 @@ internal class NativeJournalFixture(
         }
     }
 
-    suspend fun verifyAndEdit() {
-        verifyFixture()
+    suspend fun verifyAndEdit(originalMediaIncluded: Boolean = true) {
+        verifyFixture(originalMediaIncluded)
         val now = Clock.System.now()
         if (notes.getNoteById(id(8)) == null) {
             notes.create(JournalNote.Text(id(8), now, now, "Written offline on replacement phone"), id(2))
@@ -167,7 +167,7 @@ internal class NativeJournalFixture(
         assertEquals("Written offline on replacement phone", (notes.getNoteById(id(8)) as? JournalNote.Text)?.content)
     }
 
-    suspend fun verifyFixture() {
+    suspend fun verifyFixture(originalMediaIncluded: Boolean = true) {
         assertEquals("Native transfer journal", journals.getJournalById(id(1))?.title)
         assertEquals("Second transferred journal", journals.getJournalById(id(2))?.title)
         assertEquals("Text retained through native backup", (notes.getNoteById(id(3)) as? JournalNote.Text)?.content)
@@ -182,15 +182,26 @@ internal class NativeJournalFixture(
         val image = assertNotNull(notes.getNoteById(id(4)) as? JournalNote.Image)
         val audio = assertNotNull(notes.getNoteById(id(5)) as? JournalNote.Audio)
         val video = assertNotNull(notes.getNoteById(id(6)) as? JournalNote.Video)
-        verifyMedia(image.mediaRef, "proof.png")
-        verifyMedia(audio.mediaRef, "proof.wav")
-        verifyMedia(video.mediaRef, "proof.mp4")
         val draft = assertNotNull(journals.getDraft(id(10)))
         assertEquals(listOf(id(1), id(2)), draft.selectedJournalIds)
         assertEquals("Unfinished native-transfer draft", (draft.blocks[0] as? SerializableTextBlock)?.content)
-        verifyMedia(assertNotNull((draft.blocks[1] as? SerializableImageBlock)?.uri), "proof.png")
-        verifyMedia(assertNotNull((draft.blocks[2] as? SerializableAudioBlock)?.uri), "proof.wav")
-        verifyMedia(assertNotNull((draft.blocks[3] as? SerializableVideoBlock)?.uri), "proof.mp4")
+        val originals =
+            listOf(
+                image.mediaRef to "proof.png",
+                audio.mediaRef to "proof.wav",
+                video.mediaRef to "proof.mp4",
+                assertNotNull((draft.blocks[1] as? SerializableImageBlock)?.uri) to "proof.png",
+                assertNotNull((draft.blocks[2] as? SerializableAudioBlock)?.uri) to "proof.wav",
+                assertNotNull((draft.blocks[3] as? SerializableVideoBlock)?.uri) to "proof.mp4",
+            )
+        if (originalMediaIncluded) {
+            originals.forEach { (reference, name) -> verifyMedia(reference, name) }
+        } else {
+            originals.forEach { (reference, _) ->
+                assertFalse(media.exists(reference), "Cloud backup unexpectedly delivered original media")
+            }
+            verifyMissingOriginalCanWaitForSignIn(image.uid, "image", image.mediaRef, image.mediaRef)
+        }
     }
 
     fun verifyUnfinishedCameraCapture(
@@ -253,13 +264,22 @@ internal class NativeJournalFixture(
         }
         available.forEach { (reference, name) -> verifyMedia(reference, name) }
 
-        assertNull(GlobalContext.get().get<SessionStorage>().getSession(), "Partial native restore unexpectedly recovered sign-in")
         val missingNote =
             listOf(
                 Triple(image.uid, "image", image.mediaRef),
                 Triple(audio.uid, "audio", audio.mediaRef),
                 Triple(video.uid, "video", video.mediaRef),
             ).first { (_, _, reference) -> UnavailableMediaReferences.isUnavailable(reference) }
+        verifyMissingOriginalCanWaitForSignIn(missingNote.first, missingNote.second, missingNote.third, missingNote.third)
+    }
+
+    private suspend fun verifyMissingOriginalCanWaitForSignIn(
+        entityId: Uuid,
+        kind: String,
+        sourceReference: String,
+        unavailableReference: String,
+    ) {
+        assertNull(GlobalContext.get().get<SessionStorage>().getSession(), "Native restore unexpectedly recovered sign-in")
         val owner =
             GlobalContext
                 .get()
@@ -273,17 +293,17 @@ internal class NativeJournalFixture(
                 .trimEnd('/')
         val result =
             GlobalContext.get().get<AutomaticMediaRecovery>().recover(
-                missingNote.first,
+                entityId,
                 null,
-                missingNote.second,
-                missingNote.third,
-                missingNote.third,
+                kind,
+                sourceReference,
+                unavailableReference,
                 UploadScope(owner, origin),
             )
         assertEquals(
             DiagnosticReason.SIGN_IN_REQUIRED,
             assertIs<AutomaticMediaRecoveryResult.Pending>(result).reason,
-            "Unavailable originals must remain pending until their cloud recovery scope is available",
+            "Missing originals must remain pending until their cloud recovery scope is available",
         )
     }
 

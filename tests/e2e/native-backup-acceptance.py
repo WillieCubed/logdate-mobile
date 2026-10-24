@@ -855,7 +855,7 @@ def restore_radio_state(serial, original):
     raise RuntimeError(f"Could not restore emulator radio state: {detail}")
 
 
-def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_path=None, source_has_session=False, source_session_id=None, installation_trust=False):
+def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_path=None, source_has_session=False, source_session_id=None, installation_trust=False, recording_transport="cloud"):
     arguments = ["shell", "am", "instrument", "-w", "-r", "-e", "class", PROBE,
                  "-e", "nativeBackupMode", mode, "-e", "nativeIdentityMode", identity]
     if mode == "seed" and installation_trust is True:
@@ -869,7 +869,10 @@ def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_
                 raise ValueError(f"existing source fixture is missing {key}")
             arguments.extend(("-e", name, value))
         if metadata.get("recordingTransferFixture"):
+            if recording_transport not in ("cloud", "d2d"):
+                raise ValueError("recording probe requires a known Android backup transport")
             arguments.extend(("-e", "sourceRecordingTransferFixture", "true"))
+            arguments.extend(("-e", "sourceRecordingTransport", recording_transport))
         if metadata.get("installationTrustFixture") is True:
             arguments.extend(("-e", "sourceInstallationTrustFixture", "true"))
     if mode == "source-backup-integrity":

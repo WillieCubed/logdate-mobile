@@ -191,7 +191,7 @@ class NativeBackupTransferProbeTest {
                 }
                 val sourceFixture = NativeJournalFixture(koin.get(), koin.get(), koin.get(), koin.get(), koin.get())
                 sourceFixture.verifyFixture()
-                verifyRecordingTransferFixture(context, inPlace = true)
+                verifyRecordingTransferFixture(context, inPlace = true, expectation = RecordingTransferExpectation.SOURCE)
                 sourceFixture.verifyUnfinishedCameraCapture(context, inPlace = true)
                 return@runBlocking
             }
@@ -397,15 +397,30 @@ class NativeBackupTransferProbeTest {
                     ),
                     "Transferred encryption keys cannot decrypt the original Cloud media payload",
                 )
-                if (arguments.getString("sourceRecordingTransferFixture") == "true") {
-                    verifyRecordingTransferFixture(context, inPlace = mode == "verify-in-place")
+                val recordingExpectation =
+                    if (arguments.getString("sourceRecordingTransferFixture") == "true") {
+                        when (arguments.getString("sourceRecordingTransport")) {
+                            "cloud" -> RecordingTransferExpectation.CLOUD_TARGET
+                            "d2d" -> RecordingTransferExpectation.DEVICE_TRANSFER
+                            else -> error("Recording restore probe requires its selected Android transport")
+                        }
+                    } else {
+                        null
+                    }
+                if (recordingExpectation != null) {
+                    verifyRecordingTransferFixture(context, inPlace = mode == "verify-in-place", expectation = recordingExpectation)
                 }
                 fixture.verifyUnfinishedCameraCapture(context, inPlace = mode == "verify-in-place")
                 if (mode == "partial-media") {
                     fixture.verifyPartialTransfer(requireNotNull(arguments.getString("expectedMissingMediaPath")))
                     return@runBlocking
                 }
-                if (mode == "verify-restored") fixture.verifyFixture() else fixture.verifyAndEdit()
+                val originalMediaIncluded = recordingExpectation != RecordingTransferExpectation.CLOUD_TARGET
+                if (mode == "verify-restored") {
+                    fixture.verifyFixture(originalMediaIncluded)
+                } else {
+                    fixture.verifyAndEdit(originalMediaIncluded)
+                }
             }
         }
 
