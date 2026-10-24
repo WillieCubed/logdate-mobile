@@ -158,8 +158,11 @@ internal class NativeJournalFixture(
         }
     }
 
-    suspend fun verifyAndEdit(originalMediaIncluded: Boolean = true) {
-        verifyFixture(originalMediaIncluded)
+    suspend fun verifyAndEdit(
+        originalMediaIncluded: Boolean = true,
+        expectedJournalTitle: String = "Native transfer journal",
+    ) {
+        verifyFixture(originalMediaIncluded, expectedJournalTitle)
         val now = Clock.System.now()
         if (notes.getNoteById(id(8)) == null) {
             notes.create(JournalNote.Text(id(8), now, now, "Written offline on replacement phone"), id(2))
@@ -167,8 +170,11 @@ internal class NativeJournalFixture(
         assertEquals("Written offline on replacement phone", (notes.getNoteById(id(8)) as? JournalNote.Text)?.content)
     }
 
-    suspend fun verifyFixture(originalMediaIncluded: Boolean = true) {
-        assertEquals("Native transfer journal", journals.getJournalById(id(1))?.title)
+    suspend fun verifyFixture(
+        originalMediaIncluded: Boolean = true,
+        expectedJournalTitle: String = "Native transfer journal",
+    ) {
+        assertEquals(expectedJournalTitle, journals.getJournalById(id(1))?.title)
         assertEquals("Second transferred journal", journals.getJournalById(id(2))?.title)
         assertEquals("Text retained through native backup", (notes.getNoteById(id(3)) as? JournalNote.Text)?.content)
         assertNull(notes.getNoteById(id(7)), "deleted content reappeared")

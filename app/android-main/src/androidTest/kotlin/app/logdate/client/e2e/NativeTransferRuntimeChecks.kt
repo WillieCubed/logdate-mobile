@@ -177,11 +177,17 @@ internal fun verifyRecordingTransferFixture(
         require(!inPlace) { "A cloud target cannot retain source-only recording bytes" }
         assertFalse(final.exists(), "Cloud backup unexpectedly delivered an original recording")
     } else {
-        assertTrue(final.isFile, "Native device transfer did not retain the committed recording")
+        assertTrue(final.isFile, "Native device transfer did not retain the recording")
+        val expectedRecording =
+            if (inPlace && expectation == RecordingTransferExpectation.DEVICE_TRANSFER) {
+                "Changed after native D2D backup"
+            } else {
+                "committed recording"
+            }
         assertContentEquals(
-            "committed recording".encodeToByteArray(),
+            expectedRecording.encodeToByteArray(),
             final.readBytes(),
-            "Native device transfer lost the committed recording",
+            "Native device transfer did not preserve the expected recording",
         )
     }
     if (inPlace) {
