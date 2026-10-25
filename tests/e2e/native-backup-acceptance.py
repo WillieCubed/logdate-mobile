@@ -213,7 +213,7 @@ def contains_media_files(files):
     )
 
 
-def verify_restored_snapshot(restored_files, source_files, *, credentials_only):
+def verify_restored_snapshot(restored_files, source_files, *, credentials_only, allow_database_changes=False):
     """Validate durable restore contents and report the intended acceptance failure."""
     database_path = "databases/logdate"
     database = restored_files.get(database_path)
@@ -240,7 +240,7 @@ def verify_restored_snapshot(restored_files, source_files, *, credentials_only):
     source_database = source_files.get(database_path)
     if source_database is None:
         raise RuntimeError("synthetic source snapshot is missing the journal database")
-    if database["sha256"] != source_database["sha256"]:
+    if not allow_database_changes and database["sha256"] != source_database["sha256"]:
         raise RuntimeError("Android completed restore, but the destination database differs before app startup")
 
 
@@ -1300,6 +1300,10 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
         raise RuntimeError("Android did not complete the native restore")
     if exercise_system_widgets:
         capture_widget_restore_delivery(destination, output / "widget-delivery-initial")
+    if exercise_pending_camera_draft:
+        # Establish exact database delivery before app startup; the following reconciliation
+        # legitimately applies the transferred draft and may migrate the destination database.
+        verify_restored_snapshot(package_file_snapshot(destination), selected_source_files, credentials_only=False)
     if exercise_duplicate_restore:
         if exercise_pending_camera_draft:
             print("Starting the restored app so retained journal reconciliation can finish before replay", flush=True)
@@ -1337,7 +1341,12 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
     if exercise_missing_keys:
         verify_missing_keys_snapshot(restored_files)
     else:
-        verify_restored_snapshot(restored_files, selected_source_files, credentials_only=exercise_credentials_only)
+        verify_restored_snapshot(
+            restored_files,
+            selected_source_files,
+            credentials_only=exercise_credentials_only,
+            allow_database_changes=exercise_pending_camera_draft and exercise_duplicate_restore,
+        )
     print("Launching the restored app through its normal startup path", flush=True)
     launch = adb(destination, "shell", "am", "start", "-W", "-n", PACKAGE + "/app.logdate.client.MainActivity")
     private_file(output / "destination-first-launch.log", launch)

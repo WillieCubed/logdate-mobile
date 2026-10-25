@@ -36,6 +36,20 @@ internal class RetainedJournalMergeCheckpointStore(
     }
 }
 
+internal fun retainedJournalMergeCheckpointDirectory(
+    noBackupFilesDir: File,
+    generation: String,
+): File {
+    require(generation.matches(Regex("[A-Za-z0-9-]+")))
+    return File(noBackupFilesDir.canonicalFile, "retained-journal-merges/$generation")
+}
+
+internal fun requireCanonicalCheckpointPath(path: File): File {
+    val canonical = path.canonicalFile
+    require(canonical == path.absoluteFile) { "Recovery checkpoint directory changed through a symlink" }
+    return canonical
+}
+
 private class AtomicCheckpointRecords(
     private val directory: File,
 ) : CheckpointRecords {
@@ -87,16 +101,14 @@ private class AtomicCheckpointRecords(
 
     private fun recordFile(name: String): File {
         require(name.matches(RECORD_NAME))
-        val canonicalDirectory = directory.canonicalFile
-        require(canonicalDirectory == directory.absoluteFile) { "Recovery checkpoint directory changed through a symlink" }
+        val canonicalDirectory = requireCanonicalCheckpointPath(directory)
         val file = File(canonicalDirectory, name)
         require(file.canonicalFile.parentFile == canonicalDirectory && file.name == name)
         return file
     }
 
     private fun ensurePrivateDirectory(path: File) {
-        val canonical = path.canonicalFile
-        require(canonical == path.absoluteFile) { "Recovery checkpoint directory changed through a symlink" }
+        val canonical = requireCanonicalCheckpointPath(path)
         require(canonical.isDirectory || canonical.mkdirs()) { "Unable to create recovery checkpoint directory" }
         requirePrivateDirectory(canonical)
     }

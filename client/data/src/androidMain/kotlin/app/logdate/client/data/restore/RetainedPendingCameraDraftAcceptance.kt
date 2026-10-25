@@ -43,7 +43,9 @@ internal class RetainedPendingCameraDraftAcceptance(
             expectedImported.copy(
                 id = importedId,
             )
-        if (!canCommit()) return null
+        if (!canCommit()) {
+            return null
+        }
         val transferMarker = importedId.toString()
         if (drafts.isNativeTransferDraftAdmitted(importedId, transferMarker)) return importedId
         val existing = drafts.getDraftSnapshotsForRecovery().firstOrNull { it.id == importedId }

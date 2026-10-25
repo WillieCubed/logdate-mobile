@@ -115,6 +115,27 @@ class NativeJournalReplayCustody(
         consume(old)
     }
 
+    fun retireInterruptedStagedCohortGroup(
+        oldId: String,
+        sources: Map<String, Pair<File, String>>,
+    ) {
+        check(Uuid.parse(oldId).toString() == oldId)
+        sources.values.forEach { (source, hash) ->
+            check(Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS) && retainedJournalChecksum(source) == hash)
+        }
+        val old = File(root, oldId)
+        if (!old.exists()) return
+        val byPhysicalPath = sources.mapKeys { NATIVE_JOURNAL_TRANSFER_PREFIX + it.key }
+        val payloads = sealedPayloadsInCohort(oldId)
+        check(
+            payloads.all { payload ->
+                val source = byPhysicalPath[payload.path] ?: return@all false
+                payload.expectedSize == source.first.length() && prefixMatchesSource(payload.file, source.first)
+            },
+        )
+        consume(old)
+    }
+
     private fun prefixMatchesSource(
         partial: File,
         source: File,

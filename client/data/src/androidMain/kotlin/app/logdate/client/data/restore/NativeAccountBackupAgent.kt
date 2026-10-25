@@ -43,13 +43,15 @@ class NativeAccountBackupAgent : NativeBackupAgent() {
 
     override fun wasNativeJournalTransferStaged(): Boolean = journalRestore.wasStaged()
 
-    override fun finishNativeJournalTransferRestore() =
+    override fun finishNativeJournalTransferRestore(): Boolean =
         runBlocking { AndroidMediaClaimFence(noBackupFilesDir).withClaim { journalRestore.finish() } }
 
-    override fun scheduleRetainedJournalReconciliation() {
+    override fun retainedNativeCameraReconciliationScheduled() =
+        runBlocking { AndroidMediaClaimFence(noBackupFilesDir).withClaim { journalRestore.reconciliationScheduled() } }
+
+    override fun scheduleRetainedJournalReconciliation(): Boolean =
         app.logdate.client.data.restore
             .scheduleRetainedJournalReconciliation(this)
-    }
 
     override suspend fun retainAccountRecoveryBeforeCompletion(
         preferences: DataStore<Preferences>,

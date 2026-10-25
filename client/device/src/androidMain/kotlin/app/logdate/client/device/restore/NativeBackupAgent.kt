@@ -149,9 +149,12 @@ open class NativeBackupAgent : BackupAgent() {
                     }
                 }
             if (duplicateCompletion) {
-                finishNativeJournalTransferRestore()
+                val retainedCameraSource = finishNativeJournalTransferRestore()
                 super.onRestoreFinished()
                 retryAccountRecovery()
+                if (retainedCameraSource && scheduleRetainedJournalReconciliationSafely()) {
+                    retainedNativeCameraReconciliationScheduled()
+                }
                 return
             }
             val journalInstalled = restoreNativeJournalTransferSnapshot()
@@ -182,7 +185,7 @@ open class NativeBackupAgent : BackupAgent() {
             withTimeout(15_000) { retainAccountRecoveryBeforeCompletion(preferences, admission) }
         }
         detector.recordRestoreCompletedUnderDeliveryLock()
-        finishNativeJournalTransferRestore()
+        val retainedCameraSource = finishNativeJournalTransferRestore()
         synchronized(callbackLock) { restoreCompletionRecorded = true }
         try {
             runBlocking(Dispatchers.IO) {
@@ -194,6 +197,9 @@ open class NativeBackupAgent : BackupAgent() {
             }
         } catch (_: Exception) {
             Napier.w("Background native account recovery remains pending")
+        }
+        if (retainedCameraSource && scheduleRetainedJournalReconciliationSafely()) {
+            retainedNativeCameraReconciliationScheduled()
         }
     }
 
@@ -409,15 +415,16 @@ open class NativeBackupAgent : BackupAgent() {
         synchronized(callbackLock) { installationStateReset = true }
     }
 
-    private fun scheduleRetainedJournalReconciliationSafely() {
+    private fun scheduleRetainedJournalReconciliationSafely(): Boolean {
         try {
-            scheduleRetainedJournalReconciliation()
+            return scheduleRetainedJournalReconciliation()
         } catch (_: Exception) {
             Napier.w("Retained journal reconciliation remains pending")
+            return false
         }
     }
 
-    protected open fun scheduleRetainedJournalReconciliation() = Unit
+    protected open fun scheduleRetainedJournalReconciliation(): Boolean = false
 
     /** Concrete agents must validate their encrypted journal before replacing a cloud backup. */
     protected open fun requireCloudJournalRecoverability(): Unit =
@@ -434,14 +441,20 @@ open class NativeBackupAgent : BackupAgent() {
     /** A complete source snapshot was retained for merge because a local journal had prior authority. */
     protected open fun wasNativeJournalTransferStaged(): Boolean = false
 
-    protected open fun finishNativeJournalTransferRestore() = Unit
+    protected open fun finishNativeJournalTransferRestore(): Boolean = false
+
+    protected open fun retainedNativeCameraReconciliationScheduled() = Unit
 
     private fun finishCompletedNativeJournalCleanup() {
         val authority = NativeJournalRestoreAuthority(this)
         if (PostRestoreDetector(this).hasCompletedNativeRestoreDelivery() &&
             (authority.installedReceipt() != null || authority.cleanupReceipt() != null)
         ) {
-            finishNativeJournalTransferRestore()
+            val retainedCameraSource = finishNativeJournalTransferRestore()
+            if (retainedCameraSource) {
+                retryAccountRecovery()
+                if (scheduleRetainedJournalReconciliationSafely()) retainedNativeCameraReconciliationScheduled()
+            }
         }
     }
 

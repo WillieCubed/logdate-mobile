@@ -180,6 +180,17 @@ def command(*args, check=True, timeout=15):
     return subprocess.run(args, cwd=ROOT, check=check, capture_output=True, timeout=timeout)
 
 
+def process_snapshot(*, execute=command, retries=2, sleep=time.sleep):
+    """Retry transient host process-list stalls without weakening emulator ownership checks."""
+    for attempt in range(retries):
+        try:
+            return execute("ps", "-axo", "pid,args").stdout.decode().splitlines()
+        except subprocess.TimeoutExpired:
+            if attempt + 1 == retries:
+                return None
+            sleep(0.2)
+
+
 def verify_managed_emulator(sdk, output, *, command=command):
     result = command(str(sdk / "emulator/emulator"), "-no-window", "-version", check=False)
     log = output / "emulator-preflight.log"
@@ -418,6 +429,7 @@ def run_managed_pair(options, *, recovery_assets=None, fixture_control=None, exp
         observed_managed_pids = set()
         try:
             deadline = None
+            launch_deadline = time.monotonic() + max(1200, budget["boot"] * 2)
             while len(custody["targets"]) < 2:
                 if process.poll() is not None:
                     raise RuntimeError("The managed pair stopped before both drivers were ready; inspect gradle.log")
@@ -426,7 +438,12 @@ def run_managed_pair(options, *, recovery_assets=None, fixture_control=None, exp
                     time.sleep(.2)
                     continue
                 custody["gradle"]["identity"] = identity
-                processes = command("ps", "-axo", "pid,args").stdout.decode().splitlines()
+                processes = process_snapshot()
+                if processes is None:
+                    if time.monotonic() > (deadline or launch_deadline):
+                        raise RuntimeError("Managed emulator process discovery expired after repeated host process-list timeouts")
+                    time.sleep(0.2)
+                    continue
                 candidates = TARGET["managed_candidates"](processes, existing, avd)
                 candidates = EMULATOR["owned_managed_candidates"](
                     output / "managed-emulator-launches", candidates, nonce)
@@ -434,6 +451,8 @@ def run_managed_pair(options, *, recovery_assets=None, fixture_control=None, exp
                     deadline = managed_boot_deadline(deadline, time.monotonic(), budget["boot"])
                 if deadline is not None and time.monotonic() > deadline:
                     raise RuntimeError("The managed pair is still owned by the recorded Gradle handle; boot observation expired")
+                if deadline is None and not candidates and time.monotonic() > launch_deadline:
+                    raise RuntimeError("Gradle did not launch an owned managed emulator before the bounded discovery deadline")
                 observed_managed_pids.update(candidates)
                 if len(candidates) > 2:
                     raise RuntimeError("More than two new managed devices; custody is ambiguous")

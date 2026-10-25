@@ -16,6 +16,23 @@ MODULE = runpy.run_path(str(Path(__file__).with_name("managed-native-restore-acc
 
 
 class ManagedDriverControllerTest(unittest.TestCase):
+    def test_process_snapshot_retries_a_transient_host_ps_timeout(self):
+        execute = Mock(side_effect=[subprocess.TimeoutExpired("ps", 15),
+                                    subprocess.CompletedProcess([], 0, b"123 qemu-system-aarch64\n")])
+        sleep = Mock()
+
+        lines = MODULE["process_snapshot"](execute=execute, sleep=sleep)
+
+        self.assertEqual(["123 qemu-system-aarch64"], lines)
+        self.assertEqual(2, execute.call_count)
+        sleep.assert_called_once_with(0.2)
+
+    def test_process_snapshot_gives_up_after_bounded_host_ps_timeouts(self):
+        execute = Mock(side_effect=subprocess.TimeoutExpired("ps", 15))
+
+        self.assertIsNone(MODULE["process_snapshot"](execute=execute, sleep=Mock()))
+        self.assertEqual(2, execute.call_count)
+
     def test_managed_pair_boot_budget_starts_with_first_owned_qemu_not_gradle(self):
         deadline = None
         first_qemu_observed_at = 900.0

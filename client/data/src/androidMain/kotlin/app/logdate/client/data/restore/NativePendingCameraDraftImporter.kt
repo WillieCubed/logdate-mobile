@@ -8,12 +8,15 @@ import app.logdate.client.device.restore.verifyNativeJournalMediaInventory
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.media.storage.isRecoveredOriginal
+import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRecoveryRepository
 import app.logdate.client.repository.journals.PendingMediaType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.channels.FileChannel
@@ -37,60 +40,57 @@ internal class NativePendingCameraDraftImporter(
         expectedInventorySha256: String?,
     ): Boolean {
         val draftFile = sourceFiles[ENTRY_DRAFTS_PATH] ?: return true
-        val storeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        try {
-            val store = PreferenceDataStoreFactory.create(scope = storeScope, produceFile = { draftFile })
-            val sourceDrafts = AndroidLocalEntryDraftStore(store).getAllDrafts()
-            val cameraDrafts = sourceDrafts.filter(::hasPendingCameraOriginal)
-            if (cameraDrafts.isEmpty()) return true
-            val inventoryHash = expectedInventorySha256 ?: return false
-            val inventoryFile = sourceFiles[NATIVE_MEDIA_INVENTORY_PATH] ?: return false
-            val inventory = verifyNativeJournalMediaInventory(inventoryFile, inventoryHash)
-            for (draft in cameraDrafts) {
-                val recoveredReferences = mutableMapOf<String, String>()
-                val cameraRecords =
-                    draft.pendingMedia.filter {
-                        it.mediaType == PendingMediaType.CAMERA_PHOTO || it.mediaType == PendingMediaType.CAMERA_VIDEO
-                    }
-                for (record in cameraRecords) {
-                    val recordPaths = listOfNotNull(record.filePath, record.fallbackFilePath).distinct()
-                    for (sourcePath in recordPaths) {
-                        val transferPath = nativeTransferMediaPaths(setOf(sourcePath), packageName, filesDir).singleOrNull()
-                        if (transferPath == null || !transferPath.startsWith("files/camera-captures/")) {
-                            if (retainedCanonicalMediaDigest(sourcePath) == null) return false
-                            continue
-                        }
-                        val entry = inventory.entry(transferPath) ?: return false
-                        val sourceFile = sourceFiles[transferPath] ?: return false
-                        if (!verifyFile(sourceFile, entry)) return false
-                        requireCurrent()
-                        val target =
-                            File(
-                                File(filesDir, "camera-captures"),
-                                importedCaptureName(generation, draft.id.toString(), record.blockId.toString(), transferPath),
-                            )
-                        copyDurably(sourceFile, target, entry)
-                        requireCurrent()
-                        recoveredReferences[sourcePath] = target.absolutePath
-                    }
+        val scratchRoot = File(filesDir.parentFile, "no_backup/retained-draft-reads")
+        val sourceDrafts = readRetainedEntryDrafts(draftFile, scratchRoot)
+        val cameraDrafts = sourceDrafts.filter(::hasPendingCameraOriginal)
+        if (cameraDrafts.isEmpty()) return true
+        val inventoryHash = expectedInventorySha256 ?: return false
+        val inventoryFile = sourceFiles[NATIVE_MEDIA_INVENTORY_PATH] ?: return false
+        val inventory =
+            runCatching { verifyNativeJournalMediaInventory(inventoryFile, inventoryHash) }
+                .getOrElse { return false }
+        for (draft in cameraDrafts) {
+            val recoveredReferences = mutableMapOf<String, String>()
+            val cameraRecords =
+                draft.pendingMedia.filter {
+                    it.mediaType == PendingMediaType.CAMERA_PHOTO || it.mediaType == PendingMediaType.CAMERA_VIDEO
                 }
-                if (!entryDraftCameraMediaIsComplete(draft, recoveredReferences.keys) { reference ->
-                        requireCurrent()
-                        media.isRecoveredOriginal(reference, StoredMediaReferences.Unchanged)
+            for (record in cameraRecords) {
+                val recordPaths = listOfNotNull(record.filePath, record.fallbackFilePath).distinct()
+                for (sourcePath in recordPaths) {
+                    val transferPath = nativeTransferMediaPaths(setOf(sourcePath), packageName, filesDir).singleOrNull()
+                    if (transferPath == null || !transferPath.startsWith("files/camera-captures/")) {
+                        if (retainedCanonicalMediaDigest(sourcePath) == null) return false
+                        continue
                     }
-                ) {
-                    return false
-                }
-                if (RetainedPendingCameraDraftAcceptance(drafts).accept(generation, draft, recoveredReferences, canCommit, scopeFence) ==
-                    null
-                ) {
-                    return false
+                    val entry = inventory.entry(transferPath) ?: return false
+                    val sourceFile = sourceFiles[transferPath] ?: return false
+                    if (!verifyFile(sourceFile, entry)) return false
+                    requireCurrent()
+                    val target =
+                        File(
+                            File(filesDir, "camera-captures"),
+                            importedCaptureName(generation, draft.id.toString(), record.blockId.toString(), transferPath),
+                        )
+                    copyDurably(sourceFile, target, entry)
+                    requireCurrent()
+                    recoveredReferences[sourcePath] = target.absolutePath
                 }
             }
-            return true
-        } finally {
-            storeScope.cancel()
+            if (!entryDraftCameraMediaIsComplete(draft, recoveredReferences.keys) { reference ->
+                    requireCurrent()
+                    media.isRecoveredOriginal(reference, StoredMediaReferences.Unchanged)
+                }
+            ) {
+                return false
+            }
+            if (RetainedPendingCameraDraftAcceptance(drafts).accept(generation, draft, recoveredReferences, canCommit, scopeFence) ==
+                null
+            ) {
+                return false
+            }
         }
+        return true
     }
 
     private fun copyDurably(
@@ -113,11 +113,7 @@ internal class NativePendingCameraDraftImporter(
                 }
             }
             check(verifyFile(temporary, entry)) { "Staged camera bytes changed during handoff" }
-            try {
-                Files.createLink(target.toPath(), temporary.toPath())
-            } catch (_: java.nio.file.FileAlreadyExistsException) {
-                check(verifyFile(target, entry)) { "Concurrent camera handoff produced different bytes" }
-            }
+            publishVerifiedCameraCapture(temporary, target) { verifyFile(it, entry) }
             FileChannel.open(parent.toPath(), StandardOpenOption.READ).use { it.force(true) }
         } finally {
             temporary.delete()
@@ -155,6 +151,55 @@ internal class NativePendingCameraDraftImporter(
         const val ENTRY_DRAFTS_PATH = "files/datastore/entry_drafts.preferences_pb"
     }
 }
+
+internal fun publishVerifiedCameraCapture(
+    temporary: File,
+    target: File,
+    verifyTarget: (File) -> Boolean,
+) {
+    try {
+        Files.move(temporary.toPath(), target.toPath())
+    } catch (_: java.nio.file.FileAlreadyExistsException) {
+        check(verifyTarget(target)) { "Concurrent camera handoff produced different bytes" }
+    }
+}
+
+internal suspend fun readRetainedEntryDrafts(
+    source: File,
+    scratchRoot: File,
+): List<EntryDraft> {
+    require(Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(source.toPath()))
+    require(source.length() in 1..MAX_RETAINED_ENTRY_DRAFT_BYTES)
+    val rootPath = scratchRoot.toPath()
+    if (!Files.exists(rootPath, LinkOption.NOFOLLOW_LINKS)) Files.createDirectories(rootPath)
+    require(Files.isDirectory(rootPath, LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(rootPath))
+    val scratchDirectory = File(scratchRoot, "draft-read-${kotlin.uuid.Uuid.random()}")
+    check(scratchDirectory.absoluteFile.parentFile?.canonicalFile == scratchRoot.canonicalFile)
+    check(!scratchDirectory.exists() && scratchDirectory.mkdirs())
+    val scratchFile = File(scratchDirectory, "entry_drafts.preferences_pb")
+    val scopeJob = SupervisorJob()
+    val scope = CoroutineScope(scopeJob + Dispatchers.IO)
+    var failure: Throwable? = null
+    return try {
+        Files.copy(source.toPath(), scratchFile.toPath())
+        val store = PreferenceDataStoreFactory.create(scope = scope, produceFile = { scratchFile.canonicalFile })
+        AndroidLocalEntryDraftStore(store).getAllDrafts()
+    } catch (error: Throwable) {
+        failure = error
+        throw error
+    } finally {
+        withContext(NonCancellable) {
+            scopeJob.cancelAndJoin()
+            if (!scratchDirectory.deleteRecursively()) {
+                val cleanupError = IllegalStateException("Could not clean retained entry draft read copy")
+                val originalFailure = failure
+                if (originalFailure == null) throw cleanupError else originalFailure.addSuppressed(cleanupError)
+            }
+        }
+    }
+}
+
+private const val MAX_RETAINED_ENTRY_DRAFT_BYTES = 64 * 1024 * 1024
 
 internal fun ensurePrivateCameraCaptureDirectory(filesDir: File): File {
     val root = filesDir.toPath()
