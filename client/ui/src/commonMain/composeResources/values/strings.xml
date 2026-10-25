@@ -131,6 +131,8 @@
     <string name="workspace_sheet_show_map">Show map</string>
     <string name="workspace_sheet_full_view">Full view</string>
     <string name="workspace_create_label">Add a memory</string>
+    <string name="workspace_navigation_expand">Expand navigation</string>
+    <string name="workspace_navigation_collapse">Collapse navigation</string>
     <!-- Provenance -->
     <string name="captured_on_watch">Captured on your watch</string>
     <string name="captured_while_moving">While moving</string>
