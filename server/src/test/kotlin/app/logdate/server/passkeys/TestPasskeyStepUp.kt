@@ -28,6 +28,15 @@ class TestPasskeyStepUp : PasskeyStepUp {
         proof: PasskeyStepUpProof,
     ): Boolean = issued.remove(proof.challenge) == accountId
 
+    private val grants = mutableMapOf<String, Uuid>()
+
+    override fun grant(accountId: Uuid): String = "grant-${grants.size + 1}".also { grants[it] = accountId }
+
+    override fun redeem(
+        accountId: Uuid,
+        grant: String,
+    ): Boolean = grants.remove(grant) == accountId
+
     /** Begins a step-up for [accountId] and answers it, as a device with the account's passkey would. */
     fun proofFor(accountId: Uuid): PasskeyStepUpProof =
         PasskeyStepUpProof(

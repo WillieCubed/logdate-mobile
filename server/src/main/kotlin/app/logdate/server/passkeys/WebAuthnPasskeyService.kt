@@ -34,6 +34,9 @@ private const val REGISTRATION_TYPE = "registration"
 /** Stored as its own challenge type; see the `challenge_type_valid` constraint. */
 private const val STEP_UP_PURPOSE = "step_up"
 
+/** Stored as its own challenge type; see the `challenge_type_valid` constraint. */
+private const val STEP_UP_GRANT_PURPOSE = "step_up_grant"
+
 /** Matches the `passkeys.nickname` column width. */
 private const val MAX_NICKNAME_LENGTH = 100
 
@@ -287,6 +290,20 @@ class WebAuthnPasskeyService(
     fun generateStepUpOptions(userId: Uuid): PasskeyAuthenticationOptions =
         generateBoundAuthenticationOptions(STEP_UP_PURPOSE, userId)
             .copy(allowCredentials = getUserCredentials(userId))
+
+    /**
+     * Issues a step-up grant for [userId] right after they confirmed with a passkey, such as at
+     * sign-in: single use, valid for five minutes, and bound to the account. It stands in for a
+     * step-up only where a route accepts one, so a passkey sign-in can register the account's first
+     * recovery key without a second prompt.
+     */
+    fun issueStepUpGrant(userId: Uuid): String = challengeStore.issue(userId, STEP_UP_GRANT_PURPOSE)
+
+    /** Spends [grant] if it was issued to [userId] by [issueStepUpGrant] and is unused and unexpired. */
+    fun redeemStepUpGrant(
+        userId: Uuid,
+        grant: String,
+    ): Boolean = challengeStore.consume(challenge = grant, expectedType = STEP_UP_GRANT_PURPOSE, expectedUserId = userId) != null
 
     /**
      * Verifies a step-up from [generateStepUpOptions]: the challenge must have been issued to

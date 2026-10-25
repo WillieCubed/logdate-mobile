@@ -45,7 +45,13 @@ internal object RecoveryKeySchemaDocs {
             "RegisterPlcRecoveryKeyRequest" to
                 SchemaDoc(
                     "A recovery key to register, or to put in place of the registered one.",
-                    mapOf("recoveryDidKey" to "The public recovery key as a `did:key`.", "stepUp" to STEP_UP_FIELD),
+                    mapOf(
+                        "recoveryDidKey" to "The public recovery key as a `did:key`.",
+                        "stepUp" to STEP_UP_FIELD,
+                        "stepUpGrant" to
+                            "The `stepUpGrant` from a passkey sign-in or sign-up in the last five minutes, in place of " +
+                            "`stepUp`. Spent on first use, and accepted only when registering the first recovery key.",
+                    ),
                 ),
             "RecoveryKeyStepUpResponse" to
                 SchemaDoc(

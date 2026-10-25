@@ -31,6 +31,12 @@ data class RegisterPlcRecoveryKeyRequest(
     val recoveryDidKey: String,
     /** A fresh passkey confirmation from **Confirm a recovery-key change**. */
     val stepUp: PasskeyStepUpProof? = null,
+    /**
+     * The `stepUpGrant` from a passkey sign-in or sign-up in the last five minutes, used once in
+     * place of [stepUp]. Only registering the first recovery key accepts it; replacing one always
+     * needs a fresh confirmation.
+     */
+    val stepUpGrant: String? = null,
 )
 
 @Serializable
@@ -91,7 +97,13 @@ internal fun Route.recoveryKeyRoutes(
 ) {
     val routes = RecoveryKeyRouteContext(accountRepository, tokenService, atprotoIdentityService, passkeyStepUp)
     stepUpRoute(routes)
-    recoveryKeyChangeRoute(routes, "/plc/recovery-key", RecoveryKeyDocs.registerPlcRecoveryKey, "register the recovery key") {
+    recoveryKeyChangeRoute(
+        routes,
+        "/plc/recovery-key",
+        RecoveryKeyDocs.registerPlcRecoveryKey,
+        "register the recovery key",
+        acceptsGrant = true,
+    ) {
         account,
         key,
         ->
@@ -155,6 +167,7 @@ private fun Route.recoveryKeyChangeRoute(
     path: String,
     docs: RouteConfig.() -> Unit,
     operation: String,
+    acceptsGrant: Boolean = false,
     change: suspend (Account, String) -> RegisteredPlcRecoveryKey,
 ) {
     post(path, docs) {
@@ -176,7 +189,8 @@ private fun Route.recoveryKeyChangeRoute(
                 )
             }
             if (!call.recoveryKeysAvailable(routes.identity)) return@handleRecoveryKeyFailures
-            if (!call.confirmStepUp(routes.passkeyStepUp, account, request.stepUp)) return@handleRecoveryKeyFailures
+            val grant = request.stepUpGrant.takeIf { acceptsGrant && request.stepUp == null }
+            if (!call.confirmStepUp(routes.passkeyStepUp, account, request.stepUp, grant)) return@handleRecoveryKeyFailures
             val registered = change(account, request.recoveryDidKey)
             call.respond(
                 HttpStatusCode.OK,
@@ -284,18 +298,25 @@ private suspend fun ApplicationCall.handleRecoveryKeyFailures(
 }
 
 /**
- * Checks the request's passkey step-up and answers the failure when it does not hold: `409
- * STEP_UP_UNAVAILABLE` when this server cannot confirm with a passkey, `403 STEP_UP_REQUIRED` when
- * none was sent, `403 STEP_UP_FAILED` when it was not accepted.
+ * Checks the request's passkey step-up, or the sign-in [grant] a route accepts in its place, and
+ * answers the failure when it does not hold: `409 STEP_UP_UNAVAILABLE` when this server cannot
+ * confirm with a passkey, `403 STEP_UP_REQUIRED` when none was sent, `403 STEP_UP_FAILED` when it
+ * was not accepted.
  */
 @OptIn(ExperimentalUuidApi::class)
 private suspend fun ApplicationCall.confirmStepUp(
     passkeyStepUp: PasskeyStepUp?,
     account: Account,
     proof: PasskeyStepUpProof?,
+    grant: String? = null,
 ): Boolean {
     if (passkeyStepUp == null) {
         respondStepUpUnavailable()
+        return false
+    }
+    if (proof == null && grant != null) {
+        if (passkeyStepUp.redeem(account.id, grant)) return true
+        respondIdentityApiError(HttpStatusCode.Forbidden, "STEP_UP_FAILED", "The passkey confirmation was not accepted")
         return false
     }
     if (proof == null) {
