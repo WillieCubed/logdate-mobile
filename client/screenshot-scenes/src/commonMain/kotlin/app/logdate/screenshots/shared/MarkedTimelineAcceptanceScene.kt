@@ -51,7 +51,9 @@ fun MarkedTimelineAcceptanceContent(
         )
     HomeWorkspaceComposition(
         destinations =
-            HomeRouteDestination.visibleEntries(true).map { WorkspaceDestination(it.name, stringResource(it.label), it.selectedIcon) },
+            HomeRouteDestination.visibleEntries(true).map {
+                WorkspaceDestination(it.name, stringResource(it.label), it.selectedIcon, it.unselectedIcon)
+            },
         selectedKey = HomeRouteDestination.Timeline.name,
         onSelect = {},
         onCreate = {},

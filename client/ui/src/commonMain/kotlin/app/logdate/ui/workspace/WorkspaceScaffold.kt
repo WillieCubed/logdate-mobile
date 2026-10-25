@@ -4,6 +4,7 @@
 package app.logdate.ui.workspace
 
 import androidx.compose.animation.BoundsTransform
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
@@ -39,11 +40,14 @@ import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
@@ -58,10 +62,14 @@ import logdate.client.ui.generated.resources.app_name
 import logdate.client.ui.generated.resources.workspace_create_label
 import org.jetbrains.compose.resources.stringResource
 
+/** Labels are one or two words and must never wrap, so the bar stops following the system text size here. */
+private const val MAX_BAR_FONT_SCALE = 1.3f
+
 data class WorkspaceDestination(
     val key: String,
     val title: String,
     val icon: ImageVector,
+    val unselectedIcon: ImageVector = icon,
 )
 
 /** The only Home owner of navigation, system insets, destination header and creation placement. */
@@ -78,6 +86,7 @@ fun WorkspaceScaffold(
     actions: @Composable RowScope.() -> Unit = {},
     status: @Composable () -> Unit = {},
     snackbarHost: @Composable () -> Unit = {},
+    bottomEdge: WorkspaceBottomEdge? = null,
     content: @Composable () -> Unit,
 ) {
     val selected = destinations.firstOrNull { it.key == selectedKey } ?: destinations.firstOrNull() ?: return
@@ -90,6 +99,11 @@ fun WorkspaceScaffold(
         val headerCreate =
             !rail && (largeText || maxWidth <= 440.dp || navigation == WorkspaceNavigationMode.ShortBarHorizontal)
         val canvas = MaterialTheme.colorScheme.workspaceContainer(WorkspaceSurface.Canvas)
+        val edge = bottomEdge ?: rememberWorkspaceBottomEdge(selected.key)
+        val barColor by animateColorAsState(
+            MaterialTheme.colorScheme.workspaceContainer(if (edge.reached) WorkspaceSurface.Panel else WorkspaceSurface.Canvas),
+            label = "workspaceBarColor",
+        )
         // In a desktop window the app bar moves into the window's caption bar, between the system's
         // own controls, unless the text is too large to fit its height.
         val captionBar = if (onSearch != null) LocalWorkspaceCaptionBar.current ?: rememberPlatformCaptionBar(canvas) else null
@@ -111,20 +125,20 @@ fun WorkspaceScaffold(
                     val iconPosition = if (horizontal) NavigationItemIconPosition.Start else NavigationItemIconPosition.Top
                     val arrangement =
                         if (horizontal) ShortNavigationBarArrangement.Centered else ShortNavigationBarDefaults.arrangement
-                    ShortNavigationBar(containerColor = canvas, arrangement = arrangement) {
-                        destinations.forEach { destination ->
-                            ShortNavigationBarItem(
-                                selected = selected.key == destination.key,
-                                onClick = { onSelect(destination.key) },
-                                iconPosition = iconPosition,
-                                icon = { Icon(destination.icon, destination.title) },
-                                label =
-                                    if (largeText) {
-                                        null
-                                    } else {
-                                        { Text(destination.title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                                    },
-                            )
+                    val density = LocalDensity.current
+                    val barDensity = Density(density.density, minOf(density.fontScale, MAX_BAR_FONT_SCALE))
+                    CompositionLocalProvider(LocalDensity provides barDensity) {
+                        ShortNavigationBar(containerColor = barColor, arrangement = arrangement) {
+                            destinations.forEach { destination ->
+                                val isSelected = selected.key == destination.key
+                                ShortNavigationBarItem(
+                                    selected = isSelected,
+                                    onClick = { onSelect(destination.key) },
+                                    iconPosition = iconPosition,
+                                    icon = { Icon(if (isSelected) destination.icon else destination.unselectedIcon, null) },
+                                    label = { Text(destination.title) },
+                                )
+                            }
                         }
                     }
                 }
@@ -174,16 +188,12 @@ fun WorkspaceScaffold(
                                 modifier = Modifier.fillMaxHeight(),
                             ) {
                                 destinations.forEach { destination ->
+                                    val isSelected = selected.key == destination.key
                                     NavigationRailItem(
-                                        selected.key == destination.key,
+                                        isSelected,
                                         { onSelect(destination.key) },
-                                        icon = { Icon(destination.icon, destination.title) },
-                                        label =
-                                            if (largeText) {
-                                                null
-                                            } else {
-                                                { Text(destination.title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                                            },
+                                        icon = { Icon(if (isSelected) destination.icon else destination.unselectedIcon, null) },
+                                        label = { Text(destination.title) },
                                     )
                                 }
                             }
@@ -197,7 +207,7 @@ fun WorkspaceScaffold(
                                 }
                             }
                             status()
-                            Box(Modifier.fillMaxWidth().weight(1f)) {
+                            Box(Modifier.fillMaxWidth().weight(1f).nestedScroll(edge.connection)) {
                                 CompositionLocalProvider(LocalWorkspaceEnabled provides true, LocalWorkspaceHosted provides true) {
                                     holder.SaveableStateProvider(selected.key) { content() }
                                 }

@@ -17,6 +17,7 @@ import app.logdate.screenshots.common.ScreenshotTheme
 import app.logdate.screenshots.components.home_timeline.HistoryMapFixture
 import app.logdate.screenshots.components.home_timeline.historyDay
 import app.logdate.screenshots.flows.flow02_home_timeline.timelineDetailState
+import app.logdate.ui.workspace.WorkspaceBottomEdge
 import app.logdate.ui.workspace.WorkspaceScaffold
 import com.android.tools.screenshot.PreviewTest
 
@@ -119,6 +120,30 @@ fun WorkspaceReducedMotion() {
         }
     }
 }
+
+@PreviewTest
+@Preview(name = "Phone", device = ScreenshotTestData.PHONE, showBackground = true)
+@Preview(name = "Landscape", device = ScreenshotTestData.PHONE_LANDSCAPE, showBackground = true)
+@Preview(name = "Large text", device = ScreenshotTestData.COMPACT_PHONE, fontScale = 2f, showBackground = true)
+@Composable
+fun WorkspaceNavigationScrolledToBottom() =
+    ScreenshotTheme {
+        WorkspaceScaffold(
+            workspaceDestinations,
+            "locations",
+            {},
+            onSearch = {},
+            bottomEdge = WorkspaceBottomEdge(initiallyReached = true),
+        ) {
+            HumanLocationHistoryContent(
+                historyDay,
+                HumanLocationHistoryActions(),
+                showTitle = false,
+                toolbarActions = { PlacesOptionsFixture() },
+                mapContent = { HistoryMapFixture(it) },
+            )
+        }
+    }
 
 @PreviewTest
 @Preview(name = "Sync recovery", device = ScreenshotTestData.COMPACT_PHONE, fontScale = 2f, showBackground = true)
