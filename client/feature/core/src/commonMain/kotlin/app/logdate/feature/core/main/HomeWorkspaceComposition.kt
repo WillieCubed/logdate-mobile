@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import app.logdate.ui.workspace.AdaptiveWorkspaceLayout
 import app.logdate.ui.workspace.PanelConstraints
 import app.logdate.ui.workspace.WorkspaceDestination
+import app.logdate.ui.workspace.WorkspaceRailJournals
 import app.logdate.ui.workspace.WorkspaceScaffold
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.workspace_add_a_memory
@@ -28,6 +29,7 @@ fun HomeWorkspaceComposition(
     actions: @Composable RowScope.() -> Unit = {},
     status: @Composable () -> Unit = {},
     snackbarHost: @Composable () -> Unit = {},
+    journals: WorkspaceRailJournals? = null,
     content: @Composable () -> Unit,
 ) {
     WorkspaceScaffold(
@@ -42,6 +44,7 @@ fun HomeWorkspaceComposition(
         actions,
         status,
         snackbarHost = snackbarHost,
+        journals = journals,
     ) {
         if (selectedKey == HomeRouteDestination.LocationHistory.name) {
             content()

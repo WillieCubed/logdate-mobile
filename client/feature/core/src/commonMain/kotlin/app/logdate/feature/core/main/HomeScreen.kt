@@ -53,7 +53,9 @@ import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.feature.core.sync.SyncAction
 import app.logdate.feature.core.sync.SyncPresentationViewModel
 import app.logdate.feature.journals.ui.JournalClickCallback
+import app.logdate.feature.journals.ui.JournalListItemUiState
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
+import app.logdate.feature.journals.ui.JournalsOverviewViewModel
 import app.logdate.feature.rewind.ui.RewindOverviewScreen
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
@@ -68,6 +70,8 @@ import app.logdate.ui.streak.CampfireChip
 import app.logdate.ui.timeline.TimelinePane
 import app.logdate.ui.timeline.TimelineUiState
 import app.logdate.ui.workspace.WorkspaceDestination
+import app.logdate.ui.workspace.WorkspaceRailJournal
+import app.logdate.ui.workspace.WorkspaceRailJournals
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
@@ -170,6 +174,19 @@ fun HomeScreen(
         .collectAsStateWithLifecycle(initialValue = FeatureFlag.HOME_WORKSPACE_V2.defaultEnabled)
     if (workspaceEnabled) {
         val sourceState = rememberSaveableStateHolder()
+        val journalsViewModel: JournalsOverviewViewModel = koinViewModel()
+        val journalsState by journalsViewModel.uiState.collectAsStateWithLifecycle()
+        val railJournals =
+            remember(journalsState.journals, onOpenJournal) {
+                WorkspaceRailJournals(
+                    items =
+                        journalsState.journals.filterIsInstance<JournalListItemUiState.ExistingJournal>().map {
+                            WorkspaceRailJournal(it.data.id.toString(), it.data.title)
+                        },
+                    onOpen = { onOpenJournal(Uuid.parse(it)) },
+                    onSeeAll = { currentDestination = HomeRouteDestination.Journals },
+                )
+            }
         HomeWorkspaceComposition(
             destinations =
                 visibleDestinations.map {
@@ -214,6 +231,7 @@ fun HomeScreen(
                 }
             },
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+            journals = railJournals,
             modifier = homeKeys,
         ) {
             val destinationContent: @Composable () -> Unit = {
