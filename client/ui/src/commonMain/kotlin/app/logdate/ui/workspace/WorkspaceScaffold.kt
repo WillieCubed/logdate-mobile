@@ -33,7 +33,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.MenuOpen
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -66,6 +69,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
@@ -80,6 +84,8 @@ import app.logdate.ui.theme.workspaceContainer
 import kotlinx.coroutines.launch
 import logdate.client.ui.generated.resources.Res
 import logdate.client.ui.generated.resources.workspace_create_label
+import logdate.client.ui.generated.resources.workspace_journals_label
+import logdate.client.ui.generated.resources.workspace_journals_see_all
 import logdate.client.ui.generated.resources.workspace_navigation_collapse
 import logdate.client.ui.generated.resources.workspace_navigation_expand
 import org.jetbrains.compose.resources.stringResource
@@ -103,6 +109,26 @@ data class WorkspaceDestination(
     val unselectedIcon: ImageVector = icon,
 )
 
+/** A journal the expanded rail links to; [id] is handed back to [WorkspaceRailJournals.onOpen]. */
+data class WorkspaceRailJournal(
+    val id: String,
+    val title: String,
+)
+
+/**
+ * The journals an expanded, non-modal rail lists below the destinations: the first [MAX_VISIBLE] of
+ * [items], then an "All journals" row when more exist.
+ */
+data class WorkspaceRailJournals(
+    val items: List<WorkspaceRailJournal>,
+    val onOpen: (String) -> Unit,
+    val onSeeAll: () -> Unit,
+) {
+    companion object {
+        const val MAX_VISIBLE = 5
+    }
+}
+
 /** The only Home owner of navigation, system insets, destination header and creation placement. */
 @Composable
 fun WorkspaceScaffold(
@@ -118,6 +144,7 @@ fun WorkspaceScaffold(
     status: @Composable () -> Unit = {},
     snackbarHost: @Composable () -> Unit = {},
     bottomEdge: WorkspaceBottomEdge? = null,
+    journals: WorkspaceRailJournals? = null,
     content: @Composable () -> Unit,
 ) {
     val selected = destinations.firstOrNull { it.key == selectedKey } ?: destinations.firstOrNull() ?: return
@@ -228,6 +255,7 @@ fun WorkspaceScaffold(
                                 modal = navigation == WorkspaceNavigationMode.Rail,
                                 containerColor = canvas,
                                 createAction = railCreate,
+                                journals = journals,
                             )
                         }
                         Column(Modifier.weight(1f).fillMaxHeight()) {
@@ -318,6 +346,7 @@ private fun WorkspaceNavigationRail(
     modal: Boolean,
     containerColor: Color,
     createAction: (@Composable (extended: Boolean) -> Unit)?,
+    journals: WorkspaceRailJournals?,
 ) {
     val state =
         rememberWideNavigationRailState(if (defaultExpanded) WideNavigationRailValue.Expanded else WideNavigationRailValue.Collapsed)
@@ -337,18 +366,21 @@ private fun WorkspaceNavigationRail(
         }
     }
     val items: @Composable () -> Unit = {
-        destinations.forEach { destination ->
-            val isSelected = selectedKey == destination.key
-            WideNavigationRailItem(
-                railExpanded = railExpanded,
-                selected = isSelected,
-                onClick = {
-                    onSelect(destination.key)
-                    if (modal) scope.launch { state.collapse() }
-                },
-                icon = { Icon(if (isSelected) destination.icon else destination.unselectedIcon, null) },
-                label = { Text(destination.title) },
-            )
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            destinations.forEach { destination ->
+                val isSelected = selectedKey == destination.key
+                WideNavigationRailItem(
+                    railExpanded = railExpanded,
+                    selected = isSelected,
+                    onClick = {
+                        onSelect(destination.key)
+                        if (modal) scope.launch { state.collapse() }
+                    },
+                    icon = { Icon(if (isSelected) destination.icon else destination.unselectedIcon, null) },
+                    label = { Text(destination.title) },
+                )
+            }
+            if (railExpanded && !modal && journals != null) RailJournals(journals)
         }
     }
     if (modal) {
@@ -368,6 +400,35 @@ private fun WorkspaceNavigationRail(
             header = header,
             modifier = Modifier.fillMaxHeight(),
             content = items,
+        )
+    }
+}
+
+@Composable
+private fun RailJournals(journals: WorkspaceRailJournals) {
+    if (journals.items.isEmpty()) return
+    Text(
+        stringResource(Res.string.workspace_journals_label),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = RAIL_ITEM_INSET, top = Spacing.lg, bottom = Spacing.sm),
+    )
+    journals.items.take(WorkspaceRailJournals.MAX_VISIBLE).forEach { journal ->
+        WideNavigationRailItem(
+            railExpanded = true,
+            selected = false,
+            onClick = { journals.onOpen(journal.id) },
+            icon = { Icon(PlatformIcons.journal(), null) },
+            label = { Text(journal.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        )
+    }
+    if (journals.items.size > WorkspaceRailJournals.MAX_VISIBLE) {
+        WideNavigationRailItem(
+            railExpanded = true,
+            selected = false,
+            onClick = journals.onSeeAll,
+            icon = { Icon(Icons.AutoMirrored.Filled.ArrowForward, null) },
+            label = { Text(stringResource(Res.string.workspace_journals_see_all)) },
         )
     }
 }
