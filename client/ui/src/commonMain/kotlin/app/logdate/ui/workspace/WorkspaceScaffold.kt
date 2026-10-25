@@ -3,10 +3,22 @@
 
 package app.logdate.ui.workspace
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -21,32 +33,34 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationItemIconPosition
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ShortNavigationBar
 import androidx.compose.material3.ShortNavigationBarArrangement
 import androidx.compose.material3.ShortNavigationBarDefaults
 import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.Text
+import androidx.compose.material3.WideNavigationRail
+import androidx.compose.material3.WideNavigationRailDefaults
+import androidx.compose.material3.WideNavigationRailItem
+import androidx.compose.material3.WideNavigationRailValue
+import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
@@ -54,6 +68,7 @@ import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.foldable.rememberFoldableLayoutInfo
 import app.logdate.ui.platform.PlatformIcons
+import app.logdate.ui.platform.rememberSystemReduceMotion
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.theme.WorkspaceSurface
 import app.logdate.ui.theme.workspaceContainer
@@ -64,6 +79,15 @@ import org.jetbrains.compose.resources.stringResource
 
 /** Labels are one or two words and must never wrap, so the bar stops following the system text size here. */
 private const val MAX_BAR_FONT_SCALE = 1.3f
+
+private const val NAVIGATION_MOTION_MS = 300
+
+/** Wide rail items start 20dp from the edge; the header lines up with them. */
+private val RAIL_ITEM_INSET = 20.dp
+
+/** One motion for every navigation change as a window resizes, so nothing jumps; reduced motion snaps. */
+private fun <T> navigationMotion(reduceMotion: Boolean): FiniteAnimationSpec<T> =
+    if (reduceMotion) snap() else tween(NAVIGATION_MOTION_MS, easing = FastOutSlowInEasing)
 
 data class WorkspaceDestination(
     val key: String,
@@ -100,8 +124,10 @@ fun WorkspaceScaffold(
             !rail && (largeText || maxWidth <= 440.dp || navigation == WorkspaceNavigationMode.ShortBarHorizontal)
         val canvas = MaterialTheme.colorScheme.workspaceContainer(WorkspaceSurface.Canvas)
         val edge = bottomEdge ?: rememberWorkspaceBottomEdge(selected.key)
+        val reduceMotion = rememberSystemReduceMotion().value
         val barColor by animateColorAsState(
             MaterialTheme.colorScheme.workspaceContainer(if (edge.reached) WorkspaceSurface.Panel else WorkspaceSurface.Canvas),
+            animationSpec = navigationMotion(reduceMotion),
             label = "workspaceBarColor",
         )
         // In a desktop window the app bar moves into the window's caption bar, between the system's
@@ -109,18 +135,34 @@ fun WorkspaceScaffold(
         val captionBar = if (onSearch != null) LocalWorkspaceCaptionBar.current ?: rememberPlatformCaptionBar(canvas) else null
         val appBarInCaption = captionBar?.takeIf { it.height >= MIN_CAPTION_APP_BAR_HEIGHT && !largeText }
         val headerActions: @Composable RowScope.() -> Unit = {
-            if (headerCreate) {
-                onCreate?.let { WorkspaceCreateAction(it, createLabel, createEntryTransition, compact = true) }
+            onCreate?.let {
+                AnimatedVisibility(
+                    headerCreate,
+                    enter = fadeIn(navigationMotion(reduceMotion)) + expandHorizontally(navigationMotion(reduceMotion)),
+                    exit = fadeOut(navigationMotion(reduceMotion)) + shrinkHorizontally(navigationMotion(reduceMotion)),
+                ) {
+                    WorkspaceCreateAction(it, createLabel, createEntryTransition && headerCreate, compact = true)
+                }
             }
             actions()
         }
+        val railCreate: (@Composable (Boolean) -> Unit)? =
+            onCreate?.let { create ->
+                { extended ->
+                    WorkspaceCreateAction(create, createLabel, createEntryTransition && rail, extended = extended)
+                }
+            }
         Scaffold(
             snackbarHost = snackbarHost,
             containerColor = canvas,
             contentWindowInsets =
                 if (appBarInCaption != null) WindowInsets.safeDrawing.exclude(WindowInsets.captionBar) else WindowInsets.safeDrawing,
             bottomBar = {
-                if (!rail) {
+                AnimatedVisibility(
+                    !rail,
+                    enter = fadeIn(navigationMotion(reduceMotion)) + slideInVertically(navigationMotion(reduceMotion)) { it },
+                    exit = fadeOut(navigationMotion(reduceMotion)) + slideOutVertically(navigationMotion(reduceMotion)) { it },
+                ) {
                     val horizontal = navigation == WorkspaceNavigationMode.ShortBarHorizontal
                     val iconPosition = if (horizontal) NavigationItemIconPosition.Start else NavigationItemIconPosition.Top
                     val arrangement =
@@ -128,7 +170,11 @@ fun WorkspaceScaffold(
                     val density = LocalDensity.current
                     val barDensity = Density(density.density, minOf(density.fontScale, MAX_BAR_FONT_SCALE))
                     CompositionLocalProvider(LocalDensity provides barDensity) {
-                        ShortNavigationBar(containerColor = barColor, arrangement = arrangement) {
+                        ShortNavigationBar(
+                            containerColor = barColor,
+                            arrangement = arrangement,
+                            modifier = Modifier.animateContentSize(navigationMotion(reduceMotion)),
+                        ) {
                             destinations.forEach { destination ->
                                 val isSelected = selected.key == destination.key
                                 ShortNavigationBarItem(
@@ -144,7 +190,16 @@ fun WorkspaceScaffold(
                 }
             },
             floatingActionButton = {
-                if (!rail && !headerCreate && onCreate != null) WorkspaceCreateAction(onCreate, createLabel, createEntryTransition)
+                val floating = !rail && !headerCreate
+                if (onCreate != null) {
+                    AnimatedVisibility(
+                        floating,
+                        enter = fadeIn(navigationMotion(reduceMotion)) + scaleIn(navigationMotion(reduceMotion)),
+                        exit = fadeOut(navigationMotion(reduceMotion)) + scaleOut(navigationMotion(reduceMotion)),
+                    ) {
+                        WorkspaceCreateAction(onCreate, createLabel, createEntryTransition && floating)
+                    }
+                }
             },
         ) { insets ->
             WorkspaceSearchHost {
@@ -153,50 +208,20 @@ fun WorkspaceScaffold(
                         WorkspaceCaptionAppBar(selected.title, appBarInCaption, onSearch, headerActions)
                     }
                     Row(Modifier.fillMaxWidth().weight(1f)) {
-                        if (navigation == WorkspaceNavigationMode.Sidebar) {
-                            Column(
-                                Modifier
-                                    .width(240.dp)
-                                    .fillMaxHeight()
-                                    .verticalScroll(rememberScrollState())
-                                    .padding(Spacing.lg),
-                                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                            ) {
-                                // A desktop window's caption bar already names the app.
-                                if (appBarInCaption == null) {
-                                    Text(
-                                        stringResource(Res.string.app_name),
-                                        style = MaterialTheme.typography.headlineSmall,
-                                        modifier = Modifier.padding(Spacing.lg),
-                                    )
-                                }
-                                onCreate?.let { WorkspaceCreateAction(it, createLabel, createEntryTransition) }
-                                destinations.forEach { destination ->
-                                    NavigationDrawerItem(
-                                        label = { Text(destination.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                        selected = selected.key == destination.key,
-                                        onClick = { onSelect(destination.key) },
-                                        icon = { Icon(destination.icon, null) },
-                                    )
-                                }
-                            }
-                        } else if (rail) {
-                            NavigationRail(
+                        AnimatedVisibility(
+                            rail,
+                            enter = fadeIn(navigationMotion(reduceMotion)) + expandHorizontally(navigationMotion(reduceMotion)),
+                            exit = fadeOut(navigationMotion(reduceMotion)) + shrinkHorizontally(navigationMotion(reduceMotion)),
+                        ) {
+                            WorkspaceNavigationRail(
+                                destinations = destinations,
+                                selectedKey = selected.key,
+                                onSelect = onSelect,
+                                expanded = navigation == WorkspaceNavigationMode.Sidebar,
                                 containerColor = canvas,
-                                windowInsets = WindowInsets(0, 0, 0, 0),
-                                header = { onCreate?.let { WorkspaceCreateAction(it, createLabel, createEntryTransition) } },
-                                modifier = Modifier.fillMaxHeight(),
-                            ) {
-                                destinations.forEach { destination ->
-                                    val isSelected = selected.key == destination.key
-                                    NavigationRailItem(
-                                        isSelected,
-                                        { onSelect(destination.key) },
-                                        icon = { Icon(if (isSelected) destination.icon else destination.unselectedIcon, null) },
-                                        label = { Text(destination.title) },
-                                    )
-                                }
-                            }
+                                showAppName = appBarInCaption == null,
+                                createAction = railCreate,
+                            )
                         }
                         Column(Modifier.weight(1f).fillMaxHeight()) {
                             if (appBarInCaption == null) {
@@ -229,6 +254,7 @@ private fun WorkspaceCreateAction(
     label: String,
     createEntryTransition: Boolean,
     compact: Boolean = false,
+    extended: Boolean? = null,
 ) {
     val sharedScope = LocalSharedTransitionScope.current
     val visibilityScope = LocalNavAnimatedVisibilityScope.current
@@ -245,7 +271,17 @@ private fun WorkspaceCreateAction(
         } else {
             Modifier
         }
-    if (compact) {
+    if (extended != null) {
+        ExtendedFloatingActionButton(
+            text = { Text(label, Modifier.clearAndSetSemantics {}) },
+            icon = { Icon(PlatformIcons.newEntry(), label) },
+            onClick = onClick,
+            expanded = extended,
+            modifier = transitionModifier,
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+    } else if (compact) {
         IconButton(onClick = onClick, modifier = transitionModifier) {
             Icon(PlatformIcons.newEntry(), label, tint = MaterialTheme.colorScheme.primary)
         }
@@ -257,6 +293,53 @@ private fun WorkspaceCreateAction(
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         ) {
             Icon(PlatformIcons.newEntry(), label)
+        }
+    }
+}
+
+@Composable
+private fun WorkspaceNavigationRail(
+    destinations: List<WorkspaceDestination>,
+    selectedKey: String,
+    onSelect: (String) -> Unit,
+    expanded: Boolean,
+    containerColor: Color,
+    showAppName: Boolean,
+    createAction: (@Composable (extended: Boolean) -> Unit)?,
+) {
+    val state = rememberWideNavigationRailState(if (expanded) WideNavigationRailValue.Expanded else WideNavigationRailValue.Collapsed)
+    LaunchedEffect(expanded) {
+        if (expanded) state.expand() else state.collapse()
+    }
+    val railExpanded = state.targetValue == WideNavigationRailValue.Expanded
+    WideNavigationRail(
+        state = state,
+        colors = WideNavigationRailDefaults.colors(containerColor = containerColor),
+        windowInsets = WindowInsets(0, 0, 0, 0),
+        header = {
+            Column(Modifier.padding(horizontal = RAIL_ITEM_INSET), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                // A desktop window's caption bar already names the app.
+                if (railExpanded && showAppName) {
+                    Text(
+                        stringResource(Res.string.app_name),
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.padding(vertical = Spacing.lg),
+                    )
+                }
+                createAction?.invoke(railExpanded)
+            }
+        },
+        modifier = Modifier.fillMaxHeight(),
+    ) {
+        destinations.forEach { destination ->
+            val isSelected = selectedKey == destination.key
+            WideNavigationRailItem(
+                railExpanded = railExpanded,
+                selected = isSelected,
+                onClick = { onSelect(destination.key) },
+                icon = { Icon(if (isSelected) destination.icon else destination.unselectedIcon, null) },
+                label = { Text(destination.title) },
+            )
         }
     }
 }
