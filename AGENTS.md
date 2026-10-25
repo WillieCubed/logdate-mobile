@@ -245,7 +245,7 @@ Use `WorkspaceSectionSwitch` as a compact selector in the supporting panel heade
 the map or stretch them into full-width tabs. The Home destination label is Places; preserve its
 existing location-history route keys. `PanelContainment.Collection` supplies measured panel bounds without painting
 another surface behind already contained objects. Retain a working surface for Locations > Your day,
-for reading, and for phone sheets over maps. `workspaceControlBackdrop` paints a raised sticky-control background only while
+for reading, for the Journals collection, and for phone sheets over maps. `workspaceControlBackdrop` paints a raised sticky-control background only while
 content overlaps it. Expanded navigation uses the expanded wide navigation rail from 1200dp in standard posture;
 intermediate widths use the rail, phones use the short navigation bar (icons beside labels in tabletop posture
 and in landscape, where height is under 480dp), and book posture retains compact navigation. Standalone Timeline uses `PanelConstraints.ReadingCollection` (560dp maximum);
