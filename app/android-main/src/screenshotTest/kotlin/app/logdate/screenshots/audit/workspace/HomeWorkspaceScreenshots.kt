@@ -72,6 +72,8 @@ import app.logdate.ui.workspace.AdaptiveWorkspaceLayout
 import app.logdate.ui.workspace.LocalWorkspaceCaptionBar
 import app.logdate.ui.workspace.WorkspaceCaptionBar
 import app.logdate.ui.workspace.WorkspaceDestination
+import app.logdate.ui.workspace.WorkspaceRailJournal
+import app.logdate.ui.workspace.WorkspaceRailJournals
 import app.logdate.ui.workspace.WorkspaceScaffold
 import coil3.asImage
 import coil3.compose.AsyncImagePreviewHandler
@@ -94,6 +96,15 @@ import com.android.tools.screenshot.PreviewTest
 @Preview(name = "RTL", device = ScreenshotTestData.PHONE, locale = "ar", showBackground = true)
 @Preview(name = "Bubble", device = ScreenshotTestData.BUBBLE, showBackground = true)
 annotation class WorkspacePreviewMatrix
+
+internal val workspaceRailJournals =
+    WorkspaceRailJournals(
+        items =
+            listOf("Daily Reflections", "Travel Log", "Recipe Notes", "Garden Journal", "Dream Log", "Reading List")
+                .mapIndexed { index, title -> WorkspaceRailJournal(index.toString(), title) },
+        onOpen = {},
+        onSeeAll = {},
+    )
 
 internal val workspaceDestinations =
     listOf(
@@ -138,17 +149,25 @@ private fun WorkspaceSceneContent(
         ) { BitmapFactory.decodeResource(context.resources, app.logdate.client.R.drawable.workspace_sample_photo).asImage() }
     val handler = remember(image) { AsyncImagePreviewHandler { image } }
     CompositionLocalProvider(LocalAsyncImagePreviewHandler provides handler) {
-        WorkspaceScaffold(workspaceDestinations, key, {}, onCreate = {}.takeIf { key != "locations" }, onSearch = {}, actions = {
-            app.logdate.feature.core.main.HomeWorkspaceAccountAction(
-                app.logdate.feature.core.sync.SyncPresentation
-                    .Pending(2),
-                app.logdate.ui.streak
-                    .CampfirePresentation(app.logdate.ui.streak.CampfirePhase.BURNING, runDays = 4),
-                {},
-                {},
-                {},
-            )
-        }) {
+        WorkspaceScaffold(
+            workspaceDestinations,
+            key,
+            {},
+            onCreate = {}.takeIf { key != "locations" },
+            onSearch = {},
+            journals = workspaceRailJournals,
+            actions = {
+                app.logdate.feature.core.main.HomeWorkspaceAccountAction(
+                    app.logdate.feature.core.sync.SyncPresentation
+                        .Pending(2),
+                    app.logdate.ui.streak
+                        .CampfirePresentation(app.logdate.ui.streak.CampfirePhase.BURNING, runDays = 4),
+                    {},
+                    {},
+                    {},
+                )
+            },
+        ) {
             if (key == "locations" && detail == null) {
                 content()
             } else {
