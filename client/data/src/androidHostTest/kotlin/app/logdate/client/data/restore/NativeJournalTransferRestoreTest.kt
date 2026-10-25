@@ -112,6 +112,69 @@ class NativeJournalTransferRestoreTest {
     }
 
     @Test
+    fun `vacant camera transfer installs journal and durably retains verified draft media for reconciliation`() =
+        fixture { f ->
+            val draftFile =
+                File(f.current, "files/datastore/entry_drafts.preferences_pb").apply {
+                    checkNotNull(parentFile).mkdirs()
+                    writeBytes("verified draft fixture".encodeToByteArray())
+                }
+            val camera =
+                File(f.current, "files/camera-captures/pending.jpg").apply {
+                    checkNotNull(parentFile).mkdirs()
+                    writeBytes("verified photo fixture".encodeToByteArray())
+                }
+            val inventory =
+                File(f.current, NATIVE_MEDIA_INVENTORY_PATH).apply {
+                    writeText(
+                        Json.encodeToString(
+                            NativeJournalMediaInventory(
+                                1,
+                                listOf(
+                                    NativeJournalMediaInventory.Entry(
+                                        "files/camera-captures/pending.jpg",
+                                        camera.length(),
+                                        nativeSnapshotChecksum(camera),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    )
+                }
+            writeNativeJournalSourceReceipt(
+                File(f.current, NATIVE_SOURCE_RECEIPT_PATH),
+                mutablePreferencesOf(
+                    stringPreferencesKey("identity.canonical_owner_id") to "347c6231-19f4-49fa-bd1d-58ed34b9be03",
+                    stringPreferencesKey("backend_url") to "https://cloud.example",
+                ),
+                File(f.current, "files/logdate.preferences_pb"),
+                mapOf("database/logdate" to File(f.current, "database/logdate")),
+                inventory,
+                draftFile,
+            )
+
+            val restore = f.restore()
+            assertTrue(restore.restore())
+            assertEquals("immutable sender database", f.database.readText())
+            assertEquals("snapshot prefs", File(f.files, "logdate.preferences_pb").readText())
+            f.complete()
+            assertTrue(restore.finish())
+            assertFalse(f.current.exists())
+            assertTrue(NativeJournalTransferStaging(f.context).hasPendingStageMarker())
+            assertTrue(NativeJournalReplayCustody(f.context).hasInputs())
+            val source = verifiedNativeJournalSources(NativeJournalReplayCustody(f.context).sealedPayloads()).values.single()
+            assertEquals("verified draft fixture", source.getValue("files/datastore/entry_drafts.preferences_pb").readText())
+            assertEquals("verified photo fixture", source.getValue("files/camera-captures/pending.jpg").readText())
+            assertTrue(f.restore().finish(), "A process replay must resume the retained handoff")
+            assertTrue(NativeJournalTransferStaging(f.context).hasPendingStageMarker())
+            f.restore().reconciliationScheduled()
+            assertFalse(NativeJournalTransferStaging(f.context).hasPendingStageMarker())
+            assertEquals(null, NativeJournalRestoreAuthority(f.context).installedReceipt())
+            assertTrue(NativeJournalReplayCustody(f.context).hasInputs(), "Scheduling must not consume source custody")
+            assertFalse(f.restore().finish(), "Repeated completion must not re-admit the same camera source")
+        }
+
+    @Test
     fun `raw database and WAL callbacks remain valid when each exact revision is recorded`() =
         fixture { f ->
             val authority = NativeJournalRestoreAuthority(f.context)

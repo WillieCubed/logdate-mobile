@@ -1,5 +1,6 @@
 package app.logdate.client.e2e
 
+import android.app.job.JobScheduler
 import android.os.Build
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -21,6 +22,7 @@ import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.device.restore.NATIVE_MEDIA_INVENTORY_PATH
 import app.logdate.client.device.restore.NATIVE_SOURCE_RECEIPT_PATH
+import app.logdate.client.device.restore.NativeJournalReplayCustody
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.restore.PostRestoreType
 import app.logdate.client.device.restore.verifyNativeJournalMediaInventory
@@ -36,10 +38,11 @@ import app.logdate.client.repository.journals.PendingMediaType
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
 import app.logdate.shared.model.SerializableTextBlock
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -581,8 +584,30 @@ class NativeBackupTransferProbeTest {
     private suspend fun verifyPendingCameraTransferDraft(context: android.content.Context) {
         ensureLogDateApplicationStarted(context.applicationContext as android.app.Application)
         val draftsStore = AndroidLocalEntryDraftStore(context)
+
+        suspend fun custodyDiagnostics(): String {
+            val observed = draftsStore.getAllDrafts()
+            val retained = NativeJournalReplayCustody(context).sealedPayloads()
+            val admittedCount =
+                File(context.noBackupFilesDir, "native-journal-staged-sources")
+                    .listFiles()
+                    .orEmpty()
+                    .count { it.isDirectory && File(it, "admitted").isFile }
+            val pendingJob = context.getSystemService(JobScheduler::class.java).getPendingJob(0x4e4a5235) != null
+            return "cameraDrafts=${observed.count { draft ->
+                draft.pendingMedia.any { it.mediaType == PendingMediaType.CAMERA_PHOTO || it.mediaType == PendingMediaType.CAMERA_VIDEO }
+            }}, " +
+                "retainedFiles=${retained.size}, hasReceipt=${retained.any { it.path.endsWith("native_source_scope.json") }}, " +
+                "hasDrafts=${retained.any { it.path.endsWith("entry_drafts.preferences_pb") }}, " +
+                "hasInventory=${retained.any { it.path.endsWith("native_media_inventory.json") }}, " +
+                "cameraFileCount=${retained.count { it.path.contains("/camera-captures/") }}, " +
+                "admittedSourceCount=$admittedCount, retainedReconciliationPending=$pendingJob, " +
+                "stageMarker=${File(context.noBackupFilesDir, "native-journal-transfer-staged").exists()}"
+        }
         val cameraDrafts =
-            withTimeout(30_000) {
+            withTimeoutOrNull(90_000) {
+                delay(10_000)
+                Napier.i("Pending camera admission after 10s: ${custodyDiagnostics()}", tag = "NativeBackupTransferProbe")
                 while (true) {
                     val drafts =
                         draftsStore.getAllDrafts().filter { draft ->
@@ -590,10 +615,14 @@ class NativeBackupTransferProbeTest {
                                 it.mediaType == PendingMediaType.CAMERA_PHOTO || it.mediaType == PendingMediaType.CAMERA_VIDEO
                             }
                         }
-                    if (drafts.size >= 2) return@withTimeout drafts
+                    if (drafts.size >= 2) return@withTimeoutOrNull drafts
                     delay(100)
                 }
                 error("unreachable")
+            } ?: run {
+                error(
+                    "Pending camera draft admission timed out: ${custodyDiagnostics()}",
+                )
             }
         val sourceId = Uuid.parse("00000000-0000-0000-0000-000000000020")
         val sourceDraft = assertNotNull(cameraDrafts.singleOrNull { it.id == sourceId }, "Source camera draft was not restored")

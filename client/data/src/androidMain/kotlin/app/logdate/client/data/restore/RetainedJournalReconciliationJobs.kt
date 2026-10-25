@@ -11,6 +11,8 @@ import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.database.openRetainedDatabaseCopy
 import app.logdate.client.database.readRetainedDatabasePassphrases
 import app.logdate.client.datastore.createAndroidMainDataStore
+import app.logdate.client.device.restore.NATIVE_JOURNAL_TRANSFER_PREFIX
+import app.logdate.client.device.restore.NATIVE_SOURCE_RECEIPT_PATH
 import app.logdate.client.device.restore.NativeJournalReplayCustody
 import app.logdate.client.device.restore.RetainedJournalWorkspace
 import app.logdate.client.device.restore.admitNativeContent
@@ -127,8 +129,13 @@ class RetainedJournalReconciliationJobService : JobService() {
     }
 
     private suspend fun reconcile(): Boolean {
-        if (!getSystemService(UserManager::class.java).isUserUnlocked) return true
-        val koin = GlobalContext.getOrNull() ?: return true
+        if (!getSystemService(UserManager::class.java).isUserUnlocked) {
+            return true
+        }
+        val koin =
+            GlobalContext.getOrNull() ?: run {
+                return true
+            }
         return RetainedJournalReconciliationLock.prepareThenWithDeliveryGate(
             nativeRestoreDeliveryGate(),
             prepare = {
@@ -148,10 +155,11 @@ class RetainedJournalReconciliationJobService : JobService() {
                     admitNativeContent(File(filesDir, "media"))
                     val journals = koin.get<JournalRepository>()
                     val config = koin.get<app.logdate.shared.config.LogDateConfigRepository>()
+                    val expectedScope = checkNotNull(journals.getJournalRecoveryScope())
                     Repositories(
                         database = database,
                         expectedSessionId = expectedSession?.id,
-                        expectedScope = checkNotNull(journals.getJournalRecoveryScope()),
+                        expectedScope = expectedScope,
                         journals = journals,
                         notes = koin.get<JournalNotesRepository>(),
                         content = koin.get<JournalContentRepository>(),
@@ -203,12 +211,15 @@ class RetainedJournalReconciliationJobService : JobService() {
             check(session.id in originalSources) { "Active retained generation is missing from its anchored source inventory" }
         }
         val allSources = originalSources + incomingSources
-        if (allSources.isEmpty()) return repairIndependentMedia(independentIncoming, repositories, sourcesCovered = true)
+        if (allSources.isEmpty()) {
+            return repairIndependentMedia(independentIncoming, repositories, sourcesCovered = true)
+        }
         val candidateFiles = (allSources.values + independentIncoming).flatMap(::databaseKeyFiles).distinctBy { it.canonicalPath }
         val mediaSources = allSources.values.toList() + independentIncoming
         val activePreferences = createAndroidMainDataStore(this)
         val scratchRoot = File(noBackupFilesDir, "retained-journal-merge-scratch")
         clearAbandonedDatabaseCopies(scratchRoot)
+        clearAbandonedDraftCopies(File(noBackupFilesDir, "retained-draft-reads"))
         var mediaPending = false
         var allSourcesCovered = true
         for ((generation, files) in allSources) {
@@ -346,44 +357,48 @@ class RetainedJournalReconciliationJobService : JobService() {
                     repositories,
                 )
             val result = merger.merge()
-            if (result.coverageComplete) {
-                val receiptFile = files["source_scope.json"]
-                if (receiptFile != null) {
-                    val receipt =
-                        runCatching {
-                            Json.decodeFromString<app.logdate.client.device.restore.NativeJournalSourceReceipt>(receiptFile.readText())
-                        }.getOrNull() ?: return NativeSourceOutcome(true, false)
-                    val job = currentCoroutineContext()[Job]
-                    val dataStore = createAndroidMainDataStore(this)
-                    val isCurrent = {
-                        job?.isActive != false &&
-                            repositories.database.isOpen &&
-                            normalizeBackendOrigin(repositories.backendOrigin()) ==
-                            normalizeBackendOrigin(repositories.expectedScope.serverOrigin)
+            val receiptFile = files["source_scope.json"]
+            if (receiptFile != null) {
+                // Camera originals are validated against this receipt and the current owner scope;
+                // import their pending draft even when unrelated database tables remain uncovered.
+                // Keep the source in custody until full database coverage is proven below.
+                val receipt =
+                    runCatching {
+                        Json.decodeFromString<app.logdate.client.device.restore.NativeJournalSourceReceipt>(receiptFile.readText())
+                    }.getOrElse {
+                        return NativeSourceOutcome(true, false)
                     }
+                val job = currentCoroutineContext()[Job]
+                val dataStore = createAndroidMainDataStore(this)
+                val isCurrent = {
+                    job?.isActive != false &&
+                        repositories.database.isOpen &&
+                        normalizeBackendOrigin(repositories.backendOrigin()) ==
+                        normalizeBackendOrigin(repositories.expectedScope.serverOrigin)
+                }
 
-                    suspend fun requireSourceCurrent() {
-                        check(isCurrent()) { "Native pending camera delivery changed" }
-                        val current = dataStore.data.first()
-                        val actual = RetainedJournalSourceScope.from(current, sourceScope.backendOrigin)
-                        check(
-                            actual != null &&
-                                sourceScope.matchesCurrentOrAdopted(actual, current) &&
-                                sourceScope.matchesRepositoryScope(
-                                    repositories.expectedScope.ownerId,
-                                    repositories.expectedScope.serverOrigin,
-                                ),
-                        ) { "Native pending camera owner or backend changed" }
-                    }
-                    val importer =
-                        NativePendingCameraDraftImporter(
-                            filesDir,
-                            packageName,
-                            repositories.media,
-                            repositories.entryDrafts,
-                            isCurrent,
-                            ::requireSourceCurrent,
-                        ) { commit ->
+                suspend fun requireSourceCurrent() {
+                    check(isCurrent()) { "Native pending camera delivery changed" }
+                    val current = dataStore.data.first()
+                    val actual = RetainedJournalSourceScope.from(current, sourceScope.backendOrigin)
+                    check(
+                        actual != null &&
+                            sourceScope.matchesCurrentOrAdopted(actual, current) &&
+                            sourceScope.matchesRepositoryScope(
+                                repositories.expectedScope.ownerId,
+                                repositories.expectedScope.serverOrigin,
+                            ),
+                    ) { "Native pending camera owner or backend changed" }
+                }
+                val importer =
+                    NativePendingCameraDraftImporter(
+                        filesDir,
+                        packageName,
+                        repositories.media,
+                        repositories.entryDrafts,
+                        isCurrent,
+                        ::requireSourceCurrent,
+                        scopeFence = { commit ->
                             var applied = false
                             dataStore.updateData { current ->
                                 check(isCurrent()) { "Native pending camera delivery changed" }
@@ -400,11 +415,21 @@ class RetainedJournalReconciliationJobService : JobService() {
                                 current
                             }
                             applied
-                        }
-                    if (!importer.import(generation, files, receipt.mediaInventorySha256)) {
-                        return NativeSourceOutcome(true, false)
-                    }
+                        },
+                    )
+                val imported =
+                    importReceiptPinnedCameraDrafts(
+                        coverageComplete = result.coverageComplete,
+                        import = {
+                            importer.import(generation, files, receipt.mediaInventorySha256)
+                        },
+                        admitSource = { admitMergedSource(generation, opened.keyFile) },
+                    )
+                if (!imported) {
+                    return NativeSourceOutcome(true, false)
                 }
+            }
+            if (receiptFile == null && result.coverageComplete) {
                 admitMergedSource(generation, opened.keyFile)
             }
             return NativeSourceOutcome(result.mediaPending > 0, result.coverageComplete)
@@ -433,7 +458,7 @@ class RetainedJournalReconciliationJobService : JobService() {
             repositories.notes,
             repositories.content,
             repositories.media,
-            RetainedJournalMergeCheckpointStore(File(noBackupFilesDir, "retained-journal-merges/$generation")),
+            RetainedJournalMergeCheckpointStore(retainedJournalMergeCheckpointDirectory(noBackupFilesDir, generation)),
             scratchRoot,
             additionalMediaSources = additionalMediaSources,
             ensureSourceSessionCurrent = {
@@ -563,7 +588,10 @@ class RetainedJournalReconciliationJobService : JobService() {
                 .listFiles()
                 .orEmpty()
                 .filter { candidate ->
-                    (candidate.name.startsWith("retained-db-") || candidate.name.startsWith("preferences-read-")) &&
+                    (
+                        candidate.name.startsWith("retained-db-") ||
+                            candidate.name.startsWith("preferences-read-")
+                    ) &&
                         Files.isDirectory(candidate.toPath(), LinkOption.NOFOLLOW_LINKS) &&
                         !Files.isSymbolicLink(candidate.toPath())
                 }.forEach { candidate -> check(candidate.deleteRecursively()) }
@@ -572,9 +600,33 @@ class RetainedJournalReconciliationJobService : JobService() {
         }
     }
 
+    private fun clearAbandonedDraftCopies(root: File) {
+        check(root.absoluteFile.parentFile?.canonicalFile == noBackupFilesDir.canonicalFile && root.name == "retained-draft-reads")
+        if (!root.exists()) return
+        check(Files.isDirectory(root.toPath(), LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(root.toPath()))
+        root
+            .listFiles()
+            .orEmpty()
+            .filter { candidate ->
+                candidate.name.startsWith("draft-read-") &&
+                    Files.isDirectory(candidate.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+                    !Files.isSymbolicLink(candidate.toPath())
+            }.forEach { candidate -> check(candidate.deleteRecursively()) }
+    }
+
     private companion object {
         const val RECONCILIATION_TIMEOUT_MS = 5 * 60 * 1000L
         const val MAX_KEY_CANDIDATES = 128
         val DATABASE_FILES = setOf("logdate", "logdate-wal", "logdate-shm", "logdate-journal")
     }
+}
+
+internal suspend fun importReceiptPinnedCameraDrafts(
+    coverageComplete: Boolean,
+    import: suspend () -> Boolean,
+    admitSource: suspend () -> Unit,
+): Boolean {
+    if (!import()) return false
+    if (coverageComplete) admitSource()
+    return true
 }

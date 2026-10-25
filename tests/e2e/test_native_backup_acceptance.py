@@ -226,6 +226,25 @@ class RestoreSnapshotValidationTest(unittest.TestCase):
                 credentials_only=False,
             )
 
+    def test_started_camera_restore_allows_database_changes_after_prestart_comparison(self):
+        NATIVE_BACKUP_ACCEPTANCE.verify_restored_snapshot(
+            {"databases/logdate": {"sha256": "migrated"}},
+            {"databases/logdate": {"sha256": "source"}},
+            credentials_only=False,
+            allow_database_changes=True,
+        )
+
+    def test_camera_only_restore_keeps_strict_database_comparison(self):
+        harness = SCRIPT.read_text()
+        self.assertIn(
+            "allow_database_changes=exercise_pending_camera_draft and exercise_duplicate_restore,",
+            harness,
+        )
+        self.assertIn(
+            "verify_restored_snapshot(package_file_snapshot(destination), selected_source_files, credentials_only=False)",
+            harness,
+        )
+
     def test_missing_key_snapshot_accepts_rejected_journal_and_retained_preferences(self):
         NATIVE_BACKUP_ACCEPTANCE.verify_missing_keys_snapshot(
             {"files/logdate.preferences_pb": {"sha256": "preferences"}},

@@ -1,11 +1,15 @@
 package app.logdate.client.data.restore
 
 import android.content.Context
+import app.logdate.client.device.restore.NATIVE_MEDIA_INVENTORY_PATH
 import app.logdate.client.device.restore.NATIVE_SOURCE_RECEIPT_PATH
 import app.logdate.client.device.restore.NativeJournalRestoreAuthority
+import app.logdate.client.device.restore.NativeJournalSourceReceipt
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.restore.PostRestoreType
 import app.logdate.client.device.restore.retainedJournalPassphraseFile
+import app.logdate.client.device.restore.verifyNativeJournalMediaInventory
+import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.channels.FileChannel
@@ -75,7 +79,7 @@ internal class NativeJournalTransferRestore(
 
     fun wasStaged(): Boolean = staging.wasStaged()
 
-    fun finish() {
+    fun finish(): Boolean {
         val detector = PostRestoreDetector(context)
         check(detector.hasCompletedNativeRestoreDelivery())
         if (current.isDirectory &&
@@ -86,13 +90,29 @@ internal class NativeJournalTransferRestore(
             try {
                 validateSnapshot(context)
             } catch (_: MissingNativeJournalTransferKeyException) {
-                return
+                return false
             }
         }
         if (staging.wasStaged()) {
+            if (staging.hasPendingStageMarker() && authority.installedReceipt() != null) return true
             staging.finish()
             authority.finish()
-            return
+            return false
+        }
+        if (current.isDirectory && authority.installedReceipt() != null) {
+            val files =
+                try {
+                    validateSnapshot(context)
+                } catch (_: MissingNativeJournalTransferKeyException) {
+                    return false
+                } ?: return false
+            if (hasReceiptPinnedCameraOriginals(files)) {
+                // Fresh installs still take the normal DB, preferences, and account path. Preserve
+                // the already verified source separately so post-start reconciliation can import
+                // its pending draft without relying on the disposable callback workspace.
+                staging.stage(files)
+                return true
+            }
         }
         val receipt =
             authority.cleanupReceipt() ?: if (current.exists()) {
@@ -124,10 +144,28 @@ internal class NativeJournalTransferRestore(
             }
         }
         authority.finish()
+        return false
+    }
+
+    fun reconciliationScheduled() {
+        if (staging.hasPendingStageMarker() && authority.installedReceipt() != null) {
+            staging.finish()
+            authority.finish()
+        }
     }
 
     private fun snapshotFiles(): Map<String, File> =
         current.walkTopDown().filter(File::isFile).associateBy { it.relativeTo(current).invariantSeparatorsPath }
+}
+
+private fun hasReceiptPinnedCameraOriginals(files: Map<String, File>): Boolean {
+    val receiptFile = files[NATIVE_SOURCE_RECEIPT_PATH] ?: return false
+    val receipt = Json.decodeFromString<NativeJournalSourceReceipt>(receiptFile.readText())
+    if (receipt.version != 4 || receipt.entryDraftsSha256 == null) return false
+    val expectedInventoryHash = receipt.mediaInventorySha256 ?: return false
+    val inventoryFile = files[NATIVE_MEDIA_INVENTORY_PATH] ?: return false
+    val inventory = verifyNativeJournalMediaInventory(inventoryFile, expectedInventoryHash)
+    return inventory.files.any { it.path.startsWith("files/camera-captures/") }
 }
 
 private fun installAtomically(
