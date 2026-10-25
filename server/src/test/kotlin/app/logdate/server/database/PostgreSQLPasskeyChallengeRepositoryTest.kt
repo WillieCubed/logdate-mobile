@@ -35,6 +35,22 @@ class PostgreSQLPasskeyChallengeRepositoryTest {
         }
 
     @Test
+    fun `a step up grant is stored for its account and spent once`() =
+        withH2Database(WebAuthnChallengesTable) {
+            runBlocking {
+                val repository = PostgreSQLPasskeyChallengeRepository()
+                val now = Clock.System.now()
+                val grant = challenge().copy(type = "step_up_grant")
+                repository.save("passkey", grant)
+
+                assertNull(repository.consume("passkey", grant.challenge, "step_up", grant.userId, now))
+                assertNull(repository.consume("passkey", grant.challenge, "step_up_grant", Uuid.random(), now))
+                assertNotNull(repository.consume("passkey", grant.challenge, "step_up_grant", grant.userId, now))
+                assertNull(repository.consume("passkey", grant.challenge, "step_up_grant", grant.userId, now))
+            }
+        }
+
+    @Test
     fun `an authorization page challenge is stored apart from app sign-in challenges`() =
         withH2Database(WebAuthnChallengesTable) {
             runBlocking {
