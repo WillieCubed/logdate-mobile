@@ -43,7 +43,14 @@ internal object AuthSchemaDocs {
             "AuthResponseData" to
                 SchemaDoc(
                     "The account together with a new pair of tokens.",
-                    mapOf("account" to "The signed-in account.", "tokens" to "New access and refresh tokens. Replace the ones you stored."),
+                    mapOf(
+                        "account" to "The signed-in account.",
+                        "tokens" to "New access and refresh tokens. Replace the ones you stored.",
+                        "stepUpGrant" to
+                            "Sent after a passkey sign-in or sign-up on a server with recovery keys. Proof, for five minutes and " +
+                            "one use, that the person just confirmed with a passkey; send it to **Register a recovery key** " +
+                            "in place of `stepUp`.",
+                    ),
                 ),
             "AuthAccountView" to
                 SchemaDoc(

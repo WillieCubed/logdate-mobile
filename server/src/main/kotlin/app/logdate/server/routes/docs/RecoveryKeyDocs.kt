@@ -170,8 +170,9 @@ internal object RecoveryKeyDocs {
             log is the identity's history, and the server could still rewrite it. Derive or generate the key on
             the device and keep the private half there.
 
-            Needs `stepUp` from **Confirm a recovery-key change**. Registering the same key again changes
-            nothing. A different key is refused while one is set; use **Replace the recovery key** for that.
+            Needs `stepUp` from **Confirm a recovery-key change**, or instead the `stepUpGrant` from a
+            passkey sign-in or sign-up in the last five minutes, which is spent on first use. Registering the
+            same key again changes nothing. A different key is refused while one is set; use **Replace the recovery key** for that.
             Requires the `atprotoRecoveryKeysV1` protocol feature.
             """,
         )

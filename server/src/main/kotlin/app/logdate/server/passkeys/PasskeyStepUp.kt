@@ -26,6 +26,19 @@ interface PasskeyStepUp {
         accountId: Uuid,
         proof: PasskeyStepUpProof,
     ): Boolean
+
+    /**
+     * Issues a single-use grant, valid for five minutes, that [accountId] just confirmed with a
+     * passkey. A sign-in or sign-up hands it to the app so the account's first recovery key can be
+     * registered without asking for the passkey again.
+     */
+    fun grant(accountId: Uuid): String
+
+    /** Whether [grant] came from [grant] for [accountId] and is unused and unexpired. It is spent either way. */
+    fun redeem(
+        accountId: Uuid,
+        grant: String,
+    ): Boolean
 }
 
 /** The passkey assertion a client sends with a request that needs a step-up. */
@@ -66,4 +79,11 @@ class WebAuthnPasskeyStepUp(
                         type = proof.credential.type,
                     ),
             ).success
+
+    override fun grant(accountId: Uuid): String = webAuthnService.issueStepUpGrant(accountId)
+
+    override fun redeem(
+        accountId: Uuid,
+        grant: String,
+    ): Boolean = webAuthnService.redeemStepUpGrant(accountId, grant)
 }

@@ -197,6 +197,50 @@ class RecoveryKeyRoutesTest {
         }
 
     @Test
+    fun `a sign in grant registers the first recovery key once and only for its own account`() =
+        testApplication {
+            val server = installServer(recoveryKeysEnabled = true)
+            val grant = server.webAuthn.issueStepUpGrant(server.accountId)
+            val strangersGrant = server.webAuthn.issueStepUpGrant(Uuid.random())
+
+            val stranger = client.registerWithGrant(server, strangersGrant)
+            val registered = client.registerWithGrant(server, grant)
+            val reused = client.registerWithGrant(server, grant)
+
+            assertEquals(HttpStatusCode.Forbidden, stranger.status)
+            assertEquals("STEP_UP_FAILED", stranger.errorCode())
+            assertEquals(HttpStatusCode.OK, registered.status)
+            assertEquals(
+                server.recoveryDidKey,
+                json.decodeFromString<RegisterPlcRecoveryKeyResponse>(registered.bodyAsText()).data.recoveryDidKey,
+            )
+            assertEquals(HttpStatusCode.Forbidden, reused.status)
+            assertEquals("STEP_UP_FAILED", reused.errorCode())
+        }
+
+    @Test
+    fun `a sign in grant cannot replace a recovery key or stand in for a step up challenge`() =
+        testApplication {
+            val server = installServer(recoveryKeysEnabled = true)
+            client.register(server)
+            val other = didKeyFor(server.signingKeys.generateKeyPair(EcCurve.P256).publicKeyMultibase)
+            val grant = server.webAuthn.issueStepUpGrant(server.accountId)
+
+            val replace =
+                client.post("/api/v1/identity/plc/recovery-key/replace") {
+                    header(HttpHeaders.Authorization, "Bearer ${server.accessToken}")
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"recoveryDidKey":"$other","stepUpGrant":"$grant"}""")
+                }
+            val asChallenge = client.replace(server, other, stepUp = PasskeyStepUpProof(grant, server.assertion()))
+
+            assertEquals(HttpStatusCode.Forbidden, replace.status)
+            assertEquals("STEP_UP_REQUIRED", replace.errorCode())
+            assertEquals(HttpStatusCode.Forbidden, asChallenge.status)
+            assertEquals("STEP_UP_FAILED", asChallenge.errorCode())
+        }
+
+    @Test
     fun `a lost recovery key can be replaced with a passkey confirmation`() =
         testApplication {
             val server = installServer(recoveryKeysEnabled = true)
@@ -401,6 +445,16 @@ class RecoveryKeyRoutesTest {
             header(HttpHeaders.Authorization, "Bearer ${server.accessToken}")
             contentType(ContentType.Application.Json)
             setBody("""{"recoveryDidKey":"$recoveryDidKey"${stepUpJson(resolve(server, stepUp))}}""")
+        }
+
+    private suspend fun HttpClient.registerWithGrant(
+        server: TestServer,
+        grant: String,
+    ): HttpResponse =
+        post("/api/v1/identity/plc/recovery-key") {
+            header(HttpHeaders.Authorization, "Bearer ${server.accessToken}")
+            contentType(ContentType.Application.Json)
+            setBody("""{"recoveryDidKey":"${server.recoveryDidKey}","stepUpGrant":"$grant"}""")
         }
 
     private suspend fun HttpClient.prepare(server: TestServer): HttpResponse =

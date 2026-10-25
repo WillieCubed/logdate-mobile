@@ -214,6 +214,12 @@ data class AuthAccountView(
 data class AuthResponseData(
     val account: AuthAccountView,
     val tokens: AccountTokens,
+    /**
+     * Sent after a passkey sign-in or sign-up on a server with recovery keys: single-use proof, for
+     * five minutes, that the person just confirmed with a passkey. The app spends it to register the
+     * account's first recovery key without a second prompt.
+     */
+    val stepUpGrant: String? = null,
 )
 
 @Serializable
@@ -597,6 +603,7 @@ fun Route.authV1Routes(
                                 webAuthnService = webAuthnService,
                                 atprotoIdentityService = atprotoIdentityService,
                                 tokenService = tokenService,
+                                passkeyConfirmed = true,
                             )
                         Napier.i(
                             formatAuditLog(
@@ -812,6 +819,7 @@ fun Route.authV1Routes(
                                 webAuthnService = webAuthnService,
                                 atprotoIdentityService = atprotoIdentityService,
                                 tokenService = tokenService,
+                                passkeyConfirmed = true,
                             )
                         Napier.i(
                             formatAuditLog(
@@ -1741,6 +1749,7 @@ private suspend fun issueAuthResponse(
     atprotoIdentityService: AtprotoIdentityService,
     tokenService: TokenService,
     deviceSessionId: String? = null,
+    passkeyConfirmed: Boolean = false,
 ): AuthResponse {
     val fresh = atprotoIdentityService.ensureIdentity(accountRepository.findById(account.id) ?: account)
     val identities = identityRepository.findByAccountId(fresh.id)
@@ -1785,6 +1794,12 @@ private suspend fun issueAuthResponse(
                         storageMode = fresh.storageMode,
                     ),
                 tokens = tokens,
+                stepUpGrant =
+                    if (passkeyConfirmed && atprotoIdentityService.config.supportsRecoveryKeys) {
+                        webAuthnService.issueStepUpGrant(fresh.id)
+                    } else {
+                        null
+                    },
             ),
     )
 }
