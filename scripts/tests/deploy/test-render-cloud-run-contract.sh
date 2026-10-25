@@ -1267,8 +1267,9 @@ jq '.env_vars.ATPROTO_FIREHOSE_ENABLED = "yes"' \
     "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/invalid-firehose.json"
 expect_failure invalid-firehose staging "$RELEASE_SHA" invalid-firehose.json \
     "ATPROTO_FIREHOSE_ENABLED must be true or false"
-# Relays are named only in production, only with the stream on, and only as plain hostnames.
-jq '.env_vars.ATPROTO_FIREHOSE_ENABLED = "true" | .env_vars.ATPROTO_RELAY_HOSTS = "relay1.example.com,relay2.example.net"' \
+# Relays are named only in production, only with the stream on and identities published, and only
+# as plain hostnames.
+jq '.env_vars.ATPROTO_FIREHOSE_ENABLED = "true" | .env_vars.ATPROTO_PLC_PUBLISH_ENABLED = "true" | .env_vars.ATPROTO_RELAY_HOSTS = "relay1.example.com,relay2.example.net"' \
     "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/relay-hosts.json"
 output="$TMP_DIR/relay-hosts.out.json"
 if ! run_renderer production "$RELEASE_SHA" "relay-hosts.json" "$output" "$LOG_DIR/relay-hosts.err"; then
@@ -1284,8 +1285,18 @@ jq '.env_vars.ATPROTO_FIREHOSE_ENABLED = "false" | .env_vars.ATPROTO_RELAY_HOSTS
     "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/relay-hosts-stream-off.json"
 expect_failure relay-hosts-stream-off production "$RELEASE_SHA" relay-hosts-stream-off.json \
     "ATPROTO_RELAY_HOSTS needs ATPROTO_FIREHOSE_ENABLED to be true"
+for publishing in absent false; do
+    jq --arg publishing "$publishing" '
+        .env_vars.ATPROTO_FIREHOSE_ENABLED = "true" |
+        .env_vars.ATPROTO_RELAY_HOSTS = "relay.example.com" |
+        if $publishing == "absent" then del(.env_vars.ATPROTO_PLC_PUBLISH_ENABLED)
+        else .env_vars.ATPROTO_PLC_PUBLISH_ENABLED = $publishing end' \
+        "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/relay-hosts-unpublished-$publishing.json"
+    expect_failure "relay-hosts-unpublished-$publishing" production "$RELEASE_SHA" "relay-hosts-unpublished-$publishing.json" \
+        "ATPROTO_RELAY_HOSTS needs ATPROTO_PLC_PUBLISH_ENABLED to be true"
+done
 for invalid in "" "https://relay.example.com" "relay.example.com/path" "relay.example.com, relay2.example.com" "Relay.Example.com" "relay" "relay.example.com,relay.example.com" "relay.example.com:443"; do
-    jq --arg hosts "$invalid" '.env_vars.ATPROTO_FIREHOSE_ENABLED = "true" | .env_vars.ATPROTO_RELAY_HOSTS = $hosts' \
+    jq --arg hosts "$invalid" '.env_vars.ATPROTO_FIREHOSE_ENABLED = "true" | .env_vars.ATPROTO_PLC_PUBLISH_ENABLED = "true" | .env_vars.ATPROTO_RELAY_HOSTS = $hosts' \
         "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/invalid-relay-hosts.json"
     expect_failure invalid-relay-hosts production "$RELEASE_SHA" invalid-relay-hosts.json \
         "ATPROTO_RELAY_HOSTS must be a comma-separated list of distinct lowercase hostnames"

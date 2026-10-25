@@ -652,6 +652,10 @@ try:
             fail("only production may ask relays to crawl the server")
         if env_vars.get("ATPROTO_FIREHOSE_ENABLED") != "true":
             fail("ATPROTO_RELAY_HOSTS needs ATPROTO_FIREHOSE_ENABLED to be true")
+        # A relay checks each account against its published DID document, so it can follow only
+        # accounts whose identities are published (docs/runbook/repository-event-stream.md).
+        if env_vars.get("ATPROTO_PLC_PUBLISH_ENABLED") != "true":
+            fail("ATPROTO_RELAY_HOSTS needs ATPROTO_PLC_PUBLISH_ENABLED to be true")
         relay_label = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
         relay_pattern = rf"{relay_label}(?:\.{relay_label})+"
         listed_relays = relay_hosts.split(",")
