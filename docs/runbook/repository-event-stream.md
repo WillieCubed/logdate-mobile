@@ -45,7 +45,9 @@ Check these, in this order:
    curl -s "https://HOST/xrpc/com.atproto.repo.getRecord?repo=DID&collection=app.logdate.journal.entry&rkey=anything"
    ```
 
-4. Tell the relays. Set `ATPROTO_RELAY_HOSTS` to the relay hostnames, for example
+4. Tell the relays. Set `ATPROTO_PLC_PUBLISH_ENABLED` to `"true"` if it is not already, because a
+   relay checks every account against its published identity and the contract renderer refuses
+   relay hosts without it. Set `ATPROTO_RELAY_HOSTS` to the relay hostnames, for example
    `relay1.us-east.bsky.network`, and deploy again. At startup the server asks each relay to crawl it.
    Look for `SERVER_RELAY_CRAWL_REQUESTED` in the logs, one for each relay. `SERVER_RELAY_CRAWL_REFUSED`
    means a relay answered with an error, and `SERVER_RELAY_CRAWL_FAILED` means it could not be reached.
