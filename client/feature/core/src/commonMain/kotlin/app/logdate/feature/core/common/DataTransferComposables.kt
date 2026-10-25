@@ -45,6 +45,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import app.logdate.ui.common.Dialog
 import app.logdate.ui.common.MaterialCard
 import app.logdate.ui.platform.PlatformIcons
@@ -71,7 +72,10 @@ internal fun DataTransferModal(
     onDismiss: () -> Unit,
     content: @Composable () -> Unit,
 ) {
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    // The preview stand-in for the dialog is ordinary content, so it must draw above the page
+    // that composes after it; the real dialog and sheet live in their own windows.
+    val previewOverlay = if (LocalInspectionMode.current) Modifier.zIndex(1f) else Modifier
+    BoxWithConstraints(Modifier.fillMaxSize().then(previewOverlay)) {
         if (maxWidth >= 840.dp && maxHeight >= 600.dp) {
             if (LocalInspectionMode.current) {
                 Box(
