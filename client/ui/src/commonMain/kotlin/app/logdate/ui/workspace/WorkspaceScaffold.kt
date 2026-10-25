@@ -14,8 +14,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -40,7 +38,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.MenuOpen
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -154,8 +152,7 @@ fun WorkspaceScaffold(
         val navigation = workspaceNavigationMode(maxWidth, maxHeight, posture)
         val rail = !navigation.isBar
         val largeText = LocalDensity.current.fontScale >= 1.5f
-        val headerCreate =
-            !rail && (largeText || maxWidth <= 440.dp || navigation == WorkspaceNavigationMode.ShortBarHorizontal)
+        val headerCreate = !rail
         val canvas = MaterialTheme.colorScheme.workspaceContainer(WorkspaceSurface.Canvas)
         val edge = bottomEdge ?: rememberWorkspaceBottomEdge(selected.key)
         val reduceMotion = rememberSystemReduceMotion().value
@@ -175,7 +172,7 @@ fun WorkspaceScaffold(
                     enter = fadeIn(navigationMotion(reduceMotion)) + expandHorizontally(navigationMotion(reduceMotion)),
                     exit = fadeOut(navigationMotion(reduceMotion)) + shrinkHorizontally(navigationMotion(reduceMotion)),
                 ) {
-                    WorkspaceCreateAction(it, createLabel, createEntryTransition && headerCreate, compact = true)
+                    WorkspaceCreateAction(it, createLabel, createEntryTransition && headerCreate)
                 }
             }
             actions()
@@ -220,18 +217,6 @@ fun WorkspaceScaffold(
                                 )
                             }
                         }
-                    }
-                }
-            },
-            floatingActionButton = {
-                val floating = !rail && !headerCreate
-                if (onCreate != null) {
-                    AnimatedVisibility(
-                        floating,
-                        enter = fadeIn(navigationMotion(reduceMotion)) + scaleIn(navigationMotion(reduceMotion)),
-                        exit = fadeOut(navigationMotion(reduceMotion)) + scaleOut(navigationMotion(reduceMotion)),
-                    ) {
-                        WorkspaceCreateAction(onCreate, createLabel, createEntryTransition && floating)
                     }
                 }
             },
@@ -288,7 +273,6 @@ private fun WorkspaceCreateAction(
     onClick: () -> Unit,
     label: String,
     createEntryTransition: Boolean,
-    compact: Boolean = false,
     extended: Boolean? = null,
 ) {
     val sharedScope = LocalSharedTransitionScope.current
@@ -316,17 +300,9 @@ private fun WorkspaceCreateAction(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         )
-    } else if (compact) {
-        IconButton(onClick = onClick, modifier = transitionModifier) {
-            Icon(PlatformIcons.newEntry(), label, tint = MaterialTheme.colorScheme.primary)
-        }
     } else {
-        FloatingActionButton(
-            onClick,
-            modifier = transitionModifier,
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        ) {
+        // Docked in the app bar, not floating over the content.
+        FilledTonalIconButton(onClick = onClick, modifier = transitionModifier) {
             Icon(PlatformIcons.newEntry(), label)
         }
     }

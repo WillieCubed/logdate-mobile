@@ -224,8 +224,8 @@ Extend the shared primitive for new visual behavior; narrowly document reviewed 
 `config/workspace/home-allowlist.txt`. Register new route/panel roots in `home-roots.txt`.
 
 `HOME_WORKSPACE_V2` gates migration presentation only; it must not change data or recording settings.
-Keep it disabled until populated shared-shell scenes and runtime acceptance pass. Preserve the
-flag-off presentation until rollout is accepted. Run `checkHomeWorkspaceContract` for relevant changes.
+It is enabled by default and stays as a presentation rollback switch; keep the flag-off presentation
+working until the switch is retired. Run `checkHomeWorkspaceContract` for relevant changes.
 
 UI acceptance requires inspecting populated renders at matching phone/tablet sizes and a consolidated
 comparison sheet, plus compact phone, landscape, book/tabletop, dark/dynamic colors, RTL, 200% text,
