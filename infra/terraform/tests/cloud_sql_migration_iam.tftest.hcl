@@ -1,7 +1,7 @@
 mock_provider "google" {}
 mock_provider "google-beta" {}
 
-run "github_deploy_can_read_pinned_neon_migration_secrets" {
+run "github_deploy_can_read_every_secret_the_revision_mounts" {
   command = apply
 
   variables {
@@ -12,6 +12,12 @@ run "github_deploy_can_read_pinned_neon_migration_secrets" {
     enable_artifact_registry  = false
     enable_cloud_run_service  = false
     create_cloud_sql_instance = false
+    cloud_run_secret_env = {
+      DATABASE_URL      = { secret_id = "logdate-db-url", version = "1" }
+      DATABASE_USER     = { secret_id = "logdate-db-user", version = "1" }
+      DATABASE_PASSWORD = { secret_id = "logdate-db-password", version = "1" }
+      JWT_SECRET        = { secret_id = "logdate-jwt-secret", version = "1" }
+    }
   }
 
   override_resource {
@@ -32,11 +38,11 @@ run "github_deploy_can_read_pinned_neon_migration_secrets" {
 
   assert {
     condition = alltrue([
-      for secret_id in ["logdate-db-url", "logdate-db-user", "logdate-db-password"] :
+      for secret_id in ["logdate-db-url", "logdate-db-user", "logdate-db-password", "logdate-jwt-secret"] :
       google_secret_manager_secret_iam_member.github_migration_access[secret_id].role == "roles/secretmanager.secretAccessor" &&
       google_secret_manager_secret_iam_member.github_migration_access[secret_id].member == "serviceAccount:github-deploy@logdate-contract-test.iam.gserviceaccount.com"
     ])
-    error_message = "The GitHub deploy identity must read all three pinned Neon migration secrets without Cloud SQL provisioning."
+    error_message = "The GitHub deploy identity must read every secret the revision mounts, so it can migrate and run the startup preflight without Cloud SQL provisioning."
   }
 
   assert {
@@ -45,8 +51,8 @@ run "github_deploy_can_read_pinned_neon_migration_secrets" {
   }
 
   assert {
-    condition     = length(google_secret_manager_secret_iam_member.github_migration_access) == 3
-    error_message = "Secret value access must remain limited to the three database migration bindings."
+    condition     = length(google_secret_manager_secret_iam_member.github_migration_access) == 4
+    error_message = "Secret value access must remain limited to the secrets the revision mounts."
   }
 
   assert {
