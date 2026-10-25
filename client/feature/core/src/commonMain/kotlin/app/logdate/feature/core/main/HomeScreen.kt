@@ -171,7 +171,10 @@ fun HomeScreen(
     if (workspaceEnabled) {
         val sourceState = rememberSaveableStateHolder()
         HomeWorkspaceComposition(
-            destinations = visibleDestinations.map { WorkspaceDestination(it.name, stringResource(it.label), it.selectedIcon) },
+            destinations =
+                visibleDestinations.map {
+                    WorkspaceDestination(it.name, stringResource(it.label), it.selectedIcon, it.unselectedIcon)
+                },
             selectedKey = currentDestination.name,
             onSelect = {
                 currentDestination = HomeRouteDestination.valueOf(it)

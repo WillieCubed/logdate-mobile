@@ -28,6 +28,11 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.outlined.Book
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Timeline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -92,11 +97,11 @@ annotation class WorkspacePreviewMatrix
 
 internal val workspaceDestinations =
     listOf(
-        WorkspaceDestination("timeline", "Timeline", Icons.Default.Timeline),
-        WorkspaceDestination("locations", "Places", Icons.Default.Place),
-        WorkspaceDestination("journals", "Journals", Icons.Default.Book),
-        WorkspaceDestination("library", "Library", Icons.Default.Image),
-        WorkspaceDestination("rewind", "Rewind", Icons.Default.History),
+        WorkspaceDestination("timeline", "Timeline", Icons.Filled.Timeline, Icons.Outlined.Timeline),
+        WorkspaceDestination("locations", "Places", Icons.Filled.Place, Icons.Outlined.Place),
+        WorkspaceDestination("journals", "Journals", Icons.Filled.Book, Icons.Outlined.Book),
+        WorkspaceDestination("library", "Library", Icons.Filled.Image, Icons.Outlined.Image),
+        WorkspaceDestination("rewind", "Rewind", Icons.Filled.History, Icons.Outlined.History),
     )
 
 @Composable
