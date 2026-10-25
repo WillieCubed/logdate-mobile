@@ -918,6 +918,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
             exercise_credentials_only=False,
             exercise_archive_recovery=True,
             exercise_partial_media=False,
+            exercise_pending_camera_draft=False,
             exercise_data_only=False,
             exercise_duplicate_restore=False,
             resume_seeded_source=False,
