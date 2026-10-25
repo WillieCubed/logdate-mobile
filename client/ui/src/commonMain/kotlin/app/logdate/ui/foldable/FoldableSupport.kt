@@ -155,11 +155,19 @@ fun FoldableLayoutInfo.relativeTo(origin: DpOffset): FoldableLayoutInfo {
 }
 
 /**
+ * The window position [rememberWindowOrigin] reports before it has measured anything. A layout learns
+ * where it sits one frame after it is first drawn, so previews and tests that render a single frame
+ * provide it to show the settled layout.
+ */
+val LocalWindowOriginOverride = staticCompositionLocalOf<DpOffset?> { null }
+
+/**
  * Remembers where the modified element's top-left corner sits in the window, in dp. Pair with
  * [relativeTo] so a foldable split lines up with the physical hinge wherever the layout is placed.
  */
 @Composable
 fun rememberWindowOrigin(): Pair<DpOffset, Modifier> {
+    LocalWindowOriginOverride.current?.let { return it to Modifier }
     val density = LocalDensity.current
     var origin by remember { mutableStateOf(DpOffset.Zero) }
     val modifier =
