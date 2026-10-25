@@ -269,7 +269,11 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
                     isLoading = setupState.isLoading,
                     errorMessage = setupState.errorMessage,
                     onRetry = recoveryViewModel::prepareRecoveryPhrase,
-                    onPhraseContinue = { continueAfterRecovery() },
+                    onPhraseContinue = { words ->
+                        recoveryViewModel.confirmSaved(words)
+                        continueAfterRecovery()
+                    },
+                    onLater = ::continueAfterRecovery,
                 )
             }
         }
