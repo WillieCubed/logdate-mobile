@@ -92,47 +92,15 @@ object NativeArchive3SnapshotWriter {
                     .flatten()
                     .all { it in journalIds },
             )
-            val notes =
-                JsonArray(
-                    input.notes.map { note ->
-                        val archive = note.toArchiveNote(input.journalIdsByNote[note.uid].orEmpty(), media)
-                        val payload = json.encodeToJsonElement(archive) as JsonObject
-                        JsonObject(
-                            payload +
-                                ("nativePrimaryJournalId" to JsonPrimitive(input.journalIdsByNote[note.uid]?.firstOrNull()?.toString())),
-                        )
-                    },
-                )
+            val notes = archiveNotes(input, media)
             val drafts = JsonArray(input.drafts.map { json.encodeToJsonElement(it.toArchiveDraft(media)) })
             val profile = input.profile.toArchiveProfile()?.let { json.encodeToJsonElement(it) as JsonObject }
             val places = JsonArray(input.places.map { json.encodeToJsonElement(it.toArchivePlace()) })
-            val samples =
-                input.locationHistory.map { item ->
-                    val projected = json.encodeToJsonElement(item.toArchiveSample()) as JsonObject
-                    JsonObject(
-                        projected +
-                            buildMap {
-                                put("sampleId", JsonPrimitive(item.sampleId))
-                                put("userId", JsonPrimitive(item.userId))
-                                put("deviceId", JsonPrimitive(item.deviceId))
-                                item.activityType?.let { put("activityType", JsonPrimitive(it)) }
-                                item.timeZoneId?.let { put("timeZoneId", JsonPrimitive(it)) }
-                            },
-                    )
-                }
+            val samples = archiveSamples(input)
             val source =
                 NativeArchive3ExportSource(
                     input.exportedAt,
-                    input.journals.map {
-                        NativeArchive3JournalRecord(
-                            it.id.toString(),
-                            it.title,
-                            it.description,
-                            it.isFavorited,
-                            it.created.toString(),
-                            it.lastUpdated.toString(),
-                        )
-                    },
+                    input.journals.map(::journalRecord),
                     notes,
                     drafts,
                     resolution.files.map { file ->
@@ -151,4 +119,44 @@ object NativeArchive3SnapshotWriter {
             throw failure
         }
     }
+
+    private fun archiveNotes(
+        input: NativeArchive3SnapshotInput,
+        media: MediaReferences,
+    ): JsonArray =
+        JsonArray(
+            input.notes.map { note ->
+                val archive = note.toArchiveNote(input.journalIdsByNote[note.uid].orEmpty(), media)
+                val payload = json.encodeToJsonElement(archive) as JsonObject
+                JsonObject(
+                    payload +
+                        ("nativePrimaryJournalId" to JsonPrimitive(input.journalIdsByNote[note.uid]?.firstOrNull()?.toString())),
+                )
+            },
+        )
+
+    private fun archiveSamples(input: NativeArchive3SnapshotInput): List<JsonObject> =
+        input.locationHistory.map { item ->
+            val projected = json.encodeToJsonElement(item.toArchiveSample()) as JsonObject
+            JsonObject(
+                projected +
+                    buildMap {
+                        put("sampleId", JsonPrimitive(item.sampleId))
+                        put("userId", JsonPrimitive(item.userId))
+                        put("deviceId", JsonPrimitive(item.deviceId))
+                        item.activityType?.let { put("activityType", JsonPrimitive(it)) }
+                        item.timeZoneId?.let { put("timeZoneId", JsonPrimitive(it)) }
+                    },
+            )
+        }
+
+    private fun journalRecord(journal: Journal) =
+        NativeArchive3JournalRecord(
+            journal.id.toString(),
+            journal.title,
+            journal.description,
+            journal.isFavorited,
+            journal.created.toString(),
+            journal.lastUpdated.toString(),
+        )
 }

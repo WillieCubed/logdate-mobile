@@ -127,59 +127,11 @@ class CloudRecoveryPhraseAccountProof(
         fingerprint: String,
         key: ByteArray,
     ): CloudProof {
-        val journals =
-            pageProof(fingerprint, key) { since ->
-                cloudApiClient.getJournalChanges(token, since, PAGE_SIZE).getOrThrow().let { page ->
-                    Page(
-                        page.changes.flatMap {
-                            listOf(
-                                Sample("sync:journal:${it.id}:title", it.title),
-                                Sample("sync:journal:${it.id}:description", it.description),
-                            )
-                        },
-                        page.lastTimestamp,
-                        page.hasMore,
-                    )
-                }
-            }
+        val journals = pageProof(fingerprint, key) { since -> journalPage(token, since) }
         if (journals == CloudProof.MISMATCH) return journals
-        val content =
-            pageProof(fingerprint, key) { since ->
-                cloudApiClient.getContentChanges(token, since, PAGE_SIZE).getOrThrow().let { page ->
-                    Page(
-                        page.changes.flatMap {
-                            listOfNotNull(
-                                it.content?.let { value -> Sample("sync:note:${it.id}:text", value) },
-                                it.caption?.let { value -> Sample("sync:note:${it.id}:caption", value) },
-                                it.location?.let { value -> Sample("sync:note:${it.id}:location", value) },
-                                it.transcript?.let { value -> Sample("sync:note:${it.id.lowercase()}:transcript", value) },
-                                it.capturedOn?.let { value -> Sample("sync:note:${it.id}:capturedOn", value) },
-                                it.capturedDuring?.let { value -> Sample("sync:note:${it.id}:capturedDuring", value) },
-                            )
-                        },
-                        page.lastTimestamp,
-                        page.hasMore,
-                    )
-                }
-            }
+        val content = pageProof(fingerprint, key) { since -> contentPage(token, since) }
         if (content == CloudProof.MISMATCH) return content
-        val drafts =
-            pageProof(fingerprint, key) { since ->
-                cloudApiClient.getDraftChanges(token, since, PAGE_SIZE).getOrThrow().let { page ->
-                    Page(
-                        page.drafts.flatMap {
-                            listOfNotNull(
-                                it.encryptedBlocks?.let { value ->
-                                    Sample("sync:draft:${it.id}:blocks", value)
-                                },
-                                Sample("sync:draft:${it.id}:content", it.content),
-                            )
-                        },
-                        page.lastTimestamp,
-                        page.hasMore,
-                    )
-                }
-            }
+        val drafts = pageProof(fingerprint, key) { since -> draftPage(token, since) }
         if (drafts == CloudProof.MISMATCH) return drafts
         return when {
             listOf(journals, content, drafts).contains(CloudProof.INCONCLUSIVE) -> CloudProof.INCONCLUSIVE
@@ -187,6 +139,63 @@ class CloudRecoveryPhraseAccountProof(
             else -> CloudProof.NO_SAMPLE
         }
     }
+
+    private suspend fun journalPage(
+        token: String,
+        since: Long,
+    ): Page =
+        cloudApiClient.getJournalChanges(token, since, PAGE_SIZE).getOrThrow().let { page ->
+            Page(
+                page.changes.flatMap {
+                    listOf(
+                        Sample("sync:journal:${it.id}:title", it.title),
+                        Sample("sync:journal:${it.id}:description", it.description),
+                    )
+                },
+                page.lastTimestamp,
+                page.hasMore,
+            )
+        }
+
+    private suspend fun contentPage(
+        token: String,
+        since: Long,
+    ): Page =
+        cloudApiClient.getContentChanges(token, since, PAGE_SIZE).getOrThrow().let { page ->
+            Page(
+                page.changes.flatMap {
+                    listOfNotNull(
+                        it.content?.let { value -> Sample("sync:note:${it.id}:text", value) },
+                        it.caption?.let { value -> Sample("sync:note:${it.id}:caption", value) },
+                        it.location?.let { value -> Sample("sync:note:${it.id}:location", value) },
+                        it.transcript?.let { value -> Sample("sync:note:${it.id.lowercase()}:transcript", value) },
+                        it.capturedOn?.let { value -> Sample("sync:note:${it.id}:capturedOn", value) },
+                        it.capturedDuring?.let { value -> Sample("sync:note:${it.id}:capturedDuring", value) },
+                    )
+                },
+                page.lastTimestamp,
+                page.hasMore,
+            )
+        }
+
+    private suspend fun draftPage(
+        token: String,
+        since: Long,
+    ): Page =
+        cloudApiClient.getDraftChanges(token, since, PAGE_SIZE).getOrThrow().let { page ->
+            Page(
+                page.drafts.flatMap {
+                    listOfNotNull(
+                        it.encryptedBlocks?.let { value ->
+                            Sample("sync:draft:${it.id}:blocks", value)
+                        },
+                        Sample("sync:draft:${it.id}:content", it.content),
+                    )
+                },
+                page.lastTimestamp,
+                page.hasMore,
+            )
+        }
 
     private suspend fun pageProof(
         fingerprint: String,

@@ -51,28 +51,9 @@ class AndroidCanonicalMediaStore(
         val stagingFile = File(stagingDirectory, "${Uuid.random()}.tmp")
 
         try {
-            val digest = MessageDigest.getInstance("SHA-256")
-            var copiedBytes = 0L
-            FileOutputStream(stagingFile).use { output ->
-                input.use { source ->
-                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    while (true) {
-                        currentCoroutineContext().ensureActive()
-                        val read = source.read(buffer)
-                        if (read < 0) break
-                        output.write(buffer, 0, read)
-                        digest.update(buffer, 0, read)
-                        copiedBytes += read
-                    }
-                }
-                output.fd.sync()
-            }
-            require(copiedBytes == expectedSizeBytes) {
-                "Expected $expectedSizeBytes media bytes but copied $copiedBytes"
-            }
+            val (hexDigest, copiedBytes) = copyToStaging(input, stagingFile, expectedSizeBytes)
             currentCoroutineContext().ensureActive()
 
-            val hexDigest = digest.digest().toHex()
             val destinationDirectory = File(objectsDirectory, hexDigest.take(2))
             ensurePrivateDirectory(destinationDirectory)
             if (!canCommit()) throw CancellationException("Media store commit is no longer valid")
@@ -86,43 +67,7 @@ class AndroidCanonicalMediaStore(
                     )
                 lockChannel.use {
                     lockChannel.lock().use {
-                        var variant = 0L
-                        while (true) {
-                            currentCoroutineContext().ensureActive()
-                            if (!canCommit()) throw CancellationException("Media store commit is no longer valid")
-                            val name = if (variant == 0L) "$hexDigest.$extension" else "$hexDigest.retained-$variant.$extension"
-                            val destination = File(destinationDirectory, name)
-                            val ticket =
-                                publicationTickets?.reserve(
-                                    destination = "canonical-media",
-                                    sourcePath = stagingFile.absolutePath,
-                                    reference = destination.toURI().toString(),
-                                )
-                            if (Files.exists(destination.toPath(), LinkOption.NOFOLLOW_LINKS)) {
-                                if (isVerifiedObject(destination, hexDigest, copiedBytes)) {
-                                    ticket?.let { publicationTickets.publish(it.id, destination.toURI().toString()) }
-                                    syncFile(destination)
-                                    syncDirectory(destinationDirectory)
-                                    currentCoroutineContext().ensureActive()
-                                    return@withLock destination.toURI().toString()
-                                }
-                                // A working entry may still reference this path. Never remove its bytes
-                                // merely because an incoming original claims the same digest path.
-                                variant++
-                                continue
-                            }
-                            try {
-                                publishIntoPlace(stagingFile, destination, copiedBytes)
-                            } catch (_: FileAlreadyExistsException) {
-                                // Another process claimed this path. Recheck it under the lock.
-                                continue
-                            }
-                            ticket?.let { publicationTickets.publish(it.id, destination.toURI().toString()) }
-                            syncDirectory(destinationDirectory)
-                            currentCoroutineContext().ensureActive()
-                            return@withLock destination.toURI().toString()
-                        }
-                        error("No available media object path")
+                        publishUnderLock(stagingFile, destinationDirectory, hexDigest, extension, copiedBytes, canCommit)
                     }
                 }
             }
@@ -133,6 +78,80 @@ class AndroidCanonicalMediaStore(
                     Napier.w("Unable to remove private media staging file", cleanup.exceptionOrNull())
                 }
             }
+        }
+    }
+
+    /** Copies the input into the staging file, returning its SHA-256 hex digest and byte count. */
+    private suspend fun copyToStaging(
+        input: InputStream,
+        stagingFile: File,
+        expectedSizeBytes: Long,
+    ): Pair<String, Long> {
+        val digest = MessageDigest.getInstance("SHA-256")
+        var copiedBytes = 0L
+        FileOutputStream(stagingFile).use { output ->
+            input.use { source ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    currentCoroutineContext().ensureActive()
+                    val read = source.read(buffer)
+                    if (read < 0) break
+                    output.write(buffer, 0, read)
+                    digest.update(buffer, 0, read)
+                    copiedBytes += read
+                }
+            }
+            output.fd.sync()
+        }
+        require(copiedBytes == expectedSizeBytes) {
+            "Expected $expectedSizeBytes media bytes but copied $copiedBytes"
+        }
+        return digest.digest().toHex() to copiedBytes
+    }
+
+    private suspend fun publishUnderLock(
+        stagingFile: File,
+        destinationDirectory: File,
+        hexDigest: String,
+        extension: String,
+        copiedBytes: Long,
+        canCommit: () -> Boolean,
+    ): String {
+        var variant = 0L
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            if (!canCommit()) throw CancellationException("Media store commit is no longer valid")
+            val name = if (variant == 0L) "$hexDigest.$extension" else "$hexDigest.retained-$variant.$extension"
+            val destination = File(destinationDirectory, name)
+            val ticket =
+                publicationTickets?.reserve(
+                    destination = "canonical-media",
+                    sourcePath = stagingFile.absolutePath,
+                    reference = destination.toURI().toString(),
+                )
+            if (Files.exists(destination.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                if (isVerifiedObject(destination, hexDigest, copiedBytes)) {
+                    ticket?.let { publicationTickets.publish(it.id, destination.toURI().toString()) }
+                    syncFile(destination)
+                    syncDirectory(destinationDirectory)
+                    currentCoroutineContext().ensureActive()
+                    return destination.toURI().toString()
+                }
+                // A working entry may still reference this path. Never remove its bytes
+                // merely because an incoming original claims the same digest path.
+                variant++
+                continue
+            }
+            try {
+                publishIntoPlace(stagingFile, destination, copiedBytes)
+            } catch (_: FileAlreadyExistsException) {
+                // Another process claimed this path. Recheck it under the lock.
+                continue
+            }
+            ticket?.let { publicationTickets.publish(it.id, destination.toURI().toString()) }
+            syncDirectory(destinationDirectory)
+            currentCoroutineContext().ensureActive()
+            return destination.toURI().toString()
         }
     }
 
