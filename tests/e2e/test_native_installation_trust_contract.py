@@ -81,7 +81,7 @@ class InstallationTrustContractTest(unittest.TestCase):
                 database["offlineEdit"] = False
                 return b"restoreFinished: 0"
             return b"synthetic transport"
-        def probe(serial, mode, *args):
+        def probe(serial, mode, *args, **kwargs):
             events.append(mode)
             if mode == "verify":
                 database["offlineEdit"] = True
