@@ -82,30 +82,10 @@ internal class NativeJournalTransferRestore(
     fun finish(): Boolean {
         val detector = PostRestoreDetector(context)
         check(detector.hasCompletedNativeRestoreDelivery())
-        if (current.isDirectory &&
-            authority.isSnapshotRequired() &&
-            authority.installedReceipt() == null &&
-            detector.detect(isOnboarded = true) == PostRestoreType.CONTENT_MISSING
-        ) {
-            try {
-                validateSnapshot(context)
-            } catch (_: MissingNativeJournalTransferKeyException) {
-                return false
-            }
-        }
-        if (staging.wasStaged()) {
-            if (staging.hasPendingStageMarker() && authority.installedReceipt() != null) return true
-            staging.finish()
-            authority.finish()
-            return false
-        }
+        if (isAwaitingSnapshotKey(detector)) return false
+        if (staging.wasStaged()) return finishStagedRestore()
         if (current.isDirectory && authority.installedReceipt() != null) {
-            val files =
-                try {
-                    validateSnapshot(context)
-                } catch (_: MissingNativeJournalTransferKeyException) {
-                    return false
-                } ?: return false
+            val files = validatedSnapshotOrNull() ?: return false
             if (hasReceiptPinnedCameraOriginals(files)) {
                 // Fresh installs still take the normal DB, preferences, and account path. Preserve
                 // the already verified source separately so post-start reconciliation can import
@@ -114,37 +94,69 @@ internal class NativeJournalTransferRestore(
                 return true
             }
         }
-        val receipt =
-            authority.cleanupReceipt() ?: if (current.exists()) {
-                checkNotNull(authority.installedReceipt()).also {
-                    val files = snapshotFiles()
-                    check(
-                        authority.completedReceipt() == it &&
-                            authority.matchesCompletedSnapshot(files) ||
-                            files[NATIVE_SOURCE_RECEIPT_PATH]?.let(::checksum) == it,
-                    ) { "Uninstalled native journal inputs must remain in custody" }
-                    authority.rememberCompletedSnapshot(it, files)
-                    authority.beginCleanup(it)
-                }
-            } else {
-                null
-            }
-        if (receipt != null) {
-            check(receipt == authority.installedReceipt())
-            val consumed = File(current.parentFile, ".$receipt.consumed")
-            if (!consumed.exists() && current.exists()) {
-                check(authority.matchesCompletedSnapshot(snapshotFiles()))
-                Files.move(current.toPath(), consumed.toPath(), StandardCopyOption.ATOMIC_MOVE)
-                syncDirectory(current.parentFile!!)
-            }
-            if (consumed.exists()) {
-                check(Files.isDirectory(consumed.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS))
-                check(consumed.deleteRecursively())
-                syncDirectory(consumed.parentFile!!)
-            }
-        }
+        pendingCleanupReceipt()?.let(::consumeSnapshot)
         authority.finish()
         return false
+    }
+
+    private fun isAwaitingSnapshotKey(detector: PostRestoreDetector): Boolean {
+        if (!current.isDirectory ||
+            !authority.isSnapshotRequired() ||
+            authority.installedReceipt() != null ||
+            detector.detect(isOnboarded = true) != PostRestoreType.CONTENT_MISSING
+        ) {
+            return false
+        }
+        return try {
+            validateSnapshot(context)
+            false
+        } catch (_: MissingNativeJournalTransferKeyException) {
+            true
+        }
+    }
+
+    private fun finishStagedRestore(): Boolean {
+        if (staging.hasPendingStageMarker() && authority.installedReceipt() != null) return true
+        staging.finish()
+        authority.finish()
+        return false
+    }
+
+    private fun validatedSnapshotOrNull(): Map<String, File>? =
+        try {
+            validateSnapshot(context)
+        } catch (_: MissingNativeJournalTransferKeyException) {
+            null
+        }
+
+    private fun pendingCleanupReceipt(): String? {
+        authority.cleanupReceipt()?.let { return it }
+        if (!current.exists()) return null
+        val receipt = checkNotNull(authority.installedReceipt())
+        val files = snapshotFiles()
+        check(
+            authority.completedReceipt() == receipt &&
+                authority.matchesCompletedSnapshot(files) ||
+                files[NATIVE_SOURCE_RECEIPT_PATH]?.let(::checksum) == receipt,
+        ) { "Uninstalled native journal inputs must remain in custody" }
+        authority.rememberCompletedSnapshot(receipt, files)
+        authority.beginCleanup(receipt)
+        return receipt
+    }
+
+    private fun consumeSnapshot(receipt: String) {
+        check(receipt == authority.installedReceipt())
+        val consumed = File(current.parentFile, ".$receipt.consumed")
+        if (!consumed.exists() && current.exists()) {
+            check(authority.matchesCompletedSnapshot(snapshotFiles()))
+            Files.move(current.toPath(), consumed.toPath(), StandardCopyOption.ATOMIC_MOVE)
+            syncDirectory(current.parentFile!!)
+        }
+        if (consumed.exists()) {
+            check(Files.isDirectory(consumed.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS))
+            check(consumed.deleteRecursively())
+            syncDirectory(consumed.parentFile!!)
+        }
     }
 
     fun reconciliationScheduled() {

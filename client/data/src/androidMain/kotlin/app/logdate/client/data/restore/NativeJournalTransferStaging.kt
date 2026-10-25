@@ -74,60 +74,83 @@ internal class NativeJournalTransferStaging(
         var activeIntent = intent
         for ((cohort, paths) in intent.cohorts.entries.groupBy({ it.value }, { it.key })) {
             val expected = paths.associateWith { intent.files.getValue(it) }
-            val existing = custody.sealedPayloadsInCohort(cohort)
-            val complete =
-                existing.size == expected.size &&
-                    expected.all { (path, hash) ->
-                        existing.singleOrNull {
-                            it.complete &&
-                                it.path == NATIVE_JOURNAL_TRANSFER_PREFIX + path &&
-                                nativeSnapshotChecksum(it.file) == hash
-                        } !=
-                            null
-                    }
-            if (complete) continue
+            if (isCohortComplete(cohort, expected)) continue
             val oldIds = if (custody.hasCohort(cohort)) listOf(cohort) else emptyList()
             val replacement = if (oldIds.isEmpty()) cohort else Uuid.random().toString()
             if (replacement != cohort) {
-                activeIntent =
-                    activeIntent.copy(
-                        cohorts = activeIntent.cohorts + paths.associateWith { replacement },
-                        replacedCohorts =
-                            activeIntent.replacedCohorts +
-                                paths.associateWith { path ->
-                                    activeIntent.replacedCohorts[path].orEmpty() + oldIds
-                                },
-                    )
+                activeIntent = activeIntent.withReplacementCohort(paths, replacement, oldIds)
                 writeIntent(activeIntent)
                 retireInterruptedGroup(cohort, paths.associateWith { File(original, it) to intent.files.getValue(it) })
             }
-            for (path in paths) {
-                val source = File(original, path)
-                val hash = intent.files.getValue(path)
-                check(Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS) && nativeSnapshotChecksum(source) == hash)
-                source.inputStream().use {
-                    custody.captureInCohort(
-                        replacement,
-                        NATIVE_JOURNAL_TRANSFER_PREFIX + path,
-                        source.length(),
-                        it,
-                    )
-                }
-            }
-            val staged = custody.sealedPayloadsInCohort(replacement)
-            check(
-                expected.all { (path, hash) ->
-                    staged.any {
-                        it.complete &&
-                            it.path == NATIVE_JOURNAL_TRANSFER_PREFIX + path &&
-                            nativeSnapshotChecksum(it.file) == hash
-                    }
-                },
-            )
+            captureCohort(replacement, expected, original)
+            check(hasCompletePayloads(replacement, expected))
         }
         verifyAndRemember(intent, activeIntent, original)
         retireReplacedGroups(intent, activeIntent)
         consumeOriginal(intent, consumed)
+    }
+
+    private fun isCohortComplete(
+        cohort: String,
+        expected: Map<String, String>,
+    ): Boolean {
+        val existing = custody.sealedPayloadsInCohort(cohort)
+        return existing.size == expected.size &&
+            expected.all { (path, hash) ->
+                existing.singleOrNull {
+                    it.complete &&
+                        it.path == NATIVE_JOURNAL_TRANSFER_PREFIX + path &&
+                        nativeSnapshotChecksum(it.file) == hash
+                } !=
+                    null
+            }
+    }
+
+    private fun Intent.withReplacementCohort(
+        paths: List<String>,
+        replacement: String,
+        oldIds: List<String>,
+    ): Intent =
+        copy(
+            cohorts = cohorts + paths.associateWith { replacement },
+            replacedCohorts =
+                replacedCohorts +
+                    paths.associateWith { path ->
+                        replacedCohorts[path].orEmpty() + oldIds
+                    },
+        )
+
+    private fun captureCohort(
+        cohort: String,
+        expected: Map<String, String>,
+        original: File,
+    ) {
+        for ((path, hash) in expected) {
+            val source = File(original, path)
+            check(Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS) && nativeSnapshotChecksum(source) == hash)
+            source.inputStream().use {
+                custody.captureInCohort(
+                    cohort,
+                    NATIVE_JOURNAL_TRANSFER_PREFIX + path,
+                    source.length(),
+                    it,
+                )
+            }
+        }
+    }
+
+    private fun hasCompletePayloads(
+        cohort: String,
+        expected: Map<String, String>,
+    ): Boolean {
+        val staged = custody.sealedPayloadsInCohort(cohort)
+        return expected.all { (path, hash) ->
+            staged.any {
+                it.complete &&
+                    it.path == NATIVE_JOURNAL_TRANSFER_PREFIX + path &&
+                    nativeSnapshotChecksum(it.file) == hash
+            }
+        }
     }
 
     private fun retireInterruptedGroup(
