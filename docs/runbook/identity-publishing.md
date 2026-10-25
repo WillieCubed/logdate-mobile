@@ -104,6 +104,9 @@ you start. If any one fails, stop and fix it first.
        -H 'content-type: application/json' -d '{"handle":"<new handle>","password":"x"}'
    ```
 
+   Expect `400` with `{"error":"InvalidRequest","message":...}` from each, and expect no account
+   to exist for the new handle afterwards.
+
 7. Confirm that public repository commits follow the specification. Run the repository tests, which
    export repositories and verify them with the pinned reference `@atproto/repo` library, on the
    commit that production runs:

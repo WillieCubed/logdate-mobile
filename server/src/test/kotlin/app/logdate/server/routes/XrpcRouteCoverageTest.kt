@@ -1117,7 +1117,7 @@ class XrpcRouteCoverageTest {
         }
 
     @Test
-    fun `xrpc routes proxy standard session endpoints`() =
+    fun `xrpc routes proxy token session endpoints and refuse password methods`() =
         testApplication {
             val sessionService = StubSessionService()
             configureXrpcApp(
@@ -1163,13 +1163,13 @@ class XrpcRouteCoverageTest {
                     header(HttpHeaders.Authorization, "Bearer hosted-refresh")
                 }
 
-            assertEquals(HttpStatusCode.OK, createdAccount.status)
-            assertEquals(HttpStatusCode.OK, createdSession.status)
+            assertEquals(HttpStatusCode.BadRequest, createdAccount.status)
+            assertEquals(HttpStatusCode.BadRequest, createdSession.status)
             assertEquals(HttpStatusCode.OK, fetchedSession.status)
             assertEquals(HttpStatusCode.OK, refreshedSession.status)
             assertEquals(HttpStatusCode.OK, deletedSession.status)
-            assertEquals("alice.logdate.app", sessionService.lastCreateAccountRequest?.handle)
-            assertEquals("alice@example.com", sessionService.lastCreateSessionRequest?.identifier)
+            assertEquals(null, sessionService.lastCreateAccountRequest)
+            assertEquals(null, sessionService.lastCreateSessionRequest)
             assertEquals("hosted-access", sessionService.lastAccessToken)
             assertEquals("hosted-refresh", sessionService.lastRefreshToken)
             assertEquals("hosted-refresh", sessionService.deletedRefreshToken)

@@ -45,9 +45,8 @@ The server answers with a single indexed query that never writes:
 
 ## Naming rules
 
-The server checks every new handle against the rules below on signup, on username changes, and in
-`com.atproto.server.createAccount`. The rules only stop new names; they never change a handle an
-account already has.
+The server checks every new handle against the rules below on signup and on username changes. The
+rules only stop new names; they never change a handle an account already has.
 
 ### Reserved labels
 
@@ -90,9 +89,8 @@ changing a username doesn't change the handle.
 ### Identity provisioning
 
 An account without an identity gets one when the person signs in by username or email, or when the
-identity backfill reaches it. Resolving a handle never provisions one, and signing in by handle
-(`com.atproto.server.createSession` with a dotted identifier) to such an account fails with the same
-"Invalid login" error as a wrong password.
+identity backfill reaches it. Resolving a handle never provisions one. Signing in by handle with
+`com.atproto.server.createSession` is not an option, because that method refuses every password.
 
 Provisioning never gives one account two DIDs. Within one server process, it re-reads the account
 under a lock. Across instances, it writes the identity with a conditional update that succeeds only
