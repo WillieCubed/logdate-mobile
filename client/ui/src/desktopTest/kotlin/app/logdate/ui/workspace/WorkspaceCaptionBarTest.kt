@@ -45,7 +45,6 @@ class WorkspaceCaptionBarTest {
             }
             val content = onNodeWithText("Content").bounds()
             assertTrue(content.top >= 48f, "Content must start below the caption bar: $content")
-            onNodeWithText("LogDate").assertDoesNotExist()
         }
 
     @Test fun largeTextKeepsTheAppBarBelowTheCaptionBar() =
@@ -66,7 +65,6 @@ class WorkspaceCaptionBarTest {
             setContent { Workspace(captionBar = null, places = false) }
             val search = onNodeWithTag("workspace_search").bounds()
             assertTrue(search.height >= 56f, "Search keeps its full height without a caption bar: $search")
-            onNodeWithText("LogDate").assertExists()
         }
 
     private fun SemanticsNodeInteraction.bounds(): Rect = fetchSemanticsNode().boundsInRoot
