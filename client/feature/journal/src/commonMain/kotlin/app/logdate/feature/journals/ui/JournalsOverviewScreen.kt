@@ -30,7 +30,6 @@ import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.ui.workspace.LocalWorkspaceHosted
-import app.logdate.ui.workspace.PanelContainment
 import app.logdate.ui.workspace.WorkspacePanel
 import app.logdate.ui.workspace.WorkspaceSearchScope
 import kotlinx.datetime.LocalDate
@@ -128,7 +127,7 @@ fun JournalsOverviewScreenContent(
         if (!LocalWorkspaceHosted.current) {
             WorkspaceSearchScope(searchQuery, stringResource(Res.string.search_journals), onQueryChange)
         }
-        WorkspacePanel(modifier, containment = PanelContainment.Collection) {
+        WorkspacePanel(modifier) {
             Column(Modifier.fillMaxSize()) {
                 if (suggestions.isNotEmpty()) SuggestionRow(suggestions, onCreateJournal)
                 JournalListPanel(
