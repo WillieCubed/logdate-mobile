@@ -63,6 +63,7 @@ import logdate.client.feature.core.generated.resources.account_email_verify
 import logdate.client.feature.core.generated.resources.account_hosting_description
 import logdate.client.feature.core.generated.resources.account_profile_edit_label
 import logdate.client.feature.core.generated.resources.account_recovery_phrase_checking
+import logdate.client.feature.core.generated.resources.account_recovery_phrase_finish_setup
 import logdate.client.feature.core.generated.resources.account_recovery_phrase_missing
 import logdate.client.feature.core.generated.resources.account_recovery_phrase_saved
 import logdate.client.feature.core.generated.resources.account_recovery_phrase_title
@@ -305,14 +306,16 @@ private fun SignInAndRecoverySection(
             title = stringResource(Res.string.account_recovery_phrase_title),
             description =
                 stringResource(
-                    when (state.hasRecoveryPhrase) {
-                        true -> Res.string.account_recovery_phrase_saved
-                        false -> Res.string.account_recovery_phrase_missing
-                        null -> Res.string.account_recovery_phrase_checking
+                    when {
+                        state.hasRecoveryPhrase == true && state.accountRecoveryNeedsAttention ->
+                            Res.string.account_recovery_phrase_finish_setup
+                        state.hasRecoveryPhrase == true -> Res.string.account_recovery_phrase_saved
+                        state.hasRecoveryPhrase == false -> Res.string.account_recovery_phrase_missing
+                        else -> Res.string.account_recovery_phrase_checking
                     },
                 ),
             icon = {
-                if (state.hasRecoveryPhrase == false) {
+                if (state.hasRecoveryPhrase == false || state.accountRecoveryNeedsAttention) {
                     Icon(Icons.Outlined.WarningAmber, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                 } else {
                     Icon(Icons.Outlined.Password, contentDescription = null)

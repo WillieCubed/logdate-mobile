@@ -5,11 +5,13 @@ import app.logdate.client.repository.account.IdentityRecoveryFailure
 import app.logdate.client.text.UiText
 import app.logdate.feature.core.AppAuthState
 import app.logdate.feature.core.BiometricGatekeeper
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -19,6 +21,8 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RecoveryPhraseViewModelTest {
@@ -171,48 +175,40 @@ class RecoveryPhraseViewModelTest {
         runTest {
             val recovery = FakeAccountRecovery(offered = false, status = AccountRecoveryStatus.NEEDS_SETUP)
 
-            assertNull(viewModel(confirmed = true, recovery = recovery).accountRecovery.value)
+            assertNull(viewModel(confirmed = true, recovery = automatic(recovery)).accountRecovery.value)
         }
 
     @Test
-    fun `an unconfirmed phrase says nothing about moving the account`() =
+    fun `moving the account is set up whether or not a copy of the phrase was saved`() =
         runTest {
             val recovery = FakeAccountRecovery(offered = true, status = AccountRecoveryStatus.NEEDS_SETUP)
 
-            assertNull(viewModel(confirmed = false, recovery = recovery).accountRecovery.value)
+            val viewModel = viewModel(confirmed = false, recovery = automatic(recovery))
+
+            assertEquals(AccountRecoveryUiState.Ready, viewModel.accountRecovery.value)
+            assertTrue(recovery.setups.isNotEmpty() && true !in recovery.setups, "setup showed a passkey prompt")
         }
 
     @Test
-    fun `a confirmed phrase says whether it can move the account without asking for a passkey`() =
-        runTest {
-            val ready = viewModel(confirmed = true, recovery = FakeAccountRecovery(offered = true, status = AccountRecoveryStatus.READY))
-            val unfinished = FakeAccountRecovery(offered = true, status = AccountRecoveryStatus.NEEDS_SETUP)
-            val needsSetup = viewModel(confirmed = true, recovery = unfinished)
-
-            assertEquals(AccountRecoveryUiState.Ready, ready.accountRecovery.value)
-            assertEquals(AccountRecoveryUiState.NeedsSetup, needsSetup.accountRecovery.value)
-            assertEquals(0, unfinished.setups)
-        }
-
-    @Test
-    fun `confirming the phrase finishes setting up account recovery`() =
+    fun `saving a copy of the phrase asks for nothing more`() =
         runTest {
             var confirmed = false
-            val recovery = FakeAccountRecovery(offered = true, status = AccountRecoveryStatus.NEEDS_SETUP)
+            val recovery = FakeAccountRecovery(offered = true, status = AccountRecoveryStatus.NEEDS_SETUP, needsPasskey = true)
             val viewModel =
                 RecoveryPhraseViewModel(
                     gatekeeper = ScriptedGatekeeper(AppAuthState.AUTHENTICATED),
                     loadPhrase = { phrase },
                     confirmPhrase = { words -> (words == phrase).also { confirmed = it } },
                     isPhraseVerified = { confirmed },
-                    recovery = recovery,
+                    recovery = automatic(recovery),
                 )
 
             viewModel.reveal(prompt)
             viewModel.confirmSaved()
 
-            assertEquals(1, recovery.setups)
-            assertEquals(AccountRecoveryUiState.Ready, viewModel.accountRecovery.value)
+            assertEquals(RecoveryPhraseUiState.Verified, viewModel.state.value)
+            assertTrue(true !in recovery.setups, "saving the phrase showed a passkey prompt")
+            assertEquals(AccountRecoveryUiState.NeedsSetup, viewModel.accountRecovery.value)
         }
 
     @Test
@@ -222,13 +218,15 @@ class RecoveryPhraseViewModelTest {
                 FakeAccountRecovery(
                     offered = true,
                     status = AccountRecoveryStatus.NEEDS_SETUP,
-                    setupFailure = IdentityRecoveryFailure.STEP_UP_CANCELLED,
+                    needsPasskey = true,
+                    promptFailure = IdentityRecoveryFailure.STEP_UP_CANCELLED,
                 )
-            val viewModel = viewModel(confirmed = true, recovery = recovery)
+            val viewModel = viewModel(confirmed = true, recovery = automatic(recovery))
 
             viewModel.finishAccountRecoverySetup()
 
             assertEquals(AccountRecoveryUiState.NeedsSetup, viewModel.accountRecovery.value)
+            assertEquals(true, recovery.setups.last())
         }
 
     @Test
@@ -238,14 +236,15 @@ class RecoveryPhraseViewModelTest {
                 FakeAccountRecovery(
                     offered = true,
                     status = AccountRecoveryStatus.NEEDS_SETUP,
-                    setupFailure = IdentityRecoveryFailure.UNREACHABLE,
+                    needsPasskey = true,
+                    promptFailure = IdentityRecoveryFailure.PASSKEY_REQUIRED,
                 )
-            val viewModel = viewModel(confirmed = true, recovery = recovery)
+            val viewModel = viewModel(confirmed = true, recovery = automatic(recovery))
 
             viewModel.finishAccountRecoverySetup()
-            assertEquals(AccountRecoveryUiState.SetupFailed(IdentityRecoveryFailure.UNREACHABLE), viewModel.accountRecovery.value)
+            assertEquals(AccountRecoveryUiState.SetupFailed(IdentityRecoveryFailure.PASSKEY_REQUIRED), viewModel.accountRecovery.value)
 
-            recovery.setupFailure = null
+            recovery.promptFailure = null
             viewModel.finishAccountRecoverySetup()
             assertEquals(AccountRecoveryUiState.Ready, viewModel.accountRecovery.value)
         }
@@ -254,7 +253,7 @@ class RecoveryPhraseViewModelTest {
     fun `a status that cannot be read can be checked again`() =
         runTest {
             val recovery = FakeAccountRecovery(offered = true, status = AccountRecoveryStatus.READY, statusFails = true)
-            val viewModel = viewModel(confirmed = true, recovery = recovery)
+            val viewModel = viewModel(confirmed = true, recovery = automatic(recovery, retries = 0))
             assertEquals(AccountRecoveryUiState.CheckFailed, viewModel.accountRecovery.value)
 
             recovery.statusFails = false
@@ -267,19 +266,33 @@ class RecoveryPhraseViewModelTest {
     fun `a server that starts offering account recovery after the screen opens shows it`() =
         runTest {
             val recovery = FakeAccountRecovery(offered = false, status = AccountRecoveryStatus.READY)
-            val viewModel = viewModel(confirmed = true, recovery = recovery)
+            val viewModel = viewModel(confirmed = true, recovery = automatic(recovery))
 
             recovery.offeredFlow.value = true
 
             assertEquals(AccountRecoveryUiState.Ready, viewModel.accountRecovery.value)
         }
 
+    private fun TestScope.automatic(
+        recovery: FakeAccountRecovery,
+        retries: Int = 1,
+    ): AutomaticAccountRecovery =
+        AutomaticAccountRecovery(
+            recovery = recovery,
+            loadPhrase = { phrase },
+            signedInAccount = MutableStateFlow("account-123"),
+            passkeyConfirmations = MutableStateFlow(null),
+            // Eager like the view model's own scope here, so each assertion sees where setup stands.
+            scope = CoroutineScope(backgroundScope.coroutineContext + testDispatcher),
+            retryDelays = List(retries) { 1.seconds },
+        ).also { it.start() }
+
     private fun viewModel(
         storedPhrase: List<String>? = phrase,
         authResult: AppAuthState = AppAuthState.AUTHENTICATED,
         readFails: Boolean = false,
         confirmed: Boolean = false,
-        recovery: AccountRecovery? = null,
+        recovery: AutomaticAccountRecovery? = null,
     ): RecoveryPhraseViewModel {
         var reads = 0
         return RecoveryPhraseViewModel(
@@ -294,25 +307,35 @@ class RecoveryPhraseViewModelTest {
         )
     }
 
+    /** Account recovery whose status and setup are scripted; each setup records whether it could prompt. */
     private class FakeAccountRecovery(
         offered: Boolean,
         var status: AccountRecoveryStatus,
         var statusFails: Boolean = false,
-        var setupFailure: IdentityRecoveryFailure? = null,
+        private val needsPasskey: Boolean = false,
+        var promptFailure: IdentityRecoveryFailure? = null,
     ) : AccountRecovery {
         val offeredFlow = MutableStateFlow(offered)
-        var setups = 0
+        val setups = mutableListOf<Boolean>()
         override val isOffered: Flow<Boolean> = offeredFlow
 
         override suspend fun status(phrase: List<String>): Result<AccountRecoveryStatus> =
             if (statusFails) Result.failure(IllegalStateException("offline")) else Result.success(status)
 
-        override suspend fun finishSetup(phrase: List<String>): Result<Unit> {
-            setups++
-            setupFailure?.let { return Result.failure(IdentityRecoveryException(it, "refused")) }
+        override suspend fun finishSetup(
+            phrase: List<String>,
+            askForPasskey: Boolean,
+        ): Result<Unit> {
+            setups += askForPasskey
+            if (statusFails) return Result.failure(IllegalStateException("offline"))
+            if (status == AccountRecoveryStatus.READY) return Result.success(Unit)
+            if (needsPasskey && !askForPasskey) return failure(IdentityRecoveryFailure.CONFIRMATION_NEEDED)
+            if (askForPasskey) promptFailure?.let { return failure(it) }
             status = AccountRecoveryStatus.READY
             return Result.success(Unit)
         }
+
+        private fun failure(failure: IdentityRecoveryFailure): Result<Unit> = Result.failure(IdentityRecoveryException(failure, "refused"))
     }
 
     private class ScriptedGatekeeper(

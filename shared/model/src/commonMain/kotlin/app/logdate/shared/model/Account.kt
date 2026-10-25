@@ -76,6 +76,11 @@ data class CompleteAccountCreationResponse(
 data class CompleteAccountCreationData(
     val account: LogDateAccount,
     val tokens: AccountTokens,
+    /**
+     * Sent with a passkey sign-in or sign-up by a server that supports recovery keys: single-use
+     * proof, for five minutes, that the person just confirmed with a passkey.
+     */
+    val stepUpGrant: String? = null,
 )
 
 @Serializable
@@ -158,6 +163,11 @@ data class CompleteAuthenticationResponse(
 data class CompleteAuthenticationData(
     val account: LogDateAccount,
     val tokens: AccountTokens,
+    /**
+     * Sent with a passkey sign-in or sign-up by a server that supports recovery keys: single-use
+     * proof, for five minutes, that the person just confirmed with a passkey.
+     */
+    val stepUpGrant: String? = null,
 )
 
 @Serializable

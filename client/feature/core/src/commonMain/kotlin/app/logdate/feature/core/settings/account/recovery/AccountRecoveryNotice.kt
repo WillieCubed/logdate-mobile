@@ -32,10 +32,13 @@ import logdate.client.feature.core.generated.resources.account_recovery_finish
 import logdate.client.feature.core.generated.resources.account_recovery_finishing
 import logdate.client.feature.core.generated.resources.account_recovery_needs_setup
 import logdate.client.feature.core.generated.resources.account_recovery_ready
+import logdate.client.feature.core.generated.resources.account_recovery_retrying_server
+import logdate.client.feature.core.generated.resources.account_recovery_retrying_unreachable
 import logdate.client.feature.core.generated.resources.account_recovery_try_again
+import logdate.client.feature.core.generated.resources.account_recovery_try_now
 import org.jetbrains.compose.resources.stringResource
 
-/** Says whether the confirmed recovery phrase can also move the account, and finishes setting it up. */
+/** Says whether the recovery phrase on this device can also move the account, and finishes setting it up. */
 @Composable
 internal fun AccountRecoveryNotice(
     state: AccountRecoveryUiState,
@@ -55,6 +58,9 @@ internal fun AccountRecoveryNotice(
                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 Text(stringResource(Res.string.account_recovery_finishing), style = MaterialTheme.typography.bodyMedium)
             }
+
+        is AccountRecoveryUiState.Retrying ->
+            Prompt(retryingMessage(state.failure), stringResource(Res.string.account_recovery_try_now), onRetry)
 
         AccountRecoveryUiState.CheckFailed ->
             Prompt(stringResource(Res.string.account_recovery_check_failed), stringResource(Res.string.account_recovery_try_again), onRetry)
@@ -84,6 +90,15 @@ private fun Prompt(
         OutlinedButton(onClick = onAction) { Text(action) }
     }
 }
+
+@Composable
+private fun retryingMessage(failure: IdentityRecoveryFailure?): String =
+    stringResource(
+        when (failure) {
+            null, IdentityRecoveryFailure.UNREACHABLE -> Res.string.account_recovery_retrying_unreachable
+            else -> Res.string.account_recovery_retrying_server
+        },
+    )
 
 @Composable
 private fun setupFailureMessage(failure: IdentityRecoveryFailure): String =

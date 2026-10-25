@@ -32,10 +32,18 @@ interface AccountIdentityRepository {
      * the identity, ahead of the server's key. Only the public half leaves the device. The person
      * confirms the change with one of their passkeys first.
      *
+     * A passkey sign-in in the last few minutes stands in for that confirmation, so the person is
+     * not asked twice. Without one, [askForPasskey] decides: `true` shows the passkey prompt, and
+     * `false` sends nothing and fails with [IdentityRecoveryFailure.CONFIRMATION_NEEDED], for work
+     * that runs without the person in front of it.
+     *
      * Fails with [IdentityRecoveryException] when the passkey confirmation does not finish, or the
      * server refuses or cannot be reached.
      */
-    suspend fun registerRecoveryKey(recoveryPhrase: List<String>): Result<AccountRegisteredPlcRecoveryKey>
+    suspend fun registerRecoveryKey(
+        recoveryPhrase: List<String>,
+        askForPasskey: Boolean = true,
+    ): Result<AccountRegisteredPlcRecoveryKey>
 
     /**
      * Puts the recovery key derived from [recoveryPhrase] in place of the one registered on the
@@ -88,6 +96,9 @@ enum class IdentityRecoveryFailure {
 
     /** The person closed the passkey prompt, so nothing was sent. */
     STEP_UP_CANCELLED,
+
+    /** Nothing was sent because the change needs a passkey confirmation and none was asked for. */
+    CONFIRMATION_NEEDED,
 
     /** The passkey confirmation was not accepted, or it expired. */
     STEP_UP_FAILED,

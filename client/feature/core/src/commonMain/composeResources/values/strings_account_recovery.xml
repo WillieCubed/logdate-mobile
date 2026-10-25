@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Recovery phrase page: moving the account with the confirmed phrase -->
+    <!-- Recovery phrase page: moving the account with the phrase on this device -->
     <string name="account_recovery_ready">Your recovery phrase can also move your account to another server, even if your current server can’t help.</string>
-    <string name="account_recovery_needs_setup">Finish setting up so your recovery phrase can also move your account to another server, even if your current server can’t help.</string>
+    <string name="account_recovery_needs_setup">Confirm with your passkey once so your recovery phrase can also move your account to another server, even if your current server can’t help.</string>
     <string name="account_recovery_finish">Finish setting up</string>
     <string name="account_recovery_finishing">Confirm with your passkey to finish setting up.</string>
     <string name="account_recovery_check_failed">Couldn’t check whether setup is finished. Check your connection, then try again.</string>
     <string name="account_recovery_try_again">Try again</string>
+    <string name="account_recovery_try_now">Try now</string>
+    <string name="account_recovery_retrying_unreachable">Couldn’t connect to finish setting up account recovery. LogDate tries again automatically.</string>
+    <string name="account_recovery_retrying_server">The server couldn’t finish setting up account recovery. LogDate tries again automatically.</string>
     <string name="account_recovery_error_step_up_failed">Your passkey couldn’t be confirmed, so setup isn’t finished.</string>
     <string name="account_recovery_error_step_up_unavailable">This device can’t use passkeys. Finish setting up on a phone or tablet that has your passkey.</string>
     <string name="account_recovery_error_passkey_required">Add a passkey in Sign-in methods, then finish setting up.</string>

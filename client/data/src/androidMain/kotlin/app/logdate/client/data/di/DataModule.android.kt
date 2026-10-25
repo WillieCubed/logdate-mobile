@@ -83,6 +83,7 @@ import app.logdate.client.permissions.di.permissionsModule
 import app.logdate.client.repository.account.AccountIdentityRepository
 import app.logdate.client.repository.account.AccountRepository
 import app.logdate.client.repository.account.PasskeyAccountRepository
+import app.logdate.client.repository.account.PasskeyConfirmations
 import app.logdate.client.repository.audio.AudioTagRepository
 import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.DraftRepository
@@ -412,6 +413,7 @@ actual val dataModule: Module =
                 googleSignInManager = get(),
                 serverClientId = DefaultLogDateConfigRepository.GOOGLE_SERVER_CLIENT_ID,
                 deviceName = { context.userVisibleDeviceName() },
+                passkeyConfirmations = get(),
                 accountKeyUnlockCoordinator = get(),
                 beforeSignOut = { getOrNull<app.logdate.client.sync.peer.removal.WatchRemovalAccess>()?.removeAll() ?: true },
                 restoreCredentialRenewal =
@@ -434,6 +436,7 @@ actual val dataModule: Module =
                 deviceName = { context.userVisibleDeviceName() },
             )
         }
+        single { PasskeyConfirmations() }
         single<AccountIdentityRepository> {
             DefaultAccountIdentityRepository(
                 apiClient = get(),
@@ -445,6 +448,7 @@ actual val dataModule: Module =
                         passkeyManager = get(),
                         credentialCodec = PasskeyCredentialCodec(Json { ignoreUnknownKeys = true }),
                     ),
+                passkeyConfirmations = get(),
                 json = get(),
             )
         }

@@ -90,9 +90,10 @@ you start. If any one fails, stop and fix it first.
    curl -s https://cloud.logdate.app/api/v1/server/info | jq '.data.protocolFeatures'
    ```
 
-   Then register a recovery key from the app on a test account, and check that it appears first in
-   the identity's rotation keys. If LogDate's key is listed first, LogDate can overrule the person,
-   and the safeguard is not met.
+   Then sign in to a test account with its passkey in the app. The app registers the account's
+   recovery key by itself, without a second prompt; Account > Recovery phrase says whether it is set
+   up. Check that the key appears first in the identity's rotation keys. If LogDate's key is listed
+   first, LogDate can overrule the person, and the safeguard is not met.
 
 6. Confirm that sign-in is passkey-only. Both of these requests must be refused on production, even
    for an account that once had a password:

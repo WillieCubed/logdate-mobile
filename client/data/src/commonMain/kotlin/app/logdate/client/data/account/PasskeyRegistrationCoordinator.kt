@@ -54,6 +54,8 @@ internal class PasskeyRegistrationCoordinator(
     ) -> Unit,
     private val deviceName: () -> String?,
     private val accountKeyUnlockCoordinator: AccountKeyUnlockCoordinator? = null,
+    /** Receives the server's proof that the person just confirmed with a passkey, when it sends one. */
+    private val onPasskeyConfirmed: (accountId: String, grant: String) -> Unit = { _, _ -> },
 ) {
     suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> {
         return try {
@@ -110,6 +112,7 @@ internal class PasskeyRegistrationCoordinator(
             )
 
             publishAccount(completeData.account, completeData.tokens.accessToken, completeData.tokens.refreshToken, origin)
+            completeData.stepUpGrant?.let { onPasskeyConfirmed(completeData.account.id.toString(), it) }
 
             // Android enrollment is durable and continues independently of this sign-up result.
             createRestoreKey().onFailure { error ->
@@ -190,6 +193,7 @@ internal class PasskeyRegistrationCoordinator(
             )
 
             publishAccount(completeData.account, completeData.tokens.accessToken, completeData.tokens.refreshToken, origin)
+            completeData.stepUpGrant?.let { onPasskeyConfirmed(completeData.account.id.toString(), it) }
 
             Napier.i("Authentication successful for user: ${completeData.account.username}")
             Result.success(completeData.account)

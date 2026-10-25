@@ -53,6 +53,7 @@ import app.logdate.client.tiles.RecordVoiceTileUpdater
 import app.logdate.client.tiles.RecordingWindowTracker
 import app.logdate.client.watch.presence.WatchPresenceRegistration
 import app.logdate.di.initializeKoin
+import app.logdate.feature.core.settings.account.recovery.AutomaticAccountRecovery
 import app.logdate.ui.media.addLocalMedia
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
@@ -227,6 +228,9 @@ private class AndroidApplicationRuntime(
         isolated("Failed to initialize ambient prompt scheduling") { startAmbientScheduling() }
         isolated("Failed to observe reminder signals") {
             resolve<ReminderSignalObserver>().start()
+        }
+        isolated("Failed to start setting up account recovery") {
+            resolve<AutomaticAccountRecovery>().start()
         }
         isolated("Failed to start location tracking manager on app startup") {
             resolve<LocationTrackingManager>().startTracking()

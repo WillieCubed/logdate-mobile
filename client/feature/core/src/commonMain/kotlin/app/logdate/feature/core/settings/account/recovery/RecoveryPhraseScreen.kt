@@ -132,19 +132,14 @@ fun RecoveryPhraseContent(
 
                     RecoveryPhraseUiState.Hidden -> {
                         Intro()
+                        AccountRecovery(accountRecovery, onFinishAccountRecovery, onRetryAccountRecovery)
                         ShowButton(onReveal)
                     }
 
                     RecoveryPhraseUiState.Verified -> {
                         Intro()
                         DoneLine(stringResource(Res.string.recovery_phrase_verified))
-                        accountRecovery?.let {
-                            AccountRecoveryNotice(
-                                it,
-                                onFinish = onFinishAccountRecovery,
-                                onRetry = onRetryAccountRecovery,
-                            )
-                        }
+                        AccountRecovery(accountRecovery, onFinishAccountRecovery, onRetryAccountRecovery)
                         ShowButton(onReveal)
                     }
 
@@ -192,6 +187,15 @@ fun RecoveryPhraseContent(
             }
         }
     }
+}
+
+@Composable
+private fun AccountRecovery(
+    state: AccountRecoveryUiState?,
+    onFinish: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    state?.let { AccountRecoveryNotice(it, onFinish = onFinish, onRetry = onRetry) }
 }
 
 @Composable

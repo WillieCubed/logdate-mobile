@@ -2,19 +2,14 @@ package app.logdate.feature.core.settings.account.recovery
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.logdate.client.repository.account.IdentityRecoveryException
 import app.logdate.client.repository.account.IdentityRecoveryFailure
 import app.logdate.client.text.toUiText
 import app.logdate.feature.core.AppAuthState
 import app.logdate.feature.core.BiometricGatekeeper
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 sealed interface RecoveryPhraseUiState {
@@ -53,17 +48,22 @@ enum class RevealFailure {
     UNREADABLE,
 }
 
-/** Whether the confirmed recovery phrase can also move the account; shown only when that is offered. */
+/** Whether the recovery phrase on this device can also move the account; shown only when that is offered. */
 sealed interface AccountRecoveryUiState {
     data object Checking : AccountRecoveryUiState
 
     data object Ready : AccountRecoveryUiState
 
-    /** Setup hasn't finished, such as after the passkey prompt was closed. */
+    /** Setup needs one passkey confirmation, such as after the passkey prompt was closed. */
     data object NeedsSetup : AccountRecoveryUiState
 
     /** Waiting for the passkey and the server. */
     data object Finishing : AccountRecoveryUiState
+
+    /** A connection or server problem stopped setup, and it will be tried again automatically; `null` when the check itself failed. */
+    data class Retrying(
+        val failure: IdentityRecoveryFailure?,
+    ) : AccountRecoveryUiState
 
     /** Whether setup is finished could not be checked. */
     data object CheckFailed : AccountRecoveryUiState
@@ -81,12 +81,13 @@ data class RevealPrompt(
 )
 
 /**
- * Shows the 12-word recovery phrase that unlocks the synced journal, behind the device's screen
- * lock or biometrics.
+ * Shows the 12-word recovery phrase behind the device's screen lock or biometrics, so the person
+ * can save a copy in case they lose every device. Nothing else waits for them to do so: backup and
+ * account recovery are set up without it.
  *
  * @param loadPhrase reads the stored phrase, or `null` when this device has none
- * @param recovery sets up the confirmed phrase to move the account too, or `null` where that
- *   is never offered
+ * @param recovery sets up account recovery on its own and reports where it stands, or `null` where
+ *   that is never offered
  */
 class RecoveryPhraseViewModel(
     private val gatekeeper: BiometricGatekeeper,
@@ -94,9 +95,9 @@ class RecoveryPhraseViewModel(
     private val confirmPhrase: suspend (List<String>) -> Boolean = { false },
     private val isPhraseVerified: suspend () -> Boolean = { false },
     private val onVerified: () -> Unit = {},
-    private val recovery: AccountRecovery? = null,
+    private val recovery: AutomaticAccountRecovery? = null,
 ) : ViewModel() {
-    /** Records that the person saved the shown phrase, which turns on backup and account recovery. */
+    /** Records that the person saved a copy of the shown phrase. */
     fun confirmSaved() {
         val revealed = _state.value as? RecoveryPhraseUiState.Revealed ?: return
         _state.value = RecoveryPhraseUiState.Verifying
@@ -108,7 +109,6 @@ class RecoveryPhraseViewModel(
                             if (verified) {
                                 runCatching(onVerified)
                                     .onFailure { error -> Napier.w("Could not request a Cloud backup", error) }
-                                finishAccountRecoverySetup()
                                 RecoveryPhraseUiState.Verified
                             } else {
                                 RecoveryPhraseUiState.VerificationFailed
@@ -125,19 +125,11 @@ class RecoveryPhraseViewModel(
     private val _state = MutableStateFlow<RecoveryPhraseUiState>(RecoveryPhraseUiState.Checking)
     val state: StateFlow<RecoveryPhraseUiState> = _state.asStateFlow()
 
-    private val _accountRecovery = MutableStateFlow<AccountRecoveryUiState?>(null)
-
-    /** `null` unless the phrase is confirmed and account recovery is offered. */
-    val accountRecovery: StateFlow<AccountRecoveryUiState?> = _accountRecovery.asStateFlow()
-
-    private var accountRecoveryJob: Job? = null
+    /** Where account recovery setup stands; `null` when it isn't offered or this device has no phrase. */
+    val accountRecovery: StateFlow<AccountRecoveryUiState?> = recovery?.state ?: MutableStateFlow(null)
 
     init {
         check()
-        // The server's description is refreshed after the screen opens, so recovery can become offered later.
-        recovery?.let { available ->
-            viewModelScope.launch { available.isOffered.drop(1).collect { checkAccountRecovery() } }
-        }
     }
 
     /** Looks again for the phrase, which may have been entered since this screen was last open. */
@@ -187,73 +179,14 @@ class RecoveryPhraseViewModel(
         if (_state.value is RecoveryPhraseUiState.Revealed) _state.value = RecoveryPhraseUiState.Hidden
     }
 
-    /** Sets up the confirmed phrase to move the account too; the server asks for a passkey first. */
+    /** Finishes setting up account recovery now; the passkey prompt is shown first. */
     fun finishAccountRecoverySetup() {
-        val available = recovery ?: return
-        if (_accountRecovery.value == AccountRecoveryUiState.Finishing) return
-        accountRecoveryJob?.cancel()
-        accountRecoveryJob =
-            viewModelScope.launch {
-                if (!available.isOffered.first()) {
-                    _accountRecovery.value = null
-                    return@launch
-                }
-                _accountRecovery.value = AccountRecoveryUiState.Finishing
-                _accountRecovery.value =
-                    runCatching { loadPhrase() ?: error("The recovery phrase is no longer on this device") }
-                        .mapCatching { phrase -> available.finishSetup(phrase).getOrThrow() }
-                        .fold(
-                            onSuccess = { AccountRecoveryUiState.Ready },
-                            onFailure = { error ->
-                                if (error is CancellationException) throw error
-                                val failure =
-                                    (error as? IdentityRecoveryException)?.failure
-                                        ?: IdentityRecoveryFailure.REFUSED.also {
-                                            Napier.w(
-                                                "Could not finish setting up account recovery",
-                                                error,
-                                            )
-                                        }
-                                // Closing the passkey prompt leaves setup unfinished; it isn't a failure.
-                                if (failure == IdentityRecoveryFailure.STEP_UP_CANCELLED) {
-                                    AccountRecoveryUiState.NeedsSetup
-                                } else {
-                                    AccountRecoveryUiState.SetupFailed(failure)
-                                }
-                            },
-                        )
-            }
+        recovery?.finishWithPasskey()
     }
 
-    /** Checks again whether the confirmed phrase can move the account. */
+    /** Checks again whether account recovery is set up, and finishes it if no prompt is needed. */
     fun checkAccountRecovery() {
-        val available = recovery ?: return
-        if (_accountRecovery.value == AccountRecoveryUiState.Finishing) return
-        accountRecoveryJob?.cancel()
-        accountRecoveryJob =
-            viewModelScope.launch {
-                if (!available.isOffered.first() || _state.value != RecoveryPhraseUiState.Verified) {
-                    _accountRecovery.value = null
-                    return@launch
-                }
-                if (_accountRecovery.value == null) _accountRecovery.value = AccountRecoveryUiState.Checking
-                _accountRecovery.value =
-                    runCatching { loadPhrase() ?: error("The recovery phrase is no longer on this device") }
-                        .mapCatching { phrase -> available.status(phrase).getOrThrow() }
-                        .fold(
-                            onSuccess = { status ->
-                                when (status) {
-                                    AccountRecoveryStatus.READY -> AccountRecoveryUiState.Ready
-                                    AccountRecoveryStatus.NEEDS_SETUP -> AccountRecoveryUiState.NeedsSetup
-                                }
-                            },
-                            onFailure = { error ->
-                                if (error is CancellationException) throw error
-                                Napier.w("Could not check whether account recovery is set up", error)
-                                AccountRecoveryUiState.CheckFailed
-                            },
-                        )
-            }
+        recovery?.checkAgain()
     }
 
     private suspend fun readPhrase(): RecoveryPhraseUiState =

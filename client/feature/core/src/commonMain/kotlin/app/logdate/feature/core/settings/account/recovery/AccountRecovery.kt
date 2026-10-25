@@ -4,6 +4,8 @@ import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.permissions.PasskeyManager
 import app.logdate.client.repository.account.AccountIdentityRepository
+import app.logdate.client.repository.account.IdentityRecoveryException
+import app.logdate.client.repository.account.IdentityRecoveryFailure
 import app.logdate.feature.core.settings.account.ConnectedServer
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
@@ -33,7 +35,16 @@ interface AccountRecovery {
 
     suspend fun status(phrase: List<String>): Result<AccountRecoveryStatus>
 
-    suspend fun finishSetup(phrase: List<String>): Result<Unit>
+    /**
+     * Registers the key from [phrase], or replaces a key from another phrase. A recent passkey
+     * sign-in confirms a first registration; otherwise [askForPasskey] decides whether to show the
+     * passkey prompt or to fail with [IdentityRecoveryFailure.CONFIRMATION_NEEDED] without sending
+     * anything. Replacing a key always needs the prompt.
+     */
+    suspend fun finishSetup(
+        phrase: List<String>,
+        askForPasskey: Boolean = true,
+    ): Result<Unit>
 }
 
 class IdentityAccountRecovery(
@@ -47,12 +58,22 @@ class IdentityAccountRecovery(
         return Result.success(if (derived.recoveryDidKey == registered) AccountRecoveryStatus.READY else AccountRecoveryStatus.NEEDS_SETUP)
     }
 
-    override suspend fun finishSetup(phrase: List<String>): Result<Unit> {
+    override suspend fun finishSetup(
+        phrase: List<String>,
+        askForPasskey: Boolean,
+    ): Result<Unit> {
         val registered = identity.getIdentityStatus().getOrElse { return Result.failure(it) }.plcRecoveryDidKey
         val result =
             when {
-                registered == null -> identity.registerRecoveryKey(phrase)
+                registered == null -> identity.registerRecoveryKey(phrase, askForPasskey)
                 status(phrase).getOrElse { return Result.failure(it) } == AccountRecoveryStatus.READY -> return Result.success(Unit)
+                !askForPasskey ->
+                    return Result.failure(
+                        IdentityRecoveryException(
+                            IdentityRecoveryFailure.CONFIRMATION_NEEDED,
+                            "Replacing the recovery key needs a passkey confirmation",
+                        ),
+                    )
                 else -> identity.replaceRecoveryKey(phrase)
             }
         return result.map { }

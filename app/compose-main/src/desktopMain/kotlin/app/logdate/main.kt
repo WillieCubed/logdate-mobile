@@ -9,6 +9,7 @@ import app.logdate.client.media.storage.desktopMediaFileResolver
 import app.logdate.desktop.LogDateApplication
 import app.logdate.desktop.rememberApplicationState
 import app.logdate.di.appModule
+import app.logdate.feature.core.settings.account.recovery.AutomaticAccountRecovery
 import coil3.SingletonImageLoader
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
@@ -31,6 +32,8 @@ fun main() =
             )
             val mediaReferenceMigration = koinInject<StoredMediaReferenceMigrationLauncher>()
             LaunchedEffect(mediaReferenceMigration) { mediaReferenceMigration.start() }
+            val accountRecovery = koinInject<AutomaticAccountRecovery>()
+            LaunchedEffect(accountRecovery) { accountRecovery.start() }
             LogDateApplication(rememberApplicationState())
         }
     }
