@@ -27,12 +27,15 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationItemIconPosition
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ShortNavigationBar
+import androidx.compose.material3.ShortNavigationBarArrangement
+import androidx.compose.material3.ShortNavigationBarDefaults
+import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -81,10 +84,11 @@ fun WorkspaceScaffold(
     val holder = rememberSaveableStateHolder()
     val posture = rememberFoldableLayoutInfo().posture
     BoxWithConstraints(modifier.fillMaxSize()) {
-        val navigation = workspaceNavigationMode(maxWidth, posture)
-        val rail = navigation != WorkspaceNavigationMode.Bottom
+        val navigation = workspaceNavigationMode(maxWidth, maxHeight, posture)
+        val rail = !navigation.isBar
         val largeText = LocalDensity.current.fontScale >= 1.5f
-        val headerCreate = !rail && (largeText || maxWidth <= 440.dp)
+        val headerCreate =
+            !rail && (largeText || maxWidth <= 440.dp || navigation == WorkspaceNavigationMode.ShortBarHorizontal)
         val canvas = MaterialTheme.colorScheme.workspaceContainer(WorkspaceSurface.Canvas)
         // In a desktop window the app bar moves into the window's caption bar, between the system's
         // own controls, unless the text is too large to fit its height.
@@ -103,11 +107,16 @@ fun WorkspaceScaffold(
                 if (appBarInCaption != null) WindowInsets.safeDrawing.exclude(WindowInsets.captionBar) else WindowInsets.safeDrawing,
             bottomBar = {
                 if (!rail) {
-                    NavigationBar(containerColor = canvas) {
+                    val horizontal = navigation == WorkspaceNavigationMode.ShortBarHorizontal
+                    val iconPosition = if (horizontal) NavigationItemIconPosition.Start else NavigationItemIconPosition.Top
+                    val arrangement =
+                        if (horizontal) ShortNavigationBarArrangement.Centered else ShortNavigationBarDefaults.arrangement
+                    ShortNavigationBar(containerColor = canvas, arrangement = arrangement) {
                         destinations.forEach { destination ->
-                            NavigationBarItem(
-                                selected.key == destination.key,
-                                { onSelect(destination.key) },
+                            ShortNavigationBarItem(
+                                selected = selected.key == destination.key,
+                                onClick = { onSelect(destination.key) },
+                                iconPosition = iconPosition,
                                 icon = { Icon(destination.icon, destination.title) },
                                 label =
                                     if (largeText) {
