@@ -66,6 +66,15 @@ class RecoveryPhraseViewModel(
         }
     }
 
+    /** Records that the person saved a copy of [words]; nothing waits on it. */
+    fun confirmSaved(words: List<String>) {
+        viewModelScope.launch {
+            runCatching { identityKeyManager.verifyRecoveryPhrase(words) }
+                .onSuccess { recorded -> if (!recorded) Napier.w("The saved recovery phrase did not match this device's phrase") }
+                .onFailure { error -> Napier.w("Could not record that the recovery phrase was saved", error) }
+        }
+    }
+
     suspend fun recoverIdentity(words: List<String>): Result<Unit> =
         runCatching {
             identityKeyManager.recoverIdentity(words)
