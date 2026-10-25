@@ -16,6 +16,7 @@ interface AccountRepository {
      * whatever [Account.storageMode] the caller holds: only [updateStorageModeIfUnchanged] does, so a
      * save of an account read before its mode changed can't undo the change, and a mode a newer
      * server wrote is never overwritten.
+     * Updates also preserve [Account.publicIdentityDid]: a profile save cannot grant or revoke consent.
      */
     suspend fun save(account: Account): Account
 
@@ -37,6 +38,16 @@ interface AccountRepository {
     suspend fun setModeration(
         accountId: Uuid,
         moderation: AccountModeration?,
+    ): Boolean
+
+    /**
+     * Records the exact identity a trusted publication flow made public after informed consent.
+     * The write succeeds only while the stored DID is [expectedDid]; it never changes the identity.
+     * This storage operation does not establish consent or publish anything itself.
+     */
+    suspend fun recordPublicIdentity(
+        accountId: Uuid,
+        expectedDid: String,
     ): Boolean
 
     /**
@@ -143,7 +154,10 @@ class InMemoryAccountRepository : AccountRepository {
 
     override suspend fun save(account: Account): Account {
         val existingAccount = accounts[account.id]
-        val stored = existingAccount?.let { account.copy(storageMode = it.storageMode, moderation = it.moderation) } ?: account
+        val stored =
+            existingAccount?.let {
+                account.copy(storageMode = it.storageMode, moderation = it.moderation, publicIdentityDid = it.publicIdentityDid)
+            } ?: account
         if (existingAccount != null && existingAccount.username != account.username) {
             usernameIndex.remove(existingAccount.username)
         }
@@ -186,6 +200,16 @@ class InMemoryAccountRepository : AccountRepository {
         synchronized(accounts) {
             val account = accounts[accountId] ?: return@synchronized false
             accounts[accountId] = account.copy(moderation = moderation)
+            true
+        }
+
+    override suspend fun recordPublicIdentity(
+        accountId: Uuid,
+        expectedDid: String,
+    ): Boolean =
+        synchronized(accounts) {
+            val account = accounts[accountId]?.takeIf { it.did == expectedDid } ?: return@synchronized false
+            accounts[accountId] = account.copy(publicIdentityDid = expectedDid)
             true
         }
 

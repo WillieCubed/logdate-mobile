@@ -193,6 +193,12 @@ class AtprotoIdentityService(
         return accountRepository.findByHandle(normalizedHandle)?.takeIf(::hasCompleteIdentity)
     }
 
+    /** Anonymous discovery requires consent for this exact DID, independently of deployment flags. */
+    suspend fun findPublicByHandle(handle: String): Account? = findByHandle(handle)?.takeIf(::hasPublicIdentity)
+
+    private fun hasPublicIdentity(account: Account): Boolean =
+        account.isActive && account.did != null && account.publicIdentityDid == account.did
+
     /** The account that owns [did], when it has a complete identity. Reads only. */
     suspend fun findByDid(did: String): Account? {
         val normalizedDid = canonicalizeDid(did) ?: return null
@@ -447,7 +453,7 @@ class AtprotoIdentityService(
 
     override suspend fun resolveHandle(handle: String): Result<ResolveHandleResponse?> =
         runCatching {
-            findByHandle(handle)
+            findPublicByHandle(handle)
                 ?.did
                 ?.let(AtprotoDid::require)
                 ?.let(::ResolveHandleResponse)
@@ -459,7 +465,7 @@ class AtprotoIdentityService(
                 when {
                     repo.startsWith("did:") -> findByDid(repo)
                     else -> findByHandle(repo)
-                } ?: return@runCatching null
+                }?.takeIf(::hasPublicIdentity) ?: return@runCatching null
             DescribeRepoResponse(
                 handle = requireNotNull(account.handle),
                 did = AtprotoDid.require(requireNotNull(account.did)),
@@ -471,7 +477,7 @@ class AtprotoIdentityService(
 
     override suspend fun didDocument(did: AtprotoDid): Result<DidDocument?> =
         runCatching {
-            findByDid(did.toString())?.let(::documentFor)
+            findByDid(did.toString())?.takeIf(::hasPublicIdentity)?.let(::documentFor)
         }
 
     suspend fun identityStatus(account: Account): IdentityStatus {

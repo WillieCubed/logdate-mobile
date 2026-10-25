@@ -79,11 +79,12 @@ class AccountPublicRepoGate(
     fun mayShow(account: Account): Boolean = isPublicAccount(account) && account.isActive && account.moderation == null
 
     /**
-     * True when other apps can resolve [account]'s DID: a `did:web` is served by this server, and a
-     * `did:plc` exists for them only once its operations are sent to the PLC directory.
+     * True only for the exact identity its owner made public. A hosted `did:plc` also requires
+     * directory publication; neither a resolvable `did:web` nor a server flag establishes consent.
      */
     fun hasPublicIdentity(account: Account): Boolean {
         val did = account.did ?: return false
+        if (account.publicIdentityDid != did) return false
         return did.startsWith("did:web:") || (did.startsWith("did:plc:") && identityConfig.publishesPlcOperations)
     }
 

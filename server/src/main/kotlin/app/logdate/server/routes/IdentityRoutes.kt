@@ -52,7 +52,7 @@ fun Route.identityRoutes(identityService: AtprotoIdentityService) {
 private suspend fun ApplicationCall.hostAccount(identityService: AtprotoIdentityService): Account? {
     val account =
         try {
-            identityService.findByHandle(request.host().lowercase())
+            identityService.findPublicByHandle(request.host().lowercase())
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {

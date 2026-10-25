@@ -63,6 +63,11 @@ data class Account(
      * [AccountRepository.setModeration]; [AccountRepository.save] ignores it on updates.
      */
     val moderation: AccountModeration? = null,
+    /**
+     * The exact DID the owner explicitly made public, after publication completed. Null means
+     * private. Ordinary account saves preserve this value; changing identity never transfers consent.
+     */
+    val publicIdentityDid: String? = null,
 )
 
 @OptIn(ExperimentalUuidApi::class)

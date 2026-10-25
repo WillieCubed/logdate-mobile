@@ -56,8 +56,7 @@ import kotlin.uuid.Uuid
 
 /**
  * A complete public-repository server built from in-memory parts: the real sequencing block store,
- * event log, gate, policy, streaming routes and repository routes, with `did:web` identities so
- * accounts count as published.
+ * event log, gate, policy, streaming routes and repository routes, with `did:web` identities and explicit publication-consent fixtures.
  *
  * Accounts are created with [createAccount]; the ones in a personal space are shown, the legacy ones
  * are not, which is what most tests are about.
@@ -138,6 +137,7 @@ internal class FirehoseHarness(
     suspend fun createAccount(
         username: String,
         personalSpace: Boolean = true,
+        publicIdentity: Boolean = true,
     ): Account {
         val saved =
             accounts.save(
@@ -146,6 +146,7 @@ internal class FirehoseHarness(
                     username = username,
                     displayName = username,
                     createdAt = clock.now(),
+                    publicIdentityDid = if (publicIdentity) "did:web:$username.logdate.app" else null,
                     storageMode = if (personalSpace) AccountStorageMode.PERSONAL_SPACE_V1 else AccountStorageMode.LEGACY,
                 ),
             )

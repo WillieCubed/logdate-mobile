@@ -4,6 +4,7 @@ import app.logdate.integration.e2e.fixtures.createAccountWithSyntheticPasskey
 import app.logdate.integration.e2e.harness.ServerClientE2EHarness
 import app.logdate.integration.e2e.harness.withServerClientHarness
 import app.logdate.lexicon.app.logdate.crypto.SealedPayload
+import app.logdate.server.auth.AccountRepository
 import app.logdate.space.RecordSwap
 import app.logdate.space.SealedRecordCodec
 import app.logdate.space.SealingKeys
@@ -34,6 +35,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import org.koin.core.context.GlobalContext
 import studio.hypertext.atproto.repo.CarCodec
 import studio.hypertext.atproto.repo.DagCborCodec
 import studio.hypertext.atproto.repo.RepoCommitEvent
@@ -58,8 +60,27 @@ import kotlin.time.Duration.Companion.seconds
  * Runs with personal spaces, `did:web` identities and `ATPROTO_FIREHOSE_ENABLED` set by the
  * `publicFirehoseTest` Gradle task, because accounts only count as public in a personal space.
  */
+@OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 class PublicFirehoseE2ETest {
     private val json = Json { ignoreUnknownKeys = true }
+
+    @Test
+    fun `a new account stays private even after writing a public profile`() =
+        runBlocking<Unit> {
+            withServerClientHarness {
+                val account = signUp(publicIdentity = false)
+                putProfile(account, "Private")
+                val origin = origin()
+                val status = anonymous.get("$origin/xrpc/com.atproto.sync.getRepoStatus?did=${account.did}")
+                val repos = anonymous.get("$origin/xrpc/com.atproto.sync.listRepos")
+                val description = anonymous.get("$origin/xrpc/com.atproto.repo.describeRepo?repo=${account.did}")
+                assertFalse(status.status == HttpStatusCode.OK)
+                assertEquals(HttpStatusCode.OK, repos.status)
+                assertFalse(repos.bodyAsText().contains(account.did))
+                assertEquals(HttpStatusCode.BadRequest, description.status)
+                assertEquals("RepoNotFound", description.json()["error"]?.jsonPrimitive?.content)
+            }
+        }
 
     @Test
     fun `a follower receives the commit for a record created after it subscribed and decodes it`() =
@@ -233,9 +254,15 @@ class PublicFirehoseE2ETest {
 
     private val socketClient: HttpClient by lazy { HttpClient(OkHttp) { install(WebSockets) } }
 
-    private suspend fun ServerClientE2EHarness.signUp(): Account {
+    private suspend fun ServerClientE2EHarness.signUp(publicIdentity: Boolean = true): Account {
         val created = apiClient.createAccountWithSyntheticPasskey("fire_${Random.nextInt(100000, 999999)}")
         val did = requireNotNull(created.data.account.did) { "The new account has no DID" }
+        if (publicIdentity) {
+            // Model completed owner consent in this fixture, without sending anything to a directory.
+            val accounts = GlobalContext.get().get<AccountRepository>()
+            val stored = requireNotNull(accounts.findByDid(did))
+            check(accounts.recordPublicIdentity(stored.id, did))
+        }
         val token = created.data.tokens.accessToken
         val origin = origin()
         return Account(did, token, XrpcDataHome(KtorXrpcClient(httpClient, origin), httpClient, origin) { BearerToken(token) })
