@@ -252,6 +252,10 @@ variable "enable_domain_mapping" {
   type = bool
   default = false
 }
+variable "enable_load_balancer" {
+  type = bool
+  default = false
+}
 variable "enable_github_oidc" {
   type = bool
   default = false
@@ -854,6 +858,16 @@ try:
     }
     if additional_origins:
         contract["webauthn_additional_origins"] = additional_origins
+    # The main service runs end-to-end HTTP/2 so uploads over 32 MiB reach it, and Cloud Run does
+    # not pass WebSockets to such a service. The deploy workflow therefore runs the event stream as
+    # a second HTTP/1 service from the same image, and the load balancer sends the stream's path to
+    # it. Terraform derives the same name. Cloud Run's longest request timeout keeps a relay
+    # connected for an hour before it reconnects with its cursor.
+    if env_vars.get("ATPROTO_FIREHOSE_ENABLED") == "true":
+        contract["repo_event_stream"] = {
+            "service_name": f"{service_name}-repo-events",
+            "timeout_seconds": 3600,
+        }
     pathlib.Path(output_path).write_text(json.dumps(contract, separators=(",", ":")))
 except ContractError as error:
     print(f"ERROR: {error}", file=sys.stderr)

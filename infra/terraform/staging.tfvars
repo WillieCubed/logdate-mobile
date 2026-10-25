@@ -14,6 +14,7 @@ enable_github_oidc = true
 github_repo        = "WillieCubed/logdate-mobile"
 
 enable_domain_mapping = true
+enable_load_balancer  = true
 domains               = ["cloud-staging.logdate.app"]
 
 # This is the isolated non-debug signer used only for staging Cloud builds.

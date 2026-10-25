@@ -12,6 +12,8 @@ for emergency deploys.
 - Secret Manager secrets (optional, placeholder only)
 - GCS bucket for media (optional)
 - Cloud Run domain mapping (optional, requires verified domain)
+- Global external Application Load Balancer that serves the repository event stream from its own
+  HTTP/1 service (optional, set `enable_load_balancer`; see [Load balancer](#load-balancer))
 - Cloud Monitoring uptime check and alert for AT Protocol handle resolution (optional, set
   `handle_resolution_monitor`; see `docs/reference/handle-resolution.md`)
 
@@ -132,6 +134,48 @@ Set `enable_domain_mapping = true` and `domains = ["cloud.logdate.app", "logdate
 after verifying ownership of each entry in Google Search Console. One
 `google_cloud_run_domain_mapping` is created per list entry, all pointing at the same
 Cloud Run service. SSL provisioning per domain can take 15–30 minutes.
+
+## Load balancer
+The main service uses end-to-end HTTP/2, because Cloud Run limits HTTP/1 requests to 32 MiB and
+encrypted recordings and backups are larger. Cloud Run does not pass WebSockets to a service set up
+that way, and the AT Protocol repository event stream (`com.atproto.sync.subscribeRepos`) is a
+WebSocket. Relays expect it on the same hostname as everything else, and a Cloud Run domain mapping
+can only send a whole hostname to one service.
+
+`enable_load_balancer = true` puts a global external Application Load Balancer in front of every
+entry in `domains`. It sends `/xrpc/com.atproto.sync.subscribeRepos` to `<service_name>-repo-events`,
+a second service that runs the same image over HTTP/1, and every other path to the main service. The
+deploy workflow creates and updates that second service from the same deployment contract whenever
+`ATPROTO_FIREHOSE_ENABLED` is `"true"`; Terraform only routes to it. The certificate comes from
+Certificate Manager and is authorized through DNS, so it is issued before any traffic moves.
+
+Moving a hostname from its domain mapping to the load balancer:
+
+1. Apply with `enable_load_balancer = true`, then read the records to publish:
+   ```bash
+   terraform output -json load_balancer_dns_records
+   ```
+2. In the Cloudflare `logdate.app` zone, add the `certificate_authorization` CNAME as DNS only (grey
+   cloud). Wait until the certificate is active:
+   ```bash
+   gcloud certificate-manager certificates describe <service_name>-lb --project <project_id> \
+     --format='value(managed.state)'
+   ```
+3. Replace the hostname's CNAME to `ghs.googlehosted.com` with the `traffic` A record, also DNS only.
+   Proxying through Cloudflare would cap uploads at Cloudflare's request size limit.
+4. Check `https://<domain>/health`, a WebSocket to the event stream (see the
+   [repository event stream runbook](../../docs/runbook/repository-event-stream.md)), and a deploy's
+   smoke proof. Then set `enable_domain_mapping = false` to delete the unused domain mapping.
+
+Staging (`logdate-dev`) was not created with Terraform, so its state in
+`gs://logdate-dev-terraform-state` (prefix `logdate/staging`) holds only the load balancer. Apply it
+with a `backend.tf` copied from `backend.tf.example` for that bucket and prefix, and target the load
+balancer so Terraform does not try to create what already exists:
+```bash
+terraform apply -var-file=staging.tfvars \
+  -target=google_compute_global_forwarding_rule.load_balancer_https \
+  -target=google_certificate_manager_certificate_map_entry.load_balancer
+```
 
 ## Fallback (manual) deploy
 Use `scripts/deploy-cloud-run.sh` for emergency deploys with gcloud + Docker. This keeps

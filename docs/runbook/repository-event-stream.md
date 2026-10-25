@@ -21,12 +21,29 @@ Check these, in this order:
    legacy sync stay private until their journals move; see the [journal moves runbook](journal-moves.md).
 3. The database migrations are applied. The stream needs migration V51, which creates the event log.
    Deploying a release applies it, and the stream does nothing until the flag is on.
+4. The server's hostname is served by the load balancer, not a Cloud Run domain mapping. The stream
+   is a WebSocket, and only the load balancer can send it to the separate service that can carry one.
+   Follow [Load balancer](../../infra/terraform/README.md#load-balancer) to set it up and move DNS.
 
 ## Turn it on
 
 1. In the production deployment contract, set `ATPROTO_FIREHOSE_ENABLED` to `"true"` in `env_vars`
-   and leave `ATPROTO_RELAY_HOSTS` out. Deploy.
-2. Check the stream from outside. Replace `HOST` with the server's hostname:
+   and leave `ATPROTO_RELAY_HOSTS` out. Deploy. The deploy also creates or updates the stream's own
+   service and stops if that service does not accept a WebSocket.
+2. Check the stream from outside. Replace `HOST` with the server's hostname. A cursor far beyond the
+   newest event makes the server answer with one `FutureCursor` error frame and close, which shows
+   a WebSocket reaches the stream even when no account has published anything yet:
+
+   ```bash
+   node -e '
+     const socket = new WebSocket("wss://HOST/xrpc/com.atproto.sync.subscribeRepos?cursor=999999999999");
+     socket.binaryType = "arraybuffer";
+     socket.onmessage = (event) => console.log("frame", event.data.byteLength, "bytes");
+     socket.onclose = (event) => console.log("closed", event.code, event.reason);
+   '
+   ```
+
+   It prints one frame and then `closed 1000 Done`. Then list the shown repositories:
 
    ```bash
    curl -s https://HOST/xrpc/com.atproto.sync.listRepos

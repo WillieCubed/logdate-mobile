@@ -57,3 +57,21 @@ output "domain_mappings" {
     ]
   }
 }
+
+output "load_balancer_dns_records" {
+  description = "DNS records to publish for each domain when the load balancer is enabled: the CNAME that authorizes its certificate, and the A record that moves traffic from the domain mapping to the load balancer."
+  value = local.load_balancer_enabled ? {
+    for domain, authorization in google_certificate_manager_dns_authorization.load_balancer : domain => {
+      certificate_authorization = {
+        name = authorization.dns_resource_record[0].name
+        type = authorization.dns_resource_record[0].type
+        data = authorization.dns_resource_record[0].data
+      }
+      traffic = {
+        name = "${domain}."
+        type = "A"
+        data = google_compute_global_address.load_balancer[0].address
+      }
+    }
+  } : {}
+}

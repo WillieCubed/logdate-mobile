@@ -139,6 +139,17 @@ Connect to `/xrpc/com.atproto.sync.subscribeRepos` and optionally pass `cursor`:
 Events live in the database, so every server instance serves the same log. An instance finds events
 that another one stored by looking every half second.
 
+On Cloud Run the stream is served by its own service. The main service talks HTTP/2 all the way to
+the container, because Cloud Run limits HTTP/1 requests to 32 MiB and recordings can be larger. Cloud
+Run cannot pass a WebSocket to a service set up that way, so the deploy also runs the same image as a
+second service, named after the main one with `-repo-events` on the end, over plain HTTP/1. A load
+balancer in front of the server's hostname sends `/xrpc/com.atproto.sync.subscribeRepos` to that
+service and every other path to the main one. Both read the same event log, so a follower sees the
+same events either way. Cloud Run ends a request after an hour at most, so a follower is disconnected
+after an hour and should reconnect with the last cursor it saw. The
+[Terraform README](../../infra/terraform/README.md#load-balancer) explains how the load balancer is
+set up.
+
 The library that reads these frames is `RepoEventFrames` in `shared/atproto-repo`. It turns a frame
 into a `RepoCommitEvent`, `RepoSyncEvent`, `RepoIdentityEvent`, `RepoAccountEvent`, `RepoInfoMessage`
 or `RepoErrorMessage`, and `CarCodec.readCar` reads the blocks a commit carries.
