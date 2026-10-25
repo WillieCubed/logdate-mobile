@@ -46,6 +46,9 @@ reset_fake_state() {
 
 pass_count=0
 
+# The assertions below grep with -q, which exits at the first match. Piping the text into
+# grep would then fail the pipeline with SIGPIPE under pipefail whenever the text is larger
+# than the pipe buffer (infra/terraform/main.tf is), so a here-string feeds grep instead.
 assert_equals() {
     local expected="$1"
     local actual="$2"
@@ -59,7 +62,7 @@ assert_equals() {
 assert_contains() {
     local needle="$1"
     local text="$2"
-    if ! echo "$text" | grep -q -- "$needle"; then
+    if ! grep -q -- "$needle" <<<"$text"; then
         echo "FAIL: expected output to contain '$needle'"
         echo "$text"
         exit 1
@@ -70,7 +73,7 @@ assert_contains() {
 assert_not_contains() {
     local needle="$1"
     local text="$2"
-    if echo "$text" | grep -q -- "$needle"; then
+    if grep -q -- "$needle" <<<"$text"; then
         echo "FAIL: expected output to not contain '$needle'"
         echo "$text"
         exit 1
