@@ -7,7 +7,7 @@
     <string name="cloud_archive_title">Encrypted Cloud archive</string>
     <string name="cloud_archive_checking">Checking archive backup…</string>
     <string name="cloud_archive_signed_out">Sign in to use Cloud archive backup.</string>
-    <string name="cloud_archive_needs_recovery">Verify your recovery phrase before Cloud archive backup can run.</string>
+    <string name="cloud_archive_needs_recovery">Enter your recovery phrase on this device so Cloud archive backup can run.</string>
     <string name="cloud_archive_never">No encrypted Cloud archive has been saved to this account.</string>
     <string name="cloud_archive_queued">Archive backup is waiting to start.</string>
     <string name="cloud_archive_running">Uploading encrypted archive…</string>

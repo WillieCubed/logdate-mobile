@@ -13,6 +13,6 @@
     <string name="labs_activity_permission_description">Activity awareness needs it to tell when you walk, ride or travel.</string>
     <string name="labs_activity_permission_action">Allow</string>
     <string name="labs_identity_recovery_key_title">Move your account with your recovery phrase</string>
-    <string name="labs_identity_recovery_key_description">Confirming your recovery phrase also sets it up to move your account to another server, even if your current server can’t help.</string>
+    <string name="labs_identity_recovery_key_description">Lets your recovery phrase move your account to another server, even if your current server can’t help. It’s set up when you sign in with your passkey.</string>
     <string name="labs_watch_experience_description">Try the new watch app and the phone screens that go with it.</string>
 </resources>

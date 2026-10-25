@@ -65,6 +65,7 @@ import app.logdate.client.permissions.di.permissionsModule
 import app.logdate.client.repository.account.AccountIdentityRepository
 import app.logdate.client.repository.account.AccountRepository
 import app.logdate.client.repository.account.PasskeyAccountRepository
+import app.logdate.client.repository.account.PasskeyConfirmations
 import app.logdate.client.repository.audio.AudioTagRepository
 import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.DraftRepository
@@ -326,6 +327,7 @@ actual val dataModule: Module =
 
         // Account
         single<AccountRepository> { UnavailableAccountRepository() }
+        single { PasskeyConfirmations() }
         single<AccountIdentityRepository> {
             DefaultAccountIdentityRepository(
                 apiClient = get(),
@@ -337,6 +339,7 @@ actual val dataModule: Module =
                         passkeyManager = get(),
                         credentialCodec = PasskeyCredentialCodec(Json { ignoreUnknownKeys = true }),
                     ),
+                passkeyConfirmations = get(),
             )
         }
         single<PasskeyAccountRepository> { UnavailablePasskeyAccountRepository() }

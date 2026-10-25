@@ -5,6 +5,7 @@ import app.logdate.client.device.crypto.PlcRecoveryKeyManager
 import app.logdate.client.networking.ExportedSigningKeyDto
 import app.logdate.client.networking.IdentityApiClientContract
 import app.logdate.client.networking.IdentityApiException
+import app.logdate.client.networking.RegisterPlcRecoveryKeyDataDto
 import app.logdate.client.repository.account.AccountDerivedPlcRecoveryKey
 import app.logdate.client.repository.account.AccountExportedSigningKey
 import app.logdate.client.repository.account.AccountHostedPlcOperation
@@ -16,6 +17,7 @@ import app.logdate.client.repository.account.AccountRotatedSigningKey
 import app.logdate.client.repository.account.ExportedIdentitySigningKeyPayload
 import app.logdate.client.repository.account.IdentityRecoveryException
 import app.logdate.client.repository.account.IdentityRecoveryFailure
+import app.logdate.client.repository.account.PasskeyConfirmations
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
@@ -33,6 +35,8 @@ class DefaultAccountIdentityRepository(
     private val sessionStorage: SessionStorage,
     private val plcRecoveryKeyManager: PlcRecoveryKeyManager,
     private val stepUp: IdentityStepUp,
+    /** The confirmation from a recent passkey sign-in, which registers a first recovery key without another prompt. */
+    private val passkeyConfirmations: PasskeyConfirmations? = null,
     private val json: Json =
         Json {
             ignoreUnknownKeys = true
@@ -176,12 +180,46 @@ class DefaultAccountIdentityRepository(
             AccountDerivedPlcRecoveryKey(recoveryDidKey = plcRecoveryKeyManager.deriveDidKey(recoveryWords))
         }
 
-    override suspend fun registerRecoveryKey(recoveryPhrase: List<String>): Result<AccountRegisteredPlcRecoveryKey> =
+    override suspend fun registerRecoveryKey(
+        recoveryPhrase: List<String>,
+        askForPasskey: Boolean,
+    ): Result<AccountRegisteredPlcRecoveryKey> =
         runRecoveryRequest("register the recovery key") { token ->
             val recoveryDidKey = deriveOnDevice { plcRecoveryKeyManager.deriveDidKey(recoveryPhrase) }
-            val payload = apiClient.registerPlcRecoveryKey(token, recoveryDidKey, stepUp.confirm(token)).getOrThrow()
+            val payload =
+                registerWithSignInConfirmation(token, recoveryDidKey)
+                    ?: if (askForPasskey) {
+                        apiClient.registerPlcRecoveryKey(token, recoveryDidKey, stepUp.confirm(token)).getOrThrow()
+                    } else {
+                        throw IdentityRecoveryException(
+                            IdentityRecoveryFailure.CONFIRMATION_NEEDED,
+                            "Registering the recovery key needs a passkey confirmation",
+                        )
+                    }
             AccountRegisteredPlcRecoveryKey(did = payload.did, handle = payload.handle, recoveryDidKey = payload.recoveryDidKey)
         }
+
+    /**
+     * Registers with the confirmation from a recent passkey sign-in, or returns `null` when there is
+     * none or the server no longer accepts it. Any answer from the server spends it; a request that
+     * never reached the server leaves it for the next try.
+     */
+    private suspend fun registerWithSignInConfirmation(
+        token: String,
+        recoveryDidKey: String,
+    ): RegisterPlcRecoveryKeyDataDto? {
+        val confirmations = passkeyConfirmations ?: return null
+        val accountId = sessionStorage.getSession()?.accountId ?: return null
+        val grant = confirmations.usableGrant(accountId) ?: return null
+        val result = apiClient.registerPlcRecoveryKey(token, recoveryDidKey, stepUpGrant = grant)
+        val error = result.exceptionOrNull() as? IdentityApiException
+        if (error?.errorCode != NETWORK_ERROR) confirmations.spend(grant)
+        if (error?.errorCode == STEP_UP_FAILED) {
+            Napier.i("The sign-in passkey confirmation was not accepted; asking for a new one")
+            return null
+        }
+        return result.getOrThrow()
+    }
 
     override suspend fun replaceRecoveryKey(recoveryPhrase: List<String>): Result<AccountRegisteredPlcRecoveryKey> =
         runRecoveryRequest("replace the recovery key") { token ->
@@ -282,6 +320,8 @@ class DefaultAccountIdentityRepository(
 }
 
 private val WHITESPACE_REGEX = Regex("\\s+")
+private const val NETWORK_ERROR = "NETWORK_ERROR"
+private const val STEP_UP_FAILED = "STEP_UP_FAILED"
 
 /** The failure a person sees for a server error [code] from the recovery-key endpoints. */
 internal fun recoveryFailureFor(code: String): IdentityRecoveryFailure =

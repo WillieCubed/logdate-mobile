@@ -18,6 +18,7 @@ import app.logdate.client.networking.RotateSigningKeyDataDto
 import app.logdate.client.repository.account.ExportedIdentitySigningKeyPayload
 import app.logdate.client.repository.account.IdentityRecoveryException
 import app.logdate.client.repository.account.IdentityRecoveryFailure
+import app.logdate.client.repository.account.PasskeyConfirmations
 import app.logdate.shared.model.PasskeyAssertionAuthenticatorResponse
 import app.logdate.shared.model.PasskeyAssertionResponse
 import app.logdate.shared.model.PasskeyAuthenticationOptions
@@ -145,6 +146,75 @@ class DefaultAccountIdentityRepositoryTest {
             assertEquals(STEP_UP, apiClient.lastStepUp)
             assertEquals(1, stepUp.confirmations)
             assertEquals("did:key:zRecovery", result.getOrThrow().recoveryDidKey)
+        }
+
+    @Test
+    fun `a recent passkey sign in registers the recovery key without another prompt and is spent`() =
+        runTest {
+            val apiClient = FakeIdentityApiClient()
+            val stepUp = FakeStepUp()
+            val confirmations = PasskeyConfirmations().apply { record(TEST_SESSION.accountId, "sign-in-grant") }
+
+            val result =
+                repository(
+                    apiClient,
+                    stepUp = stepUp,
+                    confirmations = confirmations,
+                ).registerRecoveryKey(PHRASE, askForPasskey = false)
+
+            assertEquals("did:key:zRecovery", result.getOrThrow().recoveryDidKey)
+            assertEquals(listOf("sign-in-grant"), apiClient.grantsSent)
+            assertNull(apiClient.lastStepUp)
+            assertEquals(0, stepUp.confirmations)
+            assertNull(confirmations.usableGrant(TEST_SESSION.accountId))
+        }
+
+    @Test
+    fun `without a sign in confirmation and no prompt allowed nothing is sent`() =
+        runTest {
+            val apiClient = FakeIdentityApiClient()
+            val stepUp = FakeStepUp()
+            val otherAccount = PasskeyConfirmations().apply { record("someone-else", "their-grant") }
+
+            val result =
+                repository(
+                    apiClient,
+                    stepUp = stepUp,
+                    confirmations = otherAccount,
+                ).registerRecoveryKey(PHRASE, askForPasskey = false)
+
+            assertEquals(IdentityRecoveryFailure.CONFIRMATION_NEEDED, result.failure())
+            assertNull(apiClient.lastRegisteredRecoveryDidKey)
+            assertEquals(0, stepUp.confirmations)
+        }
+
+    @Test
+    fun `a sign in confirmation the server refuses falls back to the passkey prompt`() =
+        runTest {
+            val apiClient = FakeIdentityApiClient().apply { grantErrors += IdentityApiException("STEP_UP_FAILED", "expired") }
+            val stepUp = FakeStepUp()
+            val confirmations = PasskeyConfirmations().apply { record(TEST_SESSION.accountId, "expired-grant") }
+
+            val result = repository(apiClient, stepUp = stepUp, confirmations = confirmations).registerRecoveryKey(PHRASE)
+
+            assertEquals("did:key:zRecovery", result.getOrThrow().recoveryDidKey)
+            assertEquals(STEP_UP, apiClient.lastStepUp)
+            assertEquals(1, stepUp.confirmations)
+        }
+
+    @Test
+    fun `a sign in confirmation that never reached the server is kept for the next try`() =
+        runTest {
+            val apiClient = FakeIdentityApiClient().apply { grantErrors += IdentityApiException("NETWORK_ERROR", "offline") }
+            val confirmations = PasskeyConfirmations().apply { record(TEST_SESSION.accountId, "kept-grant") }
+            val repository = repository(apiClient, confirmations = confirmations)
+
+            val offline = repository.registerRecoveryKey(PHRASE, askForPasskey = false)
+            val retried = repository.registerRecoveryKey(PHRASE, askForPasskey = false)
+
+            assertEquals(IdentityRecoveryFailure.UNREACHABLE, offline.failure())
+            assertEquals("did:key:zRecovery", retried.getOrThrow().recoveryDidKey)
+            assertEquals(listOf("kept-grant", "kept-grant"), apiClient.grantsSent)
         }
 
     @Test
@@ -307,11 +377,13 @@ class DefaultAccountIdentityRepositoryTest {
         session: UserSession? = TEST_SESSION,
         keys: FakePlcRecoveryKeyManager = FakePlcRecoveryKeyManager(),
         stepUp: FakeStepUp = FakeStepUp(),
+        confirmations: PasskeyConfirmations? = null,
     ) = DefaultAccountIdentityRepository(
         apiClient = apiClient,
         sessionStorage = FakeSessionStorage(session = session),
         plcRecoveryKeyManager = keys,
         stepUp = stepUp,
+        passkeyConfirmations = confirmations,
         json = json,
     )
 
@@ -426,6 +498,10 @@ private class FakeIdentityApiClient(
     var lastRegisteredRecoveryDidKey: String? = null
     var lastReplacedRecoveryDidKey: String? = null
     var lastStepUp: PasskeyStepUpProofDto? = null
+    val grantsSent = mutableListOf<String>()
+
+    /** Answers for requests that carry a sign-in confirmation, in order; once empty they succeed. */
+    val grantErrors = mutableListOf<IdentityApiException>()
     var lastPreparedKey: String? = null
     var lastAccessToken: String? = null
     var lastPassphrase: String? = null
@@ -574,10 +650,13 @@ private class FakeIdentityApiClient(
         accessToken: String,
         recoveryDidKey: String,
         stepUp: PasskeyStepUpProofDto?,
+        stepUpGrant: String?,
     ): Result<RegisterPlcRecoveryKeyDataDto> {
         lastAccessToken = accessToken
         lastRegisteredRecoveryDidKey = recoveryDidKey
         lastStepUp = stepUp
+        stepUpGrant?.let { grantsSent += it }
+        if (stepUpGrant != null) grantErrors.removeFirstOrNull()?.let { return Result.failure(it) }
         registerError?.let { return Result.failure(it) }
         return Result.success(
             RegisterPlcRecoveryKeyDataDto(did = "did:plc:alice123", handle = "alice.logdate.app", recoveryDidKey = recoveryDidKey),

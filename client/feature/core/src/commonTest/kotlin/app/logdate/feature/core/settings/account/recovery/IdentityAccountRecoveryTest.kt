@@ -8,6 +8,8 @@ import app.logdate.client.repository.account.AccountIdentityStatus
 import app.logdate.client.repository.account.AccountImportedSigningKey
 import app.logdate.client.repository.account.AccountRegisteredPlcRecoveryKey
 import app.logdate.client.repository.account.AccountRotatedSigningKey
+import app.logdate.client.repository.account.IdentityRecoveryException
+import app.logdate.client.repository.account.IdentityRecoveryFailure
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -57,6 +59,21 @@ class IdentityAccountRecoveryTest {
             assertTrue(identity.replacements.isEmpty())
         }
 
+    @Test
+    fun `a key from another phrase is not replaced without a passkey prompt`() =
+        runTest {
+            val identity = FakeIdentity(registered = "did:key:zDnaeFromAnotherPhrase")
+            val recovery = IdentityAccountRecovery(identity, flowOf(true))
+
+            val result = recovery.finishSetup(phrase, askForPasskey = false)
+
+            assertEquals(
+                IdentityRecoveryFailure.CONFIRMATION_NEEDED,
+                (result.exceptionOrNull() as? IdentityRecoveryException)?.failure,
+            )
+            assertTrue(identity.replacements.isEmpty())
+        }
+
     private class FakeIdentity(
         var registered: String?,
     ) : AccountIdentityRepository {
@@ -77,7 +94,10 @@ class IdentityAccountRecoveryTest {
         override suspend fun derivePlcRecoveryDidKey(recoveryPhrase: String): Result<AccountDerivedPlcRecoveryKey> =
             Result.success(AccountDerivedPlcRecoveryKey(DERIVED))
 
-        override suspend fun registerRecoveryKey(recoveryPhrase: List<String>): Result<AccountRegisteredPlcRecoveryKey> {
+        override suspend fun registerRecoveryKey(
+            recoveryPhrase: List<String>,
+            askForPasskey: Boolean,
+        ): Result<AccountRegisteredPlcRecoveryKey> {
             registrations += recoveryPhrase
             registered = DERIVED
             return Result.success(AccountRegisteredPlcRecoveryKey("did:plc:alice123", "alice.logdate.app", DERIVED))

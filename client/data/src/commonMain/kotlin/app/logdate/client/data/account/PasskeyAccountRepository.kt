@@ -16,6 +16,7 @@ import app.logdate.client.permissions.RestoreCredentialManager
 import app.logdate.client.repository.account.AccountCreationRequest
 import app.logdate.client.repository.account.LinkedSignInProvider
 import app.logdate.client.repository.account.PasskeyAccountRepository
+import app.logdate.client.repository.account.PasskeyConfirmations
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyInfo
@@ -73,6 +74,8 @@ class DefaultPasskeyAccountRepository(
     private val accountKeyUnlockCoordinator: AccountKeyUnlockCoordinator? = null,
     private val beforeSignOut: suspend () -> Boolean = { true },
     private val restoreCredentialRenewal: RestoreCredentialRenewal? = null,
+    /** Where a passkey sign-in's confirmation goes, so a first recovery key can be registered without another prompt. */
+    private val passkeyConfirmations: PasskeyConfirmations? = null,
 ) : PasskeyAccountRepository {
     private val sessionState = PasskeyAccountSessionState()
     override val currentAccount: StateFlow<LogDateAccount?> = sessionState.currentAccount
@@ -138,6 +141,7 @@ class DefaultPasskeyAccountRepository(
             updateTokensOrRegisterPlatformAccount = sessionRefreshCoordinator::updateTokensOrRegisterPlatformAccount,
             deviceName = deviceName,
             accountKeyUnlockCoordinator = accountKeyUnlockCoordinator,
+            onPasskeyConfirmed = { accountId, grant -> passkeyConfirmations?.record(accountId, grant) },
         )
 
     private val enrollmentCoordinator =

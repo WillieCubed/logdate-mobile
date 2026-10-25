@@ -54,11 +54,15 @@ interface IdentityApiClientContract {
         signature: String,
     ): Result<ImportSigningKeyDataDto>
 
-    /** Registers [recoveryDidKey] on the identity; the server refuses it without a passkey [stepUp]. */
+    /**
+     * Registers [recoveryDidKey] on the identity; the server refuses it without a passkey [stepUp]
+     * or, in its place, the [stepUpGrant] from a passkey sign-in in the last five minutes.
+     */
     suspend fun registerPlcRecoveryKey(
         accessToken: String,
         recoveryDidKey: String,
         stepUp: PasskeyStepUpProofDto? = null,
+        stepUpGrant: String? = null,
     ): Result<RegisterPlcRecoveryKeyDataDto>
 
     /** Puts [recoveryDidKey] in place of the registered recovery key, confirmed by a passkey [stepUp]. */
@@ -227,13 +231,14 @@ class IdentityApiClient(
         accessToken: String,
         recoveryDidKey: String,
         stepUp: PasskeyStepUpProofDto?,
+        stepUpGrant: String?,
     ): Result<RegisterPlcRecoveryKeyDataDto> =
         request(
             request = { token ->
                 post("${getBaseUrl()}/identity/plc/recovery-key") {
                     header("Authorization", "Bearer $token")
                     contentType(ContentType.Application.Json)
-                    setBody(RegisterPlcRecoveryKeyRequestDto(recoveryDidKey = recoveryDidKey, stepUp = stepUp))
+                    setBody(RegisterPlcRecoveryKeyRequestDto(recoveryDidKey = recoveryDidKey, stepUp = stepUp, stepUpGrant = stepUpGrant))
                 }
             },
             success = { payload -> json.decodeFromString<RegisterPlcRecoveryKeyResponseDto>(payload).data },
@@ -402,6 +407,7 @@ data class CompleteRecoverySigningKeyImportRequestDto(
 data class RegisterPlcRecoveryKeyRequestDto(
     val recoveryDidKey: String,
     val stepUp: PasskeyStepUpProofDto? = null,
+    val stepUpGrant: String? = null,
 )
 
 @Serializable

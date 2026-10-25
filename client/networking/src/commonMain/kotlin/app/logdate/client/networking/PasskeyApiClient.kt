@@ -299,6 +299,7 @@ class PasskeyApiClient(
                     CompleteAccountCreationData(
                         account = apiResponse.data.account.toLogDateAccount(),
                         tokens = apiResponse.data.tokens,
+                        stepUpGrant = apiResponse.data.stepUpGrant,
                     ),
                 )
             } else {
@@ -354,6 +355,7 @@ class PasskeyApiClient(
                     CompleteAuthenticationData(
                         account = apiResponse.data.account.toLogDateAccount(),
                         tokens = apiResponse.data.tokens,
+                        stepUpGrant = apiResponse.data.stepUpGrant,
                     ),
                 )
             } else {
@@ -626,6 +628,7 @@ class PasskeyApiClient(
                     CompleteAccountCreationData(
                         account = apiResponse.data.account.toLogDateAccount(),
                         tokens = apiResponse.data.tokens,
+                        stepUpGrant = apiResponse.data.stepUpGrant,
                     ),
                 )
             } else {
@@ -654,6 +657,7 @@ class PasskeyApiClient(
                     CompleteAuthenticationData(
                         account = apiResponse.data.account.toLogDateAccount(),
                         tokens = apiResponse.data.tokens,
+                        stepUpGrant = apiResponse.data.stepUpGrant,
                     ),
                 )
             } else {
@@ -750,6 +754,7 @@ class PasskeyApiClient(
                     CompleteAuthenticationData(
                         account = apiResponse.data.account.toLogDateAccount(),
                         tokens = apiResponse.data.tokens,
+                        stepUpGrant = apiResponse.data.stepUpGrant,
                     ),
                 )
             } else {
@@ -863,6 +868,7 @@ private data class AuthResponseDto(
 private data class AuthResponseDataDto(
     val account: AuthAccountDto,
     val tokens: AccountTokens,
+    val stepUpGrant: String? = null,
 )
 
 @Serializable

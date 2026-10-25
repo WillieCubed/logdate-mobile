@@ -6,6 +6,7 @@ import app.logdate.client.domain.identity.ResolvedUserIdentity
 import app.logdate.client.permissions.EmailVerificationOutcome
 import app.logdate.client.repository.account.LinkedSignInProvider
 import app.logdate.client.repository.account.PasskeyAccountRepository
+import app.logdate.feature.core.settings.account.recovery.AccountRecoveryUiState
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -34,6 +36,8 @@ sealed interface AccountUiState {
         val signIn: SignInSummary,
         /** Whether this device holds the recovery phrase that unlocks the synced journal; `null` until checked. */
         val hasRecoveryPhrase: Boolean?,
+        /** Whether account recovery needs the person, such as one passkey confirmation or a fix for a failure. */
+        val accountRecoveryNeedsAttention: Boolean = false,
         /** `null` when there is no email to show and no way to add one here. */
         val email: EmailRow?,
         val server: ServerRow,
@@ -94,6 +98,7 @@ class AccountViewModel(
     private val hasRecoveryPhrase: suspend () -> Boolean,
     private val isEmailVerificationAvailable: suspend () -> Boolean,
     private val verifyEmail: suspend () -> EmailVerificationOutcome,
+    private val accountRecovery: Flow<AccountRecoveryUiState?> = flowOf(null),
 ) : ViewModel() {
     private val details = MutableStateFlow(AccountDetails())
     private var loadJob: Job? = null
@@ -121,6 +126,7 @@ class AccountViewModel(
                     ),
                 signIn = loaded.signIn,
                 hasRecoveryPhrase = loaded.hasRecoveryPhrase,
+                accountRecoveryNeedsAttention = loaded.accountRecovery.needsAttention(),
                 email =
                     when {
                         account?.email != null ->
@@ -139,6 +145,7 @@ class AccountViewModel(
 
     init {
         refresh()
+        viewModelScope.launch { accountRecovery.collect { recovery -> details.update { it.copy(accountRecovery = recovery) } } }
     }
 
     /**
@@ -236,5 +243,12 @@ class AccountViewModel(
         val hasRecoveryPhrase: Boolean? = null,
         val canVerifyEmail: Boolean = false,
         val isSigningOut: Boolean = false,
+        val accountRecovery: AccountRecoveryUiState? = null,
     )
 }
+
+/** Setup that is waiting on the person, as opposed to finished, under way, or retrying on its own. */
+private fun AccountRecoveryUiState?.needsAttention(): Boolean =
+    this == AccountRecoveryUiState.NeedsSetup ||
+        this == AccountRecoveryUiState.CheckFailed ||
+        this is AccountRecoveryUiState.SetupFailed

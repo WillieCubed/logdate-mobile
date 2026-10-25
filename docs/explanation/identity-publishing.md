@@ -84,6 +84,13 @@ only the person holds is listed ahead of LogDate's key, so it can overrule LogDa
 directory's 72-hour window. The key is derived from the person's recovery phrase, and registering,
 replacing or using it needs a fresh passkey confirmation.
 
+Nobody has to open or save the recovery phrase for this. The app already holds the phrase, so it
+registers the key by itself. A passkey sign-in or sign-up hands the app a step-up grant, which is
+the server's proof that the person confirmed with a passkey a moment ago. The grant lasts five
+minutes, works once, and is accepted only for registering the first recovery key, so the person
+never sees a second prompt. Replacing a key or using it always asks for the passkey again. When no
+grant is available, the Account screen says that one passkey confirmation is still needed.
+
 Sign-in has to be passkey-only. An identity that other apps can reach must not be protectable by a
 password that someone could guess or reuse, so the server's `createSession` and `createAccount`
 endpoints refuse passwords, even for an account that once had one.

@@ -88,6 +88,7 @@
     </plurals>
     <string name="account_recovery_phrase_title">Recovery phrase</string>
     <string name="account_recovery_phrase_saved">Saved on this device</string>
+    <string name="account_recovery_phrase_finish_setup">Saved on this device. Finish setting up account recovery.</string>
     <string name="account_recovery_phrase_checking">Checking this device…</string>
     <string name="account_recovery_phrase_missing">Not on this device. Enter it to read your synced journal.</string>
     <string name="account_email_title">Email</string>
@@ -125,11 +126,11 @@
 
     <!-- Recovery phrase -->
     <string name="recovery_phrase_title">Recovery phrase</string>
-    <string name="recovery_phrase_verify_failed">Couldn’t finish saving your recovery phrase on this device. Show it again to retry.</string>
+    <string name="recovery_phrase_verify_failed">Couldn’t record that you saved a copy. Show the phrase again to retry.</string>
     <string name="recovery_phrase_write_down">Write them down in this order, or copy them into a password manager.</string>
     <string name="recovery_phrase_saved_action">I’ve saved my recovery phrase</string>
-    <string name="recovery_phrase_verified">Saved and confirmed. Your journal can now back up.</string>
-    <string name="recovery_phrase_intro">These 12 words are the only way to read your journal on a new device, and LogDate can’t see or recover them. They’re everyday words rather than a long code, so they’re easy to write down without mistakes.</string>
+    <string name="recovery_phrase_verified">You’ve saved a copy of your recovery phrase.</string>
+    <string name="recovery_phrase_intro">Save a copy of these 12 words in case you lose every device you’re signed in on. A new device can get your journal from one you already use, so you need them only if none is left. LogDate can’t see or recover them.</string>
     <string name="recovery_phrase_show">Show recovery phrase</string>
     <string name="recovery_phrase_copy">Copy</string>
     <string name="recovery_phrase_hide">Hide</string>

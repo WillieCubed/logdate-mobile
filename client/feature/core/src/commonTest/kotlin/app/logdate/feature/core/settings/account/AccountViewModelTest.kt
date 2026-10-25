@@ -4,7 +4,9 @@ import app.logdate.client.domain.identity.ResolvedUserIdentity
 import app.logdate.client.networking.PasskeyApiErrorCodes
 import app.logdate.client.networking.PasskeyApiException
 import app.logdate.client.permissions.EmailVerificationOutcome
+import app.logdate.client.repository.account.IdentityRecoveryFailure
 import app.logdate.client.repository.account.LinkedSignInProvider
+import app.logdate.feature.core.settings.account.recovery.AccountRecoveryUiState
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyInfo
 import kotlinx.coroutines.CompletableDeferred
@@ -89,6 +91,24 @@ class AccountViewModelTest {
         runTest {
             assertEquals(false, signedIn(viewModel(hasRecoveryPhrase = false)).hasRecoveryPhrase)
             assertEquals(true, signedIn(viewModel(hasRecoveryPhrase = true)).hasRecoveryPhrase)
+        }
+
+    @Test
+    fun `account recovery that waits on the person is flagged on the account and clears once set up`() =
+        runTest {
+            val recovery = MutableStateFlow<AccountRecoveryUiState?>(AccountRecoveryUiState.NeedsSetup)
+            val viewModel = viewModel(accountRecovery = recovery)
+
+            assertEquals(true, signedIn(viewModel).accountRecoveryNeedsAttention)
+
+            recovery.value = AccountRecoveryUiState.Retrying(IdentityRecoveryFailure.UNREACHABLE)
+            assertEquals(false, signedIn(viewModel).accountRecoveryNeedsAttention)
+
+            recovery.value = AccountRecoveryUiState.SetupFailed(IdentityRecoveryFailure.PASSKEY_REQUIRED)
+            assertEquals(true, signedIn(viewModel).accountRecoveryNeedsAttention)
+
+            recovery.value = AccountRecoveryUiState.Ready
+            assertEquals(false, signedIn(viewModel).accountRecoveryNeedsAttention)
         }
 
     @Test
@@ -210,6 +230,7 @@ class AccountViewModelTest {
         checkRecoveryPhrase: suspend () -> Boolean = { hasRecoveryPhrase },
         isEmailVerificationAvailable: Boolean = false,
         verifyEmail: suspend () -> EmailVerificationOutcome = { EmailVerificationOutcome.Unsupported },
+        accountRecovery: Flow<AccountRecoveryUiState?> = MutableStateFlow(null),
     ) = AccountViewModel(
         accountRepository = repository,
         userIdentity = MutableStateFlow(identity),
@@ -217,6 +238,7 @@ class AccountViewModelTest {
         hasRecoveryPhrase = checkRecoveryPhrase,
         isEmailVerificationAvailable = { isEmailVerificationAvailable },
         verifyEmail = verifyEmail,
+        accountRecovery = accountRecovery,
     )
 
     private fun identity(
