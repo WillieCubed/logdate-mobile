@@ -1033,12 +1033,10 @@ jq '.artifact_registry_image_name = "logdate-server-staging"' "$FIXTURE_DIR/stag
 expect_failure wrong-image-name staging "$RELEASE_SHA" wrong-image-name.json "artifact_registry_image_name must be logdate-server"
 
 # Child relying parties are valid for staging; production's RP and browser origin are not.
-for relying_party in logdate.app; do
-    jq --arg relying_party "$relying_party" '.env_vars.WEBAUTHN_RP_ID = $relying_party' \
-        "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/wrong-staging-rp.json"
-    expect_failure wrong-staging-rp staging "$RELEASE_SHA" wrong-staging-rp.json \
-        "staging relying party must not be the production relying party or its ancestor"
-done
+jq '.env_vars.WEBAUTHN_RP_ID = "logdate.app"' \
+    "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/wrong-staging-rp.json"
+expect_failure wrong-staging-rp staging "$RELEASE_SHA" wrong-staging-rp.json \
+    "staging relying party must not be the production relying party or its ancestor"
 for production_host in app.logdate.app cloud.logdate.app; do
     jq --arg host "$production_host" \
         '.env_vars.WEBAUTHN_RP_ID = $host | .env_vars.WEBAUTHN_ORIGIN = ("https://" + $host)' \

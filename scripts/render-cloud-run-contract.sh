@@ -12,7 +12,8 @@ set -euo pipefail
 # pipe, which is exactly how the contract expression is fed to `terraform console` - the first
 # two production deploys died on that, at 30s and then at 120s, while the same render finished
 # instantly on a workstation with no wrapper installed. Prefer the real binary when it exists.
-readonly TERRAFORM_BIN="$(command -v terraform-bin 2>/dev/null || command -v terraform 2>/dev/null || echo terraform)"
+TERRAFORM_BIN="$(command -v terraform-bin 2>/dev/null || command -v terraform 2>/dev/null || echo terraform)"
+readonly TERRAFORM_BIN
 
 readonly TERRAFORM_INIT_TIMEOUT_SECONDS="${LOGDATE_TERRAFORM_INIT_TIMEOUT_SECONDS:-60}"
 readonly TERRAFORM_CONSOLE_TIMEOUT_SECONDS="${LOGDATE_TERRAFORM_CONSOLE_TIMEOUT_SECONDS:-120}"
@@ -402,7 +403,6 @@ else
     printf '\n' >>"$CONSOLE_EXPRESSION_FILE"
     chmod 600 "$CONSOLE_EXPRESSION_FILE"
 
-    CONSOLE_STARTED_AT=$(date +%s)
     set +e
     if command -v timeout >/dev/null 2>&1; then
         timeout --foreground -k 5 "$TERRAFORM_CONSOLE_TIMEOUT_SECONDS" "$TERRAFORM_BIN" -chdir="$PRIVATE_CONFIG_DIR" console \
