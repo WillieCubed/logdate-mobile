@@ -33,11 +33,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuOpen
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalWideNavigationRail
 import androidx.compose.material3.NavigationItemIconPosition
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ShortNavigationBar
@@ -54,6 +58,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -72,9 +77,12 @@ import app.logdate.ui.platform.rememberSystemReduceMotion
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.theme.WorkspaceSurface
 import app.logdate.ui.theme.workspaceContainer
+import kotlinx.coroutines.launch
 import logdate.client.ui.generated.resources.Res
 import logdate.client.ui.generated.resources.app_name
 import logdate.client.ui.generated.resources.workspace_create_label
+import logdate.client.ui.generated.resources.workspace_navigation_collapse
+import logdate.client.ui.generated.resources.workspace_navigation_expand
 import org.jetbrains.compose.resources.stringResource
 
 /** Labels are one or two words and must never wrap, so the bar stops following the system text size here. */
@@ -217,7 +225,8 @@ fun WorkspaceScaffold(
                                 destinations = destinations,
                                 selectedKey = selected.key,
                                 onSelect = onSelect,
-                                expanded = navigation == WorkspaceNavigationMode.Sidebar,
+                                defaultExpanded = navigation == WorkspaceNavigationMode.Sidebar,
+                                modal = navigation == WorkspaceNavigationMode.Rail,
                                 containerColor = canvas,
                                 showAppName = appBarInCaption == null,
                                 createAction = railCreate,
@@ -297,49 +306,79 @@ private fun WorkspaceCreateAction(
     }
 }
 
+/**
+ * The wide rail with the menu button Material puts in its header. It starts expanded on wide windows and
+ * collapsed otherwise; the button expands or collapses it, and on medium windows the expanded rail
+ * overlays the content instead of pushing it aside.
+ */
 @Composable
 private fun WorkspaceNavigationRail(
     destinations: List<WorkspaceDestination>,
     selectedKey: String,
     onSelect: (String) -> Unit,
-    expanded: Boolean,
+    defaultExpanded: Boolean,
+    modal: Boolean,
     containerColor: Color,
     showAppName: Boolean,
     createAction: (@Composable (extended: Boolean) -> Unit)?,
 ) {
-    val state = rememberWideNavigationRailState(if (expanded) WideNavigationRailValue.Expanded else WideNavigationRailValue.Collapsed)
-    LaunchedEffect(expanded) {
-        if (expanded) state.expand() else state.collapse()
+    val state =
+        rememberWideNavigationRailState(if (defaultExpanded) WideNavigationRailValue.Expanded else WideNavigationRailValue.Collapsed)
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(defaultExpanded) {
+        if (defaultExpanded) state.expand() else state.collapse()
     }
     val railExpanded = state.targetValue == WideNavigationRailValue.Expanded
-    WideNavigationRail(
-        state = state,
-        colors = WideNavigationRailDefaults.colors(containerColor = containerColor),
-        windowInsets = WindowInsets(0, 0, 0, 0),
-        header = {
-            Column(Modifier.padding(horizontal = RAIL_ITEM_INSET), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                // A desktop window's caption bar already names the app.
-                if (railExpanded && showAppName) {
-                    Text(
-                        stringResource(Res.string.app_name),
-                        style = MaterialTheme.typography.headlineSmall,
-                        modifier = Modifier.padding(vertical = Spacing.lg),
-                    )
-                }
-                createAction?.invoke(railExpanded)
+    val toggleLabel =
+        stringResource(if (railExpanded) Res.string.workspace_navigation_collapse else Res.string.workspace_navigation_expand)
+    val header: @Composable () -> Unit = {
+        Column(Modifier.padding(horizontal = RAIL_ITEM_INSET), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            IconButton(onClick = { scope.launch { state.toggle() } }) {
+                Icon(if (railExpanded) Icons.AutoMirrored.Filled.MenuOpen else Icons.Default.Menu, toggleLabel)
             }
-        },
-        modifier = Modifier.fillMaxHeight(),
-    ) {
+            // A desktop window's caption bar already names the app.
+            if (railExpanded && showAppName) {
+                Text(
+                    stringResource(Res.string.app_name),
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.padding(vertical = Spacing.lg),
+                )
+            }
+            createAction?.invoke(railExpanded)
+        }
+    }
+    val items: @Composable () -> Unit = {
         destinations.forEach { destination ->
             val isSelected = selectedKey == destination.key
             WideNavigationRailItem(
                 railExpanded = railExpanded,
                 selected = isSelected,
-                onClick = { onSelect(destination.key) },
+                onClick = {
+                    onSelect(destination.key)
+                    if (modal) scope.launch { state.collapse() }
+                },
                 icon = { Icon(if (isSelected) destination.icon else destination.unselectedIcon, null) },
                 label = { Text(destination.title) },
             )
         }
+    }
+    if (modal) {
+        ModalWideNavigationRail(
+            state = state,
+            colors = WideNavigationRailDefaults.colors(containerColor = containerColor),
+            windowInsets = WindowInsets(0, 0, 0, 0),
+            header = header,
+            modifier = Modifier.fillMaxHeight(),
+            content = items,
+        )
+    } else {
+        WideNavigationRail(
+            state = state,
+            colors = WideNavigationRailDefaults.colors(containerColor = containerColor),
+            windowInsets = WindowInsets(0, 0, 0, 0),
+            header = header,
+            modifier = Modifier.fillMaxHeight(),
+            content = items,
+        )
     }
 }
