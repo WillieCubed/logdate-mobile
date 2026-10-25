@@ -79,7 +79,6 @@ import app.logdate.ui.theme.WorkspaceSurface
 import app.logdate.ui.theme.workspaceContainer
 import kotlinx.coroutines.launch
 import logdate.client.ui.generated.resources.Res
-import logdate.client.ui.generated.resources.app_name
 import logdate.client.ui.generated.resources.workspace_create_label
 import logdate.client.ui.generated.resources.workspace_navigation_collapse
 import logdate.client.ui.generated.resources.workspace_navigation_expand
@@ -228,7 +227,6 @@ fun WorkspaceScaffold(
                                 defaultExpanded = navigation == WorkspaceNavigationMode.Sidebar,
                                 modal = navigation == WorkspaceNavigationMode.Rail,
                                 containerColor = canvas,
-                                showAppName = appBarInCaption == null,
                                 createAction = railCreate,
                             )
                         }
@@ -319,7 +317,6 @@ private fun WorkspaceNavigationRail(
     defaultExpanded: Boolean,
     modal: Boolean,
     containerColor: Color,
-    showAppName: Boolean,
     createAction: (@Composable (extended: Boolean) -> Unit)?,
 ) {
     val state =
@@ -335,14 +332,6 @@ private fun WorkspaceNavigationRail(
         Column(Modifier.padding(horizontal = RAIL_ITEM_INSET), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             IconButton(onClick = { scope.launch { state.toggle() } }) {
                 Icon(if (railExpanded) Icons.AutoMirrored.Filled.MenuOpen else Icons.Default.Menu, toggleLabel)
-            }
-            // A desktop window's caption bar already names the app.
-            if (railExpanded && showAppName) {
-                Text(
-                    stringResource(Res.string.app_name),
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(vertical = Spacing.lg),
-                )
             }
             createAction?.invoke(railExpanded)
         }
