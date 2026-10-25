@@ -92,10 +92,10 @@ class WorkspaceCompositionTest {
             )
         assertEquals(PanelBounds(16.dp, 16.dp, 388.dp, 768.dp), result.focus)
         assertEquals(456.dp, result.browse?.x)
-        assertEquals(360.dp, result.browse?.width)
+        assertEquals(428.dp, result.browse?.width)
     }
 
-    @Test fun aCappedPaneSitsAgainstTheHingeSoBothGuttersMatch() {
+    @Test fun eachHalfOfAVerticalHingeIsFilledSoNeitherSideKeepsAGap() {
         val result =
             resolveWorkspaceComposition(
                 1184.dp,
@@ -107,9 +107,10 @@ class WorkspaceCompositionTest {
                 browseOnStart = true,
             )
         val browse = result.browse!!
-        assertEquals(360.dp, browse.width)
+        assertEquals(16.dp, browse.x)
         assertEquals(16.dp, 534.dp - (browse.x + browse.width))
         assertEquals(16.dp, result.focus.x - 554.dp)
+        assertEquals(16.dp, 1184.dp - (result.focus.x + result.focus.width))
     }
 
     @Test fun tabletopPutsFocusAboveControlsWithoutCrossingTheHinge() {
