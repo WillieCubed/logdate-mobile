@@ -51,12 +51,13 @@ class WorkspaceNavigationModeTest {
         assertEquals(WorkspaceNavigationMode.ShortBar, mode(500, 170))
     }
 
-    @Test fun tabletopKeepsTheShortBar() {
-        assertEquals(WorkspaceNavigationMode.ShortBar, mode(1280, 600, FoldablePosture.Tabletop))
+    @Test fun tabletopPutsIconsBesideLabels() {
+        assertEquals(WorkspaceNavigationMode.ShortBarHorizontal, mode(1280, 600, FoldablePosture.Tabletop))
+        assertEquals(WorkspaceNavigationMode.ShortBar, mode(411, 600, FoldablePosture.Tabletop))
     }
 
-    @Test fun bookPostureKeepsTheRail() {
+    @Test fun bookPostureKeepsTheRailUnlessTheWindowIsShort() {
         assertEquals(WorkspaceNavigationMode.Rail, mode(1280, 900, FoldablePosture.Book))
-        assertEquals(WorkspaceNavigationMode.Rail, mode(900, 412, FoldablePosture.Book))
+        assertEquals(WorkspaceNavigationMode.ShortBarHorizontal, mode(900, 412, FoldablePosture.Book))
     }
 }
