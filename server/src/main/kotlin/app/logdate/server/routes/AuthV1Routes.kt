@@ -82,6 +82,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.route
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -1796,13 +1797,32 @@ private suspend fun issueAuthResponse(
                 tokens = tokens,
                 stepUpGrant =
                     if (passkeyConfirmed && atprotoIdentityService.config.supportsRecoveryKeys) {
-                        webAuthnService.issueStepUpGrant(fresh.id)
+                        issueStepUpGrant(webAuthnService, fresh.id)
                     } else {
                         null
                     },
             ),
     )
 }
+
+/**
+ * A step-up grant for [accountId], or `null` when one cannot be stored. The sign-in itself has
+ * already succeeded, so it goes ahead without a grant; the app then asks for the passkey again
+ * before registering a recovery key.
+ */
+@OptIn(ExperimentalUuidApi::class)
+private fun issueStepUpGrant(
+    webAuthnService: WebAuthnPasskeyService,
+    accountId: Uuid,
+): String? =
+    try {
+        webAuthnService.issueStepUpGrant(accountId)
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        Napier.e("Could not issue a step-up grant after a passkey sign-in", error)
+        null
+    }
 
 private suspend fun resolveEmailBinding(
     binding: EmailBindingRequest?,

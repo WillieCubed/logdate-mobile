@@ -50,6 +50,21 @@ class AuthSigninStepUpGrantTest {
         }
 
     @Test
+    fun `a grant that cannot be stored leaves the sign-in working without one`() =
+        testApplication {
+            val accountId = Uuid.random()
+            val passkeys = signedInPasskeys(accountId)
+            every { passkeys.issueStepUpGrant(accountId) } throws IllegalStateException("challenge store unavailable")
+            val env = configureAuthV1TestApp(webAuthnPasskeyService = passkeys, atprotoIdentityConfig = identityConfig(recoveryKeys = true))
+            runBlocking { env.accountRepository.save(account(accountId)) }
+
+            val complete = signIn()
+
+            assertEquals(HttpStatusCode.OK, complete.first)
+            assertNull(complete.second)
+        }
+
+    @Test
     fun `a passkey sign-in on a server without recovery keys issues no grant`() =
         testApplication {
             val accountId = Uuid.random()
