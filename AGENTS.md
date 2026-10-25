@@ -247,8 +247,8 @@ existing location-history route keys. `PanelContainment.Collection` supplies mea
 another surface behind already contained objects. Retain a working surface for Locations > Your day,
 for reading, and for phone sheets over maps. `workspaceControlBackdrop` paints a raised sticky-control background only while
 content overlaps it. Expanded navigation uses a 240dp sidebar from 1200dp in standard posture;
-intermediate widths use the rail, phones/tabletop use bottom navigation, and book posture retains
-compact navigation. Standalone Timeline uses `PanelConstraints.ReadingCollection` (560dp maximum);
+intermediate widths use the rail, phones/tabletop use the short navigation bar (icons beside labels in
+landscape, where height is under 480dp), and book posture retains compact navigation. Standalone Timeline uses `PanelConstraints.ReadingCollection` (560dp maximum);
 beside an opened day it uses the shared browse constraints. Composition must enforce panel maxima,
 including hinge-safe regions, instead of leaving an oversized empty surface around bounded content.
 
