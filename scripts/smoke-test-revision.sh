@@ -1156,7 +1156,9 @@ upload_space_fixture() {
     fi
     local space="at://$ACCOUNT_DID/space/app.logdate.space.personal/self"
     local blob_file="$WORK_DIR/space-blob.bin"
-    dd if=/dev/urandom of="$blob_file" bs=1024 count=1 2>/dev/null
+    # Larger than Cloud Run's 32 MiB HTTP/1 request limit, so the proof fails if the service loses
+    # end-to-end HTTP/2 and recordings that size can no longer upload.
+    dd if=/dev/urandom of="$blob_file" bs=1048576 count=33 2>/dev/null
     chmod 600 "$blob_file"
     local blob_size blob_sha body status blob_cid record record_request record_cid
     blob_size="$(wc -c <"$blob_file" | tr -d ' ')"
