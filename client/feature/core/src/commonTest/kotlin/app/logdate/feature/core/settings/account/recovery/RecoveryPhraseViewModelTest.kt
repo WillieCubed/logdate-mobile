@@ -124,7 +124,7 @@ class RecoveryPhraseViewModelTest {
         }
 
     @Test
-    fun `saving the shown phrase confirms it, and nothing is confirmed before it is shown`() =
+    fun `saving the shown phrase confirms it and nothing is confirmed before it is shown`() =
         runTest {
             var confirmed = false
             var backupRequests = 0
