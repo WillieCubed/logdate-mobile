@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Book
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import app.logdate.client.text.toUiText
 import app.logdate.feature.location.timeline.ui.history.HumanLocationHistoryActions
@@ -52,7 +53,10 @@ private fun workspaceFold(book: Boolean): app.logdate.ui.foldable.FoldableLayout
 @Composable
 fun WorkspaceBook() {
     app.logdate.ui.foldable.provideFoldableLayoutInfo(workspaceFold(true)) {
-        WorkspaceScene("timeline", detail = { TimelineDayDetailPanel(timelineDetailState, {}) }) { TimelineFixture() }
+        // One rendered frame cannot measure where the panels sit, so the settled position is given.
+        CompositionLocalProvider(app.logdate.ui.foldable.LocalWindowOriginOverride provides DpOffset(96.dp, 88.dp)) {
+            WorkspaceScene("timeline", detail = { TimelineDayDetailPanel(timelineDetailState, {}) }) { TimelineFixture() }
+        }
     }
 }
 
@@ -61,14 +65,16 @@ fun WorkspaceBook() {
 @Composable
 fun WorkspaceTabletop() {
     app.logdate.ui.foldable.provideFoldableLayoutInfo(workspaceFold(false)) {
-        WorkspaceScene("locations") {
-            HumanLocationHistoryContent(
-                historyDay,
-                HumanLocationHistoryActions(),
-                showTitle = false,
-                toolbarActions = { PlacesOptionsFixture() },
-                mapContent = { HistoryMapFixture(it) },
-            )
+        CompositionLocalProvider(app.logdate.ui.foldable.LocalWindowOriginOverride provides DpOffset(0.dp, 88.dp)) {
+            WorkspaceScene("locations") {
+                HumanLocationHistoryContent(
+                    historyDay,
+                    HumanLocationHistoryActions(),
+                    showTitle = false,
+                    toolbarActions = { PlacesOptionsFixture() },
+                    mapContent = { HistoryMapFixture(it) },
+                )
+            }
         }
     }
 }

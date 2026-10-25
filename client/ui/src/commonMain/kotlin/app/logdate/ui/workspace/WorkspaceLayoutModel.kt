@@ -115,11 +115,12 @@ private fun resolveHingeComposition(
         regions.all { it.height >= 180.dp }
     ) {
         return WorkspaceComposition(
-            focusRegion.limitWidth(focus.maximumWidth),
-            if (vertical) supportingRegion.limitWidth(browse.maximumWidth) else supportingRegion,
+            focusRegion.limitWidthTowardHinge(focus.maximumWidth, regions, vertical),
+            if (vertical) supportingRegion.limitWidthTowardHinge(browse.maximumWidth, regions, vertical) else supportingRegion,
         )
     }
-    return WorkspaceComposition(regions.maxBy { it.width.value * it.height.value }.limitWidth(focus.maximumWidth))
+    val largest = regions.maxBy { it.width.value * it.height.value }
+    return WorkspaceComposition(largest.limitWidthTowardHinge(focus.maximumWidth, regions, vertical))
 }
 
 private fun resolveLinearComposition(
@@ -174,3 +175,13 @@ private fun PanelBounds.inset(amount: Dp) =
     )
 
 private fun PanelBounds.limitWidth(maximum: Dp?) = if (maximum == null) this else copy(width = width.coerceAtMost(maximum))
+
+/** A capped pane sits against the fold, so both sides keep the same gutter there instead of a lopsided gap. */
+private fun PanelBounds.limitWidthTowardHinge(
+    maximum: Dp?,
+    regions: List<PanelBounds>,
+    vertical: Boolean,
+): PanelBounds {
+    val limited = limitWidth(maximum)
+    return if (vertical && this == regions.first()) limited.copy(x = x + width - limited.width) else limited
+}

@@ -95,6 +95,23 @@ class WorkspaceCompositionTest {
         assertEquals(360.dp, result.browse?.width)
     }
 
+    @Test fun aCappedPaneSitsAgainstTheHingeSoBothGuttersMatch() {
+        val result =
+            resolveWorkspaceComposition(
+                1184.dp,
+                800.dp,
+                PanelConstraints.Reading,
+                PanelConstraints.Browse,
+                foldable = fold(FoldableHingeOrientation.Vertical, 630, 0, 650, 800),
+                origin = DpOffset(96.dp, 0.dp),
+                browseOnStart = true,
+            )
+        val browse = result.browse!!
+        assertEquals(360.dp, browse.width)
+        assertEquals(16.dp, 534.dp - (browse.x + browse.width))
+        assertEquals(16.dp, result.focus.x - 554.dp)
+    }
+
     @Test fun tabletopPutsFocusAboveControlsWithoutCrossingTheHinge() {
         val result =
             resolveWorkspaceComposition(
