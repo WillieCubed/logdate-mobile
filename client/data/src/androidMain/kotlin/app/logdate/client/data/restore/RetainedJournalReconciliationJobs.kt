@@ -323,24 +323,13 @@ class RetainedJournalReconciliationJobService : JobService() {
                 .mapNotNull { (path, file) ->
                     path.removePrefix("database/").takeIf { path.startsWith("database/") && it in DATABASE_FILES }?.let { it to file }
                 }.toMap()
-        if ("logdate" !in databaseFiles) {
-            return NativeSourceOutcome(false, false)
-        }
-        val preferenceFile = files["files/logdate.preferences_pb"]
-        if (preferenceFile == null) {
-            return NativeSourceOutcome(false, false)
-        }
+        if ("logdate" !in databaseFiles) return NativeSourceOutcome(false, false)
+        val preferenceFile = files["files/logdate.preferences_pb"] ?: return NativeSourceOutcome(false, false)
         val sourceScope =
             files["source_scope.json"]?.let { anchor ->
                 readRetainedJournalSourceScope(preferenceFile, anchor, scratchRoot, databaseFiles.mapKeys { "database/${it.key}" })
-            }
-        if (sourceScope == null) {
-            return NativeSourceOutcome(false, false)
-        }
-        val opened = openRetainedSource(databaseFiles, candidateFiles, scratchRoot)
-        if (opened == null) {
-            return NativeSourceOutcome(false, false)
-        }
+            } ?: return NativeSourceOutcome(false, false)
+        val opened = openRetainedSource(databaseFiles, candidateFiles, scratchRoot) ?: return NativeSourceOutcome(false, false)
         opened.copy.use {
             verifyEncryptedScope(files, opened, sourceScope, preferenceFile)
             val merger =
@@ -358,82 +347,94 @@ class RetainedJournalReconciliationJobService : JobService() {
                 )
             val result = merger.merge()
             val receiptFile = files["source_scope.json"]
-            if (receiptFile != null) {
-                // Camera originals are validated against this receipt and the current owner scope;
-                // import their pending draft even when unrelated database tables remain uncovered.
-                // Keep the source in custody until full database coverage is proven below.
-                val receipt =
-                    runCatching {
-                        Json.decodeFromString<app.logdate.client.device.restore.NativeJournalSourceReceipt>(receiptFile.readText())
-                    }.getOrElse {
-                        return NativeSourceOutcome(true, false)
-                    }
-                val job = currentCoroutineContext()[Job]
-                val dataStore = createAndroidMainDataStore(this)
-                val isCurrent = {
-                    job?.isActive != false &&
-                        repositories.database.isOpen &&
-                        normalizeBackendOrigin(repositories.backendOrigin()) ==
-                        normalizeBackendOrigin(repositories.expectedScope.serverOrigin)
-                }
-
-                suspend fun requireSourceCurrent() {
-                    check(isCurrent()) { "Native pending camera delivery changed" }
-                    val current = dataStore.data.first()
-                    val actual = RetainedJournalSourceScope.from(current, sourceScope.backendOrigin)
-                    check(
-                        actual != null &&
-                            sourceScope.matchesCurrentOrAdopted(actual, current) &&
-                            sourceScope.matchesRepositoryScope(
-                                repositories.expectedScope.ownerId,
-                                repositories.expectedScope.serverOrigin,
-                            ),
-                    ) { "Native pending camera owner or backend changed" }
-                }
-                val importer =
-                    NativePendingCameraDraftImporter(
-                        filesDir,
-                        packageName,
-                        repositories.media,
-                        repositories.entryDrafts,
-                        isCurrent,
-                        ::requireSourceCurrent,
-                        scopeFence = { commit ->
-                            var applied = false
-                            dataStore.updateData { current ->
-                                check(isCurrent()) { "Native pending camera delivery changed" }
-                                val actual = RetainedJournalSourceScope.from(current, sourceScope.backendOrigin)
-                                check(
-                                    actual != null &&
-                                        sourceScope.matchesCurrentOrAdopted(actual, current) &&
-                                        sourceScope.matchesRepositoryScope(
-                                            repositories.expectedScope.ownerId,
-                                            repositories.expectedScope.serverOrigin,
-                                        ),
-                                ) { "Native pending camera owner or backend changed" }
-                                applied = commit()
-                                current
-                            }
-                            applied
-                        },
-                    )
-                val imported =
-                    importReceiptPinnedCameraDrafts(
-                        coverageComplete = result.coverageComplete,
-                        import = {
-                            importer.import(generation, files, receipt.mediaInventorySha256)
-                        },
-                        admitSource = { admitMergedSource(generation, opened.keyFile) },
-                    )
-                if (!imported) {
-                    return NativeSourceOutcome(true, false)
-                }
+            if (receiptFile == null) {
+                if (result.coverageComplete) admitMergedSource(generation, opened.keyFile)
+                return NativeSourceOutcome(result.mediaPending > 0, result.coverageComplete)
             }
-            if (receiptFile == null && result.coverageComplete) {
-                admitMergedSource(generation, opened.keyFile)
-            }
+            // Camera originals are validated against this receipt and the current owner scope;
+            // import their pending draft even when unrelated database tables remain uncovered.
+            // Keep the source in custody until full database coverage is proven.
+            val imported =
+                importPendingCameraDrafts(generation, files, receiptFile, opened, sourceScope, result.coverageComplete, repositories)
+            if (!imported) return NativeSourceOutcome(true, false)
             return NativeSourceOutcome(result.mediaPending > 0, result.coverageComplete)
         }
+    }
+
+    private suspend fun importPendingCameraDrafts(
+        generation: String,
+        files: Map<String, File>,
+        receiptFile: File,
+        opened: OpenedSource,
+        sourceScope: RetainedJournalSourceScope,
+        coverageComplete: Boolean,
+        repositories: Repositories,
+    ): Boolean {
+        val receipt =
+            runCatching {
+                Json.decodeFromString<app.logdate.client.device.restore.NativeJournalSourceReceipt>(receiptFile.readText())
+            }.getOrElse {
+                return false
+            }
+        val importer = pendingCameraDraftImporter(sourceScope, repositories)
+        return importReceiptPinnedCameraDrafts(
+            coverageComplete = coverageComplete,
+            import = {
+                importer.import(generation, files, receipt.mediaInventorySha256)
+            },
+            admitSource = { admitMergedSource(generation, opened.keyFile) },
+        )
+    }
+
+    private suspend fun pendingCameraDraftImporter(
+        sourceScope: RetainedJournalSourceScope,
+        repositories: Repositories,
+    ): NativePendingCameraDraftImporter {
+        val job = currentCoroutineContext()[Job]
+        val dataStore = createAndroidMainDataStore(this)
+        val isCurrent = {
+            job?.isActive != false &&
+                repositories.database.isOpen &&
+                normalizeBackendOrigin(repositories.backendOrigin()) ==
+                normalizeBackendOrigin(repositories.expectedScope.serverOrigin)
+        }
+        return NativePendingCameraDraftImporter(
+            filesDir,
+            packageName,
+            repositories.media,
+            repositories.entryDrafts,
+            isCurrent,
+            {
+                check(isCurrent()) { "Native pending camera delivery changed" }
+                requireSourceScopeCurrent(dataStore.data.first(), sourceScope, repositories)
+            },
+            scopeFence = { commit ->
+                var applied = false
+                dataStore.updateData { current ->
+                    check(isCurrent()) { "Native pending camera delivery changed" }
+                    requireSourceScopeCurrent(current, sourceScope, repositories)
+                    applied = commit()
+                    current
+                }
+                applied
+            },
+        )
+    }
+
+    private fun requireSourceScopeCurrent(
+        current: androidx.datastore.preferences.core.Preferences,
+        sourceScope: RetainedJournalSourceScope,
+        repositories: Repositories,
+    ) {
+        val actual = RetainedJournalSourceScope.from(current, sourceScope.backendOrigin)
+        check(
+            actual != null &&
+                sourceScope.matchesCurrentOrAdopted(actual, current) &&
+                sourceScope.matchesRepositoryScope(
+                    repositories.expectedScope.ownerId,
+                    repositories.expectedScope.serverOrigin,
+                ),
+        ) { "Native pending camera owner or backend changed" }
     }
 
     private fun mergerFor(
