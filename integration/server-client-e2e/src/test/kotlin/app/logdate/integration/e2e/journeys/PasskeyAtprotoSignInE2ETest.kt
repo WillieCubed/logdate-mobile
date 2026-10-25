@@ -80,7 +80,7 @@ class PasskeyAtprotoSignInE2ETest {
                                     put("password", "any-password-at-all")
                                 },
                             )
-                        assertEquals(HttpStatusCode.Unauthorized, passwordAttempt.status, "a passkey-only account has no password")
+                        assertEquals(HttpStatusCode.BadRequest, passwordAttempt.status, "sign-in is passkey-only")
 
                         val session = http.signInThroughBrowser(logDate, app, account, scope = "atproto transition:generic")
                         assertEquals(did, session.subject)

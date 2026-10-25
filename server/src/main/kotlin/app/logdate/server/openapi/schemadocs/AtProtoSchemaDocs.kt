@@ -229,31 +229,6 @@ internal object AtProtoSchemaDocs {
                     ),
                 ),
             // ---- XRPC sessions ------------------------------------------------------------------------------
-            "CreateAccountRequest" to
-                SchemaDoc(
-                    "Account details for `com.atproto.server.createAccount`.",
-                    mapOf(
-                        "email" to "Email for the account, optional.",
-                        "handle" to "Desired handle, under a domain from **Describe the PDS**.",
-                        "did" to "A pre-existing DID to bind, optional and normally omitted.",
-                        "inviteCode" to "Not used here.",
-                        "verificationCode" to "Not used here.",
-                        "verificationPhone" to "Not used here.",
-                        "password" to "The account password.",
-                        "recoveryKey" to "A `did:key` to register as PLC recovery key, optional.",
-                        "plcOp" to "A signed PLC operation when bringing an existing DID, optional.",
-                    ),
-                ),
-            "CreateSessionRequest" to
-                SchemaDoc(
-                    "Credentials for `com.atproto.server.createSession`.",
-                    mapOf(
-                        "identifier" to "Handle or DID.",
-                        "password" to "The account password.",
-                        "authFactorToken" to "Second-factor token, if the account requires one.",
-                        "allowTakendown" to "Whether to allow signing in to a taken-down account; normally omitted.",
-                    ),
-                ),
             "SessionResponse" to
                 SchemaDoc(
                     "An AT Protocol session: two tokens plus the account.",

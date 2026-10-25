@@ -5,14 +5,11 @@ import app.logdate.server.routes.ErrorCase
 import app.logdate.server.routes.ErrorEnvelope
 import app.logdate.server.routes.bearerOperation
 import app.logdate.server.routes.bearerUnauthorized
-import app.logdate.server.routes.jsonBody
 import app.logdate.server.routes.ok
 import app.logdate.server.routes.pdsError
 import app.logdate.server.routes.publicOperation
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.HttpStatusCode
-import studio.hypertext.atproto.pds.CreateAccountRequest
-import studio.hypertext.atproto.pds.CreateSessionRequest
 import studio.hypertext.atproto.pds.DescribeRepoResponse
 import studio.hypertext.atproto.pds.DescribeServerResponse
 import studio.hypertext.atproto.pds.EmptyPdsResponse
@@ -113,79 +110,6 @@ internal object XrpcDocs {
 
     // ---- Sessions --------------------------------------------------------------------------------
 
-    val createAccount: RouteConfig.() -> Unit = {
-        publicOperation(
-            "createAtprotoAccount",
-            ApiTags.XRPC,
-            "Create an AT Protocol account",
-            """
-            `com.atproto.server.createAccount`. Creates an account with a handle and password the AT Protocol
-            way, and returns a session. LogDate's own apps use passkeys and **Authentication** instead; this
-            exists so generic AT Protocol clients can sign up. The handle must be under one of the domains
-            **Describe the PDS** lists.
-            """,
-        )
-        request {
-            jsonBody(
-                CreateAccountRequest(email = DocExamples.EMAIL, handle = DocExamples.HANDLE, password = "correct horse battery staple"),
-                "Handle, password and optional email. Invite codes and phone verification are not used here.",
-            )
-        }
-        response {
-            ok("The account exists and a session is open.", session)
-            pdsError(
-                HttpStatusCode.BadRequest,
-                ErrorCase("UnsupportedDomain", "The handle is not under a domain this server issues.", "Handle domain is not supported"),
-                ErrorCase(
-                    "InvalidPassword",
-                    "The password does not meet the server's requirements.",
-                    "Password does not satisfy server requirements",
-                ),
-                ErrorCase(
-                    "InvalidRequest",
-                    "The handle is taken or a field failed validation; the `message` says which. A body that is not valid JSON for this method answers `400` with an empty body instead.",
-                    "Invalid session request",
-                ),
-            )
-            pdsError(HttpStatusCode.Unauthorized, ErrorCase("InvalidToken", "The credentials were rejected.", "Authentication failed"))
-            pdsError(HttpStatusCode.Forbidden, accountTakedown)
-            notConfigured()
-        }
-    }
-
-    val createSession: RouteConfig.() -> Unit = {
-        publicOperation(
-            "createAtprotoSession",
-            ApiTags.XRPC,
-            "Sign in with a password",
-            """
-            `com.atproto.server.createSession`. Signs in with a handle (or DID) and password and returns an
-            `accessJwt` for requests and a `refreshJwt` for **Refresh the session**. This is AT Protocol's
-            password login for generic clients; LogDate apps use passkeys.
-            """,
-        )
-        request {
-            jsonBody(
-                CreateSessionRequest(identifier = DocExamples.HANDLE, password = "correct horse battery staple"),
-                "Handle or DID, and password.",
-            )
-        }
-        response {
-            ok("Signed in. Send `accessJwt` as `Authorization: Bearer`.", session)
-            pdsError(
-                HttpStatusCode.BadRequest,
-                ErrorCase(
-                    "InvalidRequest",
-                    "The identifier or password could not be processed. A body that is not valid JSON for this method answers `400` with an empty body instead.",
-                    "Invalid session request",
-                ),
-            )
-            pdsError(HttpStatusCode.Unauthorized, ErrorCase("InvalidToken", "Wrong handle or password.", "Authentication failed"))
-            pdsError(HttpStatusCode.Forbidden, accountTakedown)
-            notConfigured()
-        }
-    }
-
     val getSession: RouteConfig.() -> Unit = {
         bearerOperation(
             "getAtprotoSession",
@@ -208,6 +132,10 @@ internal object XrpcDocs {
                 ),
             )
             bearerUnauthorized(ErrorEnvelope.PDS)
+            pdsError(
+                HttpStatusCode.InternalServerError,
+                ErrorCase("InternalServerError", "The request failed on the server; retry later.", "Session request failed"),
+            )
             notConfigured()
         }
     }
@@ -226,6 +154,10 @@ internal object XrpcDocs {
         response {
             ok("A new session. Replace both stored tokens.", session)
             bearerUnauthorized(ErrorEnvelope.PDS)
+            pdsError(
+                HttpStatusCode.InternalServerError,
+                ErrorCase("InternalServerError", "The request failed on the server; retry later.", "Session request failed"),
+            )
             notConfigured()
         }
     }
@@ -243,6 +175,10 @@ internal object XrpcDocs {
         response {
             ok("The session is ended. The body is an empty object.", EmptyPdsResponse())
             bearerUnauthorized(ErrorEnvelope.PDS)
+            pdsError(
+                HttpStatusCode.InternalServerError,
+                ErrorCase("InternalServerError", "The request failed on the server; retry later.", "Session request failed"),
+            )
             notConfigured()
         }
     }

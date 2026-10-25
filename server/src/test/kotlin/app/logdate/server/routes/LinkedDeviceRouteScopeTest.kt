@@ -301,6 +301,8 @@ class LinkedDeviceRouteScopeTest {
                 "GET /favicon.svg",
                 "GET /openapi.json",
                 "GET /openapi.yaml",
+                "POST /xrpc/com.atproto.server.createAccount",
+                "POST /xrpc/com.atproto.server.createSession",
             )
 
         /** Routes missing from the OpenAPI document that need a signed-in account. */

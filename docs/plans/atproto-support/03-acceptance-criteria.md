@@ -178,8 +178,8 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
 
 ### P5.2 Standard Server Session Endpoints
 
-- `com.atproto.server.createAccount` provisions a hosted account, DID, handle, signing key, repo, and ATProto session credentials through the same hosted identity path used by the first-party app.
-- `com.atproto.server.createSession` authenticates a hosted account with ATProto password credentials and returns a standards-compatible access and refresh session pair.
+- `com.atproto.server.createAccount` is always refused with a `400` `InvalidRequest`, because sign-in is passkey-only and accounts are created through the first-party app.
+- `com.atproto.server.createSession` is always refused with a `400` `InvalidRequest`, even for an account that once had a password.
 - `com.atproto.server.getSession` returns the current hosted session details for a valid ATProto access token.
 - `com.atproto.server.refreshSession` rotates a hosted refresh session without falling back to first-party JWT-only behavior.
 - `com.atproto.server.deleteSession` revokes a hosted refresh session.

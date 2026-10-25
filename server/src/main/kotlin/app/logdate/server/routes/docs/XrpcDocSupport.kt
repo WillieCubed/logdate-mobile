@@ -72,7 +72,7 @@ internal fun ResponsesConfig.authRequired() =
         ErrorCase(
             "AuthRequired",
             "The bearer or DPoP-bound access token is missing, invalid, or belongs to no account here. " +
-                "Sign in again (**Sign in with a password**) or refresh the session, then retry. When the " +
+                "Sign in again or refresh the session, then retry. When the " +
                 "`message` says the DPoP nonce is stale, take the new one from `DPoP-Nonce` and retry once.",
             "Missing bearer token",
         ),

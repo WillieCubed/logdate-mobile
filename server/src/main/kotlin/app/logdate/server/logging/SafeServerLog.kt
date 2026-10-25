@@ -74,6 +74,7 @@ private val approvedNotices =
         RepoEventNotices.CRAWL_REFUSED to "SERVER_RELAY_CRAWL_REFUSED",
         RepoEventNotices.CRAWL_FAILED to "SERVER_RELAY_CRAWL_FAILED",
         IdentityNotices.HANDLE_RESOLUTION_FAILED to "SERVER_HANDLE_RESOLUTION_FAILED",
+        IdentityNotices.SESSION_REQUEST_FAILED to "SERVER_SESSION_REQUEST_FAILED",
         IdentityNotices.BACKFILL_REFUSED_PUBLISHING to "SERVER_IDENTITY_BACKFILL_REFUSED_PUBLISHING",
         IdentityNotices.BACKFILL_FAILED to "SERVER_IDENTITY_BACKFILL_FAILED",
         IdentityNotices.BACKFILL_ACCOUNT_FAILED to "SERVER_IDENTITY_BACKFILL_ACCOUNT_FAILED",
@@ -115,6 +116,7 @@ private fun isApprovedCountMessage(message: String?): Boolean =
  */
 internal object IdentityNotices {
     const val HANDLE_RESOLUTION_FAILED = "Resolving a handle failed"
+    const val SESSION_REQUEST_FAILED = "A hosted session request failed"
     const val BACKFILL_REFUSED_PUBLISHING =
         "Identity backfill refused: PLC publishing is enabled and --allow-plc-publishing was not given"
     const val BACKFILL_FAILED = "Identity backfill failed"

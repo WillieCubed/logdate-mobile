@@ -37,9 +37,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import studio.hypertext.atproto.identity.AtprotoDid
-import studio.hypertext.atproto.pds.CreateAccountRequest
 import studio.hypertext.atproto.pds.CreateRecordRequest
-import studio.hypertext.atproto.pds.CreateSessionRequest
 import studio.hypertext.atproto.pds.DeleteRecordRequest
 import studio.hypertext.atproto.pds.EmptyPdsResponse
 import studio.hypertext.atproto.pds.GetBlobRequest
@@ -147,36 +145,21 @@ fun Route.xrpcRoutes(
             call.respond(HttpStatusCode.OK, resolved)
         }
 
-        post("/com.atproto.server.createAccount", XrpcDocs.createAccount) {
-            val sessions =
-                sessionService ?: return@post call.respond(
-                    HttpStatusCode.NotImplemented,
-                    PdsErrorResponse("Unsupported", "Session service is not configured"),
-                )
-            val request = call.receive<CreateAccountRequest>()
-            val result = sessions.createAccount(request)
-            val session = result.getOrNull()
-            if (session == null) {
-                call.respondForSessionError(result.exceptionOrNull())
-                return@post
-            }
-            call.respond(HttpStatusCode.OK, session)
+        // Sign-in is passkey-only, so neither password method does any work. Refusing before the body is
+        // read means no request, however malformed, reaches the account or password services. Neither
+        // method can succeed, so both stay out of the API reference.
+        post("/com.atproto.server.createAccount", { hidden = true }) {
+            call.respond(
+                HttpStatusCode.BadRequest,
+                PdsErrorResponse("InvalidRequest", "Accounts cannot be created with a password. Create your account in the LogDate app."),
+            )
         }
 
-        post("/com.atproto.server.createSession", XrpcDocs.createSession) {
-            val sessions =
-                sessionService ?: return@post call.respond(
-                    HttpStatusCode.NotImplemented,
-                    PdsErrorResponse("Unsupported", "Session service is not configured"),
-                )
-            val request = call.receive<CreateSessionRequest>()
-            val result = sessions.createSession(request)
-            val session = result.getOrNull()
-            if (session == null) {
-                call.respondForSessionError(result.exceptionOrNull())
-                return@post
-            }
-            call.respond(HttpStatusCode.OK, session)
+        post("/com.atproto.server.createSession", { hidden = true }) {
+            call.respond(
+                HttpStatusCode.BadRequest,
+                PdsErrorResponse("InvalidRequest", "Password sign-in is not supported. Sign in with a passkey."),
+            )
         }
 
         get("/com.atproto.server.getSession", XrpcDocs.getSession) {
@@ -1103,25 +1086,15 @@ private suspend fun io.ktor.server.application.ApplicationCall.respondForBlobErr
 }
 
 private suspend fun io.ktor.server.application.ApplicationCall.respondForSessionError(error: Throwable?) {
-    val message = error?.message.orEmpty()
-    when {
-        message == "UnsupportedDomain" ->
-            respond(HttpStatusCode.BadRequest, PdsErrorResponse("UnsupportedDomain", "Handle domain is not supported"))
-
-        message == "InvalidHandle" ->
-            respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidHandle", "Handle is reserved or not a single valid name"))
-
-        message == "InvalidPassword" || message.contains("Password must", ignoreCase = true) ->
-            respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidPassword", "Password does not satisfy server requirements"))
-
-        message == "AccountTakedown" ->
-            respond(HttpStatusCode.Forbidden, PdsErrorResponse("AccountTakedown", "Account is not active"))
-
-        message == "InvalidToken" || message == "Invalid login" ->
+    when (error?.message) {
+        "InvalidToken" ->
             respond(HttpStatusCode.Unauthorized, PdsErrorResponse("InvalidToken", "Authentication failed"))
 
-        else ->
-            respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", message.ifBlank { "Invalid session request" }))
+        else -> {
+            // The cause can carry database or library text, so it stays in the server log.
+            Napier.e(IdentityNotices.SESSION_REQUEST_FAILED, error)
+            respond(HttpStatusCode.InternalServerError, PdsErrorResponse("InternalServerError", "Session request failed"))
+        }
     }
 }
 
