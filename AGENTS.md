@@ -249,8 +249,9 @@ for reading, and for phone sheets over maps. `workspaceControlBackdrop` paints a
 content overlaps it. Expanded navigation uses the expanded wide navigation rail from 1200dp in standard posture;
 intermediate widths use the rail, phones use the short navigation bar (icons beside labels in tabletop posture
 and in landscape, where height is under 480dp), and book posture retains compact navigation. Standalone Timeline uses `PanelConstraints.ReadingCollection` (560dp maximum);
-beside an opened day it uses the shared browse constraints. Composition must enforce panel maxima,
-including hinge-safe regions, instead of leaving an oversized empty surface around bounded content.
+beside an opened day it uses the shared browse constraints. Composition must enforce panel maxima
+instead of leaving an oversized empty surface around bounded content, except that each half of a
+vertical hinge is filled so neither the navigation nor the fold has a gap beside it.
 
 Use `WorkspaceAccountAction` for the shared account target and quiet status marker. Backup status,
 recovery actions, streak, and settings belong to its on-demand menu. Do not add separate streak/sync
