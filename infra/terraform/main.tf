@@ -65,6 +65,14 @@ locals {
     var.domain != "" ? [var.domain] : [],
   ))
 
+  load_balancer_enabled = var.enable_load_balancer && var.enable_cloud_run_service
+  load_balancer_domains = local.load_balancer_enabled ? local.effective_domains : toset([])
+
+  # The deploy workflow creates this service from the same image and deployment contract as the
+  # main service; scripts/render-cloud-run-contract.sh derives the same name.
+  repo_event_stream_service_name = "${var.service_name}-repo-events"
+  repo_event_stream_path         = "/xrpc/com.atproto.sync.subscribeRepos"
+
   always_on_services = [
     "run.googleapis.com",
     "artifactregistry.googleapis.com",
@@ -80,6 +88,7 @@ locals {
   conditional_services = concat(
     var.create_gcs_bucket ? ["storage.googleapis.com"] : [],
     var.create_cloud_sql_instance ? ["sqladmin.googleapis.com"] : [],
+    local.load_balancer_enabled ? ["compute.googleapis.com", "certificatemanager.googleapis.com"] : [],
   )
 
   required_services = concat(local.always_on_services, local.conditional_services)
@@ -445,6 +454,140 @@ resource "google_cloud_run_domain_mapping" "default" {
   spec {
     route_name = google_cloud_run_v2_service.server[0].name
   }
+}
+
+# The load balancer exists for one reason: the main service runs end-to-end HTTP/2 so that uploads
+# larger than Cloud Run's 32 MiB HTTP/1 request limit reach it, and Cloud Run does not pass
+# WebSocket upgrades to such a service. The repository event stream is a WebSocket, so a second
+# service from the same image serves it over HTTP/1, and the load balancer sends that one path
+# there. Cloud Run domain mappings cannot route by path. Both services share the event log in
+# Postgres, so either one sees every event.
+resource "google_compute_global_address" "load_balancer" {
+  count = local.load_balancer_enabled ? 1 : 0
+  name  = "${var.service_name}-lb"
+
+  depends_on = [google_project_service.required]
+}
+
+resource "google_compute_region_network_endpoint_group" "server" {
+  count                 = local.load_balancer_enabled ? 1 : 0
+  name                  = "${var.service_name}-neg"
+  region                = var.region
+  network_endpoint_type = "SERVERLESS"
+
+  cloud_run {
+    service = var.service_name
+  }
+
+  depends_on = [google_project_service.required]
+}
+
+resource "google_compute_region_network_endpoint_group" "repo_event_stream" {
+  count                 = local.load_balancer_enabled ? 1 : 0
+  name                  = "${local.repo_event_stream_service_name}-neg"
+  region                = var.region
+  network_endpoint_type = "SERVERLESS"
+
+  cloud_run {
+    service = local.repo_event_stream_service_name
+  }
+
+  depends_on = [google_project_service.required]
+}
+
+resource "google_compute_backend_service" "server" {
+  count                 = local.load_balancer_enabled ? 1 : 0
+  name                  = "${var.service_name}-backend"
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  # Matches the main service's end-to-end HTTP/2.
+  protocol = "HTTP2"
+
+  backend {
+    group = google_compute_region_network_endpoint_group.server[0].id
+  }
+}
+
+resource "google_compute_backend_service" "repo_event_stream" {
+  count                 = local.load_balancer_enabled ? 1 : 0
+  name                  = "${local.repo_event_stream_service_name}-backend"
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  protocol              = "HTTP"
+
+  backend {
+    group = google_compute_region_network_endpoint_group.repo_event_stream[0].id
+  }
+}
+
+resource "google_compute_url_map" "load_balancer" {
+  count           = local.load_balancer_enabled ? 1 : 0
+  name            = "${var.service_name}-lb"
+  default_service = google_compute_backend_service.server[0].id
+
+  host_rule {
+    hosts        = tolist(local.load_balancer_domains)
+    path_matcher = "server"
+  }
+
+  path_matcher {
+    name            = "server"
+    default_service = google_compute_backend_service.server[0].id
+
+    path_rule {
+      paths   = [local.repo_event_stream_path]
+      service = google_compute_backend_service.repo_event_stream[0].id
+    }
+  }
+}
+
+# DNS authorization lets Certificate Manager issue the certificate before DNS moves to the load
+# balancer, so the switch from the domain mapping has no window without a valid certificate.
+resource "google_certificate_manager_dns_authorization" "load_balancer" {
+  for_each = local.load_balancer_domains
+  name     = "${var.service_name}-${replace(each.key, ".", "-")}"
+  domain   = each.key
+
+  depends_on = [google_project_service.required]
+}
+
+resource "google_certificate_manager_certificate" "load_balancer" {
+  count = local.load_balancer_enabled ? 1 : 0
+  name  = "${var.service_name}-lb"
+
+  managed {
+    domains            = tolist(local.load_balancer_domains)
+    dns_authorizations = [for authorization in google_certificate_manager_dns_authorization.load_balancer : authorization.id]
+  }
+}
+
+resource "google_certificate_manager_certificate_map" "load_balancer" {
+  count = local.load_balancer_enabled ? 1 : 0
+  name  = "${var.service_name}-lb"
+
+  depends_on = [google_project_service.required]
+}
+
+resource "google_certificate_manager_certificate_map_entry" "load_balancer" {
+  for_each     = local.load_balancer_domains
+  name         = "${var.service_name}-${replace(each.key, ".", "-")}"
+  map          = google_certificate_manager_certificate_map.load_balancer[0].name
+  hostname     = each.key
+  certificates = [google_certificate_manager_certificate.load_balancer[0].id]
+}
+
+resource "google_compute_target_https_proxy" "load_balancer" {
+  count           = local.load_balancer_enabled ? 1 : 0
+  name            = "${var.service_name}-lb"
+  url_map         = google_compute_url_map.load_balancer[0].id
+  certificate_map = "//certificatemanager.googleapis.com/${google_certificate_manager_certificate_map.load_balancer[0].id}"
+}
+
+resource "google_compute_global_forwarding_rule" "load_balancer_https" {
+  count                 = local.load_balancer_enabled ? 1 : 0
+  name                  = "${var.service_name}-lb-https"
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  ip_address            = google_compute_global_address.load_balancer[0].id
+  port_range            = "443"
+  target                = google_compute_target_https_proxy.load_balancer[0].id
 }
 
 # Jobs run independently of request CPU allocation and reuse the server's secret references.

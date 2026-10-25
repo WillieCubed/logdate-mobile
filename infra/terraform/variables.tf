@@ -278,6 +278,12 @@ variable "enable_domain_mapping" {
   default     = false
 }
 
+variable "enable_load_balancer" {
+  type        = bool
+  description = "Whether to serve every entry in `domains` through a global external Application Load Balancer. It sends the repository event stream to its own HTTP/1 service, because Cloud Run cannot pass WebSockets to a service that uses end-to-end HTTP/2, and sends everything else to the main service."
+  default     = false
+}
+
 variable "domains" {
   type        = list(string)
   description = "Custom domains for Cloud Run (e.g., [\"cloud.logdate.app\", \"logdate.hypertext.studio\"]). Every entry becomes its own `google_cloud_run_domain_mapping` pointing at the same service."

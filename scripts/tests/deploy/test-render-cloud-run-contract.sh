@@ -1261,6 +1261,15 @@ for environment in staging production; do
             fail "event stream opt-in could not be rendered for $environment"
         fi
         assert_equals "$enabled" "$(jq -r '.env_vars.ATPROTO_FIREHOSE_ENABLED' "$output")"
+        # With the stream on, the deploy also runs it as its own HTTP/1 service, because the main
+        # service's end-to-end HTTP/2 keeps Cloud Run from passing WebSockets to it.
+        if [[ "$enabled" == "true" ]]; then
+            assert_equals "$(jq -r '.service_name' "$output")-repo-events" \
+                "$(jq -r '.repo_event_stream.service_name' "$output")"
+            assert_equals "3600" "$(jq -r '.repo_event_stream.timeout_seconds' "$output")"
+        else
+            assert_equals "false" "$(jq -r 'has("repo_event_stream")' "$output")"
+        fi
     done
 done
 jq '.env_vars.ATPROTO_FIREHOSE_ENABLED = "yes"' \
