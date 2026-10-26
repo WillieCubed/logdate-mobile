@@ -18,6 +18,94 @@ MODULE = runpy.run_path(
 
 
 class ManagedDriverControllerTest(unittest.TestCase):
+    def test_console_name_uses_the_attested_ipv6_loopback(self):
+        connection = Mock()
+        connection.makefile.return_value = io.BytesIO(
+            b"Android Console: Authentication required\nOK\nowned\nOK\n"
+        )
+        connect = Mock(return_value=connection)
+        self.assertEqual(
+            "owned", MODULE["owned_console_avd"](5554, host="::1", connect=connect)
+        )
+        connect.assert_called_once_with(("::1", 5554), timeout=5)
+        self.assertEqual(("::1", 5554), MODULE["console_endpoint"]("n[::1]:5554\n"))
+        self.assertIsNone(MODULE["console_endpoint"]("n192.0.2.1:5554\n"))
+
+    def test_setup_console_closing_requires_observed_process_exit_within_budget(self):
+        identity = {
+            "birth": "original",
+            "command": "/sdk/qemu-system-x86_64 @owned -id validation_GradleManagedDevice",
+        }
+        for exits in (True, False):
+            with self.subTest(exits=exits), tempfile.TemporaryDirectory() as folder:
+                output = Path(folder)
+                receipts = output / "managed-emulator-invocations"
+                receipts.mkdir()
+                (receipts / "41.json").write_text(
+                    json.dumps(
+                        {
+                            "nonce": "owned",
+                            "launcherPid": 41,
+                            "arguments": [
+                                "@owned",
+                                "-id",
+                                "validation_GradleManagedDevice",
+                            ],
+                        }
+                    )
+                )
+                process = Mock(pid=30)
+                process.wait.return_value = process.poll.return_value = 0
+                scans = 0
+
+                def execute(*arguments, **keywords):
+                    nonlocal scans
+                    if arguments[0] == "ps":
+                        scans += 1
+                        data = (
+                            b""
+                            if exits and scans > 1
+                            else f"41 {identity['command']}".encode()
+                        )
+                    elif arguments[0] == "lsof":
+                        data = b"n127.0.0.1:5554\n"
+                    elif arguments[-3:] == ("emu", "avd", "name"):
+                        raise ConnectionRefusedError("console is closing")
+                    else:
+                        self.fail("An unavailable console must not be terminated")
+                    return subprocess.CompletedProcess([], 0, data)
+
+                def prepare():
+                    return MODULE["prepare_managed_setup"](
+                        ["./gradlew", "pair"],
+                        "restorePairApi34",
+                        {},
+                        output,
+                        "owned",
+                        output / "sdk",
+                        {"boot": 600, "teardown": 120},
+                        expected_avd="owned",
+                        popen=Mock(return_value=process),
+                        execute=execute,
+                        process_identity=Mock(return_value=identity),
+                        pause=Mock(),
+                        clock=Mock(side_effect=[0, 1] if exits else [0, 120]),
+                    )
+
+                if exits:
+                    self.assertIn("-x", prepare())
+                    self.assertTrue(
+                        json.loads((output / "setup-teardown.json").read_text())[
+                            "allOwnedSetupProcessesStopped"
+                        ]
+                    )
+                else:
+                    with self.assertRaisesRegex(
+                        RuntimeError, "setup processes are still live"
+                    ):
+                        prepare()
+                    self.assertFalse((output / "setup-teardown.json").exists())
+
     def test_console_name_reads_one_response_after_either_console_banner(self):
         for banner in (
             b"Android Console: Authentication required\r\nOK\r\n",

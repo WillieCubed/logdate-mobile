@@ -57,11 +57,11 @@ def retain_terminal_results(process, results, output, started_ns):
     return retained
 
 
-def owned_console_avd(port, *, connect=socket.create_connection):
+def owned_console_avd(port, *, host="127.0.0.1", connect=socket.create_connection):
     """Read the pre-authentication name from an already process-owned console."""
-    if not 5554 <= port <= 5682 or port % 2:
+    if host not in {"127.0.0.1", "::1"} or not 5554 <= port <= 5682 or port % 2:
         raise RuntimeError("An owned emulator console port is required")
-    connection = connect(("127.0.0.1", port), timeout=5)
+    connection = connect((host, port), timeout=5)
     stream = None
     try:
         stream = connection.makefile("rb")
@@ -121,16 +121,17 @@ def stop_owned_setup_guest(
             check=False,
         ).stdout.decode()
 
-    port = console_port(listeners())
-    if port is None:
+    endpoint = console_endpoint(listeners())
+    if endpoint is None:
         raise RuntimeError("Setup guest has no unique owned console port")
+    host, port = endpoint
     serial = f"emulator-{port}"
     result = execute(adb, "-s", serial, "emu", "avd", "name")
     reported = result.stdout.decode().splitlines()
     # adb's console adapter discards two OK responses, including the name
     # response when console authentication is disabled. Read that same owned
     # endpoint directly only when adb returned no name; never override a mismatch.
-    name = reported[0] if reported else owned_console_avd(port)
+    name = reported[0] if reported else owned_console_avd(port, host=host)
     # Setup snapshot validation uses -delay-adb. Its owned emulator console
     # remains available before an Android shell; actual test guests separately
     # require the QEMU property when their driver receipts become ready.
@@ -165,7 +166,7 @@ def stop_owned_setup_guest(
         "nameSource": "adb" if reported else "owned-console",
     }
     save(output / f"setup-guest-{pid}.json", evidence)
-    if process_identity(pid) != identity or console_port(listeners()) != port:
+    if process_identity(pid) != identity or console_endpoint(listeners()) != endpoint:
         raise RuntimeError(
             "Setup guest identity or port changed before graceful termination"
         )
@@ -312,15 +313,35 @@ def prepare_managed_setup(
                             != candidate
                         ):
                             continue
-                        stop_owned_setup_guest(
-                            pid,
-                            {**candidate, "nonce": nonce},
-                            current,
-                            output,
-                            str(managed_sdk / "platform-tools/adb"),
-                            execute=execute,
-                            process_identity=process_identity,
-                        )
+                        try:
+                            stop_owned_setup_guest(
+                                pid,
+                                {**candidate, "nonce": nonce},
+                                current,
+                                output,
+                                str(managed_sdk / "platform-tools/adb"),
+                                execute=execute,
+                                process_identity=process_identity,
+                            )
+                        except (
+                            ConnectionError,
+                            TimeoutError,
+                            subprocess.SubprocessError,
+                        ) as failure:
+                            # A completed setup guest may close its console before
+                            # its process exits. The next scan must still prove
+                            # every owned process gone within the original budget.
+                            save(
+                                output / f"setup-pending-{pid}.json",
+                                {
+                                    "pid": pid,
+                                    **candidate,
+                                    "nonce": nonce,
+                                    "identity": current,
+                                    "failure": type(failure).__name__,
+                                },
+                            )
+                            continue
                         stopped.add(pid)
                 if clock() >= deadline:
                     raise RuntimeError(
@@ -742,6 +763,14 @@ def save(path, contents):
     temporary.replace(path)
 
 
+def console_endpoint(listeners):
+    port = console_port(listeners)
+    if port is None:
+        return None
+    host = "127.0.0.1" if f"n127.0.0.1:{port}" in listeners.splitlines() else "::1"
+    return host, port
+
+
 def console_port(listeners):
     ports = {
         int(p)
@@ -1144,9 +1173,10 @@ def run_managed_pair(
                         "-Fn",
                         check=False,
                     ).stdout.decode()
-                    port = console_port(listeners)
-                    if port is None:
+                    endpoint = console_endpoint(listeners)
+                    if endpoint is None:
                         continue
+                    host, port = endpoint
                     serial = f"emulator-{port}"
                     if serial in custody["targets"]:
                         continue
@@ -1162,7 +1192,7 @@ def run_managed_pair(
                         .stdout.decode()
                         .splitlines()
                     )
-                    reported = names[0] if names else owned_console_avd(port)
+                    reported = names[0] if names else owned_console_avd(port, host=host)
                     if (
                         reported != avd
                         or command(
