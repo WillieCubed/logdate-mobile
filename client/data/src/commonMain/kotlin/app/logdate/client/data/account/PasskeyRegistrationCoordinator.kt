@@ -14,6 +14,7 @@ import app.logdate.client.repository.account.AccountCreationRequest
 import app.logdate.client.repository.account.LocalDataAdoptionRequiredException
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.BeginAccountCreationRequest
+import app.logdate.shared.model.BeginAuthenticationData
 import app.logdate.shared.model.BeginAuthenticationRequest
 import app.logdate.shared.model.CompleteAccountCreationRequest
 import app.logdate.shared.model.CompleteAuthenticationData
@@ -147,13 +148,7 @@ internal class PasskeyRegistrationCoordinator(
             val beginData = apiClient.beginAuthentication(beginRequest).getOrThrow()
 
             // Step 2: Convert to PasskeyAuthenticationOptions
-            val authOptions =
-                PasskeyAuthenticationOptions(
-                    challenge = beginData.challenge,
-                    rpId = beginData.rpId,
-                    allowCredentials = beginData.allowCredentials.map { it.id },
-                    timeout = beginData.timeout,
-                )
+            val authOptions = beginData.toPasskeyAuthenticationOptions()
 
             // Step 3: Authenticate with passkey
             val localAssertion = passkeyManager.authenticateWithUnlock(authOptions).getOrThrow()
@@ -212,6 +207,14 @@ internal class PasskeyRegistrationCoordinator(
             unlockSecret?.fill(0)
         }
     }
+
+    private fun BeginAuthenticationData.toPasskeyAuthenticationOptions(): PasskeyAuthenticationOptions =
+        PasskeyAuthenticationOptions(
+            challenge = challenge,
+            rpId = rpId,
+            allowCredentials = allowCredentials.map { it.id },
+            timeout = timeout,
+        )
 
     private suspend fun unlockAccountKeys(
         completeData: CompleteAuthenticationData,

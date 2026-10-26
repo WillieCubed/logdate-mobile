@@ -152,13 +152,7 @@ open class NativeBackupAgent : BackupAgent() {
                     }
                 }
             if (duplicateCompletion) {
-                val retainedCameraSource = finishNativeJournalTransferRestore()
-                finishNativeRestoreAuxiliaryUnderDeliveryLock()
-                super.onRestoreFinished()
-                retryAccountRecovery()
-                if (retainedCameraSource && scheduleRetainedJournalReconciliationSafely()) {
-                    retainedNativeCameraReconciliationScheduled()
-                }
+                finishDuplicateNativeRestore()
                 return
             }
             val journalInstalled = restoreNativeJournalTransferSnapshot()
@@ -171,6 +165,16 @@ open class NativeBackupAgent : BackupAgent() {
             nativeRestoreSession.finish()
             incomingRestoreSession.finish()
             AndroidNativeRestoreDeliveryGate.endRestore()
+        }
+    }
+
+    private fun finishDuplicateNativeRestore() {
+        val retainedCameraSource = finishNativeJournalTransferRestore()
+        finishNativeRestoreAuxiliaryUnderDeliveryLock()
+        super.onRestoreFinished()
+        retryAccountRecovery()
+        if (retainedCameraSource && scheduleRetainedJournalReconciliationSafely()) {
+            retainedNativeCameraReconciliationScheduled()
         }
     }
 
