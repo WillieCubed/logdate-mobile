@@ -69,18 +69,7 @@ class JournalMergeViewModel(
                     }
                     mutableState.update { it.copy(sourceTitle = pending.sourceTitle) }
                 }
-                val destinationId = savedStateHandle.get<String>(DESTINATION)?.let(Uuid::parse)
-                if (destinationId != null && savedStateHandle.get<String>(STAGE) != PICKER) {
-                    choose(
-                        if (mutableState.value.pickerTarget ==
-                            JournalMergePickerTarget.Source
-                        ) {
-                            requireNotNull(this@JournalMergeViewModel.sourceId)
-                        } else {
-                            destinationId
-                        },
-                    )
-                }
+                restoreDestinationSelection()
                 mergeJournals.observeCandidates().collect { candidates ->
                     allCandidates = candidates
                     refreshCandidates()
@@ -91,6 +80,19 @@ class JournalMergeViewModel(
                 Napier.e("Could not load journals for merge", error)
                 mutableState.update { it.copy(loading = false, error = JournalMergeError.Failed) }
             }
+        }
+    }
+
+    private fun restoreDestinationSelection() {
+        val destinationId = savedStateHandle.get<String>(DESTINATION)?.let(Uuid::parse)
+        if (destinationId != null && savedStateHandle.get<String>(STAGE) != PICKER) {
+            choose(
+                if (mutableState.value.pickerTarget == JournalMergePickerTarget.Source) {
+                    requireNotNull(sourceId)
+                } else {
+                    destinationId
+                },
+            )
         }
     }
 

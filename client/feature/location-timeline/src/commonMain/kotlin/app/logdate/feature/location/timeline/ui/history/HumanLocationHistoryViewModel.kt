@@ -391,18 +391,7 @@ class HumanLocationHistoryViewModel(
                 selectedItemId = selection,
                 detailVisible = current.detailVisible && selection != null,
                 dateLabel = selectedDateLabel().toUiText(),
-                daySummary =
-                    data.items.filterIsInstance<PlaceVisit>().let { visits ->
-                        val confirmed = visits.count { it.confirmedStay }
-                        val clues = visits.size - confirmed
-                        val visitCount = Res.plurals.history_visit_count.toUiText(confirmed, confirmed)
-                        if (clues > 0) {
-                            val clueCount = Res.plurals.history_location_clue_count.toUiText(clues, clues)
-                            Res.string.history_day_summary.toUiText(visitCount, clueCount)
-                        } else {
-                            visitCount
-                        }
-                    },
+                daySummary = daySummary(data),
                 items =
                     data.items.map { item ->
                         item.toHistoryUi(
@@ -448,6 +437,19 @@ class HumanLocationHistoryViewModel(
             )
         }
     }
+
+    private fun daySummary(data: LocationHistorySnapshot) =
+        data.items.filterIsInstance<PlaceVisit>().let { visits ->
+            val confirmed = visits.count { it.confirmedStay }
+            val clues = visits.size - confirmed
+            val visitCount = Res.plurals.history_visit_count.toUiText(confirmed, confirmed)
+            if (clues > 0) {
+                val clueCount = Res.plurals.history_location_clue_count.toUiText(clues, clues)
+                Res.string.history_day_summary.toUiText(visitCount, clueCount)
+            } else {
+                visitCount
+            }
+        }
 
     private fun enrich(data: LocationHistorySnapshot) {
         if (state.value.tab != HistoryTab.Day) return

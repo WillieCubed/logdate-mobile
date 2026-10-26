@@ -159,14 +159,7 @@ class MediaDetailViewModel(
             val primaryNote = media.matchingNotes.firstOrNull()
 
             val journalsDeferred = async { loadJournals(media.matchingNotes) }
-            val exifDeferred =
-                async {
-                    if (media.indexedMedia is IndexedMedia.Image) {
-                        loadExif(media.indexedMedia.uid)
-                    } else {
-                        null
-                    }
-                }
+            val exifDeferred = async { loadImageExif(media) }
             val locationDeferred = async { resolveLocationName(primaryNote?.location) }
 
             val journals = journalsDeferred.await()
@@ -222,6 +215,13 @@ class MediaDetailViewModel(
                         )
                     }
                 }
+        }
+
+    private suspend fun loadImageExif(media: LibraryMediaSource): ExifDisplayData? =
+        if (media.indexedMedia is IndexedMedia.Image) {
+            loadExif(media.indexedMedia.uid)
+        } else {
+            null
         }
 
     private suspend fun loadJournals(notes: List<JournalNote>): List<JournalReference> =
