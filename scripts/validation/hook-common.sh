@@ -127,7 +127,7 @@ collect_changed_files_from_commits() {
 
 fetch_module_tasks() {
   local module="$1"
-  ./gradlew "${module}:tasks" --all --quiet 2> /dev/null || true
+  ./gradlew --no-daemon -Pkotlin.compiler.execution.strategy=in-process "${module}:tasks" --all --quiet 2> /dev/null || true
 }
 
 module_tasks_cache_get_or_load() {

@@ -61,7 +61,7 @@ done <<< "$commits"
 # ============================================================================
 
 echo "Running compile check..."
-if ! ./gradlew :app:android-main:assembleDebug --quiet 2>&1; then
+if ! ./gradlew --no-daemon -Pkotlin.compiler.execution.strategy=in-process :app:android-main:assembleDebug --quiet 2>&1; then
   errors+=("COMPILE: Android app failed to compile. Fix build errors before pushing.")
 fi
 
@@ -70,7 +70,7 @@ fi
 # ============================================================================
 
 echo "Checking OS integration screenshot coverage..."
-if ! ./gradlew checkOsIntegrationScreenshotCoverage --quiet 2>&1; then
+if ! ./gradlew --no-daemon -Pkotlin.compiler.execution.strategy=in-process checkOsIntegrationScreenshotCoverage --quiet 2>&1; then
   errors+=("SCREENSHOTS: A registered screenshot is missing or a reference is stale. Run './run screenshots:check' for details.")
 fi
 
@@ -94,7 +94,7 @@ if [[ -n "$kt_files" ]]; then
     if [[ ${#UNRESOLVED_TEST_MODULES[@]} -gt 0 ]]; then
       errors+=("TESTS: Unable to resolve test task for affected modules.")
       for mod in "${UNRESOLVED_TEST_MODULES[@]}"; do
-        errors+=("  ${mod} (run './gradlew ${mod}:tasks --all' and add task mapping in hook-common.sh)")
+        errors+=("  ${mod} (run './gradlew --no-daemon -Pkotlin.compiler.execution.strategy=in-process ${mod}:tasks --all' and add task mapping in hook-common.sh)")
       done
     elif [[ ${#RESOLVED_TEST_TASKS[@]} -gt 0 ]]; then
       echo "Running tests for affected modules: ${modules[*]}"
@@ -103,7 +103,7 @@ if [[ -n "$kt_files" ]]; then
         echo "  $mod"
       done
 
-      if ! ./gradlew "${RESOLVED_TEST_TASKS[@]}" --quiet 2>&1; then
+      if ! ./gradlew --no-daemon -Pkotlin.compiler.execution.strategy=in-process "${RESOLVED_TEST_TASKS[@]}" --quiet 2>&1; then
         errors+=("TESTS: Tests failed for affected modules. Fix test failures before pushing.")
       fi
     fi
