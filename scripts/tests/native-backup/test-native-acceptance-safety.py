@@ -1145,6 +1145,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
                     b"Backup Manager currently enabled",
                     f"Package {HARNESS.PACKAGE} with result: Backup is not allowed".encode(),
                     b"enabled=false setupComplete=true",
+                    b"BackupManagerService: backup is not allowed",
                 ],
             ) as adb,
         ):
@@ -1155,6 +1156,20 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
 
             diagnostic = Path(temporary) / "backup-platform-diagnostics.log"
             self.assertIn(b"enabled=false setupComplete=true", diagnostic.read_bytes())
+            self.assertEqual(
+                b"BackupManagerService: backup is not allowed",
+                (Path(temporary) / "backup-platform-logcat.log").read_bytes(),
+            )
+            adb.assert_any_call(
+                "emulator-5576",
+                "logcat",
+                "-d",
+                "-t",
+                "1500",
+                "-v",
+                "threadtime",
+                timeout=60,
+            )
             self.assertIn(
                 ("shell", "dumpsys", "backup"),
                 [arguments.args[1:] for arguments in adb.call_args_list],
