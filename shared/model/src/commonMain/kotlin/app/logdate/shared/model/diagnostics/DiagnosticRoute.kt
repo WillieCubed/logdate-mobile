@@ -85,11 +85,7 @@ fun diagnosticRoute(path: String): DiagnosticRoute {
         }
 
         "diagnostics" -> {
-            when {
-                count == 2 && tail == "reports" -> DiagnosticRoute.DIAGNOSTIC_REPORTS
-                count == 3 && segments[1] == "reports" -> DiagnosticRoute.DIAGNOSTIC_REPORT
-                else -> DiagnosticRoute.UNKNOWN
-            }
+            diagnosticReportsRoute(segments)
         }
 
         else -> {
@@ -97,6 +93,13 @@ fun diagnosticRoute(path: String): DiagnosticRoute {
         }
     }
 }
+
+private fun diagnosticReportsRoute(segments: List<String>): DiagnosticRoute =
+    when {
+        segments.size == 2 && segments[1] == "reports" -> DiagnosticRoute.DIAGNOSTIC_REPORTS
+        segments.size == 3 && segments[1] == "reports" -> DiagnosticRoute.DIAGNOSTIC_REPORT
+        else -> DiagnosticRoute.UNKNOWN
+    }
 
 fun diagnosticRequestPhase(
     route: DiagnosticRoute,
