@@ -208,6 +208,9 @@ class AndroidCanonicalMediaStore(
         return runCatching { File(URI(reference)) }.getOrNull()
     }
 
+    private suspend fun <T> withPublicationClaim(block: suspend () -> T): T =
+        if (publicationTickets == null) block() else publicationTickets.withClaim(block)
+
     private fun isVerifiedObject(
         file: File,
         expectedDigest: String,
