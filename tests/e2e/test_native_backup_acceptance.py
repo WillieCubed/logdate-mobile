@@ -163,6 +163,74 @@ class DataOnlySourceSessionTest(unittest.TestCase):
 
 
 class RestoreSnapshotValidationTest(unittest.TestCase):
+    def test_cancelled_backup_retains_platform_logcat_without_retrying_backup(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        commands = []
+
+        def adb(serial, *arguments, **kwargs):
+            commands.append(arguments)
+            if arguments[:3] == ("shell", "am", "start"):
+                return b"Status: ok"
+            if arguments[:3] == ("shell", "bmgr", "backupnow"):
+                return b"Backup finished with result: Backup cancelled"
+            if arguments[:3] == ("shell", "dumpsys", "backup"):
+                return b"No backups running"
+            if arguments[0] == "logcat":
+                return b"FullBackupEngine: agent timed out"
+            return b""
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(harness, "adb", side_effect=adb),
+            patch.object(harness, "enable_backup"),
+            patch.object(
+                harness,
+                "package_file_snapshot",
+                return_value={"databases/logdate": {"bytes": 4096}},
+            ),
+        ):
+            output = Path(directory) / "backup.log"
+            with self.assertRaisesRegex(RuntimeError, "did not complete"):
+                harness.backup_source("emulator-5554", output)
+            self.assertEqual(
+                b"FullBackupEngine: agent timed out",
+                output.with_name("backup-platform-logcat.log").read_bytes(),
+            )
+        self.assertEqual(
+            1,
+            sum(command[:3] == ("shell", "bmgr", "backupnow") for command in commands),
+        )
+
+    def test_unavailable_backup_logcat_preserves_the_original_backup_failure(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+
+        def adb(serial, *arguments, **kwargs):
+            if arguments[:3] == ("shell", "am", "start"):
+                return b"Status: ok"
+            if arguments[:3] == ("shell", "bmgr", "backupnow"):
+                return b"Backup finished with result: Backup cancelled"
+            raise subprocess.TimeoutExpired(arguments, 60)
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(harness, "adb", side_effect=adb),
+            patch.object(harness, "enable_backup"),
+            patch.object(
+                harness,
+                "package_file_snapshot",
+                return_value={"databases/logdate": {"bytes": 4096}},
+            ),
+        ):
+            output = Path(directory) / "backup.log"
+            with self.assertRaisesRegex(
+                RuntimeError, "did not complete the native backup"
+            ):
+                harness.backup_source("emulator-5554", output)
+            self.assertIn(
+                b"TimeoutExpired",
+                output.with_name("backup-platform-logcat.log").read_bytes(),
+            )
+
     def test_backup_accepts_checkpointed_database_only_after_logical_probe(self):
         harness = NATIVE_BACKUP_ACCEPTANCE
         before = {"databases/logdate": {"bytes": 4096, "sha256": "before"}}
@@ -387,7 +455,9 @@ class RestoreSnapshotValidationTest(unittest.TestCase):
             allow_database_changes=True,
         )
 
-    def test_camera_only_restore_keeps_strict_database_comparison(self):
+    def test_only_started_camera_or_verified_widget_replay_allows_database_changes(
+        self,
+    ):
         tree = ast.parse(SCRIPT.read_text())
         transfer = next(
             node
@@ -411,7 +481,7 @@ class RestoreSnapshotValidationTest(unittest.TestCase):
         self.assertEqual(
             ast.dump(
                 ast.parse(
-                    "exercise_pending_camera_draft and exercise_duplicate_restore",
+                    "(exercise_pending_camera_draft or exercise_system_widgets) and exercise_duplicate_restore",
                     mode="eval",
                 ).body
             ),
@@ -430,6 +500,105 @@ class RestoreSnapshotValidationTest(unittest.TestCase):
         keywords = {keyword.arg: keyword.value for keyword in initial[0].keywords}
         self.assertNotIn("allow_database_changes", keywords)
         self.assertIs(False, ast.literal_eval(keywords["credentials_only"]))
+
+    def test_widget_replay_requires_verified_checkpoints_around_strict_byte_comparison(
+        self,
+    ):
+        tree = ast.parse(SCRIPT.read_text())
+        transfer = next(
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "transfer"
+        )
+        guard = transfer.body[0]
+        self.assertIsInstance(guard, ast.If)
+        self.assertEqual(
+            ast.dump(
+                ast.parse(
+                    "exercise_system_widgets and exercise_duplicate_restore and not callable(widget_replay_checkpoint)",
+                    mode="eval",
+                ).body
+            ),
+            ast.dump(guard.test),
+        )
+        self.assertEqual(1, len(guard.body))
+        self.assertIsInstance(guard.body[0], ast.Raise)
+        self.assertEqual("ValueError", guard.body[0].exc.func.id)
+        self.assertEqual("prepare_source", transfer.body[1].value.func.id)
+
+        duplicate = next(
+            node
+            for node in transfer.body
+            if isinstance(node, ast.If)
+            and isinstance(node.test, ast.Name)
+            and node.test.id == "exercise_duplicate_restore"
+        )
+        widget_guards = [
+            node
+            for node in duplicate.body
+            if isinstance(node, ast.If)
+            and isinstance(node.test, ast.Name)
+            and node.test.id == "exercise_system_widgets"
+        ]
+        self.assertEqual(2, len(widget_guards))
+        checkpoints = []
+        for guarded, filename in zip(
+            widget_guards,
+            (
+                "widget-initial-checkpoint.log",
+                "widget-replay-checkpoint.log",
+            ),
+        ):
+            calls = [
+                node
+                for node in ast.walk(guarded)
+                if isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "checkpoint_widget_replay"
+            ]
+            self.assertEqual(1, len(calls))
+            self.assertEqual(filename, ast.literal_eval(calls[0].args[1].right))
+            self.assertEqual("widget_replay_checkpoint", calls[0].args[-1].id)
+            checkpoints.append(calls[0])
+
+        baseline = next(
+            node
+            for node in duplicate.body
+            if isinstance(node, ast.Assign) and node.targets[0].id == "before_replay"
+        )
+        replay = next(
+            node
+            for node in duplicate.body
+            if isinstance(node, ast.Assign) and node.targets[0].id == "replay"
+        )
+        comparison = next(
+            node.value
+            for node in duplicate.body
+            if isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Name)
+            and node.value.func.id == "assert_snapshot_preserved"
+        )
+        self.assertLess(checkpoints[0].lineno, baseline.lineno)
+        self.assertLess(baseline.lineno, replay.lineno)
+        self.assertLess(replay.lineno, checkpoints[1].lineno)
+        self.assertLess(checkpoints[1].lineno, comparison.lineno)
+        self.assertEqual("before_replay", comparison.args[0].id)
+        self.assertEqual("package_file_snapshot", comparison.args[1].func.id)
+        keywords = {keyword.arg: keyword.value for keyword in comparison.keywords}
+        self.assertEqual(
+            ast.dump(
+                ast.parse(
+                    "{'shared_prefs/logdate_widget_instances.xml'} if exercise_system_widgets else ()",
+                    mode="eval",
+                ).body
+            ),
+            ast.dump(keywords["ignored_paths"]),
+        )
+        self.assertEqual(
+            ast.dump(ast.parse("not exercise_credentials_only", mode="eval").body),
+            ast.dump(keywords["require_database"]),
+        )
 
     def test_missing_key_snapshot_accepts_rejected_journal_and_retained_preferences(
         self,

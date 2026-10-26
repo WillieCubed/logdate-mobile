@@ -27,6 +27,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.security.MessageDigest
 import kotlin.io.encoding.Base64
 import kotlin.test.assertEquals
@@ -67,7 +69,8 @@ internal object NativeRetainedPrivacyBoundary {
 
                 override fun getNoBackupFilesDir() = File(root, "private").apply { mkdirs() }
 
-                override fun getDatabasePath(name: String) = File(root, "databases/$name").apply { parentFile!!.mkdirs() }
+                override fun getDatabasePath(name: String) =
+                    (if (File(name).isAbsolute) File(name) else File(root, "databases/$name")).apply { parentFile!!.mkdirs() }
             }
         private val key = ByteArray(32) { (it + 11).toByte() }
         private val sourceKey = if (mode == Mode.WRONG_KEY) ByteArray(32) { (it + 63).toByte() } else key.copyOf()
@@ -184,6 +187,7 @@ internal object NativeRetainedPrivacyBoundary {
             passphrase: ByteArray,
         ) {
             file.parentFile!!.mkdirs()
+            assertEquals(file, context.getDatabasePath(file.absolutePath), "Room must preserve the requested absolute fixture path")
             val openingKey = passphrase.copyOf()
             val database = getRoomDatabase(getDatabaseBuilder(context, openingKey, file), driver = null)
             try {
@@ -200,6 +204,10 @@ internal object NativeRetainedPrivacyBoundary {
                 database.close()
                 openingKey.fill(0)
             }
+            assertTrue(
+                Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS),
+                "The journal must exist at its requested fixture path",
+            )
         }
 
         private fun durableFiles(): Map<String, String> =

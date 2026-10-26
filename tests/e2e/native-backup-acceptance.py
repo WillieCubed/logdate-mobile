@@ -518,6 +518,15 @@ def backup_source(serial, output, *, verify_after_backup=None, before_snapshot=N
             diagnostics = f"Backup service diagnostics unavailable: {type(error).__name__}".encode()
         diagnostic_path = output.with_name("backup-platform-diagnostics.log")
         private_file(diagnostic_path, diagnostics)
+        try:
+            logcat = adb(
+                serial, "logcat", "-d", "-t", "1500", "-v", "threadtime", timeout=60
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            logcat = (
+                f"Backup platform logcat unavailable: {type(error).__name__}".encode()
+            )
+        private_file(output.with_name("backup-platform-logcat.log"), logcat)
         raise RuntimeError(
             f"Android did not complete the native backup; inspect {diagnostic_path}"
         )
@@ -1803,6 +1812,20 @@ def capture_widget_restore_delivery(serial, output):
         )
 
 
+def checkpoint_widget_replay(serial, output, metadata, identity, widget_checkpoint):
+    # System restore starts account/widget services asynchronously. Verify the actual
+    # recovered journal and flush its WAL before freezing the byte-level replay oracle.
+    probe(
+        serial,
+        "verify-restored",
+        output.with_suffix(".journal.log"),
+        metadata,
+        identity,
+    )
+    widget_checkpoint(serial, output)
+    adb(serial, "shell", "am", "force-stop", PACKAGE)
+
+
 def transfer(
     source,
     destination,
@@ -1822,7 +1845,14 @@ def transfer(
     exercise_system_widgets=False,
     exercise_cloud_backup=False,
     exercise_pending_camera_draft=False,
+    widget_replay_checkpoint=None,
 ):
+    if (
+        exercise_system_widgets
+        and exercise_duplicate_restore
+        and not callable(widget_replay_checkpoint)
+    ):
+        raise ValueError("System widget replay requires a verified durable checkpoint")
     prepare_source(
         source,
         app_apk,
@@ -1990,6 +2020,15 @@ def transfer(
                 identity,
                 pending_camera_draft=True,
             )
+        if exercise_system_widgets:
+            adb(destination, "install", "-r", "-t", str(test_apk))
+            checkpoint_widget_replay(
+                destination,
+                output / "widget-initial-checkpoint.log",
+                metadata,
+                identity,
+                widget_replay_checkpoint,
+            )
         before_replay = package_file_snapshot(destination)
         replay = restore_transport(destination, system_widgets=exercise_system_widgets)
         private_file(output / "native-restore-replay.log", replay)
@@ -1998,6 +2037,13 @@ def transfer(
         if exercise_system_widgets:
             capture_widget_restore_delivery(
                 destination, output / "widget-delivery-replay"
+            )
+            checkpoint_widget_replay(
+                destination,
+                output / "widget-replay-checkpoint.log",
+                metadata,
+                identity,
+                widget_replay_checkpoint,
             )
         assert_snapshot_preserved(
             before_replay,
@@ -2027,7 +2073,11 @@ def transfer(
             restored_files,
             selected_source_files,
             credentials_only=exercise_credentials_only,
-            allow_database_changes=exercise_pending_camera_draft
+            # Both widget checkpoints verify content and keys after normal startup;
+            # the strict replay comparison above retains the initialized DB bytes.
+            allow_database_changes=(
+                exercise_pending_camera_draft or exercise_system_widgets
+            )
             and exercise_duplicate_restore,
         )
     print("Launching the restored app through its normal startup path", flush=True)
