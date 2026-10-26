@@ -11,3 +11,8 @@ Formatting during a commit never downloads a missing tool.
 
 Run `python3 .hypertext/formatter-tools/test_native.py` to verify stdin formatting,
 configuration discovery, failure preservation, and deliberate checksum review.
+
+Configured Java VM options remain effective during formatting. Standard launcher
+notices for `JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS`, and `_JAVA_OPTIONS` are
+recognized without exposing them in formatted source. Other diagnostics still
+block the commit, including parse errors that exit with a success status.

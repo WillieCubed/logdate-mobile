@@ -59,6 +59,40 @@ class NativeFormatterTests(unittest.TestCase):
             self.assertIn(b"reviewed artifact checksum", result.stderr)
             self.assertFalse((root / "cache").exists())
 
+    def test_jvm_option_notices_do_not_reject_clean_source_or_hide_errors(self):
+        names = ("JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS")
+        for selected in [(name,) for name in names] + [names]:
+            with self.subTest(options=selected):
+                environment = {
+                    key: value for key, value in os.environ.items() if key not in names
+                }
+                for name in selected:
+                    environment[name] = (
+                        "-Dstudio.formatter.option=retained -Djava.awt.headless=true"
+                    )
+                command = [sys.executable, str(HELPER), "ktlint", "sample.gradle.kts"]
+                clean = subprocess.run(
+                    command,
+                    env=environment,
+                    input=b"val value= listOf(1,2)\n",
+                    capture_output=True,
+                )
+                self.assertEqual(
+                    clean.returncode,
+                    0,
+                    "JVM launcher notices must not reject valid Kotlin",
+                )
+                self.assertEqual(clean.stdout, b"val value = listOf(1, 2)\n")
+                invalid = subprocess.run(
+                    command,
+                    env=environment,
+                    input=b'val broken = "',
+                    capture_output=True,
+                )
+                self.assertNotEqual(invalid.returncode, 0)
+                self.assertEqual(invalid.stdout, b"")
+                self.assertTrue(invalid.stderr)
+
     def test_unknown_formatter_fails_closed(self):
         result = subprocess.run(
             [sys.executable, str(HELPER), "unknown", "sample.kt"],

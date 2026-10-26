@@ -134,6 +134,37 @@ public final class KtlintStdin {
 """
 
 
+def formatter_diagnostics(stderr):
+    """Remove each exact leading JVM environment notice, retaining real diagnostics."""
+    prefixes = {
+        "JAVA_TOOL_OPTIONS": b"Picked up JAVA_TOOL_OPTIONS: ",
+        "JDK_JAVA_OPTIONS": b"NOTE: Picked up JDK_JAVA_OPTIONS: ",
+        "_JAVA_OPTIONS": b"Picked up _JAVA_OPTIONS: ",
+    }
+    notices = {
+        name: prefix + os.fsencode(os.environ[name])
+        for name, prefix in prefixes.items()
+        if name in os.environ
+    }
+    while notices:
+        for name, prefix in notices.items():
+            matched = next(
+                (
+                    prefix + ending
+                    for ending in (b"\r\n", b"\n")
+                    if stderr.startswith(prefix + ending)
+                ),
+                None,
+            )
+            if matched is not None:
+                break
+        else:
+            break
+        stderr = stderr[len(matched) :]
+        del notices[name]
+    return stderr
+
+
 def main():
     if sys.argv[1:] == ["--setup"]:
         setup()
@@ -157,15 +188,16 @@ def main():
         ]
         source = sys.stdin.buffer.read()
         result = subprocess.run(command, input=source, capture_output=True)
+    diagnostics = formatter_diagnostics(result.stderr)
     # KtLint can report a parse error on stderr and exit zero with
     # no stdout. Never expose that as a successful formatting operation.
     if (
         result.returncode
-        or result.stderr
+        or diagnostics
         or (source.strip() and not result.stdout.strip())
     ):
-        if result.stderr:
-            sys.stderr.buffer.write(result.stderr)
+        if diagnostics:
+            sys.stderr.buffer.write(diagnostics)
         raise ValueError(
             "KtLint did not produce clean, nonempty formatted source; staged bytes were not changed"
         )
