@@ -18,6 +18,45 @@ MODULE = runpy.run_path(
 
 
 class ManagedDriverControllerTest(unittest.TestCase):
+    def test_console_name_reads_one_response_after_either_console_banner(self):
+        for banner in (
+            b"Android Console: Authentication required\r\nOK\r\n",
+            b"Android Console: type 'help' for a list of commands\r\nOK\r\n",
+        ):
+            with self.subTest(banner=banner):
+                connection = Mock()
+                connection.makefile.return_value = io.BytesIO(
+                    banner + b"owned\r\nOK\r\n"
+                )
+                connect = Mock(return_value=connection)
+                self.assertEqual(
+                    "owned", MODULE["owned_console_avd"](5554, connect=connect)
+                )
+                connect.assert_called_once_with(("127.0.0.1", 5554), timeout=5)
+                self.assertEqual(
+                    [b"avd name\n", b"quit\n"],
+                    [c.args[0] for c in connection.sendall.call_args_list],
+                )
+                connection.close.assert_called_once()
+
+    def test_console_name_rejects_unframed_ambiguous_or_oversized_responses(self):
+        banner = b"Android Console: Authentication required\nOK\n"
+        for data in (
+            b"foreign server\nOK\nowned\nOK\n",
+            banner + b"KO: denied\n",
+            banner + b"owned\nforeign\nOK\n",
+            banner + b"owned\n",
+            banner + b"x" * 4097,
+        ):
+            with self.subTest(size=len(data)):
+                connection = Mock()
+                connection.makefile.return_value = io.BytesIO(data)
+                with self.assertRaises(RuntimeError):
+                    MODULE["owned_console_avd"](
+                        5554, connect=Mock(return_value=connection)
+                    )
+                connection.close.assert_called_once()
+
     def test_process_snapshot_retries_a_transient_host_ps_timeout(self):
         execute = Mock(
             side_effect=[
@@ -788,6 +827,47 @@ class ManagedDriverControllerTest(unittest.TestCase):
             proof = json.loads((Path(folder) / "setup-guest-41.json").read_text())
             self.assertEqual(identity, proof["identity"])
 
+    def test_setup_mismatched_console_retains_read_only_identity_evidence(self):
+        identity = {
+            "birth": "original",
+            "command": "/sdk/qemu-system-x86_64 @owned -delay-adb -id validation_GradleManagedDevice",
+        }
+        candidate = {
+            "avd": "owned",
+            "managedId": "validation_GradleManagedDevice",
+            "nonce": "private",
+        }
+
+        def execute(*arguments, **keywords):
+            if arguments[0] == "lsof":
+                data = b"n127.0.0.1:5554\n"
+            elif arguments[-3:] == ("emu", "avd", "name"):
+                data = b"unexpected\nOK\n"
+            elif arguments[-3:] == ("emu", "avd", "id"):
+                data = b"validation_GradleManagedDevice\nOK\n"
+            else:
+                self.fail("A mismatched console must never be terminated")
+            return subprocess.CompletedProcess(arguments, 0, data, b"")
+
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder)
+            with self.assertRaisesRegex(RuntimeError, "Setup endpoint does not match"):
+                MODULE["stop_owned_setup_guest"](
+                    41,
+                    candidate,
+                    identity,
+                    output,
+                    "/sdk/adb",
+                    execute=execute,
+                    process_identity=Mock(return_value=identity),
+                )
+            proof = json.loads((output / "setup-endpoint-41.json").read_text())
+            self.assertEqual("unexpected\nOK\n", proof["name"]["stdout"])
+            self.assertEqual(
+                "validation_GradleManagedDevice\nOK\n", proof["id"]["stdout"]
+            )
+            self.assertEqual(candidate, proof["expected"])
+
     def test_setup_cleanup_requires_same_pid_birth_command_avd_and_console_port(self):
         identity = {
             "birth": "original",
@@ -828,6 +908,8 @@ class ManagedDriverControllerTest(unittest.TestCase):
                             data += b"n127.0.0.1:5556\n"
                     elif arguments[-3:] == ("emu", "avd", "name"):
                         data = b"foreign\nOK" if mutation == "avd" else b"owned\nOK"
+                    elif arguments[-3:] == ("emu", "avd", "id"):
+                        data = b"validation_GradleManagedDevice\nOK"
                     elif arguments[-2:] == ("getprop", "ro.kernel.qemu"):
                         data = b"0" if mutation == "not-qemu" else b"1"
                     else:

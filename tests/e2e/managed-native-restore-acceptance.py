@@ -13,6 +13,7 @@ import re
 import runpy
 import shlex
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -56,6 +57,46 @@ def retain_terminal_results(process, results, output, started_ns):
     return retained
 
 
+def owned_console_avd(port, *, connect=socket.create_connection):
+    """Read the pre-authentication name from an already process-owned console."""
+    if not 5554 <= port <= 5682 or port % 2:
+        raise RuntimeError("An owned emulator console port is required")
+    connection = connect(("127.0.0.1", port), timeout=5)
+    stream = None
+    try:
+        stream = connection.makefile("rb")
+
+        def response():
+            lines, size = [], 0
+            while True:
+                line = stream.readline(4097)
+                size += len(line)
+                if not line or len(line) > 4096 or size > 8192:
+                    raise RuntimeError(
+                        "Emulator console response is incomplete or oversized"
+                    )
+                value = line.rstrip(b"\r\n")
+                if value == b"OK":
+                    return lines
+                if value.startswith(b"KO"):
+                    raise RuntimeError("Emulator console rejected the name query")
+                lines.append(value)
+
+        banner = response()
+        if not banner or not banner[0].startswith(b"Android Console:"):
+            raise RuntimeError("The owned port did not identify an emulator console")
+        connection.sendall(b"avd name\n")
+        name = response()
+        if len(name) != 1 or not name[0]:
+            raise RuntimeError("Emulator console name is ambiguous")
+        connection.sendall(b"quit\n")
+        return name[0].decode()
+    finally:
+        if stream is not None:
+            stream.close()
+        connection.close()
+
+
 def stop_owned_setup_guest(
     pid, candidate, identity, output, adb, *, execute, process_identity
 ):
@@ -84,15 +125,45 @@ def stop_owned_setup_guest(
     if port is None:
         raise RuntimeError("Setup guest has no unique owned console port")
     serial = f"emulator-{port}"
-    reported = (
-        execute(adb, "-s", serial, "emu", "avd", "name").stdout.decode().splitlines()
-    )
+    result = execute(adb, "-s", serial, "emu", "avd", "name")
+    reported = result.stdout.decode().splitlines()
+    # adb's console adapter discards two OK responses, including the name
+    # response when console authentication is disabled. Read that same owned
+    # endpoint directly only when adb returned no name; never override a mismatch.
+    name = reported[0] if reported else owned_console_avd(port)
     # Setup snapshot validation uses -delay-adb. Its owned emulator console
     # remains available before an Android shell; actual test guests separately
     # require the QEMU property when their driver receipts become ready.
-    if not reported or reported[0] != candidate["avd"]:
+    if name != candidate["avd"]:
+        instance = execute(adb, "-s", serial, "emu", "avd", "id", check=False)
+
+        def observation(command_result):
+            return {
+                "exit": command_result.returncode,
+                "stdout": command_result.stdout.decode(errors="replace")[:4096],
+                "stderr": (command_result.stderr or b"").decode(errors="replace")[
+                    :4096
+                ],
+            }
+
+        save(
+            output / f"setup-endpoint-{pid}.json",
+            {
+                "expected": candidate,
+                "identity": identity,
+                "serial": serial,
+                "name": observation(result),
+                "id": observation(instance),
+            },
+        )
         raise RuntimeError("Setup endpoint does not match the owned emulator")
-    evidence = {"pid": pid, **candidate, "identity": identity, "serial": serial}
+    evidence = {
+        "pid": pid,
+        **candidate,
+        "identity": identity,
+        "serial": serial,
+        "nameSource": "adb" if reported else "owned-console",
+    }
     save(output / f"setup-guest-{pid}.json", evidence)
     if process_identity(pid) != identity or console_port(listeners()) != port:
         raise RuntimeError(
@@ -1086,11 +1157,12 @@ def run_managed_pair(
                         receipt, nonce, receipt.get("pid")
                     ):
                         continue
-                    reported = (
+                    names = (
                         command(adb, "-s", serial, "emu", "avd", "name")
                         .stdout.decode()
-                        .splitlines()[0]
+                        .splitlines()
                     )
+                    reported = names[0] if names else owned_console_avd(port)
                     if (
                         reported != avd
                         or command(
