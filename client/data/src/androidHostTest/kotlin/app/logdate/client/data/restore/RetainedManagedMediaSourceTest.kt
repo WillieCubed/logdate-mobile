@@ -39,6 +39,47 @@ class RetainedManagedMediaSourceTest {
     }
 
     @Test
+    fun `native debug file URI and its quarantine marker resolve retained originals`() {
+        val root = Files.createTempDirectory("retained-debug-media").toFile()
+        try {
+            val payload = File(root, "sealed-original").apply { writeText("original bytes") }
+            val digest = MessageDigest.getInstance("SHA-256").digest(payload.readBytes()).joinToString("") { "%02x".format(it) }
+            val relative = "media/objects/sha256/${digest.take(2)}/$digest.png"
+            val source = RetainedManagedMediaSource(mapOf("files/$relative" to payload))
+            for (packageName in listOf("studio.hypertext.logdate", "studio.hypertext.logdate.debug", "co.reasonabletech.logdate")) {
+                val reference = "file:/data/user/0/$packageName/files/$relative"
+                assertEquals(payload.canonicalFile, source.resolve(reference)?.file)
+                assertEquals(payload.canonicalFile, source.resolve(retainedUnavailableMediaReference(reference))?.file)
+            }
+            assertNull(source.resolve("file:/data/user/0/unrelated.app/files/$relative"))
+            assertNull(source.resolve("file:/tmp/studio.hypertext.logdate.debug/files/$relative"))
+        } finally {
+            check(root.deleteRecursively())
+        }
+    }
+
+    @Test
+    fun `canonical private file URI recovers across cohorts only with its exact digest`() {
+        val root = Files.createTempDirectory("retained-file-digest").toFile()
+        try {
+            val payload = File(root, "payload").apply { writeText("original bytes") }
+            val digest = MessageDigest.getInstance("SHA-256").digest(payload.readBytes()).joinToString("") { "%02x".format(it) }
+            val relative = "media/objects/sha256/${digest.take(2)}/$digest.png"
+            val reference = "file:/data/user/0/studio.hypertext.logdate.debug/files/$relative"
+            val source = RetainedManagedMediaSource(emptyMap(), listOf(mapOf("files/$relative" to payload)))
+            assertEquals(digest, retainedCanonicalMediaDigest(reference))
+            assertEquals(payload.canonicalFile, source.resolve(retainedUnavailableMediaReference(reference))?.file)
+            payload.writeText("corrupted bytes")
+            assertNull(source.resolve(reference))
+            assertNull(RetainedManagedMediaSource(mapOf("files/$relative" to payload)).resolve(reference))
+            assertNull(retainedCanonicalMediaDigest(reference.replace("studio.hypertext.logdate.debug", "unrelated.app")))
+            assertNull(retainedCanonicalMediaDigest(reference.replace("/files/media/", "/files/media/../media/")))
+        } finally {
+            check(root.deleteRecursively())
+        }
+    }
+
+    @Test
     fun `incoming opaque payload uses verified logical filename`() {
         val root = Files.createTempDirectory("retained-incoming-media").toFile()
         try {
