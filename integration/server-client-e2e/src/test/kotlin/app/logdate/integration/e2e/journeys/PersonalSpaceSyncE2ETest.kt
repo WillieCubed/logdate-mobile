@@ -121,7 +121,7 @@ class PersonalSpaceSyncE2ETest {
                 )
             phone.journals.create(journal)
             assertSynced(phone.manager.uploadPendingChanges())
-            assertFalse("Annecy" in rawChanges(account), "The server received the journal's title")
+            assertFalse(journal.title in rawChanges(account), "The server received the journal's title")
 
             assertSynced(tablet.manager.downloadRemoteChanges())
             val arrived = assertNotNull(tablet.journals.getJournalById(journal.id))
@@ -154,6 +154,7 @@ class PersonalSpaceSyncE2ETest {
             phone.content.addContentToJournal(note.uid, journal.id)
             val photo = ByteArray(300_000) { (it % 199).toByte() }
             val local = phone.media.saveMedia(MediaPayload("view.jpg", "image/jpeg", photo.size.toLong(), photo))
+            val draftText = "Dear diary, the lake was calm"
             val draft =
                 EditorDraft(
                     blocks =
@@ -164,7 +165,7 @@ class PersonalSpaceSyncE2ETest {
                                 48.8566,
                                 2.3522,
                                 35.5,
-                                content = "Dear diary, the lake was calm",
+                                content = draftText,
                             ),
                             SerializableImageBlock(
                                 Uuid.random(),
@@ -182,7 +183,8 @@ class PersonalSpaceSyncE2ETest {
 
             assertSynced(phone.manager.uploadPendingChanges())
             assertSynced(phone.manager.syncDrafts())
-            assertFalse("calm" in rawChanges(account), "The server received the draft's text")
+            // Short words can appear by chance in the envelope's base64 ciphertext.
+            assertFalse(draftText in rawChanges(account), "The server received the draft's text")
 
             assertSynced(tablet.manager.downloadRemoteChanges())
             assertEquals(
@@ -476,7 +478,7 @@ class PersonalSpaceSyncE2ETest {
 
             val uploaded = phone.manager.uploadPendingChanges()
             assertSynced(uploaded)
-            assertFalse("Swam" in rawChanges(account), "The server received the transcript's text")
+            assertFalse("Swam to the far buoy" in rawChanges(account), "The server received the transcript's text")
             val downloaded = tablet.manager.downloadRemoteChanges()
             assertSynced(downloaded)
 
