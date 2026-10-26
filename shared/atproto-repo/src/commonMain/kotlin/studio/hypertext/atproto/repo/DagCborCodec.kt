@@ -205,15 +205,7 @@ public object DagCborCodec {
                 }
 
                 MAJOR_TYPE_MAP -> {
-                    val size = readLength(info).toInt()
-                    val entries =
-                        buildMap(size) {
-                            repeat(size) {
-                                val key = decodeElement() as JsonPrimitive
-                                put(key.content, decodeElement())
-                            }
-                        }
-                    JsonObject(entries)
+                    decodeMap(info)
                 }
 
                 MAJOR_TYPE_TAG -> {
@@ -247,6 +239,18 @@ public object DagCborCodec {
                     error("Unsupported DAG-CBOR major type $majorType")
                 }
             }
+        }
+
+        private fun decodeMap(info: Int): JsonObject {
+            val size = readLength(info).toInt()
+            val entries =
+                buildMap(size) {
+                    repeat(size) {
+                        val key = decodeElement() as JsonPrimitive
+                        put(key.content, decodeElement())
+                    }
+                }
+            return JsonObject(entries)
         }
 
         private fun readLength(info: Int): Long =
