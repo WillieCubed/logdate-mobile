@@ -60,6 +60,12 @@ def stop_owned_setup_guest(
     pid, candidate, identity, output, adb, *, execute, process_identity
 ):
     """Stop only an attested setup endpoint, never a guessed console or reused PID."""
+    expected = {"avd": candidate["avd"], "managedId": candidate["managedId"]}
+    observed = TARGET["managed_candidates"](
+        [f"{pid} {identity['command']}"], set(), candidate["avd"]
+    ).get(pid)
+    if observed != expected or process_identity(pid) != identity:
+        raise RuntimeError("Setup guest is not the attested owned QEMU process")
 
     def listeners():
         return execute(
@@ -81,14 +87,10 @@ def stop_owned_setup_guest(
     reported = (
         execute(adb, "-s", serial, "emu", "avd", "name").stdout.decode().splitlines()
     )
-    if (
-        not reported
-        or reported[0] != candidate["avd"]
-        or execute(
-            adb, "-s", serial, "shell", "getprop", "ro.kernel.qemu"
-        ).stdout.strip()
-        != b"1"
-    ):
+    # Setup snapshot validation uses -delay-adb. Its owned emulator console
+    # remains available before an Android shell; actual test guests separately
+    # require the QEMU property when their driver receipts become ready.
+    if not reported or reported[0] != candidate["avd"]:
         raise RuntimeError("Setup endpoint does not match the owned emulator")
     evidence = {"pid": pid, **candidate, "identity": identity, "serial": serial}
     save(output / f"setup-guest-{pid}.json", evidence)

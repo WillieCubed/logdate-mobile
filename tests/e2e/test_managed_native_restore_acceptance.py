@@ -744,6 +744,50 @@ class ManagedDriverControllerTest(unittest.TestCase):
                 ]
             )
 
+    def test_setup_cleanup_accepts_delayed_adb_for_attested_qemu_guest(self):
+        identity = {
+            "birth": "original",
+            "command": "/sdk/qemu-system-x86_64 @owned -delay-adb -id validation_GradleManagedDevice",
+        }
+        candidate = {
+            "avd": "owned",
+            "managedId": "validation_GradleManagedDevice",
+            "nonce": "private",
+        }
+        with tempfile.TemporaryDirectory() as folder:
+
+            def execute(*arguments, **keywords):
+                if arguments[0] == "lsof":
+                    data = b"n127.0.0.1:5554\n"
+                elif arguments[-3:] == ("emu", "avd", "name"):
+                    data = b"owned\nOK"
+                elif "shell" in arguments:
+                    raise subprocess.CalledProcessError(
+                        1, arguments, stderr=b"device offline: setup uses -delay-adb"
+                    )
+                else:
+                    self.assertEqual(
+                        ("/sdk/adb", "-s", "emulator-5554", "emu", "kill"), arguments
+                    )
+                    data = b"OK"
+                return subprocess.CompletedProcess(arguments, 0, data)
+
+            command = Mock(side_effect=execute)
+            MODULE["stop_owned_setup_guest"](
+                41,
+                candidate,
+                identity,
+                Path(folder),
+                "/sdk/adb",
+                execute=command,
+                process_identity=Mock(return_value=identity),
+            )
+            self.assertEqual(
+                1, sum(c.args[-1] == "kill" for c in command.call_args_list)
+            )
+            proof = json.loads((Path(folder) / "setup-guest-41.json").read_text())
+            self.assertEqual(identity, proof["identity"])
+
     def test_setup_cleanup_requires_same_pid_birth_command_avd_and_console_port(self):
         identity = {
             "birth": "original",
@@ -754,12 +798,23 @@ class ManagedDriverControllerTest(unittest.TestCase):
             "managedId": "validation_GradleManagedDevice",
             "nonce": "private",
         }
-        for mutation in (None, "identity", "port", "avd", "not-qemu", "ambiguous-port"):
+        for mutation in (
+            None,
+            "identity",
+            "identity-at-kill",
+            "port",
+            "avd",
+            "not-qemu",
+            "ambiguous-port",
+        ):
             with (
                 self.subTest(mutation=mutation),
                 tempfile.TemporaryDirectory() as folder,
             ):
                 output = Path(folder)
+                guest_identity = dict(identity)
+                if mutation == "not-qemu":
+                    guest_identity["command"] = "/usr/bin/sleep 600"
                 listens = 0
 
                 def execute(*arguments, **keywords):
@@ -786,19 +841,24 @@ class ManagedDriverControllerTest(unittest.TestCase):
 
                 command = Mock(side_effect=execute)
                 current = (
-                    {**identity, "birth": "reused"}
-                    if mutation == "identity"
-                    else identity
+                    {**guest_identity, "birth": "reused"}
+                    if mutation in {"identity", "identity-at-kill"}
+                    else guest_identity
+                )
+                identity_reader = (
+                    Mock(side_effect=[guest_identity, current])
+                    if mutation == "identity-at-kill"
+                    else Mock(return_value=current)
                 )
                 if mutation is None:
                     MODULE["stop_owned_setup_guest"](
                         41,
                         candidate,
-                        identity,
+                        guest_identity,
                         output,
                         "/sdk/adb",
                         execute=command,
-                        process_identity=Mock(return_value=current),
+                        process_identity=identity_reader,
                     )
                     self.assertEqual("kill", command.call_args.args[-1])
                 else:
@@ -806,11 +866,11 @@ class ManagedDriverControllerTest(unittest.TestCase):
                         MODULE["stop_owned_setup_guest"](
                             41,
                             candidate,
-                            identity,
+                            guest_identity,
                             output,
                             "/sdk/adb",
                             execute=command,
-                            process_identity=Mock(return_value=current),
+                            process_identity=identity_reader,
                         )
                     self.assertFalse(
                         any(call.args[-1] == "kill" for call in command.call_args_list)
