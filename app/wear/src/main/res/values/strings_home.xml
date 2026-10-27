@@ -50,4 +50,5 @@
     <string name="wear_flow_failed">Couldn’t load your recent moments</string>
     <string name="wear_flow_memories">Memories</string>
     <string name="wear_flow_settings">Settings</string>
+    <string name="wear_moment_handwriting">Handwritten note</string>
 </resources>

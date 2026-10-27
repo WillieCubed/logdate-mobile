@@ -160,6 +160,7 @@ internal fun momentBody(note: JournalNote): String? =
         is JournalNote.Audio -> fullTranscript(note)
         is JournalNote.Image -> note.caption.trim().takeIf(String::isNotEmpty)
         is JournalNote.Video -> note.caption.trim().takeIf(String::isNotEmpty)
+        is JournalNote.Handwriting -> null
     }
 
 @Composable

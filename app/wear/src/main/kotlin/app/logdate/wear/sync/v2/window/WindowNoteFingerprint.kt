@@ -12,6 +12,7 @@ internal fun windowNoteFingerprint(
     val content =
         when (note) {
             is JournalNote.Text -> note.copy(syncVersion = 0)
+            is JournalNote.Handwriting -> note.copy(syncVersion = 0)
             is JournalNote.Audio -> note.copy(syncVersion = 0, mediaRef = media.storedReference(note.mediaRef))
             is JournalNote.Image -> note.copy(syncVersion = 0, mediaRef = media.storedReference(note.mediaRef))
             is JournalNote.Video -> note.copy(syncVersion = 0, mediaRef = media.storedReference(note.mediaRef))

@@ -27,6 +27,7 @@ fun momentLabel(note: JournalNote): String =
         is JournalNote.Audio -> stringResource(R.string.wear_moment_voice, formatClockDuration(note.durationMs.milliseconds))
         is JournalNote.Image -> note.caption.ifBlank { stringResource(R.string.wear_moment_photo) }
         is JournalNote.Video -> note.caption.ifBlank { stringResource(R.string.wear_moment_video) }
+        is JournalNote.Handwriting -> stringResource(R.string.wear_moment_handwriting)
     }
 
 /** The clock time of [instant] in [timeZone], in the user's 12 or 24 hour style. */
