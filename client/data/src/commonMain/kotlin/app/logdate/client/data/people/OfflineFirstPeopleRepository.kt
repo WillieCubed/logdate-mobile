@@ -62,8 +62,8 @@ class OfflineFirstPeopleRepository(
 
     override suspend fun updatePerson(person: Person) {
         withContext(dispatcher) {
-            val existing = personDao.getById(person.uid) ?: return@withContext
             mediaClaimFence.withClaim {
+                val existing = personDao.getById(person.uid) ?: return@withClaim
                 personDao.update(
                     person.toEntity(
                         createdAt = existing.created,
@@ -85,13 +85,14 @@ class OfflineFirstPeopleRepository(
         alias: String,
     ) {
         withContext(dispatcher) {
-            val existing = personDao.getById(personUid) ?: return@withContext
             val normalizedAlias = alias.trim()
-            if (normalizedAlias.isEmpty() || existing.aliases.any { it.equals(normalizedAlias, ignoreCase = true) }) {
+            if (normalizedAlias.isEmpty()) {
                 return@withContext
             }
 
             mediaClaimFence.withClaim {
+                val existing = personDao.getById(personUid) ?: return@withClaim
+                if (existing.aliases.any { it.equals(normalizedAlias, ignoreCase = true) }) return@withClaim
                 personDao.update(
                     existing.copy(
                         aliases = existing.aliases + normalizedAlias,
@@ -107,8 +108,8 @@ class OfflineFirstPeopleRepository(
         alias: String,
     ) {
         withContext(dispatcher) {
-            val existing = personDao.getById(personUid) ?: return@withContext
             mediaClaimFence.withClaim {
+                val existing = personDao.getById(personUid) ?: return@withClaim
                 personDao.update(
                     existing.copy(
                         aliases = existing.aliases.filterNot { it.equals(alias, ignoreCase = true) },

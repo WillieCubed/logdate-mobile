@@ -45,7 +45,7 @@ class OfflineFirstRewindRepositoryMetadataTest {
             var atomicInserts = 0
             val dao =
                 FakeCachedRewindDao {
-                    assertEquals(1, fence.claims, "The claim must be acquired before the atomic insert")
+                    assertEquals(true, fence.isInsideClaim, "The claim must surround the atomic insert")
                     atomicInserts++
                 }
             val repository = OfflineFirstRewindRepository(dao, UnconfinedTestDispatcher(testScheduler), fence)
