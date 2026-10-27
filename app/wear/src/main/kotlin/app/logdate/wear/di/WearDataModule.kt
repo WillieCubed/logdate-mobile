@@ -151,6 +151,7 @@ val wearDataModule =
                 phoneReachability = get(),
                 scope = get(),
                 notesV2 = get<WatchNotesV2>(),
+                deliveryStore = get(),
             )
         } binds arrayOf(WearNoteAckHandler::class, WearNoteRemovalNotifier::class)
         single<SyncManager> {
@@ -191,6 +192,7 @@ val wearDataModule =
                 retryScheduleStore = get(),
                 dataLayerClient = get(),
                 noteSchedule = get<WatchCaptureDelivery>()::schedule,
+                deadLetterStore = get(),
             )
         }
         single { PeerStateStore() }

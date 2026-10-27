@@ -40,6 +40,46 @@ class WatchSyncSchedulerTest {
     }
 
     @Test
+    fun `operation retry deadlines are shared with the sender`() =
+        runTest {
+            val pending = PendingUpload("note-1", PendingOperation.CREATE, operationId = "capture-1")
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns listOf(pending)
+            coEvery { retryScheduleStore.nextAttemptAt(EntityType.NOTE, wearRetryKey(pending)) } returns now.toEpochMilliseconds() + 30_000
+            scheduler().scheduleNext()
+            assertEquals(listOf(30_000L), scheduled)
+        }
+
+    @Test
+    fun `a retained failure does not create an immediate retry loop`() =
+        runTest {
+            val pending = PendingUpload("note-1", PendingOperation.CREATE, operationId = "capture-1")
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns listOf(pending)
+            val failures = mockk<app.logdate.client.sync.metadata.SyncDeadLetterStore>()
+            coEvery { failures.list() } returns
+                listOf(
+                    app.logdate.client.sync.metadata.SyncDeadLetterRecord(
+                        id = "capture-1",
+                        entityType = "NOTE",
+                        entityId = "note-1",
+                        operation = "CREATE",
+                        retryCount = 5,
+                        lastError = "NETWORK_UNAVAILABLE",
+                        failedAt = 0,
+                        operationId = "capture-1",
+                    ),
+                )
+            WatchSyncScheduler(
+                work = WatchSyncWork { scheduled += it },
+                syncStatus = status,
+                syncMetadataService = syncMetadataService,
+                retryScheduleStore = retryScheduleStore,
+                dataLayerClient = dataLayerClient,
+                deadLetterStore = failures,
+            ).scheduleNext()
+            assertEquals(emptyList(), scheduled)
+        }
+
+    @Test
     fun `nothing waiting schedules nothing`() =
         runTest {
             scheduler().scheduleNext()

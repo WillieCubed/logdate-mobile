@@ -316,12 +316,12 @@ class AudioSyncFlowTest {
 
             val result = syncManager.syncContent()
 
-            // Should not fail — just skip the missing note
-            assertTrue(result.success)
+            // Report unavailable local data and retain the operation.
+            kotlin.test.assertFalse(result.success)
             assertEquals(0, result.uploadedItems)
 
-            // Should clear the orphaned outbox entry
-            coVerify {
+            // Do not claim delivery of missing local data.
+            coVerify(exactly = 0) {
                 syncMetadataService.settleIfCurrent(EntityType.NOTE, match { it.entityId == noteId.toString() }, any(), any())
             }
 

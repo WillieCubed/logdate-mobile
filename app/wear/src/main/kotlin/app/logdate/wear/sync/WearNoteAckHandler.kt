@@ -10,4 +10,10 @@ fun interface WearNoteAckHandler {
         noteId: Uuid,
         ack: NoteAckPayload?,
     )
+
+    suspend fun onNoteAcknowledged(
+        noteId: Uuid,
+        ack: NoteAckPayload?,
+        transferId: String?,
+    ) = onNoteAcknowledged(noteId, ack)
 }

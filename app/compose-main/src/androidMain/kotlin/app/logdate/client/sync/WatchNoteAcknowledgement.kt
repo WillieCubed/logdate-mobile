@@ -31,9 +31,23 @@ class MessageWatchNoteAcknowledger(
     override suspend fun acknowledge(
         noteId: Uuid,
         lastUpdated: Instant,
+    ) = acknowledge(noteId, lastUpdated, null)
+
+    override suspend fun acknowledge(
+        noteId: Uuid,
+        lastUpdated: Instant,
+        transferId: String?,
     ) {
         val payload = NoteAckPayload.of(lastUpdated).encode()
-        if (!sender.send(WearAudioRequestPaths.noteAckPath(noteId), payload)) {
+        val path =
+            if (transferId ==
+                null
+            ) {
+                WearAudioRequestPaths.noteAckPath(noteId)
+            } else {
+                WearAudioRequestPaths.noteAckPath(noteId, transferId)
+            }
+        if (!sender.send(path, payload)) {
             Napier.w("Watch did not receive the acknowledgement for note $noteId; it will retry")
         }
     }

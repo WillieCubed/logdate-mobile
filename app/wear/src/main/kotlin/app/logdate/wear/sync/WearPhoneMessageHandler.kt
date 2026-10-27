@@ -59,7 +59,9 @@ class WearPhoneMessageHandler(
                 return
             }
         try {
-            ackHandler.onNoteAcknowledged(noteId, readAck(noteId, data))
+            val transferId = WearAudioRequestPaths.transferIdFromAckPath(path)
+            val ack = readAck(noteId, data)
+            if (transferId == null) ackHandler.onNoteAcknowledged(noteId, ack) else ackHandler.onNoteAcknowledged(noteId, ack, transferId)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

@@ -44,4 +44,19 @@ class MessageWatchNoteAcknowledgerTest {
 
             acknowledger.acknowledge(noteId, stored)
         }
+
+    @Test
+    fun `a transfer receipt retains its token and stored version`() =
+        runTest {
+            val token = Uuid.random().toString()
+            val sent = mutableListOf<Pair<String, ByteArray>>()
+            val acknowledger = MessageWatchNoteAcknowledger { path, bytes -> sent.add(path to bytes) }
+            acknowledger.acknowledge(noteId, stored, token)
+            assertEquals(
+                app.logdate.client.sync.datalayer.WearAudioRequestPaths
+                    .noteAckPath(noteId, token),
+                sent.single().first,
+            )
+            assertEquals(NoteAckPayload.of(stored), NoteAckPayload.decode(sent.single().second))
+        }
 }

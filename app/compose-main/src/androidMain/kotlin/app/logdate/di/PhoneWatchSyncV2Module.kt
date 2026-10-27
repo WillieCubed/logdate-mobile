@@ -242,9 +242,14 @@ val phoneWatchSyncV2Module =
                         acknowledger,
                         notifier,
                         mapper,
-                        canAcknowledgeExistingAudio = { note, data ->
-                            operation == null || WatchCaptureReceipt.existingAudioMatches(note, data, mediaFiles::filePath)
-                        },
+                        proveExistingAudio =
+                            if (operation == null) {
+                                null
+                            } else {
+                                { note, data ->
+                                    WatchCaptureReceipt.existingAudioMatches(note, data, mediaFiles::filePath)
+                                }
+                            },
                     )
                 WatchRecordIngestorV2(
                     ingestMetadata = ingestor::onNoteMetadata,

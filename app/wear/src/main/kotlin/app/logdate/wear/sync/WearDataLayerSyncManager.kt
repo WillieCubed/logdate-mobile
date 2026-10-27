@@ -2,6 +2,7 @@ package app.logdate.wear.sync
 
 import app.logdate.client.database.dao.HealthSnapshotDao
 import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.sync.SyncError
@@ -42,8 +43,8 @@ import kotlin.uuid.Uuid
  *
  * Resilience features:
  * - Exponential backoff (5s base, 5min cap) for transient failures
- * - Items that fail [MAX_RETRY_ATTEMPTS] times are recorded as dead letters and retried every
- *   [DEAD_LETTER_RETRY_INTERVAL_MS]; they leave the outbox only when delivered or discarded
+ * - Items that fail [MAX_RETRY_ATTEMPTS] times stay pending with a retained failure until retried
+ *   or discarded; successful audio sends waiting for acknowledgement consume no failure attempts
  * - Only the operation an attempt sent is settled or charged with a failure, so a change queued
  *   while an attempt is in flight is never lost or counted against
  * - Parent-before-child ordering (journals → notes → associations → health)
@@ -71,6 +72,7 @@ class WearDataLayerSyncManager(
     private val audioDigester: AudioFileDigester = FileAudioDigester(),
     private val clock: Clock = Clock.System,
     private val notesV2: WatchNotesV2? = null,
+    private val deliveryStore: WearAudioDeliveryStore = WearAudioDeliveryStore(),
 ) : SyncManager,
     WearNoteAckHandler,
     WearNoteRemovalNotifier {
@@ -90,6 +92,7 @@ class WearDataLayerSyncManager(
             mediaFiles,
             audioDigester,
             clock,
+            deliveryStore,
         )
 
     /** True while a run has [syncLock]; the status follows it. */
@@ -128,7 +131,7 @@ class WearDataLayerSyncManager(
         val errors = mutableListOf<SyncError>()
 
         for (pending in pendingNotes) {
-            if (!legacy.shouldAttempt(EntityType.NOTE, pending.entityId)) {
+            if (!legacy.shouldAttempt(EntityType.NOTE, pending)) {
                 Napier.d("Skipping note ${pending.entityId} — backoff not elapsed")
                 continue
             }
@@ -156,43 +159,45 @@ class WearDataLayerSyncManager(
         }
     }
 
-    /**
-     * Clears a note the phone confirmed. It runs under the same lock as uploads, so a confirmation can
-     * neither land in the middle of an upload's own bookkeeping nor clear a version newer than the one
-     * the phone stored. A queued removal is never cleared by the confirmation of a create, and a
-     * confirmation without a version, from an older phone, clears the note as before. Once a
-     * confirmation is applied, the note's data item is deleted.
-     */
+    suspend fun onNoteAcknowledged(noteId: Uuid) = onNoteAcknowledged(noteId, null, null)
+
+    suspend fun onNoteAcknowledged(
+        noteId: Uuid,
+        transferId: String,
+    ) = onNoteAcknowledged(noteId, null, transferId)
+
     override suspend fun onNoteAcknowledged(
         noteId: Uuid,
         ack: NoteAckPayload?,
-    ) = syncLock.withLock {
-        val pending = queuedNote(noteId)
-        if (pending == null) {
-            Napier.d("Note $noteId was confirmed but is no longer queued")
-            return@withLock
-        }
-        if (pending.operation == PendingOperation.DELETE) {
-            Napier.i("Note $noteId was confirmed, but its removal has not reached the phone yet; the removal stays queued")
-            return@withLock
-        }
-        if (ack != null && isNewerThan(noteId, ack)) {
-            Napier.i("Note $noteId changed after the version the phone confirmed; it stays queued")
-            return@withLock
-        }
-        legacy.settle(EntityType.NOTE, pending, version = 1)
-        deleteDeliveredDataItem(noteId)
-    }
+    ) = onNoteAcknowledged(noteId, ack, null)
 
-    private suspend fun queuedNote(noteId: Uuid): PendingUpload? =
-        syncMetadataService.getPendingUploads(EntityType.NOTE).firstOrNull { it.entityId == noteId.toString() }
-
-    private suspend fun isNewerThan(
+    /** A receipt settles only the captured operation and exact audio snapshot it identifies. */
+    override suspend fun onNoteAcknowledged(
         noteId: Uuid,
-        ack: NoteAckPayload,
-    ): Boolean {
-        val local = notesRepository.getNoteById(noteId) ?: return false
-        return local.lastUpdated.toEpochMilliseconds() > ack.lastUpdated
+        ack: NoteAckPayload?,
+        transferId: String?,
+    ) = syncLock.withLock {
+        val deliveries = deliveryStore.deliveries(noteId.toString())
+        val delivery = if (transferId != null) deliveries.firstOrNull { it.token == transferId } else deliveries.singleOrNull()
+        if (delivery == null || (transferId == null && !delivery.allowsLegacy)) return@withLock
+        val pending = syncMetadataService.getPendingUploads(EntityType.NOTE).firstOrNull { it.entityId == noteId.toString() }
+        var settled = false
+        if (pending != null && delivery.matches(pending)) {
+            val note = notesRepository.getNoteById(noteId) as? JournalNote.Audio ?: return@withLock
+            if (ack != null && note.lastUpdated.toEpochMilliseconds() != ack.lastUpdated) return@withLock
+            if (!delivery.matchesSnapshot(legacy.deliverySnapshot(note))) return@withLock
+            if (!legacy.settle(EntityType.NOTE, pending, version = 1)) return@withLock
+            settled = true
+        } else if (transferId == null) {
+            return@withLock
+        }
+        if (pending == null || delivery.operationId != null) retryScheduleStore.clear(EntityType.NOTE, delivery.retryKey)
+        deadLetterStore
+            .list()
+            .filter { it.entityType == EntityType.NOTE.name && delivery.matchesFailure(it) }
+            .forEach { deadLetterStore.remove(it.id) }
+        deliveryStore.remove(delivery.token)
+        if (settled) deleteDeliveredDataItem(noteId)
     }
 
     /**
@@ -230,7 +235,7 @@ class WearDataLayerSyncManager(
         val errors = mutableListOf<SyncError>()
 
         for (pending in pendingJournals) {
-            if (!legacy.shouldAttempt(EntityType.JOURNAL, pending.entityId)) {
+            if (!legacy.shouldAttempt(EntityType.JOURNAL, pending)) {
                 Napier.d("Skipping journal ${pending.entityId} — backoff not elapsed")
                 continue
             }
@@ -268,7 +273,7 @@ class WearDataLayerSyncManager(
         val errors = mutableListOf<SyncError>()
 
         for (pending in pendingAssociations) {
-            if (!legacy.shouldAttempt(EntityType.ASSOCIATION, pending.entityId)) {
+            if (!legacy.shouldAttempt(EntityType.ASSOCIATION, pending)) {
                 Napier.d("Skipping association ${pending.entityId} — backoff not elapsed")
                 continue
             }
@@ -354,22 +359,7 @@ class WearDataLayerSyncManager(
 
     override fun observeDeadLetters(): Flow<List<SyncDeadLetterRecord>> = deadLetterStore.observe()
 
-    override suspend fun retryDeadLetter(id: String) =
-        syncLock.withLock {
-            val record = deadLetterStore.list().firstOrNull { it.id == id } ?: return@withLock
-            val entityType = runCatching { EntityType.valueOf(record.entityType) }.getOrNull()
-            val operation = runCatching { PendingOperation.valueOf(record.operation) }.getOrNull()
-            if (entityType == null || operation == null) {
-                Napier.w("Cannot retry dead-letter $id with type=${record.entityType} op=${record.operation}")
-                deadLetterStore.remove(id)
-                return@withLock
-            }
-            if (syncMetadataService.getPendingUploads(entityType).none { it.entityId == record.entityId }) {
-                syncMetadataService.enqueuePending(record.entityId, entityType, operation)
-            }
-            retryScheduleStore.clear(entityType, record.entityId)
-            deadLetterStore.remove(id)
-        }
+    override suspend fun retryDeadLetter(id: String) = syncLock.withLock { legacy.retryDeadLetter(id) }
 
     /**
      * Abandons a set-aside item: the only way one leaves the outbox without reaching the phone. Only
@@ -395,7 +385,11 @@ class WearDataLayerSyncManager(
         record: SyncDeadLetterRecord,
     ): PendingUpload? =
         syncMetadataService.getPendingUploads(entityType).firstOrNull { pending ->
-            pending.entityId == record.entityId && (record.operationId == null || pending.operationId == record.operationId)
+            pending.entityId == record.entityId &&
+                pending.operationId == record.operationId &&
+                pending.scope == record.scope &&
+                pending.operation.name == record.operation &&
+                pending.expectedServerVersion == record.expectedServerVersion
         }
 
     companion object {

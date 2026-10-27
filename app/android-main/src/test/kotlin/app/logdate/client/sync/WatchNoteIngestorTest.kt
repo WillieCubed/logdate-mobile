@@ -461,6 +461,30 @@ class WatchNoteIngestorTest {
             assertEquals(listOf(note.lastUpdated, note.lastUpdated), acknowledger.versions)
         }
 
+    @Test
+    fun `a different audio edit is not acknowledged by the already stored note`() =
+        runTest {
+            val note = watchAudioNote()
+            ingestor.onNoteMetadata(mapper.toDataMap(note))
+            ingestor.onAudioBytes(note.uid, bytes("audio"))
+            ingestor.onNoteMetadata(mapper.toDataMap(note.copy(durationMs = note.durationMs + 1000)))
+            ingestor.onAudioBytes(note.uid, bytes("different audio"))
+            assertEquals(listOf(note.uid), acknowledger.acknowledged)
+            assertTrue(store.stashedMetadata(note.uid) != null)
+            assertEquals("audio", store.audioText(note.uid))
+        }
+
+    @Test
+    fun `a mismatched digest cannot acknowledge an already stored audio note`() =
+        runTest {
+            val note = watchAudioNote()
+            ingestor.onNoteMetadata(withDigestOf("audio", note))
+            ingestor.onAudioBytes(note.uid, bytes("audio"))
+            ingestor.onNoteMetadata(withDigestOf("different audio", note))
+            assertEquals(listOf(note.uid), acknowledger.acknowledged)
+            assertTrue(store.stashedMetadata(note.uid) != null)
+        }
+
     private fun bytes(text: String): InputStream = ByteArrayInputStream(text.encodeToByteArray())
 
     private fun watchAudioNote(id: Uuid = Uuid.random()): JournalNote.Audio {

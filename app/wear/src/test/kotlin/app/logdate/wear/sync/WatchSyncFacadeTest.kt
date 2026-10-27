@@ -65,6 +65,31 @@ class WatchSyncFacadeTest {
     }
 
     @Test
+    fun `unavailable local storage remains visible above connectivity pauses`() {
+        assertEquals(
+            SyncPausedReason.LOCAL_STORAGE_UNAVAILABLE,
+            combinedWatchSyncStatus(
+                status(pausedReason = SyncPausedReason.LOCAL_STORAGE_UNAVAILABLE),
+                status(pausedReason = SyncPausedReason.OFFLINE),
+            ).pausedReason,
+        )
+        assertEquals(
+            SyncPausedReason.LOCAL_STORAGE_UNAVAILABLE,
+            combinedWatchSyncStatus(
+                status(pausedReason = SyncPausedReason.MEDIA_WAITING_FOR_WIFI),
+                status(pausedReason = SyncPausedReason.LOCAL_STORAGE_UNAVAILABLE),
+            ).pausedReason,
+        )
+        assertEquals(
+            SyncPausedReason.NEEDS_DEVICE_LINK,
+            combinedWatchSyncStatus(
+                status(pausedReason = SyncPausedReason.NEEDS_DEVICE_LINK),
+                status(pausedReason = SyncPausedReason.LOCAL_STORAGE_UNAVAILABLE),
+            ).pausedReason,
+        )
+    }
+
+    @Test
     fun `the cloud engine's own error reaches the status unchanged`() {
         val error = SyncError(SyncErrorType.AUTHENTICATION_ERROR, "The server refused this watch's session", retryable = true)
 

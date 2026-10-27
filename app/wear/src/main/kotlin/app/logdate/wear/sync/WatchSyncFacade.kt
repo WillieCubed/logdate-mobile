@@ -86,8 +86,9 @@ private fun worsePause(
 /** How much the person has to do before sync can go on: linking again from the phone is the most. */
 private fun SyncPausedReason.effortToClear(): Int =
     when (this) {
-        SyncPausedReason.NEEDS_DEVICE_LINK -> 6
-        SyncPausedReason.NEEDS_RECOVERY_PHRASE -> 5
+        SyncPausedReason.NEEDS_DEVICE_LINK -> 7
+        SyncPausedReason.NEEDS_RECOVERY_PHRASE -> 6
+        SyncPausedReason.LOCAL_STORAGE_UNAVAILABLE -> 5
         SyncPausedReason.NOT_SIGNED_IN -> 4
         SyncPausedReason.BACKGROUND_DATA_OFF -> 3
         SyncPausedReason.OFFLINE -> 2

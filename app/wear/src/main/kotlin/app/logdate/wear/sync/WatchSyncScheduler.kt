@@ -2,6 +2,7 @@ package app.logdate.wear.sync
 
 import app.logdate.client.sync.SyncStatus
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.wear.sync.v2.delivery.NoteSchedule
@@ -42,6 +43,7 @@ class WatchSyncScheduler(
     private val dataLayerClient: WearDataLayerClient,
     private val clock: Clock = Clock.System,
     private val noteSchedule: suspend () -> NoteSchedule = { NoteSchedule.Outbox },
+    private val deadLetterStore: SyncDeadLetterStore? = null,
 ) {
     /** Follows the sync status in [scope] for the life of the app. */
     @OptIn(FlowPreview::class)
@@ -69,10 +71,21 @@ class WatchSyncScheduler(
         work.runAfter((dueAt - clock.now().toEpochMilliseconds()).coerceAtLeast(0L))
     }
 
-    private suspend fun earliestAttemptAt(types: List<EntityType>): Long? =
-        types
-            .flatMap { type -> syncMetadataService.getPendingUploads(type).map { pending -> type to pending.entityId } }
-            .minOfOrNull { (type, entityId) -> retryScheduleStore.nextAttemptAt(type, entityId) ?: 0L }
+    private suspend fun earliestAttemptAt(types: List<EntityType>): Long? {
+        val failures = deadLetterStore?.list().orEmpty()
+        return types
+            .flatMap { type -> syncMetadataService.getPendingUploads(type).map { type to it } }
+            .filterNot { (type, pending) ->
+                failures.any {
+                    it.entityType == type.name &&
+                        it.entityId == pending.entityId &&
+                        it.operationId == pending.operationId &&
+                        it.scope == pending.scope &&
+                        it.operation == pending.operation.name &&
+                        it.expectedServerVersion == pending.expectedServerVersion
+                }
+            }.minOfOrNull { (type, pending) -> retryScheduleStore.nextAttemptAt(type, wearRetryKey(pending)) ?: 0L }
+    }
 
     private suspend fun scheduleNextLogged() {
         try {

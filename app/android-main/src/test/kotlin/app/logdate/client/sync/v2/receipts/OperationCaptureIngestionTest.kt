@@ -102,9 +102,14 @@ class OperationCaptureIngestionTest {
                     acknowledger,
                     { },
                     mapper,
-                    canAcknowledgeExistingAudio = { note, data ->
-                        operation == null || WatchCaptureReceipt.existingAudioMatches(note, data, resolveFile)
-                    },
+                    proveExistingAudio =
+                        if (operation == null) {
+                            null
+                        } else {
+                            { note, data ->
+                                WatchCaptureReceipt.existingAudioMatches(note, data, resolveFile)
+                            }
+                        },
                 )
             WatchRecordIngestorV2(
                 ingestor::onNoteMetadata,
@@ -224,6 +229,28 @@ class OperationCaptureIngestionTest {
             stored[text.uid] = audio(phone.absolutePath)
             send(audio("/watch/recording.m4a"), "audio-operation", media(phone))
             assertEquals("audio-operation", receipt("audio-operation")?.operationId)
+        }
+
+    @Test
+    fun `matching stored metadata cannot certify different recording bytes`() =
+        runTest {
+            val phone = File(root, "phone.m4a").apply { writeBytes(byteArrayOf(1, 2)) }
+            val incoming = File(root, "watch.m4a").apply { writeBytes(byteArrayOf(3, 4)) }
+            stored[text.uid] = audio(phone.absolutePath)
+            send(audio("/watch/recording.m4a"), "different-bytes", media(incoming))
+            assertTrue(sent.isEmpty())
+            assertNull(receipt("different-bytes"))
+            assertContentEquals(byteArrayOf(1, 2), phone.readBytes())
+        }
+
+    @Test
+    fun `matching recording bytes cannot certify different audio metadata`() =
+        runTest {
+            val phone = File(root, "phone.m4a").apply { writeBytes(byteArrayOf(1, 2)) }
+            stored[text.uid] = audio(phone.absolutePath)
+            send(audio("/watch/recording.m4a").copy(durationMs = 1000), "different-metadata", media(phone))
+            assertTrue(sent.isEmpty())
+            assertNull(receipt("different-metadata"))
         }
 
     @Test
