@@ -123,7 +123,17 @@ internal suspend fun verifiedCanonicalMediaReference(
 ): String? {
     if (retainedCanonicalMediaDigest(reference) == null) return null
     val original = UnavailableMediaReferences.nativeSource(reference) ?: reference
-    return original.takeIf { verify(it) }
+    val canonical =
+        when (val parsed = MediaReference.parse(original)) {
+            is MediaReference.LocalFile -> {
+                "logdate-media://library/" + checkNotNull(retainedPrivateMediaPath(parsed.path)).removePrefix("media/")
+            }
+
+            else -> {
+                original
+            }
+        }
+    return original.takeIf { verify(canonical) }
 }
 
 /** Match only LogDate's Android private collections, including the development application ID. */

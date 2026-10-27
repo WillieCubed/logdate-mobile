@@ -1,6 +1,11 @@
 package app.logdate.client.data.restore
 
+import app.logdate.client.media.InMemoryMediaManager
+import app.logdate.client.media.MediaFileSource
+import app.logdate.client.media.storage.StoredMediaReferences
+import app.logdate.client.media.storage.isRecoveredOriginal
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.Buffer
 import java.io.File
 import java.nio.file.Files
 import java.security.MessageDigest
@@ -154,6 +159,39 @@ class RetainedManagedMediaSourceTest {
             assertNull(verifiedCanonicalMediaReference("logdate-media://library/objects/sha256/bb/$digest.png", ::verify))
             assertEquals(1, checks)
             assertNull(verifiedCanonicalMediaReference(canonical) { false })
+        }
+
+    @Test
+    fun `consumed retained bytes reuse a verified live original without quarantining its legacy URI`() =
+        runTest {
+            val digest = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+            val relative = "objects/sha256/ba/$digest.png"
+            val original = "file:/data/user/0/studio.hypertext.logdate.debug/files/media/$relative"
+            val canonical = "logdate-media://library/$relative"
+            var bytes = "abc"
+            val checked = mutableListOf<String>()
+            val media =
+                object : InMemoryMediaManager() {
+                    override suspend fun exists(mediaId: String): Boolean {
+                        checked += mediaId
+                        return mediaId == canonical
+                    }
+
+                    override suspend fun openMedia(uri: String): MediaFileSource {
+                        assertEquals(canonical, uri)
+                        return MediaFileSource("original.png", "image/png", bytes.length.toLong()) {
+                            Buffer().apply { write(bytes.encodeToByteArray()) }
+                        }
+                    }
+                }
+
+            suspend fun verify(reference: String) = media.isRecoveredOriginal(reference, StoredMediaReferences.Unchanged)
+            assertNull(RetainedManagedMediaSource(emptyMap()).resolve(original))
+            assertEquals(original, verifiedCanonicalMediaReference(original, ::verify))
+            assertEquals(original, verifiedCanonicalMediaReference(retainedUnavailableMediaReference(original), ::verify))
+            assertEquals(listOf(canonical, canonical), checked)
+            bytes = "abd"
+            assertNull(verifiedCanonicalMediaReference(original, ::verify))
         }
 
     @Test
