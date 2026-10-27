@@ -1,95 +1,130 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:installLocation="internalOnly"
-    android:targetSandboxVersion="2">
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:tools="http://schemas.android.com/tools"
+  android:installLocation="internalOnly"
+  android:targetSandboxVersion="2"
+>
 
     <uses-feature
-        android:name="android.software.companion_device_setup"
-        android:required="false" />
+    android:name="android.software.companion_device_setup"
+    android:required="false"
+  />
 
     <!--
         Chromebooks and desktops without a touchscreen can install LogDate; it works with a
         keyboard, mouse, or trackpad. See large-screens-and-desktop-windowing.md.
     -->
     <uses-feature
-        android:name="android.hardware.touchscreen"
-        android:required="false" />
+    android:name="android.hardware.touchscreen"
+    android:required="false"
+  />
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.REQUEST_COMPANION_PROFILE_WATCH" />
-    <uses-permission android:name="android.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE" />
+    <uses-permission
+    android:name="android.permission.REQUEST_COMPANION_PROFILE_WATCH"
+  />
+    <uses-permission
+    android:name="android.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE"
+  />
+
+    <uses-permission
+    android:name="com.google.android.gms.permission.AD_ID"
+    tools:node="remove"
+  />
+    <uses-permission
+    android:name="android.permission.ACCESS_ADSERVICES_AD_ID"
+    tools:node="remove"
+  />
 
     <application
-        android:name="app.logdate.client.LogdateApplication"
-        android:allowBackup="true"
-        android:backupAgent="app.logdate.client.data.restore.NativeAccountBackupAgent"
-        android:fullBackupOnly="true"
-        android:appCategory="productivity"
-        android:dataExtractionRules="@xml/data_extraction_rules"
-        android:enableOnBackInvokedCallback="true"
-        android:fullBackupContent="@xml/backup_rules"
-        android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.LogDate"
-        tools:targetApi="34">
+    android:name="app.logdate.client.LogdateApplication"
+    android:allowBackup="true"
+    android:backupAgent="app.logdate.client.data.restore.NativeAccountBackupAgent"
+    android:fullBackupOnly="true"
+    android:appCategory="productivity"
+    android:dataExtractionRules="@xml/data_extraction_rules"
+    android:enableOnBackInvokedCallback="true"
+    android:fullBackupContent="@xml/backup_rules"
+    android:icon="@mipmap/ic_launcher"
+    android:label="@string/app_name"
+    android:roundIcon="@mipmap/ic_launcher_round"
+    android:supportsRtl="true"
+    android:theme="@style/Theme.LogDate"
+    tools:targetApi="34"
+  >
 
         <meta-data
-            android:name="app.logdate.watchExperienceDefault"
-            android:value="${watchExperienceDefault}" />
+      android:name="google_analytics_adid_collection_enabled"
+      android:value="false"
+    />
 
         <meta-data
-            android:name="app.logdate.quietSaveDefault"
-            android:value="${quietSaveDefault}" />
+      android:name="app.logdate.watchExperienceDefault"
+      android:value="${watchExperienceDefault}"
+    />
+
+        <meta-data
+      android:name="app.logdate.quietSaveDefault"
+      android:value="${quietSaveDefault}"
+    />
 
         <!-- Maps SDK 20 can load a legacy renderer on older Google Play services. -->
         <uses-library
-            android:name="org.apache.http.legacy"
-            android:required="false" />
+      android:name="org.apache.http.legacy"
+      android:required="false"
+    />
 
         <!-- Koin installs the worker factory after loading the application's dependencies. -->
         <provider
-            android:name="androidx.startup.InitializationProvider"
-            android:authorities="${applicationId}.androidx-startup"
-            android:exported="false"
-            tools:node="merge">
+      android:name="androidx.startup.InitializationProvider"
+      android:authorities="${applicationId}.androidx-startup"
+      android:exported="false"
+      tools:node="merge"
+    >
             <meta-data
-                android:name="androidx.work.WorkManagerInitializer"
-                android:value="androidx.startup"
-                tools:node="remove" />
+        android:name="androidx.work.WorkManagerInitializer"
+        android:value="androidx.startup"
+        tools:node="remove"
+      />
         </provider>
 
         <meta-data
-            android:name="firebase_performance_logcat_enabled"
-            android:value="true" />
+      android:name="firebase_performance_logcat_enabled"
+      android:value="true"
+    />
         <meta-data
-            android:name="com.google.mlkit.vision.DEPENDENCIES"
-            android:value="barcode_ui" />
+      android:name="com.google.mlkit.vision.DEPENDENCIES"
+      android:value="barcode_ui"
+    />
         <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="@string/google_maps_api_key" />
+      android:name="com.google.android.geo.API_KEY"
+      android:value="@string/google_maps_api_key"
+    />
         <meta-data
-            android:name="health_connect.privacy_policy_url"
-            android:value="https://logdate.app/privacy" />
+      android:name="health_connect.privacy_policy_url"
+      android:value="https://logdate.app/privacy"
+    />
 
         <activity
-            android:name="app.logdate.client.MainActivity"
-            android:exported="true"
-            android:theme="@style/Theme.LogDate.Starting"
-            android:enableOnBackInvokedCallback="true"
-            android:documentLaunchMode="intoExisting"
-            android:supportsPictureInPicture="true"
-            android:resizeableActivity="true"
-            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|density|keyboard|keyboardHidden|navigation"
-            android:windowSoftInputMode="adjustResize">
+      android:name="app.logdate.client.MainActivity"
+      android:exported="true"
+      android:theme="@style/Theme.LogDate.Starting"
+      android:enableOnBackInvokedCallback="true"
+      android:documentLaunchMode="intoExisting"
+      android:supportsPictureInPicture="true"
+      android:resizeableActivity="true"
+      android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|density|keyboard|keyboardHidden|navigation"
+      android:windowSoftInputMode="adjustResize"
+    >
             <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
+        android:name="android.app.shortcuts"
+        android:resource="@xml/shortcuts"
+      />
             <meta-data
-                android:name="android.allow.multiple_resumed_activities"
-                android:value="true" />
+        android:name="android.allow.multiple_resumed_activities"
+        android:value="true"
+      />
 
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
@@ -210,34 +245,35 @@
         
         <!-- fullUser permits every orientation and respects the person's rotation lock. -->
         <activity
-            android:name="app.logdate.client.remote.RemoteCameraActivity"
-            android:exported="false"
-            android:resizeableActivity="true"
-            android:screenOrientation="fullUser"
-            tools:ignore="DiscouragedApi" />
+      android:name="app.logdate.client.remote.RemoteCameraActivity"
+      android:exported="false"
+      android:resizeableActivity="true"
+      android:screenOrientation="fullUser"
+      tools:ignore="DiscouragedApi"
+    />
 
         <activity
-            android:name="app.logdate.client.EditorActivity"
-            android:supportsPictureInPicture="true"
-            android:exported="true"
-            android:theme="@style/Theme.LogDate"
-            android:enableOnBackInvokedCallback="true"
-            android:documentLaunchMode="always"
-            android:windowSoftInputMode="adjustResize"
-            android:resizeableActivity="true"
-            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|density|keyboard|keyboardHidden|navigation"
-            android:taskAffinity=".editor">
+      android:name="app.logdate.client.EditorActivity"
+      android:supportsPictureInPicture="true"
+      android:exported="true"
+      android:theme="@style/Theme.LogDate"
+      android:enableOnBackInvokedCallback="true"
+      android:documentLaunchMode="always"
+      android:windowSoftInputMode="adjustResize"
+      android:resizeableActivity="true"
+      android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|density|keyboard|keyboardHidden|navigation"
+      android:taskAffinity=".editor"
+    >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
             </intent-filter>
             <!-- Launchers and the taskbar offer "New window" for the editor. -->
             <property
-                android:name="android.window.PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI"
-                android:value="true" />
+        android:name="android.window.PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI"
+        android:value="true"
+      />
             <!-- Keeps a floating or freeform editor window large enough to write in. -->
-            <layout
-                android:minWidth="280dp"
-                android:minHeight="320dp" />
+            <layout android:minWidth="280dp" android:minHeight="320dp" />
         </activity>
 
         <!--
@@ -246,11 +282,14 @@
             it without holding any special permission.
         -->
         <activity-alias
-            android:name=".HealthConnectPermissionsRationaleActivity"
-            android:exported="true"
-            android:targetActivity="app.logdate.client.MainActivity">
+      android:name=".HealthConnectPermissionsRationaleActivity"
+      android:exported="true"
+      android:targetActivity="app.logdate.client.MainActivity"
+    >
             <intent-filter>
-                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+                <action
+          android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"
+        />
             </intent-filter>
         </activity-alias>
 
@@ -262,33 +301,43 @@
             in HC settings regardless of other manifest entries.
         -->
         <activity-alias
-            android:name=".ViewHealthPermissionUsageActivity"
-            android:exported="true"
-            android:targetActivity="app.logdate.client.MainActivity"
-            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+      android:name=".ViewHealthPermissionUsageActivity"
+      android:exported="true"
+      android:targetActivity="app.logdate.client.MainActivity"
+      android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
+    >
             <intent-filter>
-                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
-                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+                <action
+          android:name="android.intent.action.VIEW_PERMISSION_USAGE"
+        />
+                <category
+          android:name="android.intent.category.HEALTH_PERMISSIONS"
+        />
             </intent-filter>
         </activity-alias>
 
         <receiver
-            android:name="app.logdate.client.activity.PhoneActivityTransitionReceiver"
-            android:enabled="true"
-            android:exported="false" />
+      android:name="app.logdate.client.activity.PhoneActivityTransitionReceiver"
+      android:enabled="true"
+      android:exported="false"
+    />
 
         <receiver
-            android:name="app.logdate.client.ambient.AmbientPromptAlarmReceiver"
-            android:enabled="true"
-            android:exported="false" />
+      android:name="app.logdate.client.ambient.AmbientPromptAlarmReceiver"
+      android:enabled="true"
+      android:exported="false"
+    />
 
         <receiver
-            android:name="app.logdate.client.ambient.AmbientPromptBootReceiver"
-            android:enabled="true"
-            android:exported="false">
+      android:name="app.logdate.client.ambient.AmbientPromptBootReceiver"
+      android:enabled="true"
+      android:exported="false"
+    >
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action
+          android:name="android.intent.action.MY_PACKAGE_REPLACED"
+        />
                 <action android:name="android.intent.action.TIME_SET" />
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
@@ -296,11 +345,18 @@
 
         <!-- Data Layer sync listener: receives notes, journals, associations, health data, the watch state document, and messages from paired Wear OS watch -->
         <service
-            android:name="app.logdate.client.sync.PhoneDataLayerListenerService"
-            android:exported="true">
+      android:name="app.logdate.client.sync.PhoneDataLayerListenerService"
+      android:exported="true"
+    >
             <intent-filter>
-                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
-                <data android:scheme="wear" android:host="*" android:pathPrefix="/logdate/v2/w2p/record" />
+                <action
+          android:name="com.google.android.gms.wearable.DATA_CHANGED"
+        />
+                <data
+          android:scheme="wear"
+          android:host="*"
+          android:pathPrefix="/logdate/v2/w2p/record"
+        />
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:pathPrefix="/logdate/notes" />
@@ -318,7 +374,9 @@
                 <data android:path="/logdate/state" />
             </intent-filter>
             <intent-filter>
-                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <action
+          android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED"
+        />
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:pathPrefix="/logdate/sync" />
@@ -328,32 +386,82 @@
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:pathPrefix="/logdate/camera" />
-                <data android:scheme="wear" android:host="*" android:path="/logdate/live/recording" />
+                <data
+          android:scheme="wear"
+          android:host="*"
+          android:path="/logdate/live/recording"
+        />
             </intent-filter>
             <intent-filter>
-                <action android:name="com.google.android.gms.wearable.CHANNEL_EVENT" />
-                <data android:scheme="wear" android:host="*" android:pathPrefix="/logdate/v2/w2p/media" />
-                <data android:scheme="wear" android:host="*" android:pathPrefix="/logdate/v2/p2w/media/" />
-                <data android:scheme="wear" android:host="*" android:pathPrefix="/logdate/v2/p2w/window-body/" />
+                <action
+          android:name="com.google.android.gms.wearable.CHANNEL_EVENT"
+        />
+                <data
+          android:scheme="wear"
+          android:host="*"
+          android:pathPrefix="/logdate/v2/w2p/media"
+        />
+                <data
+          android:scheme="wear"
+          android:host="*"
+          android:pathPrefix="/logdate/v2/p2w/media/"
+        />
+                <data
+          android:scheme="wear"
+          android:host="*"
+          android:pathPrefix="/logdate/v2/p2w/window-body/"
+        />
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:pathPrefix="/logdate/notes" />
             </intent-filter>
             <intent-filter>
-                <action android:name="com.google.android.gms.wearable.CAPABILITY_CHANGED" />
+                <action
+          android:name="com.google.android.gms.wearable.CAPABILITY_CHANGED"
+        />
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:path="/logdate_watch_sync_v2" />
             </intent-filter>
             <intent-filter>
-                <action android:name="com.google.android.gms.wearable.REQUEST_RECEIVED" />
-                <data android:scheme="wear" android:host="*" android:path="/logdate/v2/receipts" />
-                <data android:scheme="wear" android:host="*" android:path="/logdate/v2/window/resync" />
-                <data android:scheme="wear" android:host="*" android:path="/logdate/v2/media/info" />
-                <data android:scheme="wear" android:host="*" android:path="/logdate/v2/media/range" />
-                <data android:scheme="wear" android:host="*" android:path="/logdate/v2/window/body" />
-                <data android:scheme="wear" android:host="*" android:path="/logdate/reminders/claim" />
-                <data android:scheme="wear" android:host="*" android:path="/logdate/live/playback/command" />
+                <action
+          android:name="com.google.android.gms.wearable.REQUEST_RECEIVED"
+        />
+                <data
+          android:scheme="wear"
+          android:host="*"
+          android:path="/logdate/v2/receipts"
+        />
+                <data
+          android:scheme="wear"
+          android:host="*"
+          android:path="/logdate/v2/window/resync"
+        />
+                <data
+          android:scheme="wear"
+          android:host="*"
+          android:path="/logdate/v2/media/info"
+        />
+                <data
+          android:scheme="wear"
+          android:host="*"
+          android:path="/logdate/v2/media/range"
+        />
+                <data
+          android:scheme="wear"
+          android:host="*"
+          android:path="/logdate/v2/window/body"
+        />
+                <data
+          android:scheme="wear"
+          android:host="*"
+          android:path="/logdate/reminders/claim"
+        />
+                <data
+          android:scheme="wear"
+          android:host="*"
+          android:path="/logdate/live/playback/command"
+        />
             </intent-filter>
         </service>
 
@@ -363,15 +471,17 @@
             flow; it exists so the account can be recorded with the platform at all.
         -->
         <service
-            android:name="app.logdate.client.LogDateAccountAuthenticatorService"
-            android:exported="false">
+      android:name="app.logdate.client.LogDateAccountAuthenticatorService"
+      android:exported="false"
+    >
             <intent-filter>
                 <action android:name="android.accounts.AccountAuthenticator" />
             </intent-filter>
 
             <meta-data
-                android:name="android.accounts.AccountAuthenticator"
-                android:resource="@xml/authenticator" />
+        android:name="android.accounts.AccountAuthenticator"
+        android:resource="@xml/authenticator"
+      />
         </service>
 
         <!--
@@ -380,30 +490,37 @@
             See docs/reference/android/os-integration/quick-settings-tiles.md.
         -->
         <service
-            android:name="app.logdate.client.tiles.NewEntryTileService"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@drawable/ic_tile_new_entry"
-            android:label="@string/tile_new_entry"
-            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+      android:name="app.logdate.client.tiles.NewEntryTileService"
+      android:enabled="false"
+      android:exported="true"
+      android:icon="@drawable/ic_tile_new_entry"
+      android:label="@string/tile_new_entry"
+      android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+    >
             <intent-filter>
-                <action android:name="android.service.quicksettings.action.QS_TILE" />
+                <action
+          android:name="android.service.quicksettings.action.QS_TILE"
+        />
             </intent-filter>
         </service>
 
         <service
-            android:name="app.logdate.client.tiles.RecordVoiceTileService"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@drawable/ic_tile_record_voice"
-            android:label="@string/tile_record_voice"
-            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+      android:name="app.logdate.client.tiles.RecordVoiceTileService"
+      android:enabled="false"
+      android:exported="true"
+      android:icon="@drawable/ic_tile_record_voice"
+      android:label="@string/tile_record_voice"
+      android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+    >
             <intent-filter>
-                <action android:name="android.service.quicksettings.action.QS_TILE" />
+                <action
+          android:name="android.service.quicksettings.action.QS_TILE"
+        />
             </intent-filter>
             <meta-data
-                android:name="android.service.quicksettings.ACTIVE_TILE"
-                android:value="true" />
+        android:name="android.service.quicksettings.ACTIVE_TILE"
+        android:value="true"
+      />
         </service>
 
         <!--
@@ -413,15 +530,16 @@
             See docs/reference/android/os-integration/bubbles.md.
         -->
         <activity
-            android:name="app.logdate.client.bubble.RecordingBubbleActivity"
-            android:allowEmbedded="true"
-            android:documentLaunchMode="always"
-            android:enabled="false"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:label="@string/recorder_bubble_title"
-            android:resizeableActivity="true"
-            android:theme="@style/Theme.LogDate" />
+      android:name="app.logdate.client.bubble.RecordingBubbleActivity"
+      android:allowEmbedded="true"
+      android:documentLaunchMode="always"
+      android:enabled="false"
+      android:excludeFromRecents="true"
+      android:exported="false"
+      android:label="@string/recorder_bubble_title"
+      android:resizeableActivity="true"
+      android:theme="@style/Theme.LogDate"
+    />
 
         <!--
             Assistant actions (Android 16+). The AppFunctions compiler generates this service and its
@@ -431,23 +549,28 @@
             lives in app/compose-main, through LogDateAppFunctions and AppFunctionService to Service.
         -->
         <service
-            android:name="app.logdate.client.appfunctions.LogDateAppFunctionService"
-            android:enabled="false"
-            android:exported="true"
-            android:permission="android.permission.BIND_APP_FUNCTION_SERVICE"
-            tools:ignore="Instantiatable"
-            tools:targetApi="36">
+      android:name="app.logdate.client.appfunctions.LogDateAppFunctionService"
+      android:enabled="false"
+      android:exported="true"
+      android:permission="android.permission.BIND_APP_FUNCTION_SERVICE"
+      tools:ignore="Instantiatable"
+      tools:targetApi="36"
+    >
             <property
-                android:name="android.app.appfunctions.v2"
-                android:value="logdate_app_functions.xml" />
+        android:name="android.app.appfunctions.v2"
+        android:value="logdate_app_functions.xml"
+      />
             <intent-filter>
-                <action android:name="android.app.appfunctions.AppFunctionService" />
+                <action
+          android:name="android.app.appfunctions.AppFunctionService"
+        />
             </intent-filter>
         </service>
 
         <property
-            android:name="android.app.appfunctions.app_metadata"
-            android:resource="@xml/app_functions_app_metadata" />
+      android:name="android.app.appfunctions.app_metadata"
+      android:resource="@xml/app_functions_app_metadata"
+    />
 
         <!--
             Saves a capture reminder's quick reply as an entry. Reminders only offer the Write action
@@ -455,25 +578,32 @@
             See docs/reference/android/os-integration/notification-quick-reply.md.
         -->
         <receiver
-            android:name="app.logdate.client.ambient.QuickReplyReceiver"
-            android:exported="false">
+      android:name="app.logdate.client.ambient.QuickReplyReceiver"
+      android:exported="false"
+    >
             <intent-filter>
                 <action android:name="app.logdate.action.QUICK_REPLY" />
             </intent-filter>
         </receiver>
 
         <receiver
-            android:name="app.logdate.client.bubble.FloatRecorderReceiver"
-            android:enabled="false"
-            android:exported="false">
+      android:name="app.logdate.client.bubble.FloatRecorderReceiver"
+      android:enabled="false"
+      android:exported="false"
+    >
             <intent-filter>
                 <action android:name="app.logdate.action.FLOAT_RECORDER" />
             </intent-filter>
         </receiver>
 
-        <service android:name="app.logdate.client.watch.presence.LogDateCompanionDeviceService"
-            android:exported="true" android:permission="android.permission.BIND_COMPANION_DEVICE_SERVICE">
-            <intent-filter><action android:name="android.companion.CompanionDeviceService" /></intent-filter>
+        <service
+      android:name="app.logdate.client.watch.presence.LogDateCompanionDeviceService"
+      android:exported="true"
+      android:permission="android.permission.BIND_COMPANION_DEVICE_SERVICE"
+    >
+            <intent-filter><action
+          android:name="android.companion.CompanionDeviceService"
+        /></intent-filter>
         </service>
     </application>
 

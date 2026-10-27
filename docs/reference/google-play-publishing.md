@@ -61,15 +61,15 @@ internal publish from `main`, which defeats continuous dogfooding. The
 
 ## Required Secrets
 
-| Purpose | Secret name | Required for | Notes |
-| --- | --- | --- | --- |
-| Play Developer API access | none (variable `LOGDATE_PLAY_SERVICE_ACCOUNT`) | Internal + production | Keyless. Both jobs authenticate through Workload Identity Federation as this service account, and Gradle Play Publisher uses the resulting application-default credentials. |
-| Firebase debug config | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64` | CI, screenshot tests, local debug parity | Base64 of `app/android-main/google-services.json`. Materialized by [`setup-firebase-configs`](../../.github/actions/setup-firebase-configs/action.yml) with `android-flavor: debug` (default). |
-| Firebase release config | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_RELEASE_BASE64` | Internal + production Play publishing | Base64 of `app/android-main/src/release/google-services.json`. Materialized by [`setup-firebase-configs`](../../.github/actions/setup-firebase-configs/action.yml) with `android-flavor: release`. |
-| Release keystore file | `LOGDATE_RELEASE_STORE_BASE64` | Internal | Base64-encoded `.jks` or `.keystore` file content. |
-| Release keystore password | `LOGDATE_RELEASE_STORE_PASSWORD` | Internal | Passed into the existing Android release signing config. |
-| Release key alias | `LOGDATE_RELEASE_KEY_ALIAS` | Internal | Passed into the existing Android release signing config. |
-| Release key password | `LOGDATE_RELEASE_KEY_PASSWORD` | Internal | Passed into the existing Android release signing config. |
+| Purpose                   | Secret name                                           | Required for                             | Notes                                                                                                                                                                                              |
+| ------------------------- | ----------------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Play Developer API access | none (variable `LOGDATE_PLAY_SERVICE_ACCOUNT`)        | Internal + production                    | Keyless. Both jobs authenticate through Workload Identity Federation as this service account, and Gradle Play Publisher uses the resulting application-default credentials.                        |
+| Firebase debug config     | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64`   | CI, screenshot tests, local debug parity | Base64 of `app/android-main/google-services.json`. Materialized by [`setup-firebase-configs`](../../.github/actions/setup-firebase-configs/action.yml) with `android-flavor: debug` (default).     |
+| Firebase release config   | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_RELEASE_BASE64` | Internal + production Play publishing    | Base64 of `app/android-main/src/release/google-services.json`. Materialized by [`setup-firebase-configs`](../../.github/actions/setup-firebase-configs/action.yml) with `android-flavor: release`. |
+| Release keystore file     | `LOGDATE_RELEASE_STORE_BASE64`                        | Internal                                 | Base64-encoded `.jks` or `.keystore` file content.                                                                                                                                                 |
+| Release keystore password | `LOGDATE_RELEASE_STORE_PASSWORD`                      | Internal                                 | Passed into the existing Android release signing config.                                                                                                                                           |
+| Release key alias         | `LOGDATE_RELEASE_KEY_ALIAS`                           | Internal                                 | Passed into the existing Android release signing config.                                                                                                                                           |
+| Release key password      | `LOGDATE_RELEASE_KEY_PASSWORD`                        | Internal                                 | Passed into the existing Android release signing config.                                                                                                                                           |
 
 The workflow materializes the keystore at runtime and removes it before the
 job exits. Firebase config materialization is handled by the
@@ -284,6 +284,13 @@ bundle when an internal release is dispatched. Run the local Wear build before c
 watch changes so a broken watch release cannot reach `main`.
 
 ## Local Verification
+
+Advertising-ID collection is disabled on phone and watch while ordinary Firebase Analytics and
+Crashlytics remain enabled. `verifyAdvertisingIdReleaseBundle` checks the merged release manifest
+and every packaged module manifest before either app can publish. It rejects advertising-ID
+permissions, a missing collection opt-out, or disabled Firebase collection; the phone also requires
+both Firebase component registrations. This keeps the existing no-advertising-ID Play declaration
+consistent with dependency updates.
 
 To verify the Android release bundle still builds locally without
 publishing:

@@ -1,6 +1,8 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:tools="http://schemas.android.com/tools"
+>
 
     <uses-feature android:name="android.hardware.type.watch" />
 
@@ -8,9 +10,13 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission
+    android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"
+  />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission
+    android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+  />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!--
@@ -18,13 +24,20 @@
         health permission, earlier versions under body sensors.
     -->
     <uses-permission
-        android:name="android.permission.BODY_SENSORS"
-        android:maxSdkVersion="35" />
+    android:name="android.permission.BODY_SENSORS"
+    android:maxSdkVersion="35"
+  />
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
 
     <!-- Places are captured on demand. Workouts use activity recognition only when reminders are enabled. -->
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" tools:node="remove" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" tools:node="remove" />
+    <uses-permission
+    android:name="android.permission.ACCESS_BACKGROUND_LOCATION"
+    tools:node="remove"
+  />
+    <uses-permission
+    android:name="android.permission.FOREGROUND_SERVICE_LOCATION"
+    tools:node="remove"
+  />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
@@ -36,27 +49,48 @@
         system output switcher and, on watches without it, Bluetooth settings.
     -->
     <queries>
-        <package android:name="com.google.android.apps.maps" tools:node="remove" />
+        <package
+      android:name="com.google.android.apps.maps"
+      tools:node="remove"
+    />
         <intent>
-            <action android:name="com.android.settings.panel.action.MEDIA_OUTPUT" />
+            <action
+        android:name="com.android.settings.panel.action.MEDIA_OUTPUT"
+      />
         </intent>
         <intent>
             <action android:name="android.settings.BLUETOOTH_SETTINGS" />
         </intent>
     </queries>
 
+    <uses-permission
+    android:name="com.google.android.gms.permission.AD_ID"
+    tools:node="remove"
+  />
+    <uses-permission
+    android:name="android.permission.ACCESS_ADSERVICES_AD_ID"
+    tools:node="remove"
+  />
+
     <application
-        android:allowBackup="true"
-        android:dataExtractionRules="@xml/data_extraction_rules"
-        android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
-        android:supportsRtl="true"
-        android:theme="@android:style/Theme.DeviceDefault"
-        android:name=".LogDateWearApplication">
+    android:allowBackup="true"
+    android:dataExtractionRules="@xml/data_extraction_rules"
+    android:icon="@mipmap/ic_launcher"
+    android:label="@string/app_name"
+    android:supportsRtl="true"
+    android:theme="@android:style/Theme.DeviceDefault"
+    android:name=".LogDateWearApplication"
+  >
 
         <meta-data
-            android:name="app.logdate.watchExperienceDefault"
-            android:value="${watchExperienceDefault}" />
+      android:name="google_analytics_adid_collection_enabled"
+      android:value="false"
+    />
+
+        <meta-data
+      android:name="app.logdate.watchExperienceDefault"
+      android:value="${watchExperienceDefault}"
+    />
 
         <!--
             Remove auto-initializers merged from transitive dependencies.
@@ -66,25 +100,30 @@
         -->
 
         <provider
-            android:name="androidx.startup.InitializationProvider"
-            android:authorities="${applicationId}.androidx-startup"
-            android:exported="false"
-            tools:node="merge">
+      android:name="androidx.startup.InitializationProvider"
+      android:authorities="${applicationId}.androidx-startup"
+      android:exported="false"
+      tools:node="merge"
+    >
             <!-- Remove Emoji2 font download -->
             <meta-data
-                android:name="androidx.emoji2.text.EmojiCompatInitializer"
-                android:value="androidx.startup"
-                tools:node="remove" />
+        android:name="androidx.emoji2.text.EmojiCompatInitializer"
+        android:value="androidx.startup"
+        tools:node="remove"
+      />
         </provider>
 
         <!-- MediaSessionService must be exported for system media controllers. -->
         <service
-            android:name="app.logdate.client.media.audio.AudioPlaybackService"
-            android:exported="true"
-            android:foregroundServiceType="mediaPlayback"
-            tools:ignore="ExportedService">
+      android:name="app.logdate.client.media.audio.AudioPlaybackService"
+      android:exported="true"
+      android:foregroundServiceType="mediaPlayback"
+      tools:ignore="ExportedService"
+    >
             <intent-filter>
-                <action android:name="androidx.media3.session.MediaSessionService" />
+                <action
+          android:name="androidx.media3.session.MediaSessionService"
+        />
             </intent-filter>
         </service>
 
@@ -94,11 +133,18 @@
             path is listed here.
         -->
         <service
-            android:name=".sync.WearDataLayerListenerService"
-            android:exported="true">
+      android:name=".sync.WearDataLayerListenerService"
+      android:exported="true"
+    >
             <intent-filter>
-                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
-                <data android:scheme="wear" android:host="*" android:pathPrefix="/logdate/v2/device/removal" />
+                <action
+          android:name="com.google.android.gms.wearable.DATA_CHANGED"
+        />
+                <data
+          android:scheme="wear"
+          android:host="*"
+          android:pathPrefix="/logdate/v2/device/removal"
+        />
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:pathPrefix="/logdate/notes" />
@@ -122,7 +168,9 @@
                 <data android:pathPrefix="/logdate/v2/p2w/tombstone/" />
             </intent-filter>
             <intent-filter>
-                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <action
+          android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED"
+        />
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:pathPrefix="/logdate/notes" />
@@ -134,7 +182,9 @@
                 <data android:path="/logdate/v2/receipts/push" />
             </intent-filter>
             <intent-filter>
-                <action android:name="com.google.android.gms.wearable.CAPABILITY_CHANGED" />
+                <action
+          android:name="com.google.android.gms.wearable.CAPABILITY_CHANGED"
+        />
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:path="/logdate_phone_app" />
@@ -143,13 +193,24 @@
                 <data android:path="/logdate_phone_sync_v2" />
             </intent-filter>
             <intent-filter>
-                <action android:name="com.google.android.gms.wearable.REQUEST_RECEIVED" />
-                <data android:scheme="wear" android:host="*" android:path="/logdate/live/recording/command" />
-                <data android:scheme="wear" android:host="*" android:path="/logdate/live/playback/command" />
+                <action
+          android:name="com.google.android.gms.wearable.REQUEST_RECEIVED"
+        />
                 <data
-                    android:scheme="wear"
-                    android:host="*"
-                    android:pathPrefix="/logdate/link" />
+          android:scheme="wear"
+          android:host="*"
+          android:path="/logdate/live/recording/command"
+        />
+                <data
+          android:scheme="wear"
+          android:host="*"
+          android:path="/logdate/live/playback/command"
+        />
+                <data
+          android:scheme="wear"
+          android:host="*"
+          android:pathPrefix="/logdate/link"
+        />
                 <data android:path="/logdate/presence" />
                 <data android:path="/logdate/diag/ping" />
                 <data android:path="/logdate/v2/device/removal" />
@@ -157,185 +218,232 @@
                 <data android:path="/logdate/reminders/deliver" />
             </intent-filter>
             <intent-filter>
-                <action android:name="com.google.android.gms.wearable.NODE_MIGRATED" />
-                <data
-                    android:scheme="wear"
-                    android:host="*" />
+                <action
+          android:name="com.google.android.gms.wearable.NODE_MIGRATED"
+        />
+                <data android:scheme="wear" android:host="*" />
             </intent-filter>
         </service>
 
         <!-- The shared phone receiver must not start background location on the watch. -->
         <receiver
-            android:name="app.logdate.client.location.tracking.LocationTrackingBootReceiver"
-            tools:node="remove" />
+      android:name="app.logdate.client.location.tracking.LocationTrackingBootReceiver"
+      tools:node="remove"
+    />
 
         <service
-            android:name=".reminders.WorkoutEndListenerService"
-            android:exported="true"
-            android:permission="com.google.android.wearable.healthservices.permission.PASSIVE_DATA_BINDING" />
+      android:name=".reminders.WorkoutEndListenerService"
+      android:exported="true"
+      android:permission="com.google.android.wearable.healthservices.permission.PASSIVE_DATA_BINDING"
+    />
         <receiver
-            android:name=".reminders.ReminderRestoreReceiver"
-            android:exported="true">
+      android:name=".reminders.ReminderRestoreReceiver"
+      android:exported="true"
+    >
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action
+          android:name="android.intent.action.MY_PACKAGE_REPLACED"
+        />
             </intent-filter>
         </receiver>
 
         <!-- Entry Count complication: shows today's journal entry count -->
         <service
-            android:name=".complication.EntryCountComplicationService"
-            android:exported="true"
-            android:label="@string/wear_complication_entry_count_label"
-            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+      android:name=".complication.EntryCountComplicationService"
+      android:exported="true"
+      android:label="@string/wear_complication_entry_count_label"
+      android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER"
+    >
             <intent-filter>
-                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+                <action
+          android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST"
+        />
             </intent-filter>
 
             <meta-data
-                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="SHORT_TEXT" />
+        android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+        android:value="SHORT_TEXT"
+      />
             <meta-data
-                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
-                android:value="900" />
+        android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+        android:value="900"
+      />
         </service>
 
         <!-- Mood complication: shows today's mood emoji -->
         <service
-            android:name=".complication.MoodComplicationService"
-            android:exported="true"
-            android:label="@string/wear_complication_mood_label"
-            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+      android:name=".complication.MoodComplicationService"
+      android:exported="true"
+      android:label="@string/wear_complication_mood_label"
+      android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER"
+    >
             <intent-filter>
-                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+                <action
+          android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST"
+        />
             </intent-filter>
 
             <meta-data
-                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="SHORT_TEXT" />
+        android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+        android:value="SHORT_TEXT"
+      />
             <meta-data
-                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
-                android:value="900" />
+        android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+        android:value="900"
+      />
         </service>
 
         <!-- Streak complication: the campfire (also as a ranged value), or the journaling streak -->
         <service
-            android:name=".complication.StreakComplicationService"
-            android:exported="true"
-            android:label="@string/wear_complication_streak_label"
-            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+      android:name=".complication.StreakComplicationService"
+      android:exported="true"
+      android:label="@string/wear_complication_streak_label"
+      android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER"
+    >
             <intent-filter>
-                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+                <action
+          android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST"
+        />
             </intent-filter>
 
             <meta-data
-                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="SHORT_TEXT,LONG_TEXT,RANGED_VALUE" />
+        android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+        android:value="SHORT_TEXT,LONG_TEXT,RANGED_VALUE"
+      />
             <meta-data
-                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
-                android:value="21600" />
+        android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+        android:value="21600"
+      />
         </service>
 
         <!-- Quick Capture complication: mic icon to start voice recording -->
         <service
-            android:name=".complication.QuickCaptureComplicationService"
-            android:exported="true"
-            android:label="@string/wear_complication_quick_capture_label"
-            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+      android:name=".complication.QuickCaptureComplicationService"
+      android:exported="true"
+      android:label="@string/wear_complication_quick_capture_label"
+      android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER"
+    >
             <intent-filter>
-                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+                <action
+          android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST"
+        />
             </intent-filter>
 
             <meta-data
-                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="SMALL_IMAGE" />
+        android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+        android:value="SMALL_IMAGE"
+      />
             <meta-data
-                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
-                android:value="0" />
+        android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+        android:value="0"
+      />
         </service>
 
         <!-- Quick Capture tile: four capture buttons + entry count -->
         <service
-            android:name=".tile.QuickCaptureTileService"
-            android:exported="true"
-            android:label="@string/wear_tile_quick_capture_label"
-            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+      android:name=".tile.QuickCaptureTileService"
+      android:exported="true"
+      android:label="@string/wear_tile_quick_capture_label"
+      android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER"
+    >
             <intent-filter>
-                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+                <action
+          android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER"
+        />
             </intent-filter>
 
             <meta-data
-                android:name="androidx.wear.tiles.PREVIEW"
-                android:resource="@drawable/tile_preview" />
+        android:name="androidx.wear.tiles.PREVIEW"
+        android:resource="@drawable/tile_preview"
+      />
         </service>
 
         <!-- Today's Summary tile: entry count, mood, latest entry -->
         <service
-            android:name=".tile.TodaySummaryTileService"
-            android:exported="true"
-            android:label="@string/wear_tile_summary_label"
-            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+      android:name=".tile.TodaySummaryTileService"
+      android:exported="true"
+      android:label="@string/wear_tile_summary_label"
+      android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER"
+    >
             <intent-filter>
-                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+                <action
+          android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER"
+        />
             </intent-filter>
 
             <meta-data
-                android:name="androidx.wear.tiles.PREVIEW"
-                android:resource="@drawable/tile_preview" />
+        android:name="androidx.wear.tiles.PREVIEW"
+        android:resource="@drawable/tile_preview"
+      />
         </service>
 
         <!-- On this day tile: only while the new watch app is on (SurfaceComponents enables it) -->
         <service
-            android:name=".tile.OnThisDayTileService"
-            android:enabled="false"
-            android:exported="true"
-            android:label="@string/wear_memory_on_this_day"
-            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+      android:name=".tile.OnThisDayTileService"
+      android:enabled="false"
+      android:exported="true"
+      android:label="@string/wear_memory_on_this_day"
+      android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER"
+    >
             <intent-filter>
-                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+                <action
+          android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER"
+        />
             </intent-filter>
 
             <meta-data
-                android:name="androidx.wear.tiles.PREVIEW"
-                android:resource="@drawable/tile_preview" />
+        android:name="androidx.wear.tiles.PREVIEW"
+        android:resource="@drawable/tile_preview"
+      />
         </service>
 
         <!-- On this day complication: only while the new watch app is on (SurfaceComponents enables it) -->
         <service
-            android:name=".complication.OnThisDayComplicationService"
-            android:enabled="false"
-            android:exported="true"
-            android:label="@string/wear_memory_on_this_day"
-            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+      android:name=".complication.OnThisDayComplicationService"
+      android:enabled="false"
+      android:exported="true"
+      android:label="@string/wear_memory_on_this_day"
+      android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER"
+    >
             <intent-filter>
-                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+                <action
+          android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST"
+        />
             </intent-filter>
 
             <meta-data
-                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="LONG_TEXT" />
+        android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+        android:value="LONG_TEXT"
+      />
             <meta-data
-                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
-                android:value="3600" />
+        android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+        android:value="3600"
+      />
         </service>
 
         <!-- Mark complication: marks the moment without opening the app; only while the new watch app is on -->
         <service
-            android:name=".complication.MarkComplicationService"
-            android:enabled="false"
-            android:exported="true"
-            android:label="@string/wear_surface_mark"
-            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+      android:name=".complication.MarkComplicationService"
+      android:enabled="false"
+      android:exported="true"
+      android:label="@string/wear_surface_mark"
+      android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER"
+    >
             <intent-filter>
-                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+                <action
+          android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST"
+        />
             </intent-filter>
 
             <meta-data
-                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="SHORT_TEXT,MONOCHROMATIC_IMAGE,SMALL_IMAGE" />
+        android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+        android:value="SHORT_TEXT,MONOCHROMATIC_IMAGE,SMALL_IMAGE"
+      />
             <meta-data
-                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
-                android:value="0" />
+        android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+        android:value="0"
+      />
         </service>
 
         <!--
@@ -343,20 +451,23 @@
                app to run.
         -->
         <meta-data
-            android:name="com.google.android.wearable.standalone"
-            android:value="true" />
+      android:name="com.google.android.wearable.standalone"
+      android:value="true"
+    />
 
         <!-- Marks the moment from a complication, a tile or a notification action, without opening the app. -->
         <receiver
-            android:name=".v2.mark.MarkMomentReceiver"
-            android:exported="false" />
+      android:name=".v2.mark.MarkMomentReceiver"
+      android:exported="false"
+    />
 
         <activity
-            android:name=".presentation.MainActivity"
-            android:exported="true"
-            android:launchMode="singleTop"
-            android:taskAffinity=""
-            android:theme="@style/MainActivityTheme.Starting">
+      android:name=".presentation.MainActivity"
+      android:exported="true"
+      android:launchMode="singleTop"
+      android:taskAffinity=""
+      android:theme="@style/MainActivityTheme.Starting"
+    >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -374,10 +485,15 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data
-                    android:scheme="studio.hypertext.logdate"
-                    android:host="watch"
-                    android:path="/today" />
-                <data android:scheme="studio.hypertext.logdate" android:host="watch" android:pathPrefix="/moment/" />
+          android:scheme="studio.hypertext.logdate"
+          android:host="watch"
+          android:path="/today"
+        />
+                <data
+          android:scheme="studio.hypertext.logdate"
+          android:host="watch"
+          android:pathPrefix="/moment/"
+        />
             </intent-filter>
         </activity>
     </application>

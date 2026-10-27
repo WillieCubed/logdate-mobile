@@ -2,6 +2,7 @@ package app.logdate
 
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.tasks.Exec
 import java.io.File
 
 /**
@@ -18,6 +19,36 @@ class LogDateReleasePlugin : Plugin<Project> {
     override fun apply(target: Project) {
         target.extensions.create("logdateRelease", LogDateReleaseExtension::class.java, target)
         configureAndroidShortcuts(target)
+        configureAdvertisingIdVerification(target)
+    }
+}
+
+private fun configureAdvertisingIdVerification(project: Project) {
+    val bundle = project.layout.buildDirectory.file("outputs/bundle/release/${project.name}-release.aab")
+    val manifests = project.layout.buildDirectory.dir("intermediates/merged_manifest/release")
+    val script =
+        project.rootProject.layout.projectDirectory
+            .file("scripts/verify-android-advertising-id.py")
+    val verification =
+        project.tasks.register("verifyAdvertisingIdReleaseBundle", Exec::class.java) {
+            group = "verification"
+            description = "Verifies that advertising ID is disabled in the final release bundle."
+            dependsOn("bundleRelease")
+            inputs.file(bundle)
+            inputs.dir(manifests)
+            inputs.file(script)
+            commandLine(
+                "python3",
+                script.asFile.absolutePath,
+                "--bundle",
+                bundle.get().asFile.absolutePath,
+                "--manifest-dir",
+                manifests.get().asFile.absolutePath,
+            )
+            if (project.name == "android-main") args("--require-firebase")
+        }
+    project.tasks.matching { it.name == "publishReleaseBundle" }.configureEach {
+        dependsOn(verification)
     }
 }
 
@@ -69,7 +100,10 @@ open class LogDateReleaseExtension(
 
     /** Local benchmark and baseline-profile work may sign a release build with the debug key. Never for publishing. */
     val allowDebugReleaseSigning: Boolean =
-        project.providers.gradleProperty("logdate.allowDebugReleaseSigning").orNull?.toBoolean() == true
+        project.providers
+            .gradleProperty("logdate.allowDebugReleaseSigning")
+            .orNull
+            ?.toBoolean() == true
 
     private val taskNames = project.gradle.startParameter.taskNames
 
