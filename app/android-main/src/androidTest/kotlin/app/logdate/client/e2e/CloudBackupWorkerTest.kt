@@ -1,7 +1,6 @@
 package app.logdate.client.e2e
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.work.WorkerParameters
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.domain.export.archive.ArchiveCategory
@@ -42,7 +41,7 @@ class CloudBackupWorkerTest : CloudArchiveWorkerFixture() {
     fun `uploads the sealed archive through the file streaming API`() =
         runTest {
             val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("backup", 1L, 1L)))
-            val params = mockk<WorkerParameters>(relaxed = true)
+            val params = workerParameters()
             every { params.id } returns UUID.randomUUID()
             val worker =
                 CloudBackupWorker(
@@ -92,6 +91,7 @@ class CloudBackupWorkerTest : CloudArchiveWorkerFixture() {
                             ArchiveExportSummary(
                                 ArchiveCounts(0, 0, 0, 0, 0, 0, hasProfile = false),
                                 ArchiveScope(complete = true),
+                                sourceFingerprint = "large-payload",
                             ),
                         ),
                     )
@@ -107,7 +107,7 @@ class CloudBackupWorkerTest : CloudArchiveWorkerFixture() {
                     cipherKeyRequests++
                     ByteArray(32) { 7 }
                 }
-            val params = mockk<WorkerParameters>(relaxed = true)
+            val params = workerParameters()
             val workId = UUID.randomUUID()
             every { params.id } returns workId
             val worker =
@@ -136,8 +136,8 @@ class CloudBackupWorkerTest : CloudArchiveWorkerFixture() {
             assertTrue(cloud.uploadedFileSize > payloadSize)
             assertTrue(cloud.uploadedFileDigest?.isNotBlank() == true)
             assertEquals(null, cloud.uploadedFileBytes)
-            assertFalse(File(context.noBackupFilesDir, "cloud-backup-$workId.zip").exists())
-            assertFalse(File(context.noBackupFilesDir, "cloud-backup-$workId.scope").exists())
+            assertFalse(File(context.noBackupFilesDir, "cloud-backup-pending.zip").exists())
+            assertFalse(File(context.noBackupFilesDir, "cloud-backup-pending.scope").exists())
         }
 
     @Test
@@ -152,7 +152,7 @@ class CloudBackupWorkerTest : CloudArchiveWorkerFixture() {
                         throw CancellationException("upload cancelled after a partial read")
                     }
                 }
-            val params = mockk<WorkerParameters>(relaxed = true)
+            val params = workerParameters()
             every { params.id } returns workId
             val worker =
                 CloudBackupWorker(
@@ -167,14 +167,14 @@ class CloudBackupWorkerTest : CloudArchiveWorkerFixture() {
                 )
 
             assertFailsWith<CancellationException> { worker.doWork() }
-            val archive = File(context.noBackupFilesDir, "cloud-backup-$workId.zip")
+            val archive = File(context.noBackupFilesDir, "cloud-backup-pending.zip")
             val digestBeforeRetry = archive.sha256()
             assertEquals(16, interruptedUploadBytes)
             assertTrue(archive.length() > interruptedUploadBytes, "the first upload must stop before EOF")
             assertTrue(archive.isFile)
-            assertTrue(File(context.noBackupFilesDir, "cloud-backup-$workId.scope").isFile)
-            assertFalse(File(context.noBackupFilesDir, "cloud-backup-$workId.plain.part").exists())
-            assertFalse(File(context.noBackupFilesDir, "cloud-backup-$workId.encrypted.part").exists())
+            assertTrue(File(context.noBackupFilesDir, "cloud-backup-pending.scope").isFile)
+            assertFalse(File(context.noBackupFilesDir, "cloud-backup-pending.plain.part").exists())
+            assertFalse(File(context.noBackupFilesDir, "cloud-backup-pending.encrypted.part").exists())
 
             assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Success)
             assertEquals(digestBeforeRetry, cloud.uploadedFileDigest)
@@ -186,7 +186,7 @@ class CloudBackupWorkerTest : CloudArchiveWorkerFixture() {
     fun `retry reuses the exact encrypted archive for the same work and account`() =
         runTest {
             val cloud = FakeCloudBackupDataSource(Result.failure(IllegalStateException("offline")))
-            val params = mockk<WorkerParameters>(relaxed = true)
+            val params = workerParameters()
             val workId = UUID.randomUUID()
             every { params.id } returns workId
             val worker =
@@ -203,14 +203,14 @@ class CloudBackupWorkerTest : CloudArchiveWorkerFixture() {
 
             assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Retry)
             val firstDigest = cloud.uploadedFileDigest
-            assertTrue(File(context.noBackupFilesDir, "cloud-backup-$workId.zip").exists())
+            assertTrue(File(context.noBackupFilesDir, "cloud-backup-pending.zip").exists())
             cloud.uploadResult = Result.success(BackupUploadResult("backup", 2L, 1L))
 
             assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Success)
             assertEquals(firstDigest, cloud.uploadedFileDigest)
             assertEquals(2, cloud.fileUploadCalls)
-            assertFalse(File(context.noBackupFilesDir, "cloud-backup-$workId.zip").exists())
-            assertFalse(File(context.noBackupFilesDir, "cloud-backup-$workId.scope").exists())
+            assertFalse(File(context.noBackupFilesDir, "cloud-backup-pending.zip").exists())
+            assertFalse(File(context.noBackupFilesDir, "cloud-backup-pending.scope").exists())
         }
 
     @Test
@@ -223,7 +223,7 @@ class CloudBackupWorkerTest : CloudArchiveWorkerFixture() {
                     refreshResults += Result.success("refreshed-access")
                 }
             val session = FakeSessionStorage(UserSession("access", "refresh", "account"))
-            val params = mockk<WorkerParameters>(relaxed = true)
+            val params = workerParameters()
             every { params.id } returns UUID.randomUUID()
             val worker =
                 CloudBackupWorker(
@@ -253,7 +253,7 @@ class CloudBackupWorkerTest : CloudArchiveWorkerFixture() {
             val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("backup", 1L, 1L)))
             val session = FakeSessionStorage(UserSession("access", "refresh", "account"))
             val deviceId = FakeDeviceIdProvider()
-            val params = mockk<WorkerParameters>(relaxed = true)
+            val params = workerParameters()
             val workId = UUID.randomUUID()
             every { params.id } returns workId
             val worker =
@@ -281,8 +281,8 @@ class CloudBackupWorkerTest : CloudArchiveWorkerFixture() {
             assertFalse("metadata.json" in entries)
             sealed.delete()
             restored.delete()
-            assertFalse(File(context.noBackupFilesDir, "cloud-backup-$workId.zip").exists())
-            assertFalse(File(context.noBackupFilesDir, "cloud-backup-$workId.scope").exists())
+            assertFalse(File(context.noBackupFilesDir, "cloud-backup-pending.zip").exists())
+            assertFalse(File(context.noBackupFilesDir, "cloud-backup-pending.scope").exists())
         }
 
     @Test
@@ -290,7 +290,7 @@ class CloudBackupWorkerTest : CloudArchiveWorkerFixture() {
         runTest {
             val useCase = v2Exporter("{\"schemaVersion\":\"2.0\"}")
             val cloud = FakeCloudBackupDataSource(Result.failure(IllegalStateException("offline")))
-            val params = mockk<WorkerParameters>(relaxed = true)
+            val params = workerParameters()
             val workId = UUID.randomUUID()
             every { params.id } returns workId
             val worker =
@@ -306,15 +306,15 @@ class CloudBackupWorkerTest : CloudArchiveWorkerFixture() {
                 )
 
             assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Retry)
-            assertTrue(File(context.noBackupFilesDir, "cloud-backup-$workId.zip").exists())
+            assertTrue(File(context.noBackupFilesDir, "cloud-backup-pending.zip").exists())
             assertTrue(
                 context.noBackupFilesDir
                     .listFiles()
                     .orEmpty()
                     .none { it.name.endsWith(".plain.part") },
             )
-            File(context.noBackupFilesDir, "cloud-backup-$workId.zip").delete()
-            File(context.noBackupFilesDir, "cloud-backup-$workId.scope").delete()
+            File(context.noBackupFilesDir, "cloud-backup-pending.zip").delete()
+            File(context.noBackupFilesDir, "cloud-backup-pending.scope").delete()
         }
 
     @Test
@@ -329,7 +329,7 @@ class CloudBackupWorkerTest : CloudArchiveWorkerFixture() {
                     ),
                 )
             val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L)))
-            val params = mockk<WorkerParameters>(relaxed = true)
+            val params = workerParameters()
             every { params.id } returns UUID.randomUUID()
             val worker =
                 CloudBackupWorker(
@@ -358,7 +358,7 @@ class CloudBackupWorkerTest : CloudArchiveWorkerFixture() {
     fun `skips without authenticated session`() =
         runTest {
             val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L)))
-            val params = mockk<WorkerParameters>(relaxed = true)
+            val params = workerParameters()
             every { params.id } returns UUID.randomUUID()
             val worker =
                 CloudBackupWorker(
@@ -384,8 +384,10 @@ class CloudBackupWorkerTest : CloudArchiveWorkerFixture() {
                 mockk<IdentityKeyManager> {
                     coEvery { isRecoveryPhraseVerified() } returns false
                     coEvery { hasIdentityKey() } returns true
+                    coEvery { canUseForAccount(any()) } returns true
+                    coEvery { getIdentityKey() } returns ByteArray(32) { 7 }
                 }
-            val params = mockk<WorkerParameters>(relaxed = true)
+            val params = workerParameters()
             every { params.id } returns UUID.randomUUID()
             val worker =
                 CloudBackupWorker(
@@ -414,7 +416,7 @@ class CloudBackupWorkerTest : CloudArchiveWorkerFixture() {
                     coEvery { isRecoveryPhraseVerified() } returns false
                     coEvery { hasIdentityKey() } returns false
                 }
-            val params = mockk<WorkerParameters>(relaxed = true)
+            val params = workerParameters()
             every { params.id } returns UUID.randomUUID()
             val worker =
                 CloudBackupWorker(

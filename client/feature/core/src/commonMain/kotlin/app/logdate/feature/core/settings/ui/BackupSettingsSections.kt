@@ -11,6 +11,7 @@ internal fun SyncSettingsSection(
     cloudArchiveStatus: CloudArchiveStatus,
     isAuthenticated: Boolean,
     onSyncUsingMobileData: () -> Unit = {},
+    onArchiveBackupNow: () -> Unit = {},
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
     onEnterRecoveryPhrase: (() -> Unit)? = null,
@@ -25,5 +26,6 @@ internal fun SyncSettingsSection(
         onSignIn = onNavigateToSignIn,
         onEnterRecoveryPhrase = onEnterRecoveryPhrase,
         modifier = modifier,
+        onArchiveBackupNow = onArchiveBackupNow,
     )
 }

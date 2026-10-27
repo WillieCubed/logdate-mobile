@@ -37,6 +37,15 @@ import app.logdate.ui.common.MaterialCard
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.backup_cloud_title
+import logdate.client.feature.core.generated.resources.backup_overview_none
+import logdate.client.feature.core.generated.resources.backup_overview_now
+import logdate.client.feature.core.generated.resources.backup_overview_saved
+import logdate.client.feature.core.generated.resources.cloud_archive_checking_contents
+import logdate.client.feature.core.generated.resources.cloud_archive_encrypting
+import logdate.client.feature.core.generated.resources.cloud_archive_exporting
+import logdate.client.feature.core.generated.resources.cloud_archive_failed_detail
+import logdate.client.feature.core.generated.resources.cloud_archive_unavailable_detail
+import logdate.client.feature.core.generated.resources.cloud_archive_uploading
 import logdate.client.feature.core.generated.resources.journal_storage_enter_recovery_phrase
 import logdate.client.feature.core.generated.resources.sync_account_mobile_data
 import logdate.client.feature.core.generated.resources.sync_account_storage_unsupported_detail
@@ -55,23 +64,42 @@ internal fun BackupStatusItem(
     syncStatus: SyncStatus?,
     cloudArchiveStatus: CloudArchiveStatus,
     onSyncUsingMobileData: () -> Unit = {},
+    onArchiveBackupNow: () -> Unit = {},
     modifier: Modifier = Modifier,
     onUpdateApp: (() -> Unit)? = null,
     onEnterRecoveryPhrase: (() -> Unit)? = null,
+    reviewableIssueCount: Int = 0,
 ) {
     val status = backupStatus(syncStatus, cloudArchiveStatus)
+    val showArchiveRetry = cloudArchiveStatus.needsManualRetry && status == AccountSyncStatus.UNKNOWN
+    val archiveProgress = cloudArchiveStatus.progress.takeIf { cloudArchiveStatus.phase == CloudArchivePhase.RUNNING }
+    val noSavedBackup = cloudArchiveStatus.phase == CloudArchivePhase.NEVER_BACKED_UP && status == AccountSyncStatus.CHECKING
+    val savedBackupAvailable =
+        cloudArchiveStatus.phase == CloudArchivePhase.COMPLETE &&
+            cloudArchiveStatus.lastCompletedAt != null &&
+            status in setOf(AccountSyncStatus.CHECKING, AccountSyncStatus.WAITING, AccountSyncStatus.UP_TO_DATE)
     val title =
-        when (status) {
-            AccountSyncStatus.WAITING_FOR_WIFI -> Res.string.sync_heading_wifi
-            AccountSyncStatus.OFFLINE -> Res.string.sync_heading_offline
-            AccountSyncStatus.BACKGROUND_RESTRICTED -> Res.string.sync_heading_background
-            AccountSyncStatus.STORAGE_FULL -> Res.string.sync_heading_storage
-            AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED -> Res.string.sync_heading_update
-            AccountSyncStatus.UNKNOWN, AccountSyncStatus.SERVER_UNAVAILABLE, AccountSyncStatus.CONNECTION_UNAVAILABLE,
-            AccountSyncStatus.DEVICE_ACCESS_REQUIRED, AccountSyncStatus.CONFLICT, AccountSyncStatus.LOCAL_DATA_UNAVAILABLE,
-            AccountSyncStatus.MEDIA_TOO_LARGE,
-            -> Res.string.sync_heading_failed
-            else -> status.messageResource()
+        if (noSavedBackup) {
+            Res.string.backup_overview_none
+        } else if (savedBackupAvailable) {
+            Res.string.backup_overview_saved
+        } else {
+            when (status) {
+                AccountSyncStatus.WAITING_FOR_WIFI -> Res.string.sync_heading_wifi
+
+                AccountSyncStatus.OFFLINE -> Res.string.sync_heading_offline
+
+                AccountSyncStatus.BACKGROUND_RESTRICTED -> Res.string.sync_heading_background
+
+                AccountSyncStatus.STORAGE_FULL -> Res.string.sync_heading_storage
+                AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED -> Res.string.sync_heading_update
+                AccountSyncStatus.UNKNOWN, AccountSyncStatus.SERVER_UNAVAILABLE, AccountSyncStatus.CONNECTION_UNAVAILABLE,
+                AccountSyncStatus.DEVICE_ACCESS_REQUIRED, AccountSyncStatus.CONFLICT, AccountSyncStatus.LOCAL_DATA_UNAVAILABLE,
+                AccountSyncStatus.MEDIA_TOO_LARGE,
+                -> Res.string.sync_heading_failed
+
+                else -> status.messageResource()
+            }
         }
     MaterialCard(
         modifier = modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
@@ -86,28 +114,68 @@ internal fun BackupStatusItem(
                 Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
                     if (status == AccountSyncStatus.SYNCING) {
                         SyncProgressIndicator(
-                            total = if (syncStatus?.isSyncing == true) syncStatus.totalForRun else 0,
-                            completed = if (syncStatus?.isSyncing == true) syncStatus.completedInRun else 0,
+                            total =
+                                if (archiveProgress != null) {
+                                    archiveProgress.fraction?.let { 1000 }
+                                } else if (syncStatus?.isSyncing == true) {
+                                    syncStatus.totalForRun
+                                } else {
+                                    null
+                                },
+                            completed =
+                                if (archiveProgress != null) {
+                                    ((archiveProgress.fraction ?: 0f) * 1000).toInt()
+                                } else if (syncStatus?.isSyncing == true) {
+                                    syncStatus.completedInRun
+                                } else {
+                                    0
+                                },
                             modifier = Modifier.size(28.dp),
                         )
                     } else {
                         val icon =
-                            when (status) {
-                                AccountSyncStatus.UP_TO_DATE -> Icons.Rounded.CloudDone
-                                AccountSyncStatus.RECOVERING -> Icons.Rounded.CloudSync
-                                AccountSyncStatus.WAITING_FOR_WIFI -> Icons.Rounded.Wifi
-                                AccountSyncStatus.OFFLINE -> Icons.Rounded.CloudOff
-                                AccountSyncStatus.BACKGROUND_RESTRICTED -> Icons.Rounded.DataSaverOn
-                                AccountSyncStatus.WAITING -> Icons.Rounded.Schedule
-                                AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED -> Icons.Rounded.SystemUpdate
-                                else -> Icons.Rounded.CloudSync
+                            if (savedBackupAvailable) {
+                                Icons.Rounded.CloudDone
+                            } else {
+                                when (status) {
+                                    AccountSyncStatus.UP_TO_DATE -> Icons.Rounded.CloudDone
+                                    AccountSyncStatus.RECOVERING -> Icons.Rounded.CloudSync
+                                    AccountSyncStatus.WAITING_FOR_WIFI -> Icons.Rounded.Wifi
+                                    AccountSyncStatus.OFFLINE -> Icons.Rounded.CloudOff
+                                    AccountSyncStatus.BACKGROUND_RESTRICTED -> Icons.Rounded.DataSaverOn
+                                    AccountSyncStatus.WAITING -> Icons.Rounded.Schedule
+                                    AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED -> Icons.Rounded.SystemUpdate
+                                    else -> Icons.Rounded.CloudSync
+                                }
                             }
                         Icon(icon, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(24.dp))
                     }
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Text(stringResource(title), style = MaterialTheme.typography.bodyLarge)
-                    if (title != status.messageResource()) {
+                    Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
+                    if (archiveProgress != null) {
+                        val stage =
+                            when (archiveProgress.stage) {
+                                CloudArchiveStage.CHECKING -> Res.string.cloud_archive_checking_contents
+                                CloudArchiveStage.EXPORTING -> Res.string.cloud_archive_exporting
+                                CloudArchiveStage.ENCRYPTING -> Res.string.cloud_archive_encrypting
+                                CloudArchiveStage.UPLOADING -> Res.string.cloud_archive_uploading
+                            }
+                        Text(stringResource(stage), style = MaterialTheme.typography.bodyMedium)
+                    }
+                    if (showArchiveRetry) {
+                        val detail =
+                            if (cloudArchiveStatus.phase == CloudArchivePhase.FAILED) {
+                                Res.string.cloud_archive_failed_detail
+                            } else {
+                                Res.string.cloud_archive_unavailable_detail
+                            }
+                        Text(
+                            stringResource(detail),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    } else if (title != status.messageResource() && !noSavedBackup && !savedBackupAvailable) {
                         val detail =
                             when {
                                 status == AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED ->
@@ -145,6 +213,13 @@ internal fun BackupStatusItem(
                     shape = MaterialTheme.shapes.large,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 ) { Text(stringResource(Res.string.sync_account_update_app)) }
+            }
+            if (backupOverviewState(syncStatus, cloudArchiveStatus, reviewableIssueCount).canBackUpNow) {
+                Button(
+                    onClick = onArchiveBackupNow,
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) { Text(stringResource(Res.string.backup_overview_now)) }
             }
         }
     }

@@ -2,6 +2,7 @@ package app.logdate.client.e2e
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import androidx.work.WorkerParameters
 import app.logdate.client.datastore.OriginBoundSession
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
@@ -42,6 +43,29 @@ abstract class CloudArchiveWorkerFixture {
         mockk<IdentityKeyManager> {
             coEvery { isRecoveryPhraseVerified() } returns true
             coEvery { hasIdentityKey() } returns true
+            coEvery { canUseForAccount(any()) } returns true
+            coEvery { getIdentityKey() } returns ByteArray(32) { 7 }
+        }
+
+    protected val archiveProgress = mutableListOf<androidx.work.Data>()
+
+    @org.junit.Before
+    @org.junit.After
+    fun clearOwnedBackupTestArtifacts() {
+        listOf(".zip", ".scope", ".scope.part", ".plain.part", ".encrypted.part").forEach { suffix ->
+            File(context.noBackupFilesDir, "cloud-backup-pending$suffix").delete()
+        }
+    }
+
+    protected fun workerParameters(): WorkerParameters =
+        mockk<WorkerParameters>(relaxed = true).also { params ->
+            every { params.id } returns UUID.randomUUID()
+            every { params.progressUpdater.updateProgress(any(), any(), any()) } answers {
+                archiveProgress += thirdArg<androidx.work.Data>()
+                androidx.work.impl.utils.futures.SettableFuture
+                    .create<Void>()
+                    .apply { set(null) }
+            }
         }
 
     protected fun v2Exporter(
@@ -49,9 +73,11 @@ abstract class CloudArchiveWorkerFixture {
         scope: ArchiveScope = ArchiveScope(complete = true),
     ): ExportArchiveUseCase =
         mockk<ExportArchiveUseCase>().also { useCase ->
+            coEvery { useCase.sourceFingerprint(any()) } returns "test-content:$manifest"
             every { useCase.export(any(), any()) } answers {
                 val container = invocation.args[1] as ArchiveContainer
                 flow {
+                    emit(ArchiveExportProgress.Starting)
                     container.write("README.txt", "LogDate export")
                     container.write("manifest.json", manifest)
                     container.write("SHA256SUMS", "checksums")
@@ -60,6 +86,7 @@ abstract class CloudArchiveWorkerFixture {
                             ArchiveExportSummary(
                                 ArchiveCounts(0, 0, 0, 0, 0, 0, hasProfile = false),
                                 scope,
+                                sourceFingerprint = "test-content:$manifest",
                             ),
                         ),
                     )

@@ -231,6 +231,7 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             onNavigateToSignIn = onNavigateToSignIn,
             onNavigateToRecoveryPhrase = { onNavigateTo(RecoveryPhraseEntrySettingsRoute) },
             onNavigateToExport = { onNavigateTo(ExportSettingsRoute) },
+            onReviewSavedEdits = { onNavigateTo(app.logdate.feature.core.sync.navigation.SyncIssuesRoute) },
             onRecoverJournalMerge = { operation ->
                 onNavigateTo(JournalMergeRoute(operation.sourceId.toString(), operation.operationId.toString()))
             },

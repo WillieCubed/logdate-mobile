@@ -138,6 +138,7 @@ class AutomaticSyncSettingsTest {
     @Test
     fun archiveFailureCannotShowEntrySyncAsComplete() =
         runDesktopComposeUiTest(width = 411, height = 891) {
+            var retryRequests = 0
             setContent {
                 LogDateTheme(darkTheme = false) {
                     SyncSettingsContent(
@@ -146,6 +147,7 @@ class AutomaticSyncSettingsTest {
                         cloudArchiveStatus = CloudArchiveStatus(CloudArchivePhase.FAILED),
                         isAuthenticated = true,
                         onSyncNow = {},
+                        onArchiveBackupNow = { retryRequests++ },
                         onNavigateToSignIn = {},
                         quotaUsage = StorageQuotaUi(100, 0, 0f, formattedTotal = "100 GB", formattedUsed = "0 B"),
                         isQuotaAvailable = true,
@@ -154,7 +156,9 @@ class AutomaticSyncSettingsTest {
                 }
             }
             onAllNodesWithText("Sync couldn't finish").assertCountEquals(1)
-            onNodeWithText("LogDate will try again automatically.").assertExists()
+            onNodeWithText("The cloud backup did not finish. Try again when you’re ready.").assertExists()
+            onNodeWithText("Back up now").assertExists().performClick()
+            assertEquals(1, retryRequests)
             onNodeWithText("Up to date").assertDoesNotExist()
             saveScreenshot("phone-automatic-retry", onRoot().captureToImage())
         }

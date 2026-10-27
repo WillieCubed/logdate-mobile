@@ -1,0 +1,13 @@
+<resources>
+    <string name="backup_overview_saved">Saved backup available</string>
+    <string name="backup_overview_last_saved">Last saved backup</string>
+    <string name="backup_overview_none">No saved backup yet</string>
+    <string name="backup_overview_pending">Changes waiting to sync</string>
+    <string name="backup_overview_review">Review sync issues</string>
+    <plurals name="backup_overview_conflicts">
+        <item quantity="one">1 edit needs review</item>
+        <item quantity="other">%1$d edits need review</item>
+    </plurals>
+    <string name="backup_overview_now">Back up now</string>
+    <string name="backup_overview_date_time">%1$s · %2$s</string>
+</resources>

@@ -16,7 +16,7 @@ internal fun backupStatus(
     if (entries != AccountSyncStatus.UP_TO_DATE && entries != AccountSyncStatus.WAITING && entries != AccountSyncStatus.CHECKING) {
         return entries
     }
-    if (archive == null) return entries
+    if (archive == null || !archive.supportsBackup) return entries
     return when (archive.phase) {
         CloudArchivePhase.RUNNING -> AccountSyncStatus.SYNCING
         CloudArchivePhase.SIGNED_OUT -> AccountSyncStatus.SIGN_IN_REQUIRED

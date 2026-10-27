@@ -104,6 +104,7 @@ fun HomeScreen(
     onOpenSyncSettings: () -> Unit = {},
     onEnterRecoveryPhrase: () -> Unit = {},
     onOpenWatch: () -> Unit = {},
+    onOpenSyncIssues: () -> Unit = {},
     onOpenDay: (LocalDate) -> Unit = {},
     onOpenTextNote: (Uuid) -> Unit = {},
     onOpenStreak: () -> Unit = {},
@@ -149,10 +150,13 @@ fun HomeScreen(
     val onSyncAction: (SyncAction) -> Unit = { action ->
         when (action) {
             SyncAction.UseMobileData -> syncPresentationViewModel.useMobileData()
+
             SyncAction.SignIn,
             SyncAction.ManageStorage,
             -> onOpenSettings()
-            SyncAction.ReviewConflicts, SyncAction.ReviewIssues -> Unit
+
+            SyncAction.ReviewConflicts, SyncAction.ReviewIssues -> onOpenSyncIssues()
+
             SyncAction.OpenStatus -> onOpenSyncSettings()
             SyncAction.EnterRecoveryPhrase -> onEnterRecoveryPhrase()
             SyncAction.UpdateApp -> updateScope.launch { appUpdates.checkForUpdates(AppUpdateCheckTrigger.Manual) }
@@ -272,16 +276,27 @@ fun HomeScreen(
                                 }
                             }
                         }
-                        HomeRouteDestination.LocationHistory -> locationContent(Modifier.fillMaxSize())
-                        HomeRouteDestination.Journals ->
+
+                        HomeRouteDestination.LocationHistory -> {
+                            locationContent(Modifier.fillMaxSize())
+                        }
+
+                        HomeRouteDestination.Journals -> {
                             JournalsOverviewScreen(
                                 onOpenJournal,
                                 onBrowseJournals,
                                 onCreateJournal,
                                 modifier = Modifier.fillMaxSize(),
                             )
-                        HomeRouteDestination.Library -> libraryContent(Modifier.fillMaxSize())
-                        HomeRouteDestination.Rewind -> RewindOverviewScreen(onOpenRewind, modifier = Modifier.fillMaxSize())
+                        }
+
+                        HomeRouteDestination.Library -> {
+                            libraryContent(Modifier.fillMaxSize())
+                        }
+
+                        HomeRouteDestination.Rewind -> {
+                            RewindOverviewScreen(onOpenRewind, modifier = Modifier.fillMaxSize())
+                        }
                     }
                 }
             }
@@ -294,13 +309,20 @@ fun HomeScreen(
         when {
             // Foldable laid flat (tabletop): keep navigation in the bottom/flat half rather
             // than spanning a rail across the hinge.
-            adaptiveInfo.windowPosture.isTabletop -> NavigationSuiteType.NavigationBar
+            adaptiveInfo.windowPosture.isTabletop -> {
+                NavigationSuiteType.NavigationBar
+            }
+
             // Wide enough (>= 600dp), including landscape phones: always use the side rail,
             // never a bottom bar. Material's default would drop to a bottom bar here because
             // the window height is compact.
-            adaptiveInfo.windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND) ->
+            adaptiveInfo.windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND) -> {
                 NavigationSuiteType.NavigationRail
-            else -> NavigationSuiteType.NavigationBar
+            }
+
+            else -> {
+                NavigationSuiteType.NavigationBar
+            }
         }
 
     Scaffold(

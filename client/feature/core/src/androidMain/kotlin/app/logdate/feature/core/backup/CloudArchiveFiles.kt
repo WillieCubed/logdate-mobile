@@ -31,6 +31,13 @@ internal suspend fun pruneAbandonedCloudArchives(context: Context) {
                 ).forEach { uniqueName ->
                     workManager.getWorkInfosForUniqueWork(uniqueName).get().forEach { work ->
                         if (!work.state.isFinished) {
+                            if (uniqueName.startsWith(CloudBackupWorker.WORK_NAME)) {
+                                names += "cloud-backup-pending.zip"
+                                names += "cloud-backup-pending.scope"
+                                names += "cloud-backup-pending.scope.part"
+                                names += "cloud-backup-pending.plain.part"
+                                names += "cloud-backup-pending.encrypted.part"
+                            }
                             names += "cloud-backup-${work.id}.zip"
                             names += "cloud-backup-${work.id}.scope"
                             names += "cloud-backup-${work.id}.scope.part"
@@ -49,20 +56,8 @@ internal suspend fun pruneAbandonedCloudArchives(context: Context) {
                         }
                     }
                 }
-                workManager.getWorkInfosByTag(CloudRestoreWorker.WORK_TAG).get().forEach { work ->
-                    if (!work.state.isFinished) {
-                        if (work.tags.contains(CloudRestoreWorker.WORK_TAG)) {
-                            names += "cloud-restore-${work.id}.zip"
-                            names += "cloud-restore-${work.id}.plain.part"
-                            names += "cloud-restore-${work.id}.encrypted.part"
-                            context.noBackupFilesDir
-                                .listFiles()
-                                .orEmpty()
-                                .filter { it.name.startsWith("cloud-restore-") && it.name.endsWith(".zip") }
-                                .forEach { names += it.name }
-                        }
-                    }
-                }
+                retainActiveCloudRestoreArchives(context, workManager, names)
+
                 names
             }
         } catch (cancellation: CancellationException) {
@@ -71,6 +66,27 @@ internal suspend fun pruneAbandonedCloudArchives(context: Context) {
             return
         }
     pruneAbandonedCloudArchives(context.noBackupFilesDir, System.currentTimeMillis(), activeNames)
+}
+
+private fun retainActiveCloudRestoreArchives(
+    context: Context,
+    workManager: WorkManager,
+    names: MutableSet<String>,
+) {
+    workManager.getWorkInfosByTag(CloudRestoreWorker.WORK_TAG).get().forEach { work ->
+        if (!work.state.isFinished) {
+            if (work.tags.contains(CloudRestoreWorker.WORK_TAG)) {
+                names += "cloud-restore-${work.id}.zip"
+                names += "cloud-restore-${work.id}.plain.part"
+                names += "cloud-restore-${work.id}.encrypted.part"
+                context.noBackupFilesDir
+                    .listFiles()
+                    .orEmpty()
+                    .filter { it.name.startsWith("cloud-restore-") && it.name.endsWith(".zip") }
+                    .forEach { names += it.name }
+            }
+        }
+    }
 }
 
 fun pruneAbandonedCloudArchives(

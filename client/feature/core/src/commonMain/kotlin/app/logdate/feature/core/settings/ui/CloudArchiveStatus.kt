@@ -22,15 +22,31 @@ data class CloudArchiveStatus(
     val phase: CloudArchivePhase,
     /** Server-confirmed completion time in epoch milliseconds. */
     val lastCompletedAt: Long? = null,
+    val progress: CloudArchiveProgress? = null,
+    val supportsBackup: Boolean = true,
 ) {
+    /** Whether the status surface should offer recovery for a failed or unconfirmed archive. */
+    val needsManualRetry: Boolean get() = supportsBackup && (phase == CloudArchivePhase.FAILED || phase == CloudArchivePhase.UNAVAILABLE)
+
     val canRetry: Boolean
         get() =
-            phase == CloudArchivePhase.NEVER_BACKED_UP ||
-                phase == CloudArchivePhase.FAILED ||
-                phase == CloudArchivePhase.RETRYING ||
-                phase == CloudArchivePhase.COMPLETE ||
-                phase == CloudArchivePhase.UNAVAILABLE
+            supportsBackup &&
+                phase in
+                setOf(
+                    CloudArchivePhase.NEVER_BACKED_UP,
+                    CloudArchivePhase.FAILED,
+                    CloudArchivePhase.RETRYING,
+                    CloudArchivePhase.COMPLETE,
+                    CloudArchivePhase.UNAVAILABLE,
+                )
 }
+
+enum class CloudArchiveStage { CHECKING, EXPORTING, ENCRYPTING, UPLOADING }
+
+data class CloudArchiveProgress(
+    val stage: CloudArchiveStage,
+    val fraction: Float? = null,
+)
 
 enum class ArchiveWorkState { IDLE, QUEUED, RUNNING, RETRYING, FAILED, SUCCEEDED }
 
@@ -60,23 +76,37 @@ fun resolveCloudArchiveStatus(
     workState: ArchiveWorkState,
     serverCompletedAt: Long?,
     serverLookupFailed: Boolean,
+    progress: CloudArchiveProgress? = null,
 ): CloudArchiveStatus {
     if (!identityKeyAvailable) return CloudArchiveStatus(CloudArchivePhase.NEEDS_RECOVERY)
     val confirmedAt = if (serverLookupFailed) null else serverCompletedAt
     val phase =
         when (workState) {
-            ArchiveWorkState.RUNNING -> CloudArchivePhase.RUNNING
-            ArchiveWorkState.RETRYING -> CloudArchivePhase.RETRYING
-            ArchiveWorkState.QUEUED -> CloudArchivePhase.QUEUED
-            ArchiveWorkState.FAILED -> CloudArchivePhase.FAILED
-            ArchiveWorkState.IDLE, ArchiveWorkState.SUCCEEDED ->
+            ArchiveWorkState.RUNNING -> {
+                CloudArchivePhase.RUNNING
+            }
+
+            ArchiveWorkState.RETRYING -> {
+                CloudArchivePhase.RETRYING
+            }
+
+            ArchiveWorkState.QUEUED -> {
+                CloudArchivePhase.QUEUED
+            }
+
+            ArchiveWorkState.FAILED -> {
+                CloudArchivePhase.FAILED
+            }
+
+            ArchiveWorkState.IDLE, ArchiveWorkState.SUCCEEDED -> {
                 when {
                     serverLookupFailed -> CloudArchivePhase.UNAVAILABLE
                     confirmedAt != null -> CloudArchivePhase.COMPLETE
                     else -> CloudArchivePhase.NEVER_BACKED_UP
                 }
+            }
         }
-    return CloudArchiveStatus(phase, confirmedAt)
+    return CloudArchiveStatus(phase, confirmedAt, progress.takeIf { phase == CloudArchivePhase.RUNNING })
 }
 
 interface CloudArchiveStatusSource {
@@ -87,7 +117,8 @@ interface CloudArchiveStatusSource {
 
 /** Non-Android targets have no Android archive worker. */
 object UnavailableCloudArchiveStatusSource : CloudArchiveStatusSource {
-    override fun observe(session: UserSession): Flow<CloudArchiveStatus> = flowOf(CloudArchiveStatus(CloudArchivePhase.UNAVAILABLE))
+    override fun observe(session: UserSession): Flow<CloudArchiveStatus> =
+        flowOf(CloudArchiveStatus(CloudArchivePhase.UNAVAILABLE, supportsBackup = false))
 
     override suspend fun requestBackup() = Unit
 }

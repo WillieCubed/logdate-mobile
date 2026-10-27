@@ -51,6 +51,7 @@ fun SyncSettingsScreen(
     onNavigateToRecoveryPhrase: () -> Unit = {},
     onNavigateToExport: () -> Unit = {},
     onRecoverJournalMerge: (JournalMergeOperation) -> Unit = {},
+    onReviewSavedEdits: () -> Unit = {},
     viewModel: DataSettingsViewModel = koinViewModel(),
     mergeJournals: MergeJournalsUseCase = koinInject(),
     journalStorage: JournalStorageMove = koinInject(),
@@ -62,6 +63,7 @@ fun SyncSettingsScreen(
     val scope = rememberCoroutineScope()
     LaunchedEffect(journalStorage) { journalStorage.refresh() }
     val uiState by viewModel.uiState.collectAsState()
+    val reviewableIssueCount by viewModel.reviewableIssueCount.collectAsState()
     val nativeBackupStatus by viewModel.nativeBackupStatus.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -122,6 +124,8 @@ fun SyncSettingsScreen(
 
     SyncSettingsContent(
         onBack = onBack,
+        onReviewSavedEdits = onReviewSavedEdits,
+        reviewableIssueCount = reviewableIssueCount,
         mergeIssues = mergeIssues,
         onRecoverJournalMerge = onRecoverJournalMerge,
         journalMove = journalMove,
@@ -172,10 +176,12 @@ fun SyncSettingsContent(
     modifier: Modifier = Modifier,
     mergeIssues: List<JournalMergeOperation> = emptyList(),
     onRecoverJournalMerge: (JournalMergeOperation) -> Unit = {},
+    onReviewSavedEdits: () -> Unit = {},
     journalMove: JournalMoveState = JournalMoveState.NotOffered,
     onRetryJournalMove: () -> Unit = {},
     onSwitchJournalBack: () -> Unit = {},
     onUpdateApp: (() -> Unit)? = null,
+    reviewableIssueCount: Int = 0,
 ) {
     SettingsScaffold(
         title = stringResource(Res.string.sync_and_backup),
@@ -194,7 +200,20 @@ fun SyncSettingsContent(
                 onEnterRecoveryPhrase = onNavigateToRecoveryPhrase,
                 modifier = Modifier.padding(horizontal = Spacing.lg),
                 onUpdateApp = onUpdateApp,
+                onArchiveBackupNow = onArchiveBackupNow,
+                reviewableIssueCount = reviewableIssueCount,
             )
+        }
+        if (isAuthenticated && backupOverviewState(syncStatus, cloudArchiveStatus, reviewableIssueCount).hasDetails) {
+            item {
+                BackupDetailsSection(
+                    syncStatus = syncStatus,
+                    archiveStatus = cloudArchiveStatus,
+                    onReviewIssues = onReviewSavedEdits,
+                    reviewableIssueCount = reviewableIssueCount,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+            }
         }
         if (isAuthenticated && journalMove != JournalMoveState.NotOffered) {
             item {

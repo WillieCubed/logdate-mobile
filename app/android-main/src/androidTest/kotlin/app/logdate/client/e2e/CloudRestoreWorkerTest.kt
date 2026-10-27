@@ -742,7 +742,7 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
             assertEquals(1, cloud.fileDownloadCalls)
             val expected = byteArrayOf('P'.code.toByte(), 'K'.code.toByte(), 1, 2, 3)
             assertTrue(enqueued?.readBytes()?.contentEquals(expected) == true)
-            enqueued.delete()
+            requireNotNull(enqueued).delete()
         }
 
     @Test

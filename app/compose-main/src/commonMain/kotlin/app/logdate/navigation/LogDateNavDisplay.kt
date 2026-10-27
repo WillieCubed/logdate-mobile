@@ -55,6 +55,7 @@ import app.logdate.feature.core.settings.navigation.WatchTroubleshootingRoute
 import app.logdate.feature.core.settings.navigation.navigateToSettingsCategory
 import app.logdate.feature.core.settings.navigation.settingsEntries
 import app.logdate.feature.core.settings.navigation.watchEntries
+import app.logdate.feature.core.sync.navigation.SyncIssuesRoute
 import app.logdate.feature.core.sync.navigation.syncIssuesEntry
 import app.logdate.feature.core.watch.continuity.watchHandoffEntries
 import app.logdate.feature.editor.navigation.EditorLaunchMode
@@ -277,6 +278,7 @@ fun LogDateNavDisplay(
                                             onOpenSyncSettings = { backStack.add(SyncSettingsRoute) },
                                             onEnterRecoveryPhrase = { backStack.add(RecoveryPhraseEntrySettingsRoute) },
                                             onOpenWatch = { backStack.add(WatchSettingsRoute) },
+                                            onOpenSyncIssues = { backStack.add(SyncIssuesRoute) },
                                             onOpenDay = { date -> backStack.add(TimelineDetailRoute(date.toString())) },
                                             onOpenTextNote = { backStack.add(NoteDetailRoute(it)) },
                                             onOpenStreak = { backStack.add(StreakSettingsRoute) },
