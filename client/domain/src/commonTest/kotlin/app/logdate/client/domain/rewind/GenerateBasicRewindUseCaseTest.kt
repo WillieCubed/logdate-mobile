@@ -48,11 +48,20 @@ import app.logdate.client.repository.transcription.TranscriptionStatus
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindContent
 import app.logdate.shared.model.RewindGenerationRequest
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
@@ -78,6 +87,54 @@ import kotlin.uuid.Uuid
  * media, and location history.
  */
 class GenerateBasicRewindUseCaseTest {
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun `leaving before persistence cancels the generation request`() =
+        runTest {
+            val start = LocalDate(2026, 4, 1).atStartOfDayIn(TimeZone.currentSystemDefault())
+            val end = LocalDate(2026, 4, 2).atStartOfDayIn(TimeZone.currentSystemDefault())
+            val manager = FakeRewindGenerationManager()
+            val useCase =
+                createUseCase(
+                    generationManager = manager,
+                    notesRepository = FakeJournalNotesRepository(notesFlow = flow { awaitCancellation() }),
+                )
+            val generation = launch { useCase(start, end) }
+            runCurrent()
+
+            generation.cancelAndJoin()
+
+            assertEquals(RewindGenerationRequest.Status.CANCELLED, manager.lastUpdatedStatus)
+        }
+
+    @Test
+    fun `leaving when the saved story appears still completes the generation request`() =
+        runTest {
+            val start = LocalDate(2026, 4, 1).atStartOfDayIn(TimeZone.currentSystemDefault())
+            val end = LocalDate(2026, 4, 2).atStartOfDayIn(TimeZone.currentSystemDefault())
+            val note = JournalNote.Text(creationTimestamp = start, lastUpdated = start, content = "A new entry")
+            val repository = RecordingRewindRepository()
+            val manager = FakeRewindGenerationManager()
+            val useCase =
+                createUseCase(
+                    rewindRepository = repository,
+                    generationManager = manager,
+                    notesRepository = FakeJournalNotesRepository(listOf(note)),
+                )
+            val generation =
+                launch {
+                    val owner = currentCoroutineContext().job
+                    repository.afterSave = { owner.cancel() }
+                    useCase(start, end)
+                }
+
+            generation.join()
+
+            assertTrue(generation.isCancelled)
+            assertNotNull(repository.savedRewind)
+            assertEquals(RewindGenerationRequest.Status.COMPLETED, manager.lastUpdatedStatus)
+        }
+
     @Test
     fun `failed refresh keeps the previously saved rewind`() =
         runTest {
@@ -427,6 +484,7 @@ class GenerateBasicRewindUseCaseTest {
 }
 
 private class RecordingRewindRepository : RewindRepository {
+    var afterSave: () -> Unit = {}
     var savedRewind: Rewind? = null
     var replacedUid: Uuid? = null
     var deleteCount: Int = 0
@@ -454,6 +512,7 @@ private class RecordingRewindRepository : RewindRepository {
 
     override suspend fun saveRewind(rewind: Rewind) {
         savedRewind = rewind
+        afterSave()
     }
 
     override suspend fun replaceRewind(
@@ -513,18 +572,24 @@ private class FakeRewindGenerationManager : RewindGenerationManager {
         status: RewindGenerationRequest.Status,
         details: String?,
     ): Boolean {
+        yield()
         lastUpdatedStatus = status
         lastUpdatedDetails = details
         return true
     }
 
-    override suspend fun cancelGeneration(requestId: Uuid): Boolean = false
+    override suspend fun cancelGeneration(requestId: Uuid): Boolean {
+        yield()
+        lastUpdatedStatus = RewindGenerationRequest.Status.CANCELLED
+        return true
+    }
 }
 
 private class FakeJournalNotesRepository(
     private val notes: List<JournalNote> = emptyList(),
+    notesFlow: Flow<List<JournalNote>> = flowOf(notes),
 ) : JournalNotesRepository {
-    override val allNotesObserved: Flow<List<JournalNote>> = flowOf(notes)
+    override val allNotesObserved: Flow<List<JournalNote>> = notesFlow
 
     override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> = flowOf(emptyList())
 
@@ -532,11 +597,11 @@ private class FakeJournalNotesRepository(
         start: Instant,
         end: Instant,
     ): Flow<List<JournalNote>> =
-        flowOf(
+        allNotesObserved.map { notes ->
             notes.filter { note ->
                 note.creationTimestamp >= start && note.creationTimestamp < end
-            },
-        )
+            }
+        }
 
     override fun observeNotesPage(
         pageSize: Int,

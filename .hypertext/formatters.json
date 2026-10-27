@@ -238,6 +238,28 @@
   "exclude": [
     {
       "include": [
+        "app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/flows/flow06_rewind/Flow06_04_CurrentWeekRewindScreenshotsKt/S02_CurrentWeekRewindEmpty_Compact Phone_677a6e6d_0.png",
+        "app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/flows/flow06_rewind/Flow06_04_CurrentWeekRewindScreenshotsKt/S02_CurrentWeekRewindEmpty_Dynamic Color_99ae8525_0.png",
+        "app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/flows/flow06_rewind/Flow06_04_CurrentWeekRewindScreenshotsKt/S02_CurrentWeekRewindEmpty_Landscape_7391e7ba_0.png",
+        "app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/flows/flow06_rewind/Flow06_04_CurrentWeekRewindScreenshotsKt/S02_CurrentWeekRewindEmpty_Large Text_3cbc690d_0.png",
+        "app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/flows/flow06_rewind/Flow06_04_CurrentWeekRewindScreenshotsKt/S02_CurrentWeekRewindEmpty_Phone Dark_67e6f6ed_0.png",
+        "app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/flows/flow06_rewind/Flow06_04_CurrentWeekRewindScreenshotsKt/S02_CurrentWeekRewindEmpty_Phone_2dd8a156_0.png",
+        "app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/flows/flow06_rewind/Flow06_04_CurrentWeekRewindScreenshotsKt/S02_CurrentWeekRewindEmpty_RTL_e315f812_0.png",
+        "app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/flows/flow06_rewind/Flow06_04_CurrentWeekRewindScreenshotsKt/S02_CurrentWeekRewindEmpty_Tablet_341ed7fd_0.png",
+        "app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/flows/flow06_rewind/Flow06_04_CurrentWeekRewindScreenshotsKt/S01_CurrentWeekRewindReady_Compact Phone_677a6e6d_0.png",
+        "app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/flows/flow06_rewind/Flow06_04_CurrentWeekRewindScreenshotsKt/S01_CurrentWeekRewindReady_Dynamic Color_99ae8525_0.png",
+        "app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/flows/flow06_rewind/Flow06_04_CurrentWeekRewindScreenshotsKt/S01_CurrentWeekRewindReady_Landscape_7391e7ba_0.png",
+        "app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/flows/flow06_rewind/Flow06_04_CurrentWeekRewindScreenshotsKt/S01_CurrentWeekRewindReady_Large Text_3cbc690d_0.png",
+        "app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/flows/flow06_rewind/Flow06_04_CurrentWeekRewindScreenshotsKt/S01_CurrentWeekRewindReady_Phone Dark_67e6f6ed_0.png",
+        "app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/flows/flow06_rewind/Flow06_04_CurrentWeekRewindScreenshotsKt/S01_CurrentWeekRewindReady_Phone_2dd8a156_0.png",
+        "app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/flows/flow06_rewind/Flow06_04_CurrentWeekRewindScreenshotsKt/S01_CurrentWeekRewindReady_RTL_e315f812_0.png",
+        "app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/flows/flow06_rewind/Flow06_04_CurrentWeekRewindScreenshotsKt/S01_CurrentWeekRewindReady_Tablet_341ed7fd_0.png"
+      ],
+      "kind": "binary",
+      "reason": "PNG screenshot references for the populated and empty current-week Rewind overview."
+    },
+    {
+      "include": [
         ".hypertext/formatting/*",
         ".hypertext/formatter-tools/setup.py",
         ".hypertext/formatter-tools/run.py",

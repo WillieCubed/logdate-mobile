@@ -49,12 +49,20 @@ fun RewindOverviewScreen(
     onOpenRewind: RewindOpenCallback,
     viewModel: RewindOverviewViewModel = koinViewModel(),
     modifier: Modifier = Modifier,
+    onCreateMemory: (() -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val period by viewModel.selectedPeriod.collectAsStateWithLifecycle()
+    val firstDayOfWeek by viewModel.firstDayOfWeek.collectAsStateWithLifecycle()
     RewindScreenContent(
         uiState,
         onOpenRewind = onOpenRewind,
-        onRetryRewind = viewModel::forceGenerateLastWeekRewind,
+        onRetryRewind = viewModel::retrySelectedPeriod,
+        selectedPeriod = period,
+        onSelectPeriod = viewModel::selectPeriod,
+        onRefreshCurrentWeek = viewModel::refreshCurrentWeek,
+        firstDayOfWeek = firstDayOfWeek,
+        onCreateMemory = onCreateMemory,
         onGenerateAnnualRewind = null,
         modifier = modifier.fillMaxSize(),
     )

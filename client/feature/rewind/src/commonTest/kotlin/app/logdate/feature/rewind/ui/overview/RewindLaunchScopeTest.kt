@@ -14,6 +14,14 @@ class RewindLaunchScopeTest {
         assertEquals(listOf(weekly), listOf(weekly, annual).forWeeklyLaunch())
     }
 
+    @Test
+    fun `a completed week replaces its earlier preview in history`() {
+        val partial = history("Week 36").copy(endDate = LocalDate(2025, 9, 3))
+        val complete = history("Week 36")
+
+        assertEquals(listOf(complete), listOf(complete, partial).forWeeklyLaunch())
+    }
+
     private fun history(label: String) =
         RewindHistoryUiState(
             uid = Uuid.random(),
