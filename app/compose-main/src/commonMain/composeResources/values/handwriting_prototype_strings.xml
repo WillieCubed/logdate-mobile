@@ -1,0 +1,7 @@
+<resources>
+    <string name="ink_practice_saving">Saving…</string>
+    <string name="ink_practice_saved">Saved on this device.</string>
+    <string name="ink_practice_earlier">An earlier version was saved. Save again to keep your latest changes.</string>
+    <string name="ink_practice_save_error">Could not save. Your handwriting is still here; try saving again.</string>
+    <string name="ink_practice_load_error">Could not open the saved handwriting. Your original file has been kept.</string>
+</resources>

@@ -47,7 +47,7 @@ sealed class VersionConstraint {
 @Serializable
 data class ContentUploadRequest(
     val id: String,
-    val type: String, // TEXT, IMAGE, VIDEO, AUDIO
+    val type: String, // TEXT, IMAGE, VIDEO, AUDIO, HANDWRITING
     val content: String?,
     val mediaUri: String?,
     val durationMs: Long = 0,

@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.foldable.FoldableSplitLayout
 import app.logdate.ui.foldable.calculateFoldableSplitLayout
@@ -22,6 +23,7 @@ internal fun FocusedBlockLayout(
     modifier: Modifier = Modifier,
     preview: (@Composable () -> Unit)? = null,
     textEditor: Boolean = false,
+    contentPadding: Dp = 16.dp,
     editor: @Composable () -> Unit,
 ) {
     val fold = rememberFoldableLayoutInfo()
@@ -39,7 +41,7 @@ internal fun FocusedBlockLayout(
         Layout(
             content = {
                 Box(Modifier.fillMaxSize()) { preview?.invoke() }
-                Box(Modifier.fillMaxSize().padding(16.dp)) { editor() }
+                Box(Modifier.fillMaxSize().padding(contentPadding)) { editor() }
             },
             modifier = Modifier.fillMaxSize(),
         ) { measurables, constraints ->

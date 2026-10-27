@@ -2,7 +2,6 @@
 
 package app.logdate.feature.timeline.ui
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,7 +24,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -36,6 +34,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.ui.common.DropdownMenu
 import app.logdate.ui.common.MarkdownText
 import app.logdate.ui.common.noteDragSource
+import app.logdate.ui.handwriting.HandwritingPreview
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.TimelineLine
@@ -328,6 +327,13 @@ private fun TimelineContentItem(
             }
             // Actual content
             when (item) {
+                is JournalNote.Handwriting ->
+                    HandwritingPreview(
+                        item.document,
+                        Modifier.fillMaxWidth().height(240.dp),
+                        unreadable =
+                            item.unreadableContent != null,
+                    )
                 is JournalNote.Text -> {
                     MarkdownText(
                         content = item.content,
@@ -482,22 +488,6 @@ fun LazyListScope.constructTimeline(
                 ZoomLevel.DEFAULT -> {
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun PinchableContainer(
-    defaultContent: @Composable () -> Unit,
-    expandedContent: @Composable () -> Unit,
-    animationLabel: String = "Pinchable Container",
-) {
-    var expanded by remember { mutableStateOf(false) }
-    AnimatedContent(targetState = expanded, label = animationLabel) { isExpanded ->
-        if (isExpanded) {
-            expandedContent()
-        } else {
-            defaultContent()
         }
     }
 }

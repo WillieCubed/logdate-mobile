@@ -143,6 +143,7 @@ private fun NoteUiState.timestamp(): Instant =
         is AudioNoteUiState -> timestamp
         is ImageNoteUiState -> timestamp
         is TextNoteUiState -> timestamp
+        is HandwritingNoteUiState -> timestamp
         is VideoNoteUiState -> timestamp
     }
 

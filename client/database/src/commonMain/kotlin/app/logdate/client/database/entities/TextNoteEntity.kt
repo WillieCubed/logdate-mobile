@@ -47,4 +47,6 @@ data class TextNoteEntity(
     override val capturedDuring: String? = null,
     @ColumnInfo(name = "location_metadata")
     override val locationMetadata: String? = null,
+    @ColumnInfo(name = "content_format", defaultValue = "'text'")
+    val contentFormat: String = "text",
 ) : GenericNoteData()

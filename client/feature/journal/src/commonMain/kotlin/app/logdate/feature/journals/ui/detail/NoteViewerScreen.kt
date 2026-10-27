@@ -18,29 +18,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.LibraryAdd
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -54,54 +36,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.text.asString
-import app.logdate.feature.editor.ui.audio.expansion.ImmersiveAudioScreen
-import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
 import app.logdate.feature.journals.ui.AddToJournalPicker
 import app.logdate.feature.journals.ui.deriveCoverColor
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
-import app.logdate.ui.adaptive.FoldableBookLayout
-import app.logdate.ui.adaptive.FoldableTabletopLayout
-import app.logdate.ui.audio.LocalAudioPlaybackState
-import app.logdate.ui.common.BannerContent
 import app.logdate.ui.common.MarkdownText
-import app.logdate.ui.common.MessageBanner
 import app.logdate.ui.common.transitions.TransitionKeys
-import app.logdate.ui.platform.PlatformIcons
+import app.logdate.ui.handwriting.HandwritingPreview
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
-import app.logdate.ui.workspace.WorkspacePanel
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
 import logdate.client.feature.journal.generated.resources.Res
-import logdate.client.feature.journal.generated.resources.add_to_journal
-import logdate.client.feature.journal.generated.resources.cd_edit_entry
-import logdate.client.feature.journal.generated.resources.cd_next_entry
-import logdate.client.feature.journal.generated.resources.cd_previous_entry
 import logdate.client.feature.journal.generated.resources.error
 import logdate.client.feature.journal.generated.resources.image_note
-import logdate.client.feature.journal.generated.resources.location
 import logdate.client.feature.journal.generated.resources.note_viewer_share_chooser_title
-import logdate.client.feature.journal.generated.resources.open_in_locations
-import logdate.client.feature.journal.generated.resources.pinned_location
-import logdate.client.feature.journal.generated.resources.recording_playback_failed
-import logdate.client.feature.journal.generated.resources.share
-import logdate.client.ui.generated.resources.common_back
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
-import kotlin.math.absoluteValue
-import kotlin.math.roundToLong
 import kotlin.uuid.Uuid
-import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Viewer screen that renders notes with type-specific presentation.
@@ -152,6 +110,19 @@ fun NoteViewerScreen(
                 onGoBack = onGoBack,
                 modifier = modifier.then(sharedBoundsModifier),
             )
+        }
+        is NoteViewerUiState.HandwritingContent -> {
+            NoteViewerScaffoldContent(
+                shared = state.shared,
+                onGoBack = onGoBack,
+                onOpenLocationTimeline = onOpenLocationTimeline,
+                onNavigateToNote = onNavigateToNote,
+                onShowAddToJournal = { showAddToJournal = true },
+                onShare = shareCurrentNote,
+                modifier = modifier.then(sharedBoundsModifier),
+            ) {
+                HandwritingPreview(state.document, Modifier.fillMaxWidth().height(480.dp), unreadable = state.unreadable)
+            }
         }
         is NoteViewerUiState.TextContent -> {
             NoteViewerScaffoldContent(
@@ -381,7 +352,7 @@ private fun AudioNoteViewerEntry(
 
 // endregion
 
-// region Scaffold and toolbar
+// region Shared transition
 
 @Composable
 private fun rememberNoteViewerSharedBoundsModifier(
@@ -408,338 +379,9 @@ private fun rememberNoteViewerSharedBoundsModifier(
     }
 }
 
-/**
- * Shared immersive layout for non-audio note presentations.
- * Provides the toolbar with journal context and routes foldable postures through hinge-safe panes.
- */
-@Composable
-fun NoteViewerScaffoldContent(
-    shared: NoteViewerShared,
-    onGoBack: () -> Unit,
-    onEdit: (() -> Unit)? = null,
-    onOpenLocationTimeline: () -> Unit = {},
-    onNavigateToNote: (Uuid) -> Unit = {},
-    onShowAddToJournal: () -> Unit = {},
-    onShare: () -> Unit = {},
-    modifier: Modifier = Modifier,
-    noteContent: @Composable () -> Unit,
-) {
-    val journalContext = shared.journalContext
-    val accentColor =
-        journalContext?.let {
-            remember(it.journalId) { deriveCoverColor(it.journalId) }
-        }
-
-    if (LocalWorkspaceEnabled.current) {
-        WorkspacePanel(modifier) {
-            Column(Modifier.fillMaxSize()) {
-                NoteViewerToolbar(onGoBack, journalContext, accentColor, onNavigateToNote, onShowAddToJournal, onShare, onEdit)
-                Box(Modifier.weight(1f).fillMaxWidth()) {
-                    NoteViewerContent(shared, onOpenLocationTimeline, noteContent = noteContent)
-                }
-            }
-        }
-        return
-    }
-    FoldableTabletopLayout(
-        modifier = modifier,
-        minPaneHeight = 220.dp,
-        topPane = {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surfaceDim),
-            ) {
-                NoteViewerContent(
-                    shared = shared,
-                    onOpenLocationTimeline = onOpenLocationTimeline,
-                    noteContent = noteContent,
-                )
-            }
-        },
-        bottomPane = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surfaceDim)
-                        .navigationBarsPadding()
-                        .padding(horizontal = Spacing.sm, vertical = Spacing.md),
-                verticalArrangement = Arrangement.Center,
-            ) {
-                NoteViewerToolbar(
-                    onGoBack = onGoBack,
-                    journalContext = journalContext,
-                    accentColor = accentColor,
-                    onNavigateToNote = onNavigateToNote,
-                    onShowAddToJournal = onShowAddToJournal,
-                    onShare = onShare,
-                    onEdit = onEdit,
-                )
-            }
-        },
-        standardContent = {
-            FoldableBookLayout(
-                modifier = Modifier.fillMaxSize(),
-                minPaneWidth = 320.dp,
-                startPane = {
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.surfaceDim),
-                    ) {
-                        NoteViewerContent(
-                            shared = shared,
-                            onOpenLocationTimeline = onOpenLocationTimeline,
-                            noteContent = noteContent,
-                        )
-                    }
-                },
-                endPane = {
-                    Column(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.surfaceDim)
-                                .navigationBarsPadding()
-                                .padding(horizontal = Spacing.sm, vertical = Spacing.md),
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        NoteViewerToolbar(
-                            onGoBack = onGoBack,
-                            journalContext = journalContext,
-                            accentColor = accentColor,
-                            onNavigateToNote = onNavigateToNote,
-                            onShowAddToJournal = onShowAddToJournal,
-                            onShare = onShare,
-                            onEdit = onEdit,
-                        )
-                    }
-                },
-                standardContent = {
-                    ImmersiveEditorLayout(
-                        topBarContent = {
-                            NoteViewerToolbar(
-                                onGoBack = onGoBack,
-                                journalContext = journalContext,
-                                accentColor = accentColor,
-                                onNavigateToNote = onNavigateToNote,
-                                onShowAddToJournal = onShowAddToJournal,
-                                onShare = onShare,
-                                onEdit = onEdit,
-                            )
-                        },
-                        editorContent = {
-                            NoteViewerContent(
-                                shared = shared,
-                                onOpenLocationTimeline = onOpenLocationTimeline,
-                                noteContent = noteContent,
-                            )
-                        },
-                        bottomContent = {
-                            Spacer(modifier = Modifier.fillMaxWidth())
-                        },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                },
-            )
-        },
-    )
-}
-
-/**
- * Navigation toolbar with journal context and prev/next navigation.
- */
-@Composable
-private fun NoteViewerToolbar(
-    onGoBack: () -> Unit,
-    journalContext: JournalContext? = null,
-    accentColor: Color? = null,
-    onNavigateToNote: (Uuid) -> Unit = {},
-    onShowAddToJournal: () -> Unit = {},
-    onShare: () -> Unit = {},
-    onEdit: (() -> Unit)? = null,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        FilledTonalIconButton(
-            onClick = onGoBack,
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = stringResource(UiRes.string.common_back),
-            )
-        }
-
-        if (journalContext != null) {
-            Spacer(modifier = Modifier.weight(1f))
-
-            Text(
-                text = journalContext.journalTitle,
-                style = MaterialTheme.typography.labelMedium,
-                color = accentColor ?: MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        if (onEdit != null) {
-            IconButton(onClick = onEdit) {
-                Icon(
-                    painter = PlatformIcons.edit(),
-                    contentDescription = stringResource(Res.string.cd_edit_entry),
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        }
-
-        IconButton(onClick = onShowAddToJournal) {
-            Icon(
-                Icons.Default.LibraryAdd,
-                contentDescription = stringResource(Res.string.add_to_journal),
-                tint = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-
-        IconButton(onClick = onShare) {
-            Icon(
-                Icons.Default.Share,
-                contentDescription = stringResource(Res.string.share),
-                tint = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-
-        if (journalContext != null) {
-            IconButton(
-                onClick = { journalContext.previousNoteId?.let(onNavigateToNote) },
-                enabled = journalContext.hasPrevious,
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                    contentDescription = stringResource(Res.string.cd_previous_entry),
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-            IconButton(
-                onClick = { journalContext.nextNoteId?.let(onNavigateToNote) },
-                enabled = journalContext.hasNext,
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = stringResource(Res.string.cd_next_entry),
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        }
-    }
-}
-
-/**
- * Note body wrapper — handles location card and content placement.
- * No Card/Surface wrapper; each type-specific viewer handles its own surface treatment.
- */
-@Composable
-fun NoteViewerContent(
-    shared: NoteViewerShared,
-    onOpenLocationTimeline: () -> Unit = {},
-    noteContent: @Composable () -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        shared.location?.let { location ->
-            NoteLocationCard(
-                location = location,
-                onOpenLocationTimeline = onOpenLocationTimeline,
-            )
-        }
-
-        noteContent()
-    }
-}
-
 // endregion
 
 // region Supporting components
-
-@Composable
-private fun NoteLocationCard(
-    location: NoteLocation,
-    onOpenLocationTimeline: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val coordinates = location.coordinates
-    val placeCenter = location.place?.let { place -> place.latitude?.let { latitude -> place.longitude?.let { latitude to it } } }
-    val title = location.displayName ?: stringResource(Res.string.pinned_location)
-    val subtitle =
-        when {
-            coordinates != null ->
-                "${coordinates.latitude.formatCoordinate()}, ${coordinates.longitude.formatCoordinate()}"
-            placeCenter != null ->
-                "${placeCenter.first.formatCoordinate()}, ${placeCenter.second.formatCoordinate()}"
-            else -> ""
-        }
-
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            FilledTonalIconButton(
-                onClick = onOpenLocationTimeline,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = null,
-                )
-            }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-            ) {
-                Text(
-                    text = stringResource(Res.string.location),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                if (subtitle.isNotBlank()) {
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            FilledTonalButton(onClick = onOpenLocationTimeline) {
-                Text(text = stringResource(Res.string.open_in_locations))
-            }
-        }
-    }
-}
 
 @Composable
 fun NoteViewerLoadingContent(modifier: Modifier = Modifier) {
@@ -776,107 +418,6 @@ fun NoteViewerErrorContent(
             )
         }
     }
-}
-
-private fun Double.formatCoordinate(): String {
-    val roundedScaled = (this * 10_000).roundToLong()
-    val absoluteScaled = roundedScaled.absoluteValue
-    val wholePart = absoluteScaled / 10_000
-    val fractionPart = (absoluteScaled % 10_000).toString().padStart(4, '0')
-    val sign = if (roundedScaled < 0) "-" else ""
-
-    return "$sign$wholePart.$fractionPart"
-}
-
-// endregion
-
-// region Audio viewer content
-
-@Composable
-fun AudioNoteViewerContent(
-    uiState: AudioNoteViewerUiState,
-    onGoBack: () -> Unit,
-    onPlayPause: () -> Unit = {},
-    onSeek: (Float) -> Unit = {},
-    onSkipBack: () -> Unit = {},
-    onSkipForward: () -> Unit = {},
-    modifier: Modifier = Modifier,
-) {
-    val audioPlaybackState = LocalAudioPlaybackState.current
-
-    when (uiState) {
-        AudioNoteViewerUiState.Loading -> {
-            NoteViewerLoadingContent(modifier = modifier)
-        }
-
-        is AudioNoteViewerUiState.Error -> {
-            NoteViewerErrorContent(
-                message = uiState.message.asString(),
-                modifier = modifier,
-            )
-        }
-
-        is AudioNoteViewerUiState.Ready -> {
-            // Only the player itself carries the caller's modifier (which may include a
-            // shared-element transition anchor) — the wrapping Box is a plain overlay host so the
-            // error banner doesn't get pulled into that transition's resize/clip animation.
-            Box(modifier = Modifier.fillMaxSize()) {
-                ImmersiveAudioScreen(
-                    amplitudes = uiState.context.amplitudes,
-                    progress = uiState.playbackState.progress,
-                    isPlaying = uiState.playbackState.isPlaying,
-                    palette = uiState.context.palette,
-                    daylightPeriod = uiState.context.daylightPeriod,
-                    durationMs = uiState.durationMs,
-                    createdAt = uiState.createdAt,
-                    segments = uiState.context.segments,
-                    detectedSounds = uiState.detectedSounds,
-                    onPlayPause = onPlayPause,
-                    onSeek = onSeek,
-                    onSkipBack = onSkipBack,
-                    onSkipForward = onSkipForward,
-                    onClose = onGoBack,
-                    outputSelection = audioPlaybackState.outputSelection,
-                    onOutputDeviceSelected = audioPlaybackState.selectOutputDevice,
-                    modifier = modifier.fillMaxSize(),
-                )
-                AudioPlaybackErrorBanner(
-                    visible = uiState.playbackState.errorMessage != null,
-                    modifier =
-                        Modifier
-                            .align(Alignment.TopCenter)
-                            .statusBarsPadding()
-                            .padding(Spacing.lg),
-                )
-            }
-        }
-    }
-}
-
-/**
- * Transient banner shown over the immersive player when the current recording fails to play
- * (e.g. the underlying file is missing or unreadable), so a failed tap gives real feedback
- * instead of silently doing nothing.
- */
-@Composable
-private fun AudioPlaybackErrorBanner(
-    visible: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    MessageBanner(
-        content =
-            if (visible) {
-                BannerContent(
-                    message = stringResource(Res.string.recording_playback_failed),
-                    icon = Icons.Filled.Error,
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                )
-            } else {
-                null
-            },
-        modifier = modifier,
-    )
 }
 
 // endregion

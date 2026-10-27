@@ -18,6 +18,13 @@ internal fun List<JournalNote>.withMarkedCapture(mark: MarkedMoment): List<Journ
             }
         val activity = mark.capturedDuring ?: note.capturedDuring
         when (note) {
+            is JournalNote.Handwriting ->
+                note.copy(
+                    creationTimestamp = mark.capturedAt,
+                    timeZoneId = mark.timeZoneId,
+                    location = location,
+                    capturedDuring = activity,
+                )
             is JournalNote.Text ->
                 note.copy(
                     creationTimestamp = mark.capturedAt,

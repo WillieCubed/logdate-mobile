@@ -25,6 +25,45 @@ class MarkedMomentEditorContextTest {
     }
 
     @Test
+    fun `handwriting fills the original marked day without changing original ink`() {
+        val captured = Instant.parse("2026-10-10T21:00:00Z")
+        val written = Instant.parse("2026-10-12T21:00:00Z")
+        val mark =
+            MarkedMoment(
+                Uuid.random(),
+                captured,
+                "UTC",
+                null,
+                null,
+                MarkState.OPEN,
+                "",
+                emptySet(),
+                "watch",
+                captured,
+                0,
+                capturedDuring = CaptureActivity.MOVING,
+            )
+        val note =
+            JournalNote.Handwriting(
+                creationTimestamp = written,
+                lastUpdated = written,
+                document =
+                    app.logdate.shared.model
+                        .HandwritingDocument(),
+                unreadableContent = "preserved ink payload",
+            )
+        val saved = listOf(note).withMarkedCapture(mark).single() as JournalNote.Handwriting
+
+        assertEquals(captured, saved.creationTimestamp)
+        assertEquals(mark.timeZoneId, saved.timeZoneId)
+        assertEquals(CaptureActivity.MOVING, saved.capturedDuring)
+        assertEquals(note.uid, saved.uid)
+        assertEquals(note.document, saved.document)
+        assertEquals(note.unreadableContent, saved.unreadableContent)
+        assertEquals(written, saved.lastUpdated)
+    }
+
+    @Test
     fun `notes that fill a mark record the activity the mark was made during`() {
         val captured = Instant.parse("2026-10-10T21:00:00Z")
         val mark =

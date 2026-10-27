@@ -29,6 +29,9 @@ class BlocksUiState(
     val onDeleteBlock: (Uuid) -> Unit,
     val onPersistAudioRecordingTarget: suspend (Uuid, String, String?) -> Boolean = { _, _, _ -> true },
     val onPersistCameraCaptureTarget: suspend (Uuid, String, CapturedMediaType) -> Boolean = { _, _, _ -> false },
+    val allowBlockCreation: Boolean = true,
+    val allowHandwritingCreation: Boolean = false,
+    val blockPresentations: Map<Uuid, EditorBlockPresentation> = emptyMap(),
 ) {
     val hasContent get() = blocks.any { it.hasContent() }
 }
@@ -43,14 +46,25 @@ fun rememberBlocksUiState(
     onUpdateJournalSelection: (List<Uuid>) -> Unit,
     onPersistAudioRecordingTarget: suspend (Uuid, String, String?) -> Boolean = { _, _, _ -> true },
     onPersistCameraCaptureTarget: suspend (Uuid, String, CapturedMediaType) -> Boolean = { _, _, _ -> false },
+    blockPresentations: Map<Uuid, EditorBlockPresentation> = emptyMap(),
+    allowHandwritingCreation: Boolean = false,
 ): BlocksUiState {
     val hasContent by remember(editorState.blocks) {
         derivedStateOf { editorState.blocks.isNotEmpty() }
     }
 
-    return remember(editorState, hasContent, onPersistAudioRecordingTarget, onPersistCameraCaptureTarget) {
+    return remember(
+        editorState,
+        hasContent,
+        blockPresentations,
+        allowHandwritingCreation,
+        onPersistAudioRecordingTarget,
+        onPersistCameraCaptureTarget,
+    ) {
         BlocksUiState(
             blocks = editorState.blocks,
+            blockPresentations = blockPresentations,
+            allowHandwritingCreation = allowHandwritingCreation,
             expandedBlockId = editorState.expandedBlockId,
             availableJournals = editorState.availableJournals,
             selectedJournalIds = editorState.selectedJournalIds,

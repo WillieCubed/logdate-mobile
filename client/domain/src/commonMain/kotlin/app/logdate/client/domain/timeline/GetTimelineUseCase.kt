@@ -361,7 +361,7 @@ private fun List<JournalNote>.firstVisualUri(): String? =
             is JournalNote.Image -> entry.mediaRef
             is JournalNote.Video -> entry.mediaRef
             is JournalNote.Audio -> null
-            is JournalNote.Text -> null
+            is JournalNote.Text, is JournalNote.Handwriting -> null
         }
     }
 

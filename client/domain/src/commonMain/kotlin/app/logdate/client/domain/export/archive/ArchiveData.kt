@@ -65,10 +65,15 @@ data class ArchiveNote(
     val locationDetails: ArchiveNoteLocation? = null,
     /** The journals this note appears in. A note may be in several, or in none. */
     val journalIds: List<String> = emptyList(),
+    val handwriting: app.logdate.shared.model.HandwritingDocument? = null,
+    val unreadableHandwriting: String? = null,
 )
 
 @Serializable
 enum class ArchiveNoteType {
+    @SerialName("handwriting")
+    HANDWRITING,
+
     @SerialName("text")
     TEXT,
 
@@ -145,10 +150,15 @@ data class ArchiveDraftBlock(
     val transcription: String? = null,
     val location: ArchiveLocation? = null,
     val thumbnail: ArchiveMediaRef? = null,
+    val handwriting: app.logdate.shared.model.HandwritingDocument? = null,
+    val unreadableHandwriting: String? = null,
 )
 
 @Serializable
 enum class ArchiveBlockType {
+    @SerialName("handwriting")
+    HANDWRITING,
+
     @SerialName("text")
     TEXT,
 

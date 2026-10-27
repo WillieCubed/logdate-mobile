@@ -116,6 +116,10 @@ internal class JournalNoteRecoveryPersistence(
             }
         val count =
             when (note) {
+                is JournalNote.Handwriting ->
+                    textNoteDao.updateForRestore(
+                        note.toEntity(linkedPlaceId, preserveSourcePlace = true, sourceLocation = sourceLocation),
+                    )
                 is JournalNote.Text ->
                     textNoteDao.updateForRestore(
                         note.toEntity(linkedPlaceId, preserveSourcePlace = true, sourceLocation = sourceLocation),
@@ -135,7 +139,7 @@ internal class JournalNoteRecoveryPersistence(
             }
         check(count == 1) { "Note changed during archive recovery" }
         when (note) {
-            is JournalNote.Text -> Unit
+            is JournalNote.Text, is JournalNote.Handwriting -> Unit
             is JournalNote.Image -> mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
             is JournalNote.Video -> mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
             is JournalNote.Audio -> {
@@ -160,7 +164,7 @@ internal class JournalNoteRecoveryPersistence(
 
     private suspend fun storedNoteRecord(note: JournalNote): GenericNoteData? =
         when (note) {
-            is JournalNote.Text -> textNoteDao.findNoteOneOff(note.uid)
+            is JournalNote.Text, is JournalNote.Handwriting -> textNoteDao.findNoteOneOff(note.uid)
             is JournalNote.Image -> imageNoteDao.findNoteOneOff(note.uid)
             is JournalNote.Video -> videoNoteDao.findNoteOneOff(note.uid)
             is JournalNote.Audio -> audioNoteDao.findNoteOneOff(note.uid)
@@ -179,6 +183,7 @@ internal class JournalNoteRecoveryPersistence(
                     ?.id
                     ?.let { notePlaceResolver.get(it)?.id }
             when (storedNote) {
+                is JournalNote.Handwriting -> textNoteDao.addNote(storedNote.toEntity(linkedPlaceId, preserveSourcePlace))
                 is JournalNote.Text -> textNoteDao.addNote(storedNote.toEntity(linkedPlaceId, preserveSourcePlace))
                 is JournalNote.Image -> {
                     imageNoteDao.addNote(storedNote.toEntity(linkedPlaceId, preserveSourcePlace))
@@ -219,7 +224,7 @@ internal class JournalNoteRecoveryPersistence(
         syncedAt: Instant,
     ) {
         when (note) {
-            is JournalNote.Text -> textNoteDao.updateSyncMetadata(note.uid, syncVersion, syncedAt)
+            is JournalNote.Text, is JournalNote.Handwriting -> textNoteDao.updateSyncMetadata(note.uid, syncVersion, syncedAt)
             is JournalNote.Image -> imageNoteDao.updateSyncMetadata(note.uid, syncVersion, syncedAt)
             is JournalNote.Audio -> audioNoteDao.updateSyncMetadata(note.uid, syncVersion, syncedAt)
             is JournalNote.Video -> videoNoteDao.updateSyncMetadata(note.uid, syncVersion, syncedAt)

@@ -14,7 +14,7 @@ import kotlin.uuid.Uuid
  */
 const val ACTION_CAPTURE = "app.logdate.action.CAPTURE"
 
-/** `text`, `voice`, `camera`, or `video`. Anything else opens a text entry. */
+/** `text`, `voice`, `camera`, or `video`. Anything else uses the saved starting mode. */
 const val EXTRA_CAPTURE_MODE = "mode"
 
 /** A journal UUID to pre-select for the new entry. */
@@ -32,8 +32,8 @@ const val CAPTURE_JOURNAL_PARAM = "journal"
 /**
  * The editor route for a capture request.
  *
- * An unknown [mode] falls back to text rather than failing, so a newer shortcut or another app's
- * guess never leaves the person on an error. An invalid [journalId] is ignored for the same reason.
+ * A missing or unknown [mode] uses the saved starting mode, so a generic capture respects the
+ * person's preference. An invalid [journalId] is ignored for the same reason.
  */
 fun captureRoute(
     mode: String?,
@@ -57,7 +57,8 @@ fun widgetCaptureRoute(
             when {
                 camera -> EditorLaunchMode.Camera
                 record -> EditorLaunchMode.Voice
-                else -> EditorLaunchMode.Text
+                photoUri != null -> EditorLaunchMode.Text
+                else -> EditorLaunchMode.Default
             },
         promptPhotoUri = photoUri,
     )
@@ -67,7 +68,8 @@ private fun captureLaunchMode(mode: String?): EditorLaunchMode =
         "voice" -> EditorLaunchMode.Voice
         "camera" -> EditorLaunchMode.Camera
         "video" -> EditorLaunchMode.Video
-        else -> EditorLaunchMode.Text
+        "text" -> EditorLaunchMode.Text
+        else -> EditorLaunchMode.Default
     }
 
 /**
@@ -76,6 +78,7 @@ private fun captureLaunchMode(mode: String?): EditorLaunchMode =
  */
 fun captureShortcutId(mode: EditorLaunchMode): String? =
     when (mode) {
+        EditorLaunchMode.Default -> null
         EditorLaunchMode.Text -> "new_note"
         EditorLaunchMode.Voice -> "record_voice"
         EditorLaunchMode.Camera -> "take_photo"

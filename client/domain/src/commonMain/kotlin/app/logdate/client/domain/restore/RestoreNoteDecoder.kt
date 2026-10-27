@@ -22,6 +22,7 @@ internal fun ExportNote.toJournalNote(
         mediaResolution.uri ?: mediaPath?.takeIf { mediaResolution.allowSourceFallback && it.isNotBlank() }
     val note =
         when (type.lowercase()) {
+            "handwriting" -> toHandwritingNote(id, location)
             "text" ->
                 JournalNote.Text(
                     uid = id,
@@ -75,6 +76,21 @@ internal fun ExportNote.toJournalNote(
     return note.withCapturedOn(CaptureDevice.fromWireName(capturedOn)).withCapturedDuring(CaptureActivity.fromWireName(capturedDuring))
 }
 
+private fun ExportNote.toHandwritingNote(
+    id: Uuid,
+    location: NoteLocation?,
+): JournalNote.Handwriting =
+    JournalNote.Handwriting(
+        uid = id,
+        creationTimestamp = createdAt,
+        lastUpdated = updatedAt,
+        document = requireNotNull(handwriting) { "Missing original handwriting document" },
+        unreadableContent = unreadableHandwriting,
+        timeZoneId = timeZone,
+        syncVersion = syncVersion,
+        location = location,
+    )
+
 private fun ArchiveNoteLocation.toNoteLocation() =
     NoteLocation(
         coordinates =
@@ -107,6 +123,7 @@ internal fun JournalNote.withExistingCaptureMetadata(existing: JournalNote?): Jo
     val device = existing?.capturedOn ?: capturedOn
     val activity = existing?.capturedDuring ?: capturedDuring
     return when (this) {
+        is JournalNote.Handwriting -> copy(timeZoneId = zone, capturedOn = device, capturedDuring = activity)
         is JournalNote.Text -> copy(timeZoneId = zone, capturedOn = device, capturedDuring = activity)
         is JournalNote.Image -> copy(timeZoneId = zone, capturedOn = device, capturedDuring = activity)
         is JournalNote.Audio -> copy(timeZoneId = zone, capturedOn = device, capturedDuring = activity)

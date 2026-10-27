@@ -20,6 +20,7 @@
               "type": "union",
               "refs": [
                 "#textBlock",
+                "#handwritingBlock",
                 "#imageBlock",
                 "#videoBlock",
                 "#audioBlock",
@@ -234,6 +235,37 @@
           "type": "ref",
           "ref": "app.logdate.defs#media",
           "description": "The captured photo or video. Absent until something is captured."
+        }
+      }
+    },
+    "handwritingBlock": {
+      "type": "object",
+      "description": "Original editable handwriting in an unfinished entry.",
+      "required": [
+        "id",
+        "createdAt",
+        "document"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Identifier of the block, unique within the draft. The saved entry keeps it."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "When the block was started, which becomes the time of its entry."
+        },
+        "location": {
+          "type": "ref",
+          "ref": "app.logdate.defs#location",
+          "description": "Where the block was started."
+        },
+        "document": {
+          "type": "string",
+          "maxLength": 1000000,
+          "description": "A versioned LogDate HandwritingDocument encoded as JSON, retaining fractional coordinates, pressure and transforms without floating-point values in DAG-CBOR. Oversized documents fail sync explicitly and are never trimmed."
         }
       }
     }

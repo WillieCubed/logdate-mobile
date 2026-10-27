@@ -12,6 +12,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
+import app.logdate.shared.model.HandwritingDocument
 import app.logdate.shared.model.PhotoPresentation
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.Serializable
@@ -98,18 +99,34 @@ private data class StoredNoteLocation(
 private fun NoteLocation.storedLocation(preserveSourcePlace: Boolean): String =
     locationJson.encodeToString(StoredNoteLocation.serializer(), StoredNoteLocation(coordinates, place, preserveSourcePlace))
 
-fun TextNoteEntity.toModel(place: NotePlace? = null) =
-    JournalNote.Text(
-        uid = uid,
-        content = content,
-        creationTimestamp = created,
-        lastUpdated = lastUpdated,
-        syncVersion = syncVersion,
-        location = mapLocation(latitude, longitude, altitude, locationAccuracy, place, placeId, locationMetadata),
-        timeZoneId = timeZoneId,
-        capturedOn = CaptureDevice.fromWireName(capturedOn),
-        capturedDuring = CaptureActivity.fromWireName(capturedDuring),
-    )
+fun TextNoteEntity.toModel(place: NotePlace? = null): JournalNote =
+    if (contentFormat == "handwriting") {
+        val decoded = runCatching { HandwritingDocument.decode(content) }.getOrNull()
+        JournalNote.Handwriting(
+            uid = uid,
+            document = decoded ?: HandwritingDocument(),
+            unreadableContent = if (decoded == null) content else null,
+            creationTimestamp = created,
+            lastUpdated = lastUpdated,
+            syncVersion = syncVersion,
+            location = mapLocation(latitude, longitude, altitude, locationAccuracy, place, placeId, locationMetadata),
+            timeZoneId = timeZoneId,
+            capturedOn = CaptureDevice.fromWireName(capturedOn),
+            capturedDuring = CaptureActivity.fromWireName(capturedDuring),
+        )
+    } else {
+        JournalNote.Text(
+            uid = uid,
+            content = content,
+            creationTimestamp = created,
+            lastUpdated = lastUpdated,
+            syncVersion = syncVersion,
+            location = mapLocation(latitude, longitude, altitude, locationAccuracy, place, placeId, locationMetadata),
+            timeZoneId = timeZoneId,
+            capturedOn = CaptureDevice.fromWireName(capturedOn),
+            capturedDuring = CaptureActivity.fromWireName(capturedDuring),
+        )
+    }
 
 fun JournalNote.Text.toEntity(
     linkedPlaceId: Uuid? = null,
@@ -118,6 +135,28 @@ fun JournalNote.Text.toEntity(
 ) = TextNoteEntity(
     uid = uid,
     content = content,
+    created = creationTimestamp,
+    lastUpdated = lastUpdated,
+    syncVersion = syncVersion,
+    latitude = location?.coordinates?.latitude,
+    longitude = location?.coordinates?.longitude,
+    altitude = location?.coordinates?.altitude,
+    locationAccuracy = location?.coordinates?.accuracy,
+    placeId = linkedPlaceId,
+    locationMetadata = if (sourceLocation != null) sourceLocation.locationMetadata else location?.storedLocation(preserveSourcePlace),
+    timeZoneId = timeZoneId,
+    capturedOn = capturedOn?.wireName,
+    capturedDuring = capturedDuring?.wireName,
+)
+
+fun JournalNote.Handwriting.toEntity(
+    linkedPlaceId: Uuid? = null,
+    preserveSourcePlace: Boolean = false,
+    sourceLocation: GenericNoteData? = null,
+) = TextNoteEntity(
+    uid = uid,
+    content = unreadableContent ?: document.encode(),
+    contentFormat = "handwriting",
     created = creationTimestamp,
     lastUpdated = lastUpdated,
     syncVersion = syncVersion,

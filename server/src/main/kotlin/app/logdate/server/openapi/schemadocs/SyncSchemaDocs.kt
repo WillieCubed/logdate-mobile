@@ -2,25 +2,6 @@ package app.logdate.server.openapi.schemadocs
 
 import app.logdate.server.openapi.SchemaDoc
 
-private const val EPOCH_MS = "Milliseconds since the Unix epoch, UTC."
-private const val DEVICE_ID = "Which device made the change. Any stable string; the apps use a per-install ID. Defaults to `unknown`."
-private const val SERVER_VERSION_ASSIGNED =
-    "The version the server assigned to this write. Versions only ever increase per account; use them as `since` cursors."
-private const val SYNC_VERSION_IGNORED = "Ignored. The server assigns versions itself; kept for older clients."
-private const val CURSOR_LAST_TIMESTAMP =
-    "The highest version in this page, or the `since` you sent if the page is empty. Send it as the next `since`. " +
-        "Despite the name it is a version, not a clock time."
-private const val HAS_MORE =
-    "`true` when more changes exist beyond this page; call again with `since` = `lastTimestamp`. `changes` and `deletions` " +
-        "are cut to `limit` separately but share this one cursor, so when it is `true` a record with a lower version than " +
-        "`lastTimestamp` can still be waiting in the list that was cut short. Use a `limit` large enough that pages are " +
-        "rarely full, or re-page from your previous cursor rather than from `lastTimestamp` when it is `true`."
-private const val DELETION_VERSION =
-    "The version the server assigned to the deletion. Deletions share one version sequence with changes, so compare it " +
-        "with a record's `serverVersion` to tell whether the record was re-created afterwards."
-private const val IS_DELETED_ALWAYS_FALSE = "Always `false`. Deletions are delivered in the `deletions` list, not here."
-private const val ENCRYPTED_BY_APPS = "The LogDate apps send this encrypted; the server never reads it."
-
 /** Prose for the contents, journals, associations, drafts, media, backups and sync-status schemas. */
 internal object SyncSchemaDocs {
     val docs: Map<String, SchemaDoc> =
@@ -75,109 +56,7 @@ internal object SyncSchemaDocs {
                 ),
             "VersionConstraint.None" to
                 SchemaDoc("No check: the update always applies, even over newer changes.", mapOf("type" to "Always `none`.")),
-            // ---- Contents -------------------------------------------------------------------------
-            "ContentUploadRequest" to
-                SchemaDoc(
-                    "A whole entry, as sent to **Create or replace an entry**.",
-                    mapOf(
-                        "id" to "The entry's ID. Must equal the `contentId` in the path.",
-                        "type" to "What kind of entry: `TEXT`, `IMAGE`, `VIDEO` or `AUDIO`.",
-                        "content" to "The entry's text, or `null` for entries without text. $ENCRYPTED_BY_APPS",
-                        "mediaUri" to "Reference to the entry's media (usually a `downloadUrl` from **Upload a media file**), or `null`.",
-                        "durationMs" to "Length of an audio or video entry in milliseconds; `0` otherwise.",
-                        "createdAt" to "When the entry was written on the device. $EPOCH_MS",
-                        "lastUpdated" to "When the entry was last edited on the device. $EPOCH_MS",
-                        "syncVersion" to SYNC_VERSION_IGNORED,
-                        "deviceId" to DEVICE_ID,
-                        "photoPresentation" to "Photo layout: `EdgeToEdge` or `Framed`. Omit on updates to preserve the current layout.",
-                        "caption" to "Caption for an image or video, or `null`. $ENCRYPTED_BY_APPS",
-                        "location" to "Where the entry was written, or `null`. $ENCRYPTED_BY_APPS",
-                        "transcript" to
-                            "Structured audio transcript encrypted by the app; omitted values survive only while media is unchanged. $ENCRYPTED_BY_APPS",
-                        "capturedOn" to "The device that captured the entry, or `null` when not recorded. $ENCRYPTED_BY_APPS",
-                        "capturedDuring" to
-                            "What the person was doing at capture, or `null` when not recorded. $ENCRYPTED_BY_APPS",
-                    ),
-                ),
-            "ContentUploadResponse" to
-                SchemaDoc(
-                    "Confirmation that an entry was saved.",
-                    mapOf(
-                        "id" to "The entry's ID.",
-                        "serverVersion" to SERVER_VERSION_ASSIGNED,
-                        "uploadedAt" to "When the server accepted the write. $EPOCH_MS",
-                    ),
-                ),
-            "ContentUpdateRequest" to
-                SchemaDoc(
-                    "The fields of an entry to change, as sent to **Change part of an entry**. Omitted fields keep their values.",
-                    mapOf(
-                        "content" to "New text, or omit to keep the current text. $ENCRYPTED_BY_APPS",
-                        "mediaUri" to "New media reference, or omit to keep the current one.",
-                        "durationMs" to "New duration in milliseconds, or omit to keep the current duration. An explicit `0` is retained.",
-                        "lastUpdated" to "When the edit was made on the device. $EPOCH_MS",
-                        "syncVersion" to SYNC_VERSION_IGNORED,
-                        "deviceId" to DEVICE_ID,
-                        "versionConstraint" to "Optional conflict check; see `VersionConstraint`.",
-                        "photoPresentation" to "Photo layout: `EdgeToEdge` or `Framed`. Omit on updates to preserve the current layout.",
-                        "caption" to "New caption, or omit to keep the current one. $ENCRYPTED_BY_APPS",
-                        "location" to "New location, or omit to keep the current one. $ENCRYPTED_BY_APPS",
-                        "transcript" to "Encrypted audio transcript; omit to preserve it while media is unchanged. $ENCRYPTED_BY_APPS",
-                        "capturedOn" to "The device that captured the entry; omit it to leave it unchanged. $ENCRYPTED_BY_APPS",
-                        "capturedDuring" to "What the person was doing at capture; omit it to leave it unchanged. $ENCRYPTED_BY_APPS",
-                    ),
-                ),
-            "ContentUpdateResponse" to
-                SchemaDoc(
-                    "Confirmation that an entry was updated.",
-                    mapOf(
-                        "id" to "The entry's ID.",
-                        "serverVersion" to SERVER_VERSION_ASSIGNED,
-                        "updatedAt" to "When the server applied the update. $EPOCH_MS",
-                    ),
-                ),
-            "ContentChangesResponse" to
-                SchemaDoc(
-                    "One page of the entry change feed.",
-                    mapOf(
-                        "changes" to "Entries created or updated after `since`, oldest version first.",
-                        "deletions" to "Entries deleted after `since`.",
-                        "lastTimestamp" to CURSOR_LAST_TIMESTAMP,
-                        "hasMore" to HAS_MORE,
-                    ),
-                ),
-            "ContentChange" to
-                SchemaDoc(
-                    "An entry as the server holds it.",
-                    mapOf(
-                        "id" to "The entry's ID.",
-                        "type" to "`TEXT`, `IMAGE`, `VIDEO` or `AUDIO`.",
-                        "content" to "The entry's text, or `null`. $ENCRYPTED_BY_APPS",
-                        "mediaUri" to "Reference to the entry's media, or `null`.",
-                        "durationMs" to "Length of an audio or video entry in milliseconds; `0` otherwise.",
-                        "createdAt" to "When the entry was written on the device. $EPOCH_MS",
-                        "lastUpdated" to "The `lastUpdated` the client sent on its last write, stored as given. $EPOCH_MS",
-                        "serverVersion" to SERVER_VERSION_ASSIGNED,
-                        "isDeleted" to IS_DELETED_ALWAYS_FALSE,
-                        "photoPresentation" to "Photo layout: `EdgeToEdge` or `Framed`. Omit on updates to preserve the current layout.",
-                        "caption" to "Caption for an image or video, or `null`. $ENCRYPTED_BY_APPS",
-                        "location" to "Where the entry was written, or `null`. $ENCRYPTED_BY_APPS",
-                        "transcript" to
-                            "Structured audio transcript encrypted by the app; omitted values survive only while media is unchanged. $ENCRYPTED_BY_APPS",
-                        "capturedOn" to "The device that captured the entry, or `null` when not recorded. $ENCRYPTED_BY_APPS",
-                        "capturedDuring" to
-                            "What the person was doing at capture, or `null` when not recorded. $ENCRYPTED_BY_APPS",
-                    ),
-                ),
-            "ContentDeletion" to
-                SchemaDoc(
-                    "A tombstone: an entry that was deleted.",
-                    mapOf(
-                        "id" to "The deleted entry's ID.",
-                        "deletedAt" to "When it was deleted. $EPOCH_MS",
-                        "serverVersion" to DELETION_VERSION,
-                    ),
-                ),
+            *ContentSyncSchemaDocs.entries,
             // ---- Journals -------------------------------------------------------------------------
             "JournalMergeRequest" to
                 SchemaDoc(

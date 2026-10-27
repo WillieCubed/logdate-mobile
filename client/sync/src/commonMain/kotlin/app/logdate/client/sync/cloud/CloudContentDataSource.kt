@@ -6,6 +6,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.transcription.TranscriptDocument
 import app.logdate.client.sync.crypto.SyncPayloadCipher
+import app.logdate.shared.model.HandwritingDocument
 import app.logdate.shared.model.PhotoPresentation
 import app.logdate.shared.model.sync.VersionConstraint
 import kotlinx.serialization.json.Json
@@ -161,6 +162,7 @@ class DefaultCloudContentDataSource(
             type =
                 when (this) {
                     is JournalNote.Text -> "TEXT"
+                    is JournalNote.Handwriting -> "HANDWRITING"
                     is JournalNote.Image -> "IMAGE"
                     is JournalNote.Video -> "VIDEO"
                     is JournalNote.Audio -> "AUDIO"
@@ -168,6 +170,7 @@ class DefaultCloudContentDataSource(
             content =
                 when (this) {
                     is JournalNote.Text -> encryptNoteText(uid, content)
+                    is JournalNote.Handwriting -> encryptNoteText(uid, unreadableContent ?: document.encode())
                     else -> null
                 },
             mediaUri =
@@ -204,6 +207,7 @@ class DefaultCloudContentDataSource(
             content =
                 when (this) {
                     is JournalNote.Text -> encryptNoteText(uid, content)
+                    is JournalNote.Handwriting -> encryptNoteText(uid, unreadableContent ?: document.encode())
                     else -> null
                 },
             mediaUri =
@@ -260,6 +264,7 @@ class DefaultCloudContentDataSource(
         val lastUpdated = Instant.fromEpochMilliseconds(lastUpdated)
 
         return when (type) {
+            "HANDWRITING" -> toHandwritingNote(uid, creationTimestamp, lastUpdated)
             "TEXT" ->
                 JournalNote.Text(
                     uid = uid,
@@ -312,6 +317,29 @@ class DefaultCloudContentDataSource(
                 )
             else -> throw UnsupportedRemoteFormatException()
         }
+    }
+
+    private suspend fun ContentChange.toHandwritingNote(
+        uid: Uuid,
+        created: Instant,
+        updated: Instant,
+    ): JournalNote.Handwriting {
+        val decoded =
+            try {
+                HandwritingDocument.decode(decryptNoteText(uid, requireNotNull(content)))
+            } catch (_: app.logdate.shared.model.UnsupportedHandwritingVersionException) {
+                throw UnsupportedRemoteFormatException()
+            }
+        return JournalNote.Handwriting(
+            uid = uid,
+            creationTimestamp = created,
+            lastUpdated = updated,
+            document = decoded,
+            location = decryptNoteLocation(uid, location),
+            syncVersion = serverVersion,
+            capturedOn = decryptNoteCapturedOn(uid, capturedOn),
+            capturedDuring = decryptNoteCapturedDuring(uid, capturedDuring),
+        )
     }
 
     private suspend fun encryptNoteText(

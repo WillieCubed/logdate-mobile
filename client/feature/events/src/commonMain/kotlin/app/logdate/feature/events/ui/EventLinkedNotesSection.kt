@@ -138,6 +138,9 @@ private fun NotePreview(note: JournalNote) {
     val previewSize = 56.dp
     val shape = RoundedCornerShape(Spacing.sm)
     when (note) {
+        is JournalNote.Handwriting ->
+            app.logdate.ui.handwriting
+                .HandwritingPreview(note.document, Modifier.size(previewSize).clip(shape), unreadable = note.unreadableContent != null)
         is JournalNote.Image ->
             AsyncImage(
                 model = note.mediaRef,

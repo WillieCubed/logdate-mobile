@@ -28,6 +28,15 @@ class LogdatePreferencesDataSource(
     private val userPreferences: DataStore<Preferences>,
     private val featureAvailable: (FeatureFlag) -> Boolean = { it.availableForLaunch },
 ) {
+    fun observeEntryStartMode(): Flow<EntryStartMode> =
+        userPreferences.data.map { preferences ->
+            EntryStartMode.entries.firstOrNull { it.name == preferences[ENTRY_START_MODE] } ?: EntryStartMode.TEXT
+        }
+
+    suspend fun setEntryStartMode(mode: EntryStartMode) {
+        userPreferences.updateData { it.toMutablePreferences().apply { this[ENTRY_START_MODE] = mode.name } }
+    }
+
     fun observeQuietSaveEnabled(): Flow<Boolean> = userPreferences.data.map { it[QUIET_SAVE_ENABLED] ?: true }
 
     suspend fun setQuietSaveEnabled(enabled: Boolean) {
@@ -41,6 +50,7 @@ class LogdatePreferencesDataSource(
 
     // TODO: Migrate to datastore-proto
     companion object {
+        val ENTRY_START_MODE = stringPreferencesKey("entry_default_capture_mode")
         val QUIET_SAVE_ENABLED = booleanPreferencesKey("quiet_save_preference_enabled")
         val BIRTHDAY = longPreferencesKey("birthday")
         val IS_ONBOARDED = booleanPreferencesKey("is_onboarded")

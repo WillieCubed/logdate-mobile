@@ -337,6 +337,11 @@ internal fun getEditorDraftFingerprint(state: EditorState): String =
             .filterNot { state.isReadOnly(it.id) }
             .forEach { block ->
                 when (block) {
+                    is HandwritingBlockUiState -> {
+                        appendFingerprintField("handwriting")
+                        appendCommonBlockFields(block)
+                        appendFingerprintField(block.page.encode())
+                    }
                     is TextBlockUiState -> {
                         appendFingerprintField("text")
                         appendCommonBlockFields(block)

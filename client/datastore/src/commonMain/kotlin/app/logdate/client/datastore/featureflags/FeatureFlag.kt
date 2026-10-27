@@ -28,8 +28,14 @@ enum class FeatureFlag(
      */
     LIBRARY(key = "library_enabled", defaultEnabled = true),
 
+    /** Immersive entry overview and block focus, with a legacy presentation rollback. */
+    IMMERSIVE_ENTRY_EDITOR(key = "immersive_entry_editor_enabled", defaultEnabled = true),
+
     /** Stop quiet phone recordings and preserve them as drafts. */
     QUIET_SAVE(key = "quiet_save_available", defaultEnabled = false),
+
+    /** Original ink blocks, retained through drafts, saved entries, archives and sync. */
+    HANDWRITING_ENTRIES(key = "handwriting_entries_enabled", defaultEnabled = true),
 
     /**
      * Automatic event detection and the Events surface.

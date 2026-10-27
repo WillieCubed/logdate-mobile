@@ -50,6 +50,18 @@ data class SerializableTextBlock(
 ) : SerializableEntryBlock()
 
 @Serializable
+data class SerializableHandwritingBlock(
+    override val id:
+        @Serializable(with = UuidSerializer::class)
+        Uuid,
+    override val timestamp: Instant,
+    override val locationLat: Double? = null,
+    override val locationLng: Double? = null,
+    override val altitude: Double? = null,
+    val document: HandwritingDocument,
+) : SerializableEntryBlock()
+
+@Serializable
 data class SerializableImageBlock(
     override val id:
         @Serializable(with = UuidSerializer::class)

@@ -204,7 +204,7 @@ navController.navigate(
 
 ### User Experience
 - [ ] Add writing analytics and insights
-- [ ] Implement focus mode for distraction-free writing
+- [x] Focus individual blocks while retaining entry context and original content
 - [ ] Add accessibility improvements (voice control, screen reader)
 - [ ] Implement editor customization (themes, fonts)
 - [ ] Add writing goals and progress tracking
@@ -222,3 +222,13 @@ navController.navigate(
 - [ ] Implement memory usage optimization
 - [ ] Add editor testing automation
 - [ ] Implement editor debugging tools
+
+## Entry overview and block focus
+
+The entry overview and focused editor share each block's surface. Focusing expands that surface into the working area; predictive back can reverse or cancel the transition. A single capture bar changes modes without replacing existing blocks. Layout responds to local bounds and separating hinges, and keeps draft content and overview scroll state across resizing.
+
+The preferred starting mode is stored in user preferences and opens directly for a fresh entry. Explicit capture shortcuts, incoming content, and reopening an existing draft take precedence. Earlier entries are read from the current day's notes and remain separate from the draft being written.
+
+Handwriting is an ordinary entry block containing a versioned `HandwritingDocument`. Drafts, saved notes, archives, and sync retain the original strokes, pressure, page coordinates, and transforms. Personal-space records use a dedicated handwriting block whose document is encoded as JSON inside a string, preserving fractional values without introducing floats into DAG-CBOR. Unsupported documents remain explicit sync failures rather than becoming text or losing strokes.
+
+`IMMERSIVE_ENTRY_EDITOR` controls the overview/focus presentation; `HANDWRITING_ENTRIES` also permits handwriting in the legacy presentation. Both default on, with the legacy presentation available for rollback. The isolated debug scenes in [the prototype guide](../../../docs/prototypes/handwriting-entry.md) remain useful for design exploration; production acceptance uses `EntryFocusDraftJourneyTest` on managed phone and tablet devices with the actual keyboard and repositories.

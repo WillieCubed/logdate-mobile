@@ -129,4 +129,5 @@
     <string name="history_access_ready_message">Record visits and journeys in the background. This uses more battery and keeps a recording notification visible. You can pause at any time.</string>
     <string name="history_access_ready_action">Start recording</string>
     <string name="history_places_count">%1$d places</string>
+    <string name="history_memory_handwriting">Handwritten memory</string>
 </resources>

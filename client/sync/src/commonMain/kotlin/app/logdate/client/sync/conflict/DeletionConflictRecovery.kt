@@ -16,6 +16,7 @@ import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.SerializableAudioBlock
 import app.logdate.shared.model.SerializableCameraBlock
 import app.logdate.shared.model.SerializableEntryBlock
+import app.logdate.shared.model.SerializableHandwritingBlock
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.SerializableVideoBlock
@@ -226,7 +227,7 @@ class DeletionConflictRecovery(
         val ref = note.mediaRefOrNull() ?: return note
         val retained = preserveReference(ref, scope, note.uid)
         return when (note) {
-            is JournalNote.Text -> note
+            is JournalNote.Text, is JournalNote.Handwriting -> note
             is JournalNote.Image -> note.copy(mediaRef = retained)
             is JournalNote.Video -> note.copy(mediaRef = retained)
             is JournalNote.Audio -> note.copy(mediaRef = retained)
@@ -280,6 +281,7 @@ class DeletionConflictRecovery(
             blocks =
                 draft.blocks.map { block ->
                     when (block) {
+                        is SerializableHandwritingBlock -> block
                         is SerializableTextBlock -> {
                             block
                         }
@@ -330,6 +332,7 @@ class DeletionConflictRecovery(
 
 private fun JournalNote.recoveredAs(id: Uuid): JournalNote =
     when (this) {
+        is JournalNote.Handwriting -> copy(uid = id, syncVersion = 0, lastUpdated = Clock.System.now())
         is JournalNote.Text -> copy(uid = id, syncVersion = 0, lastUpdated = Clock.System.now())
         is JournalNote.Image -> copy(uid = id, syncVersion = 0, lastUpdated = Clock.System.now())
         is JournalNote.Video -> copy(uid = id, syncVersion = 0, lastUpdated = Clock.System.now())
@@ -338,6 +341,7 @@ private fun JournalNote.recoveredAs(id: Uuid): JournalNote =
 
 private fun SerializableEntryBlock.recoveredAs(id: Uuid): SerializableEntryBlock =
     when (this) {
+        is SerializableHandwritingBlock -> copy(id = id)
         is SerializableTextBlock -> copy(id = id)
         is SerializableImageBlock -> copy(id = id)
         is SerializableVideoBlock -> copy(id = id)

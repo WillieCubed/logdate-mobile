@@ -87,6 +87,7 @@ internal suspend fun RetainedJournalDatabaseMerger.importNoteMedia(note: Journal
 internal fun JournalNote.withRetainedMergeId(id: Uuid): JournalNote =
     when (this) {
         is JournalNote.Text -> copy(uid = id)
+        is JournalNote.Handwriting -> copy(uid = id)
         is JournalNote.Image -> copy(uid = id)
         is JournalNote.Video -> copy(uid = id)
         is JournalNote.Audio -> copy(uid = id)
@@ -94,7 +95,7 @@ internal fun JournalNote.withRetainedMergeId(id: Uuid): JournalNote =
 
 internal fun JournalNote.withRetainedMediaRef(ref: String): JournalNote =
     when (this) {
-        is JournalNote.Text -> this
+        is JournalNote.Text, is JournalNote.Handwriting -> this
         is JournalNote.Image -> copy(mediaRef = ref)
         is JournalNote.Video -> copy(mediaRef = ref)
         is JournalNote.Audio -> copy(mediaRef = ref)

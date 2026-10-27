@@ -38,6 +38,7 @@ import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.changes_saved
+import logdate.client.feature.editor.generated.resources.entry_start_default_mode
 import logdate.client.feature.editor.generated.resources.error_saving
 import logdate.client.feature.editor.generated.resources.load_drafts
 import logdate.client.feature.editor.generated.resources.manage_drafts
@@ -71,7 +72,10 @@ fun NoteEditorToolbar(
     actionsEnabled: Boolean = true,
     optionsVisible: Boolean = true,
     saveEnabled: Boolean = true,
+    saveLabel: String? = null,
+    onChooseDefaultMode: (() -> Unit)? = null,
 ) {
+    val saveDescription = saveLabel ?: stringResource(Res.string.save_entry)
     var showMenu by remember { mutableStateOf(false) }
 
     LaunchedEffect(optionsVisible, actionsVisible) {
@@ -137,7 +141,7 @@ fun NoteEditorToolbar(
                     }
                 }
 
-                IconTooltip(label = stringResource(Res.string.save_entry)) {
+                IconTooltip(label = saveDescription) {
                     FilledTonalIconButton(
                         onClick = { onSave() },
                         enabled = actionsEnabled && saveEnabled,
@@ -145,7 +149,7 @@ fun NoteEditorToolbar(
                     ) {
                         Icon(
                             painter = PlatformIcons.save(),
-                            contentDescription = stringResource(Res.string.save_entry),
+                            contentDescription = saveDescription,
                         )
                     }
                 }
@@ -173,6 +177,16 @@ fun NoteEditorToolbar(
                                         onShowDrafts()
                                     },
                                 )
+                                onChooseDefaultMode?.let { chooseMode ->
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(Res.string.entry_start_default_mode)) },
+                                        enabled = actionsEnabled,
+                                        onClick = {
+                                            showMenu = false
+                                            chooseMode()
+                                        },
+                                    )
+                                }
                             }
                         }
                     }

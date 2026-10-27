@@ -7,6 +7,7 @@ internal fun Instant.wirePrecision(): Instant = Instant.fromEpochMilliseconds(to
 
 internal fun JournalNote.withVersion(version: Long): JournalNote =
     when (this) {
+        is JournalNote.Handwriting -> copy(syncVersion = version)
         is JournalNote.Text -> copy(syncVersion = version)
         is JournalNote.Image -> copy(syncVersion = version)
         is JournalNote.Video -> copy(syncVersion = version)
@@ -26,6 +27,7 @@ internal fun JournalNote.uploadedFields(
     val updated = lastUpdated.wirePrecision()
     val uploadedLocation = location?.takeIf { it.hasLocation }
     return when (this) {
+        is JournalNote.Handwriting -> uploadedHandwritingFields(version)
         is JournalNote.Text ->
             copy(
                 syncVersion = version,
@@ -72,3 +74,14 @@ internal fun JournalNote.uploadedFields(
             )
     }
 }
+
+private fun JournalNote.Handwriting.uploadedHandwritingFields(version: Long): JournalNote.Handwriting =
+    copy(
+        syncVersion = version,
+        creationTimestamp = creationTimestamp.wirePrecision(),
+        lastUpdated = lastUpdated.wirePrecision(),
+        location = location?.takeIf { it.hasLocation },
+        timeZoneId = null,
+        capturedOn = null,
+        capturedDuring = null,
+    )

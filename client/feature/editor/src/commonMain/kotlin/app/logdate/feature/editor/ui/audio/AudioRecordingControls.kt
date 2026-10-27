@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -126,7 +127,7 @@ fun AudioRecordingControls(
                         onStopRecording()
                     },
                     enabled = !isStarting && recordingState != RecordingState.PROCESSING,
-                    modifier = Modifier.fillMaxWidth(0.8f),
+                    modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth(0.8f),
                 )
                 RecordingErrorText(errorMessage)
             }
@@ -198,7 +199,7 @@ private fun AudioRecordingControlsColumn(
             onStartRecording = onStartRecording,
             onStopRecording = onStopRecording,
             enabled = !isStarting && recordingState != RecordingState.PROCESSING,
-            modifier = Modifier.fillMaxWidth(0.8f),
+            modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth(0.8f),
         )
         RecordingErrorText(errorMessage)
     }

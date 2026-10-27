@@ -22,6 +22,7 @@ internal fun JournalNote.withVisitContext(context: VisitMemoryContext): JournalN
         )
     return when (this) {
         is JournalNote.Text -> copy(location = location)
+        is JournalNote.Handwriting -> copy(location = location)
         is JournalNote.Image -> copy(location = location)
         is JournalNote.Video -> copy(location = location)
         is JournalNote.Audio -> copy(location = location)

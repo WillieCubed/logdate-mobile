@@ -48,6 +48,7 @@ class JournalCreationViewModel(
                         id = note.uid,
                         textPreview =
                             when (note) {
+                                is JournalNote.Handwriting -> "Handwriting"
                                 is JournalNote.Text -> note.content.take(100)
                                 is JournalNote.Image -> note.caption
                                 is JournalNote.Video -> note.caption
@@ -55,7 +56,7 @@ class JournalCreationViewModel(
                             },
                         type =
                             when (note) {
-                                is JournalNote.Text -> NotePreviewType.TEXT
+                                is JournalNote.Text, is JournalNote.Handwriting -> NotePreviewType.TEXT
                                 is JournalNote.Image -> NotePreviewType.IMAGE
                                 is JournalNote.Video -> NotePreviewType.VIDEO
                                 is JournalNote.Audio -> NotePreviewType.AUDIO

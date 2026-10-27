@@ -61,7 +61,7 @@ internal fun EntryEditorViewModel.initializePhotoPromptImpl(
 internal fun EntryEditorViewModel.initializeLaunchModeImpl(mode: EditorLaunchMode) {
     val blocks = mutableEditorState.value.blocks
     when (mode) {
-        EditorLaunchMode.Text -> Unit
+        EditorLaunchMode.Default, EditorLaunchMode.Text -> Unit
         EditorLaunchMode.Voice -> {
             if (blocks.any { it is AudioBlockUiState }) return
             val audio = createNewBlock(BlockType.AUDIO) as AudioBlockUiState

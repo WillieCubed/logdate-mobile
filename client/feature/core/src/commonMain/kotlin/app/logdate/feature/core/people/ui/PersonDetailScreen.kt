@@ -259,6 +259,7 @@ private fun PersonLinkedSection(uiState: PersonDetailViewModel.UiState) {
 @Composable
 private fun JournalNote.previewLabel(): String =
     when (this) {
+        is JournalNote.Handwriting -> "Handwriting"
         is JournalNote.Text -> content.take(120)
         is JournalNote.Audio -> stringResource(Res.string.person_detail_voice_note_preview)
         is JournalNote.Image -> caption.ifBlank { stringResource(Res.string.person_detail_photo_preview) }.take(120)

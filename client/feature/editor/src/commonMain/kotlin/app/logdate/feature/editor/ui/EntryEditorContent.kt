@@ -7,6 +7,7 @@ package app.logdate.feature.editor.ui
 
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -25,6 +26,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
@@ -35,17 +37,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import app.logdate.client.text.resolve
-import app.logdate.feature.editor.ui.common.NoteEditorToolbar
-import app.logdate.feature.editor.ui.common.PlatformBackHandler
-import app.logdate.feature.editor.ui.content.EditorBottomContent
+import app.logdate.feature.editor.ui.content.entryDayContext
+import app.logdate.feature.editor.ui.content.rememberEntryStartPreferences
 import app.logdate.feature.editor.ui.dialog.DraftsBottomSheet
 import app.logdate.feature.editor.ui.dialog.alert.ConfirmEntryExitDialog
 import app.logdate.feature.editor.ui.drop.EntryKeyboardContentReceiver
-import app.logdate.feature.editor.ui.drop.EntryMediaImport
-import app.logdate.feature.editor.ui.drop.MediaImportProblem
 import app.logdate.feature.editor.ui.drop.entryDropTarget
 import app.logdate.feature.editor.ui.drop.entryPasteTarget
 import app.logdate.feature.editor.ui.editor.EditorBackgroundSaveEffect
@@ -54,25 +57,27 @@ import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.delegate.DefaultAudioBlockFinalizer
 import app.logdate.feature.editor.ui.editor.rememberEditorAutoSave
+import app.logdate.feature.editor.ui.handwriting.EntryPageOverview
+import app.logdate.feature.editor.ui.handwriting.EntryPageScrollAnchor
+import app.logdate.feature.editor.ui.handwriting.StoryCaptureMode
+import app.logdate.feature.editor.ui.handwriting.blockType
+import app.logdate.feature.editor.ui.handwriting.captureModeForBlock
+import app.logdate.feature.editor.ui.handwriting.rememberEntryPageState
+import app.logdate.feature.editor.ui.handwriting.rememberHandwritingBlockPresentations
 import app.logdate.feature.editor.ui.layout.EditorFocus
-import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
+import app.logdate.feature.editor.ui.layout.LocalEditorContextControlsVisible
 import app.logdate.feature.editor.ui.layout.editorFocus
 import app.logdate.feature.editor.ui.state.rememberBlocksUiState
-import app.logdate.ui.keyboard.AppKeyboardShortcut
-import app.logdate.ui.keyboard.AppShortcutScope
 import app.logdate.ui.platform.rememberLogDateHaptics
 import app.logdate.ui.provenance.CapturedOnWatchBanner
 import app.logdate.ui.provenance.showsWatchProvenance
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.draft_deleted
-import logdate.client.feature.editor.generated.resources.editor_entry_changed
-import logdate.client.feature.editor.generated.resources.editor_save_separately
-import logdate.client.feature.editor.generated.resources.media_import_unreadable
-import logdate.client.feature.editor.generated.resources.media_import_unsupported
 import logdate.client.feature.editor.generated.resources.undo
 import org.jetbrains.compose.resources.getString
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.uuid.Uuid
 
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
 val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
@@ -92,18 +97,47 @@ fun EntryEditorContent(
     onEntrySaved: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: EntryEditorViewModel = koinViewModel(),
+    handwritingEnabled: Boolean = false,
+    blockFocusEnabled: Boolean = false,
 ) {
     val editorState by viewModel.editorState.collectAsState()
+    val startPreferences = rememberEntryStartPreferences(viewModel, blockFocusEnabled, handwritingEnabled)
     val focus = editorState.editorFocus()
+    val page = rememberEntryPageState()
     val snackbarHostState = remember { SnackbarHostState() }
     val shouldReturnToPickerOnBack = editorState.shouldReturnToPickerOnBack()
     var journalSelectorExpanded by remember { mutableStateOf(false) }
     val haptics = rememberLogDateHaptics()
 
+    var handwritingProgress by remember { mutableStateOf(0f) }
+    var handwritingTarget by remember { mutableStateOf(false) }
+    var contextAvailable by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val updateBlock = blockUpdateCallback(editorState.blocks, viewModel::updateBlock)
+    val handwritingPresentations =
+        rememberHandwritingBlockPresentations(
+            editorState,
+            updateBlock,
+            handwritingProgress,
+            contextAvailable,
+            adaptToTheme = blockFocusEnabled,
+            keepInkBelowControls = blockFocusEnabled,
+        )
+    val activeHandwriting = focus is EditorFocus.Drawing
+    LaunchedEffect(activeHandwriting) {
+        if (activeHandwriting) {
+            focusManager.clearFocus()
+            keyboard?.hide()
+        }
+    }
     val uiState =
         rememberBlocksUiState(
             editorState = editorState,
-            onUpdateBlock = blockUpdateCallback(editorState.blocks, viewModel::updateBlock),
+            onUpdateBlock = updateBlock,
+            blockPresentations = handwritingPresentations,
+            allowHandwritingCreation = handwritingEnabled,
             onFocusBlock = { id ->
                 journalSelectorExpanded = false
                 viewModel.setExpandedBlockId(id)
@@ -120,7 +154,8 @@ fun EntryEditorContent(
 
     // Only live camera capture takes over the entry chrome.
     val activeCamera = focus is EditorFocus.Camera
-    val isImmersiveBlockActive = activeCamera
+    val handwritingMotion = activeHandwriting || handwritingTarget
+    val isImmersiveBlockActive = activeCamera || handwritingTarget
     LaunchedEffect(editorState.isRecordingAudio) {
         if (editorState.isRecordingAudio) journalSelectorExpanded = false
     }
@@ -146,7 +181,7 @@ fun EntryEditorContent(
     val handleEditorBack: () -> Unit = {
         when {
             editorState.isSaving || editorState.shouldExit -> Unit
-            activeCamera -> {
+            activeCamera || activeHandwriting || (blockFocusEnabled && editorState.expandedBlockId != null) -> {
                 viewModel.dismissExpandedBlockOrClearSingleEmpty()
                 Unit
             }
@@ -163,16 +198,16 @@ fun EntryEditorContent(
         }
     }
 
-    // Live camera back is handled by MainEditorContent via PlatformPredictiveBackHandler.
-    // This handler only covers cases that must interrupt navigation: unsaved changes and
-    // shouldReturnToPicker. Plain exit is left to Nav3 so predictive back can animate.
-    PlatformBackHandler(
-        enabled =
-            !activeCamera &&
-                (shouldReturnToPickerOnBack || !editorState.canExitWithoutSaving),
-    ) {
-        handleEditorBack()
-    }
+    val exitBackModifier =
+        rememberEntryEditorExitBack(
+            enabled =
+                !activeCamera &&
+                    !activeHandwriting &&
+                    !(blockFocusEnabled && editorState.expandedBlockId != null) &&
+                    !page.earlierExpanded &&
+                    (shouldReturnToPickerOnBack || !editorState.canExitWithoutSaving),
+            onCommit = handleEditorBack,
+        )
 
     EditorBackgroundSaveEffect { viewModel.autoSaveLatestEntry() }
 
@@ -183,26 +218,15 @@ fun EntryEditorContent(
             enabled = !editorState.isSaving && !editorState.shouldExit,
         )
 
+    EntryEditConflictFeedback(
+        editorState.entryEditConflict,
+        snackbarHostState,
+        viewModel::saveConflictingVersionSeparately,
+        viewModel::dismissEntryEditConflict,
+    )
     LaunchedEffect(editorState.errorMessage) {
         editorState.errorMessage?.let { error ->
             snackbarHostState.showSnackbar(error.resolve())
-        }
-    }
-
-    LaunchedEffect(editorState.entryEditConflict) {
-        if (editorState.entryEditConflict) {
-            val result =
-                snackbarHostState.showSnackbar(
-                    message = getString(Res.string.editor_entry_changed),
-                    actionLabel = getString(Res.string.editor_save_separately),
-                    withDismissAction = true,
-                    duration = SnackbarDuration.Indefinite,
-                )
-            if (result == SnackbarResult.ActionPerformed) {
-                viewModel.saveConflictingVersionSeparately()
-            } else {
-                viewModel.dismissEntryEditConflict()
-            }
         }
     }
 
@@ -210,9 +234,11 @@ fun EntryEditorContent(
         if (editorState.shouldExit) {
             when (editorState.exitReason) {
                 EditorExitReason.DISCARDED -> onNavigateBack()
-                EditorExitReason.ENTRY_SAVED,
-                null,
-                -> onEntrySaved()
+                EditorExitReason.ENTRY_SAVED -> {
+                    haptics.saveSucceeded()
+                    onEntrySaved()
+                }
+                null -> onEntrySaved()
             }
         }
     }
@@ -284,149 +310,191 @@ fun EntryEditorContent(
     var dropActive by remember { mutableStateOf(false) }
     val canSave =
         focus !is EditorFocus.Recording && !editorState.isEditingLocked && !editorState.isSaving && !editorState.shouldExit
-    // Dropped, pasted, and keyboard media: attach what was copied, and say why anything was not.
-    val onMediaImport: (EntryMediaImport) -> Unit = { result ->
-        viewModel.setInitialAttachments(result.uris)
-        result.problems.firstOrNull()?.let { problem ->
-            scope.launch {
-                val message =
-                    when (problem) {
-                        MediaImportProblem.Unsupported -> Res.string.media_import_unsupported
-                        MediaImportProblem.Unreadable -> Res.string.media_import_unreadable
-                    }
-                snackbarHostState.showSnackbar(getString(message))
+    val onMediaImport = entryMediaImportHandler(viewModel, snackbarHostState, scope)
+    val focusedBlock = editorState.blocks.firstOrNull { it.id == editorState.expandedBlockId }
+    val returnToEntry: () -> Unit = {
+        editorState.expandedBlockId?.let { id ->
+            page.focusedAnchor =
+                EntryPageScrollAnchor(
+                    id,
+                    page.blockPositions[id] ?: page.focusedAnchor?.takeIf { it.blockId == id }?.top ?: page.viewportTop + 88f,
+                    page.viewportWidth,
+                )
+        }
+        focusManager.clearFocus()
+        keyboard?.hide()
+        viewModel.dismissExpandedBlockOrClearSingleEmpty()
+    }
+    val chooseCapture: (StoryCaptureMode) -> Unit = { mode ->
+        if (!editorState.isEditingLocked && !editorState.isRecordingAudio) {
+            val existing = if (focusedBlock != null) editorState.blocks.lastOrNull { captureModeForBlock(it) == mode } else null
+            if (existing != null) viewModel.setExpandedBlockId(existing.id) else viewModel.createNewBlock(mode.blockType(), Uuid.random())
+        }
+    }
+    SharedTransitionLayout {
+        CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+            EntryKeyboardContentReceiver(onMediaImported = onMediaImport) {
+                EntryEditorFrame(
+                    state = editorState,
+                    page = page,
+                    defaultMode = startPreferences.mode,
+                    blockFocusEnabled = blockFocusEnabled,
+                    focusProgress = handwritingProgress,
+                    onReturn = returnToEntry,
+                    onExit = handleEditorBack,
+                    onCapture = chooseCapture,
+                    modifier =
+                        modifier
+                            .then(exitBackModifier)
+                            .onSizeChanged { contextAvailable = with(density) { it.width.toDp() >= 840.dp } }
+                            .entryDropTarget(
+                                onText = { viewModel.appendTextBlock(it) },
+                                onMediaImported = onMediaImport,
+                                onActiveChanged = { dropActive = it },
+                            ).entryPasteTarget(onMediaImported = onMediaImport)
+                            .then(
+                                if (dropActive) {
+                                    Modifier.border(3.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.large)
+                                } else {
+                                    Modifier
+                                },
+                            ).entryEditorShortcuts(canSave, handleEditorBack) {
+                                viewModel.saveEntry(viewModel.editorState.value)
+                            },
+                    isImmersiveBlockActive = isImmersiveBlockActive,
+                    isAudioRecordingActive = editorState.isRecordingAudio,
+                    focusState =
+                        if (handwritingTarget) {
+                            focus
+                        } else if (activeHandwriting) {
+                            EditorFocus.Entry
+                        } else {
+                            focus
+                        },
+                    animateContextControls = !handwritingMotion && !blockFocusEnabled,
+                    drawingBackdrop = if (blockFocusEnabled) MaterialTheme.colorScheme.surfaceDim else Color.White,
+                    bottomContentTopPadding = if (blockFocusEnabled) 0.dp else 24.dp,
+                    hasJournalSelection = uiState.availableJournals.any { it.id in uiState.selectedJournalIds },
+                    entryLocked = editorState.isSaving || editorState.shouldExit || editorState.isEditingLocked,
+                    immersiveExitProgress =
+                        if (handwritingMotion) {
+                            if (handwritingTarget) 0f else 1f
+                        } else {
+                            chromeProgress.value
+                        },
+                    topBarContent = {
+                        EntryEditorTopBar(
+                            editorState,
+                            blockFocusEnabled,
+                            if (blockFocusEnabled) editorState.expandedBlockId != null else isImmersiveBlockActive,
+                            autoSaveState.status,
+                            floating = blockFocusEnabled,
+                            onBack = handleEditorBack,
+                            onReturnToEntry = returnToEntry,
+                            onShowDrafts = { showDraftsDialog = true },
+                            onSave = {
+                                viewModel.saveEntry(viewModel.editorState.value)
+                            },
+                            onCaptureMode = chooseCapture,
+                            onJournalSelection = viewModel::setSelectedJournals,
+                            onChooseDefaultMode = startPreferences.onShow,
+                        )
+                    },
+                    editorContent = {
+                        Column(Modifier.fillMaxSize()) {
+                            if (!isImmersiveBlockActive) {
+                                editorState.markId?.let {
+                                    MarkContextBanner(it, editorState.errorMessage, viewModel::continueWithoutMarkedMoment)
+                                }
+                                editorState.visitContext?.let { VisitMemoryContextBanner(it) }
+                                if (showsWatchProvenance(editorState.capturedOnWatch)) {
+                                    CapturedOnWatchBanner()
+                                }
+                            }
+                            CompositionLocalProvider(LocalEditorContextControlsVisible provides !blockFocusEnabled) {
+                                MainEditorContent(
+                                    floatingChrome = blockFocusEnabled,
+                                    overviewContent =
+                                        if (blockFocusEnabled) {
+                                            (
+                                                { blocks ->
+                                                    EntryPageOverview(
+                                                        blocks,
+                                                        editorState.todayNotes,
+                                                        page,
+                                                        startPreferences.mode,
+                                                        onAudioResolverReady = {
+                                                            id,
+                                                            resolver,
+                                                            ->
+                                                            viewModel.bindAudioBlockFinalizer(id, DefaultAudioBlockFinalizer(resolver))
+                                                        },
+                                                    )
+                                                }
+                                            )
+                                        } else {
+                                            null
+                                        },
+                                    expandAnySelectedBlock = blockFocusEnabled,
+                                    defaultStartMode = startPreferences.mode,
+                                    todayNotes = editorState.todayNotes,
+                                    entryContext = entryDayContext(editorState, blockFocusEnabled),
+                                    onOpenEntry = { viewModel.loadExistingEntry(it) },
+                                    modifier = Modifier.weight(1f),
+                                    uiState = uiState,
+                                    focusState = focus,
+                                    shouldReturnToPickerOnBack = shouldReturnToPickerOnBack,
+                                    onDismissExpanded = returnToEntry,
+                                    onBlockFocusTransitionProgress = { handwritingProgress = it },
+                                    onBlockFocusTargetChanged = { expanded -> handwritingTarget = expanded && activeHandwriting },
+                                    onBackProgress = { p ->
+                                        if (isImmersiveBlockActive) scope.launch { chromeProgress.snapTo(p) }
+                                    },
+                                    onBackCommit = {
+                                        if (isImmersiveBlockActive) {
+                                            scope.launch {
+                                                chromeProgress.animateTo(
+                                                    1f,
+                                                    tween(300, easing = FastOutSlowInEasing),
+                                                )
+                                            }
+                                        }
+                                    },
+                                    onBackCancel = {
+                                        if (isImmersiveBlockActive) {
+                                            scope.launch {
+                                                chromeProgress.animateTo(
+                                                    0f,
+                                                    tween(300, easing = FastOutSlowInEasing),
+                                                )
+                                            }
+                                        }
+                                    },
+                                    onAudioResolverReady = { blockId, resolver ->
+                                        viewModel.bindAudioBlockFinalizer(blockId, DefaultAudioBlockFinalizer(resolver))
+                                    },
+                                )
+                            }
+                        }
+                    },
+                    bottomContent = {
+                        EntryEditorCaptureControls(
+                            editorState,
+                            blockFocusEnabled,
+                            journalSelectorExpanded,
+                            onExpandedChange = { journalSelectorExpanded = it },
+                            onCaptureMode = chooseCapture,
+                            onJournalSelection = viewModel::setSelectedJournals,
+                        )
+                    },
+                )
             }
         }
     }
-    EntryKeyboardContentReceiver(onMediaImported = onMediaImport) {
-        ImmersiveEditorLayout(
-            modifier =
-                modifier
-                    .entryDropTarget(
-                        onText = { viewModel.appendTextBlock(it) },
-                        onMediaImported = onMediaImport,
-                        onActiveChanged = { dropActive = it },
-                    ).entryPasteTarget(onMediaImported = onMediaImport)
-                    .then(
-                        if (dropActive) {
-                            Modifier.border(3.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.large)
-                        } else {
-                            Modifier
-                        },
-                    ).onPreviewKeyEvent { event ->
-                        when (AppKeyboardShortcut.match(event, AppShortcutScope.Editor)) {
-                            AppKeyboardShortcut.SaveEntry ->
-                                canSave.also { save ->
-                                    if (save) {
-                                        haptics.saveSucceeded()
-                                        viewModel.saveEntry(editorState)
-                                    }
-                                }
-                            AppKeyboardShortcut.CloseEditor -> {
-                                handleEditorBack()
-                                true
-                            }
-                            else -> false
-                        }
-                    },
-            isImmersiveBlockActive = isImmersiveBlockActive,
-            isAudioRecordingActive = editorState.isRecordingAudio,
-            focusState = focus,
-            hasJournalSelection = uiState.availableJournals.any { it.id in uiState.selectedJournalIds },
-            entryLocked = editorState.isSaving || editorState.shouldExit || editorState.isEditingLocked,
-            immersiveExitProgress = chromeProgress.value,
-            topBarContent = {
-                NoteEditorToolbar(
-                    onBack = handleEditorBack,
-                    onSave = {
-                        haptics.saveSucceeded()
-                        viewModel.saveEntry(editorState)
-                    },
-                    onShowDrafts = { showDraftsDialog = true },
-                    draftCount = editorState.availableDrafts.size,
-                    autoSaveStatus = autoSaveState.status,
-                    actionsVisible = !isImmersiveBlockActive,
-                    optionsVisible = focus !is EditorFocus.Recording,
-                    saveEnabled = focus !is EditorFocus.Recording && !editorState.isEditingLocked,
-                    actionsEnabled = !editorState.isSaving && !editorState.shouldExit,
-                )
-            },
-            editorContent = {
-                Column(Modifier.fillMaxSize()) {
-                    if (!isImmersiveBlockActive) {
-                        editorState.markId?.let {
-                            MarkContextBanner(it, editorState.errorMessage, viewModel::continueWithoutMarkedMoment)
-                        }
-                        editorState.visitContext?.let { VisitMemoryContextBanner(it) }
-                        if (showsWatchProvenance(editorState.capturedOnWatch)) {
-                            CapturedOnWatchBanner()
-                        }
-                    }
-                    MainEditorContent(
-                        modifier = Modifier.weight(1f),
-                        uiState = uiState,
-                        focusState = focus,
-                        shouldReturnToPickerOnBack = shouldReturnToPickerOnBack,
-                        onDismissExpanded = {
-                            viewModel.dismissExpandedBlockOrClearSingleEmpty()
-                        },
-                        onBackProgress = { p ->
-                            if (isImmersiveBlockActive) scope.launch { chromeProgress.snapTo(p) }
-                        },
-                        onBackCommit = {
-                            if (isImmersiveBlockActive) {
-                                scope.launch {
-                                    chromeProgress.animateTo(
-                                        1f,
-                                        tween(300, easing = FastOutSlowInEasing),
-                                    )
-                                }
-                            }
-                        },
-                        onBackCancel = {
-                            if (isImmersiveBlockActive) {
-                                scope.launch {
-                                    chromeProgress.animateTo(
-                                        0f,
-                                        tween(300, easing = FastOutSlowInEasing),
-                                    )
-                                }
-                            }
-                        },
-                        onAudioResolverReady = { blockId, resolver ->
-                            viewModel.bindAudioBlockFinalizer(blockId, DefaultAudioBlockFinalizer(resolver))
-                        },
-                    )
-                }
-            },
-            bottomContent = {
-                EditorBottomContent(
-                    availableJournals = uiState.availableJournals,
-                    selectedJournalIds = uiState.selectedJournalIds,
-                    onJournalSelectionChanged = { if (focus !is EditorFocus.Recording) uiState.onJournalSelectionChanged(it) },
-                    enabled =
-                        focus !is EditorFocus.Recording && !editorState.isSaving && !editorState.shouldExit && !editorState.isEditingLocked,
-                    journalSelectorExpanded = journalSelectorExpanded,
-                    onJournalSelectorExpandedChange = { expanded ->
-                        if (focus !is EditorFocus.Recording &&
-                            !editorState.isSaving &&
-                            !editorState.shouldExit &&
-                            !editorState.isEditingLocked
-                        ) {
-                            journalSelectorExpanded = expanded
-                        }
-                    },
-                )
-            },
-        )
-    }
-
     Box(modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter),
-        ) { data ->
-            Snackbar(snackbarData = data, actionOnNewLine = true)
-        }
+        ) { data -> Snackbar(snackbarData = data, actionOnNewLine = true) }
     }
 }

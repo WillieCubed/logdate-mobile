@@ -29,6 +29,7 @@ fun todayTilePresentation(
         latest =
             when (latest) {
                 is JournalNote.Text -> latest.content.take(30)
+                is JournalNote.Handwriting -> context.getString(R.string.watch_tile_handwriting)
                 is JournalNote.Audio -> context.getString(R.string.watch_tile_voice)
                 is JournalNote.Image -> context.getString(R.string.watch_tile_photo)
                 is JournalNote.Video -> context.getString(R.string.watch_tile_video)

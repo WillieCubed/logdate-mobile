@@ -39,6 +39,7 @@ import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.common.applyStandardContentWidth
 import app.logdate.ui.common.transitions.TransitionKeys
+import app.logdate.ui.handwriting.HandwritingPreview
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
 import kotlinx.datetime.TimeZone
@@ -248,6 +249,22 @@ private fun JournalEntryItem(
 
     Column(modifier = modifier) {
         when (entry) {
+            is EntryDisplayData.HandwritingEntry -> {
+                VerticalEntryCardShell(
+                    timestamp = entry.timestamp,
+                    capturedOnWatch = entry.capturedOnWatch,
+                    capturedDuring = entry.capturedDuring,
+                    onClick = onClick,
+                    onRemoveFromJournal = onRemoveFromJournal,
+                    cardModifier = noteViewerSharedBoundsModifier,
+                ) {
+                    HandwritingPreview(
+                        entry.document,
+                        Modifier.fillMaxWidth().height(240.dp),
+                        unreadable = entry.unreadable,
+                    )
+                }
+            }
             is EntryDisplayData.TextEntry ->
                 TextEntryCard(
                     entry = entry,

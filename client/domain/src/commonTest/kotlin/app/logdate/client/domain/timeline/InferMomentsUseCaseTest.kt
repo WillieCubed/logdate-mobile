@@ -64,6 +64,27 @@ class InferMomentsUseCaseTest {
             )
         }
 
+    @Test
+    fun `handwriting remains a moment source without turning stroke data into text`() =
+        runTest {
+            val note =
+                JournalNote.Handwriting(
+                    creationTimestamp = morningTime,
+                    lastUpdated = morningTime,
+                    document =
+                        app.logdate.shared.model
+                            .HandwritingDocument(),
+                    unreadableContent = "original stroke payload",
+                )
+            val useCase = InferMomentsUseCase(FailingMomentExtractor(), FakeAudioTagRepository())
+
+            val moment = useCase(date, listOf(note), emptyList()).single()
+
+            assertEquals(listOf(note), moment.sourceNotes)
+            assertTrue(moment.textFragments.isEmpty())
+            assertTrue(moment.media.isEmpty())
+        }
+
     private val date = LocalDate(2025, 3, 15)
 
     // Use local-time-aware timestamps to avoid timezone issues in tests

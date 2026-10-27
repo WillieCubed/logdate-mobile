@@ -108,6 +108,7 @@ class NoteViewerViewModel(
             )
         _uiState.value =
             when (note) {
+                is JournalNote.Handwriting -> NoteViewerUiState.HandwritingContent(shared, note.document, note.unreadableContent != null)
                 is JournalNote.Text -> NoteViewerUiState.TextContent(shared, note.content)
                 is JournalNote.Image -> NoteViewerUiState.ImageContent(shared, note.mediaRef)
                 is JournalNote.Video -> NoteViewerUiState.VideoContent(shared, note.mediaRef)
@@ -235,6 +236,14 @@ sealed interface NoteViewerUiState {
         val shared: NoteViewerShared
 
         fun withJournalContext(context: JournalContext?): Content
+    }
+
+    data class HandwritingContent(
+        override val shared: NoteViewerShared,
+        val document: app.logdate.shared.model.HandwritingDocument,
+        val unreadable: Boolean = false,
+    ) : Content {
+        override fun withJournalContext(context: JournalContext?) = copy(shared = shared.copy(journalContext = context))
     }
 
     data class TextContent(

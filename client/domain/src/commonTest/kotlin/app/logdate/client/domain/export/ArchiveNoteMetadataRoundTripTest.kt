@@ -60,7 +60,7 @@ class ArchiveNoteMetadataRoundTripTest : ArchiveExportFixture() {
                         assertEquals("", restored.caption)
                         assertEquals("", restored.transcription)
                     }
-                    is JournalNote.Text -> error("Media note became text")
+                    is JournalNote.Text, is JournalNote.Handwriting -> error("Media note became a non-media note")
                 }
             }
         }

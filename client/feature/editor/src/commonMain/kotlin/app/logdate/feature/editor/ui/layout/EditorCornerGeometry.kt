@@ -5,6 +5,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.platform.DefaultScreenCornerRadius
 
+/** Document blocks keep their shape independently of the display and capture panels. */
+internal val EditorBlockCornerRadius = 12.dp
+
 internal data class EditorCornerGeometry(
     val cardRadius: Dp,
     val controlRadius: Dp,

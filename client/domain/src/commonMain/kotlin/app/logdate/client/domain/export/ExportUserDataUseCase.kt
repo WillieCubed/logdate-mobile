@@ -6,32 +6,16 @@ import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
-import app.logdate.client.repository.journals.NoteLocation
-import app.logdate.client.repository.location.LocationHistoryItem
 import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.places.UserPlacesRepository
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.user.UserStateRepository
-import app.logdate.shared.model.EditorDraft
-import app.logdate.shared.model.Journal
-import app.logdate.shared.model.Place
-import app.logdate.shared.model.SerializableAudioBlock
-import app.logdate.shared.model.SerializableCameraBlock
-import app.logdate.shared.model.SerializableEntryBlock
-import app.logdate.shared.model.SerializableImageBlock
-import app.logdate.shared.model.SerializableTextBlock
-import app.logdate.shared.model.SerializableVideoBlock
 import app.logdate.shared.model.profile.LogDateProfile
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.okio.encodeToBufferedSink
-import okio.BufferedSink
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -49,10 +33,6 @@ class ExportUserDataUseCase(
     private val deviceIdProvider: DeviceIdProvider,
     private val appInfoProvider: AppInfoProvider,
 ) {
-    companion object {
-        private val EXTENSION_PATTERN = Regex("\\.[a-zA-Z0-9]+$")
-    }
-
     private val json =
         Json {
             // Compact (not pretty-printed): a machine-readable export doesn't need
@@ -173,6 +153,20 @@ class ExportUserDataUseCase(
                 val exportNotes =
                     notes.map { note ->
                         when (note) {
+                            is JournalNote.Handwriting ->
+                                ExportNote(
+                                    id = note.uid.toString(),
+                                    type = "handwriting",
+                                    handwriting = note.document,
+                                    unreadableHandwriting = note.unreadableContent,
+                                    createdAt = note.creationTimestamp,
+                                    updatedAt = note.lastUpdated,
+                                    location = note.location?.toExportLocation(),
+                                    syncVersion = note.syncVersion,
+                                    capturedOn = note.capturedOn?.wireName,
+                                    capturedDuring = note.capturedDuring?.wireName,
+                                    timeZone = note.timeZoneId,
+                                )
                             is JournalNote.Text ->
                                 ExportNote(
                                     id = note.uid.toString(),
@@ -321,421 +315,4 @@ class ExportUserDataUseCase(
                 emit(ExportProgress.Failed(ExportError.UNKNOWN))
             }
         }
-
-    private fun createMediaPath(
-        uri: String,
-        seed: String,
-        timestamp: Instant,
-        noteType: String? = null,
-    ): String {
-        val rawFileName =
-            uri
-                .substringAfterLast("/")
-                .substringBefore("?")
-
-        val extension =
-            EXTENSION_PATTERN
-                .find(rawFileName)
-                ?.value
-                ?.substring(1)
-                ?.lowercase()
-                ?: run {
-                    // Content URIs (e.g. content://media/external/images/media/1000025292)
-                    // carry no extension in the last path segment. Infer from the URI
-                    // path structure first, then fall back to the note type.
-                    val inferred = inferExtensionFromUri(uri, noteType)
-                    Napier.w(
-                        "No extension found in URI: $uri — " +
-                            if (inferred != null) {
-                                "using .$inferred inferred from content type"
-                            } else {
-                                "falling back to .bin; MIME type will be detected on import"
-                            },
-                    )
-                    inferred ?: "bin"
-                }
-
-        return "${ExportFileStructure.MEDIA_FOLDER}/$seed.$extension"
-    }
-
-    /**
-     * Infers a file extension for URIs that carry no extension in their path segment.
-     *
-     * Bare MediaStore content URIs (e.g. `content://media/external/images/media/123`) have no
-     * extension in the last path segment. The URI collection name (/images/, /video/, /audio/)
-     * is checked first because it is more reliable than [noteType], which comes from the
-     * serialized export model and could be stale.
-     */
-    private fun inferExtensionFromUri(
-        uri: String,
-        noteType: String?,
-    ): String? {
-        val lower = uri.lowercase()
-        return when {
-            "/images/" in lower -> "jpg"
-            "/video/" in lower -> "mp4"
-            "/audio/" in lower -> "m4a"
-            noteType == "image" -> "jpg"
-            noteType == "video" -> "mp4"
-            noteType == "audio" -> "m4a"
-            else -> null
-        }
-    }
-
-    private fun getMediaFilesToExport(
-        notes: List<ExportNote>,
-        drafts: List<ExportDraft>,
-    ): List<ExportMediaFile> {
-        val mediaFilesBySource = linkedMapOf<String, ExportMediaFile>()
-
-        notes.forEach { note ->
-            val mediaPath = note.mediaPath ?: return@forEach
-            mediaFilesBySource.getOrPut(mediaPath) {
-                ExportMediaFile(
-                    exportPath = createMediaPath(mediaPath, note.id, note.createdAt, note.type),
-                    sourceUri = mediaPath,
-                )
-            }
-        }
-
-        drafts.forEach { draft ->
-            draft.mediaReferences.forEachIndexed { index, mediaRef ->
-                mediaFilesBySource.getOrPut(mediaRef) {
-                    ExportMediaFile(
-                        exportPath = createMediaPath(mediaRef, "${draft.id}_$index", draft.createdAt),
-                        sourceUri = mediaRef,
-                    )
-                }
-            }
-        }
-
-        return mediaFilesBySource.values.toList()
-    }
-
-    private fun NoteLocation.toExportLocation(): ExportLocation? {
-        val lat = effectiveLatitude ?: return null
-        val lng = effectiveLongitude ?: return null
-        return ExportLocation(
-            latitude = lat,
-            longitude = lng,
-            placeName = displayName,
-            altitude = coordinates?.altitude,
-            accuracy = coordinates?.accuracy,
-        )
-    }
-
-    private fun SerializableEntryBlock.toMediaReferences(): List<String> =
-        when (this) {
-            is SerializableImageBlock -> listOfNotNull(uri)
-            is SerializableVideoBlock -> listOfNotNull(uri, thumbnailUri)
-            is SerializableAudioBlock -> listOfNotNull(uri)
-            is SerializableCameraBlock -> listOfNotNull(uri)
-            is SerializableTextBlock -> emptyList()
-        }
-
-    private fun EditorDraft.toExportDraft(): ExportDraft {
-        val location =
-            blocks.firstNotNullOfOrNull { block ->
-                val latitude = block.locationLat
-                val longitude = block.locationLng
-                if (latitude != null && longitude != null) {
-                    ExportLocation(
-                        latitude = latitude,
-                        longitude = longitude,
-                        altitude = block.altitude,
-                    )
-                } else {
-                    null
-                }
-            }
-
-        val content =
-            blocks
-                .filterIsInstance<SerializableTextBlock>()
-                .joinToString("\n") { it.content }
-
-        val mediaReferences =
-            blocks
-                .flatMap { it.toMediaReferences() }
-                .distinct()
-
-        return ExportDraft(
-            id = id.toString(),
-            journalId = selectedJournalIds.firstOrNull()?.toString(),
-            journalIds = selectedJournalIds.map { it.toString() },
-            content = content,
-            createdAt = createdAt,
-            updatedAt = lastModifiedAt,
-            location = location,
-            mediaReferences = mediaReferences,
-            blocks = blocks,
-        )
-    }
 }
-
-sealed class ExportProgress {
-    data object Starting : ExportProgress()
-
-    data class InProgress(
-        val percentage: Float,
-        val stage: ExportStage,
-    ) : ExportProgress()
-
-    data class Completed(
-        val result: ExportResult,
-    ) : ExportProgress()
-
-    data class Failed(
-        val error: ExportError,
-    ) : ExportProgress()
-}
-
-/**
- * Typed export progress stages. The presentation layer resolves
- * these to localized strings.
- */
-enum class ExportStage {
-    COLLECTING_JOURNALS,
-    COLLECTING_NOTES,
-    COLLECTING_DRAFTS,
-    PREPARING_DATA,
-    WRITING_ARCHIVE,
-}
-
-/**
- * Typed export errors. The presentation layer resolves these
- * to localized user-facing messages.
- */
-enum class ExportError {
-    UNKNOWN,
-}
-
-/**
- * Result of a completed export. Holds domain objects and serializes each
- * category lazily so only one JSON string is in memory at a time.
- */
-class ExportResult(
-    private val json: Json,
-    private val exportMetadata: ExportMetadata,
-    private val journals: List<Journal>,
-    private val exportNotes: List<ExportNote>,
-    private val exportRelations: List<ExportJournalNoteRelation>,
-    private val exportDrafts: List<ExportDraft>,
-    private val profilePayload: ProfilePayload?,
-    private val placesPayload: PlacesPayload?,
-    private val locationHistoryPayload: LocationHistoryPayload?,
-    val mediaFiles: List<ExportMediaFile>,
-    val stats: ExportStats,
-    internal val issues: List<ExportIssue>,
-) {
-    fun serializeMetadata(): String = json.encodeToString(exportMetadata)
-
-    fun serializeJournals(): String = json.encodeToString(mapOf("journals" to journals))
-
-    fun serializeNotes(): String = json.encodeToString(mapOf("notes" to exportNotes))
-
-    fun serializeJournalNotes(): String = json.encodeToString(mapOf("journal_notes" to exportRelations))
-
-    fun serializeDrafts(): String = json.encodeToString(mapOf("drafts" to exportDrafts))
-
-    fun serializeProfile(): String? = profilePayload?.let { json.encodeToString(it) }
-
-    fun serializePlaces(): String? = placesPayload?.let { json.encodeToString(it) }
-
-    fun serializeLocationHistory(): String? = locationHistoryPayload?.let { json.encodeToString(it) }
-
-    fun serializeMediaManifest(files: List<ExportMediaFile> = mediaFiles): String? =
-        files.takeIf { it.isNotEmpty() }?.let { json.encodeToString(ExportMediaManifest(it)) }
-
-    // Streaming encoders: write JSON directly to the archive sink instead of
-    // materializing a full String (+ its byte-array copy). Peak memory for a
-    // category becomes the okio buffer size rather than the whole category, which
-    // is what keeps large exports (e.g. extensive location history) off the heap.
-
-    @OptIn(ExperimentalSerializationApi::class)
-    fun writeMetadata(sink: BufferedSink) = json.encodeToBufferedSink(exportMetadata, sink)
-
-    @OptIn(ExperimentalSerializationApi::class)
-    fun writeJournals(sink: BufferedSink) = json.encodeToBufferedSink(mapOf("journals" to journals), sink)
-
-    @OptIn(ExperimentalSerializationApi::class)
-    fun writeNotes(sink: BufferedSink) = json.encodeToBufferedSink(mapOf("notes" to exportNotes), sink)
-
-    @OptIn(ExperimentalSerializationApi::class)
-    fun writeJournalNotes(sink: BufferedSink) = json.encodeToBufferedSink(mapOf("journal_notes" to exportRelations), sink)
-
-    @OptIn(ExperimentalSerializationApi::class)
-    fun writeDrafts(sink: BufferedSink) = json.encodeToBufferedSink(mapOf("drafts" to exportDrafts), sink)
-
-    val hasProfile: Boolean get() = profilePayload != null
-
-    @OptIn(ExperimentalSerializationApi::class)
-    fun writeProfile(sink: BufferedSink) {
-        profilePayload?.let { json.encodeToBufferedSink(it, sink) }
-    }
-
-    val hasPlaces: Boolean get() = placesPayload != null
-
-    @OptIn(ExperimentalSerializationApi::class)
-    fun writePlaces(sink: BufferedSink) {
-        placesPayload?.let { json.encodeToBufferedSink(it, sink) }
-    }
-
-    val hasLocationHistory: Boolean get() = locationHistoryPayload != null
-
-    @OptIn(ExperimentalSerializationApi::class)
-    fun writeLocationHistory(sink: BufferedSink) {
-        locationHistoryPayload?.let { json.encodeToBufferedSink(it, sink) }
-    }
-
-    fun hasMediaManifest(files: List<ExportMediaFile> = mediaFiles): Boolean = files.isNotEmpty()
-
-    @OptIn(ExperimentalSerializationApi::class)
-    fun writeMediaManifest(
-        sink: BufferedSink,
-        files: List<ExportMediaFile> = mediaFiles,
-    ) = json.encodeToBufferedSink(ExportMediaManifest(files), sink)
-
-    fun renderIssuesText(additionalIssues: List<ExportIssue> = emptyList()): String? {
-        val allIssues = (issues + additionalIssues).distinct()
-        if (allIssues.isEmpty()) return null
-
-        return buildString {
-            appendLine("LogDate export issues")
-            appendLine()
-            appendLine("This export completed, but some recoverable problems were detected.")
-            appendLine("Affected content may need to be re-exported after the source files or metadata are repaired.")
-            appendLine()
-            appendLine("Issues:")
-            allIssues.forEach { issue ->
-                appendLine("- ${issue.describe()}")
-            }
-            appendLine()
-            appendLine("Possible mitigations:")
-            appendLine("- Keep this archive; unaffected data was still exported.")
-            appendLine("- Re-open the affected entries in LogDate and verify the media still loads.")
-            appendLine("- If media is missing, reattach the original image, video, or recording and export again.")
-            appendLine(
-                "- If the app is referencing an old private file path, saving or re-importing the media can refresh the stored reference.",
-            )
-        }
-    }
-}
-
-/**
- * Represents a media file to be included in the export.
- */
-@Serializable
-data class ExportMediaFile(
-    val exportPath: String,
-    val sourceUri: String,
-)
-
-private fun Place.toExportPlaceOrNull(): ExportPlace? =
-    when (this) {
-        is Place.UserDefined ->
-            ExportPlace(
-                id = id.toString(),
-                displayName = displayName,
-                latitude = lat,
-                longitude = lng,
-                radiusMeters = radiusMeters,
-                description = description,
-            )
-    }
-
-private fun LocationHistoryItem.toExportLocationHistoryItem(): ExportLocationHistoryItem =
-    ExportLocationHistoryItem(
-        sampleId = sampleId,
-        userId = userId,
-        deviceId = deviceId,
-        timestamp = timestamp,
-        loggedAt = loggedAt,
-        latitude = location.latitude,
-        longitude = location.longitude,
-        altitudeMeters = location.altitude.value,
-        confidence = confidence,
-        isGenuine = isGenuine,
-        capturePipeline = capturePipeline.name,
-        captureSource = captureSource.name,
-        accuracyMeters = accuracyMeters,
-        speedMetersPerSecond = speedMetersPerSecond,
-        bearingDegrees = bearingDegrees,
-        isMock = isMock,
-    )
-
-enum class ExportIssueCode {
-    JOURNALS_UNAVAILABLE,
-    NOTES_UNAVAILABLE,
-    DRAFTS_UNAVAILABLE,
-    APP_INFO_UNAVAILABLE,
-    DEVICE_ID_UNAVAILABLE,
-    USER_ID_UNAVAILABLE,
-    PROFILE_UNAVAILABLE,
-    PLACES_UNAVAILABLE,
-    LOCATION_HISTORY_UNAVAILABLE,
-    ASSOCIATIONS_UNAVAILABLE,
-    MEDIA_MANIFEST_UNAVAILABLE,
-    MEDIA_RECOVERED_NORMALIZED_PATH,
-    MEDIA_RECOVERED_APP_PRIVATE_AUDIO,
-    MEDIA_RECOVERED_APP_PRIVATE_MEDIA,
-    MEDIA_RECOVERED_MEDIA_STORE,
-    MEDIA_BYTES_MISSING,
-}
-
-data class ExportIssue(
-    val code: ExportIssueCode,
-    val source: String? = null,
-    val detail: String? = null,
-)
-
-private fun MutableList<ExportIssue>.record(
-    code: ExportIssueCode,
-    throwable: Throwable,
-    source: String? = null,
-) {
-    val detail = throwable.message ?: throwable::class.simpleName ?: "unknown error"
-    add(ExportIssue(code = code, source = source, detail = detail))
-    Napier.w("Export issue recorded: ${code.name}", throwable)
-}
-
-private fun ExportIssue.describe(): String =
-    when (code) {
-        ExportIssueCode.JOURNALS_UNAVAILABLE ->
-            "Journals could not be loaded. The export used an empty journals section."
-        ExportIssueCode.NOTES_UNAVAILABLE ->
-            "Notes could not be loaded. The export used an empty notes section."
-        ExportIssueCode.DRAFTS_UNAVAILABLE ->
-            "Drafts could not be loaded. The export used an empty drafts section."
-        ExportIssueCode.APP_INFO_UNAVAILABLE ->
-            "App version metadata could not be read. Default export metadata was written instead."
-        ExportIssueCode.DEVICE_ID_UNAVAILABLE ->
-            "Device ID metadata could not be read. A fallback device identifier was written instead."
-        ExportIssueCode.USER_ID_UNAVAILABLE ->
-            "User identity metadata could not be read. A fallback user identifier was written instead."
-        ExportIssueCode.PROFILE_UNAVAILABLE ->
-            "Profile data could not be loaded. The export omitted the profile section."
-        ExportIssueCode.PLACES_UNAVAILABLE ->
-            "Places could not be loaded. The export omitted the places section."
-        ExportIssueCode.LOCATION_HISTORY_UNAVAILABLE ->
-            "Location history could not be loaded. The export omitted the location history section."
-        ExportIssueCode.ASSOCIATIONS_UNAVAILABLE ->
-            "Journal associations could not be loaded. The export wrote an empty journal_notes section."
-        ExportIssueCode.MEDIA_MANIFEST_UNAVAILABLE ->
-            "Media manifest preparation failed. Media entries may be incomplete."
-        ExportIssueCode.MEDIA_RECOVERED_NORMALIZED_PATH ->
-            "Recovered media by normalizing a stale file path${sourceSuffix(source)}"
-        ExportIssueCode.MEDIA_RECOVERED_APP_PRIVATE_AUDIO ->
-            "Recovered audio from app-private recording storage${sourceSuffix(source)}"
-        ExportIssueCode.MEDIA_RECOVERED_APP_PRIVATE_MEDIA ->
-            "Recovered media from app-private storage${sourceSuffix(source)}"
-        ExportIssueCode.MEDIA_RECOVERED_MEDIA_STORE ->
-            "Recovered media from MediaStore${sourceSuffix(source)}"
-        ExportIssueCode.MEDIA_BYTES_MISSING ->
-            "Media bytes could not be exported${sourceSuffix(source)}"
-    }
-
-private fun sourceSuffix(source: String?): String =
-    source?.let {
-        ": $it"
-    } ?: "."

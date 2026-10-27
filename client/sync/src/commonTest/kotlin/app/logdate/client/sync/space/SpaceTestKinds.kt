@@ -318,6 +318,7 @@ internal fun noteKind(
 
 internal fun JournalNote.withSyncVersion(version: Long): JournalNote =
     when (this) {
+        is JournalNote.Handwriting -> copy(syncVersion = version)
         is JournalNote.Text -> copy(syncVersion = version)
         is JournalNote.Image -> copy(syncVersion = version)
         is JournalNote.Video -> copy(syncVersion = version)

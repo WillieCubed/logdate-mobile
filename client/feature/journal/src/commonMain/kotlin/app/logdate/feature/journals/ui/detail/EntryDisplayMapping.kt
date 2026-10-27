@@ -9,6 +9,16 @@ import app.logdate.client.repository.journals.isCapturedOnWatch
  */
 internal fun JournalNote.toEntryDisplayData(otherJournals: List<JournalReference> = emptyList()): EntryDisplayData =
     when (this) {
+        is JournalNote.Handwriting ->
+            EntryDisplayData.HandwritingEntry(
+                uid,
+                creationTimestamp,
+                document,
+                otherJournals,
+                isCapturedOnWatch,
+                unreadable = unreadableContent != null,
+                capturedDuring = capturedDuring,
+            )
         is JournalNote.Text ->
             EntryDisplayData.TextEntry(
                 id = uid,

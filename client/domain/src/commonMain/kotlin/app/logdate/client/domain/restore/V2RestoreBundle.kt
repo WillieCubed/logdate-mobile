@@ -153,11 +153,13 @@ private fun V2RestoreBundle.decodeAndMapNotes(): Pair<List<ExportNote>, List<Exp
                 id = note.id,
                 type = note.type.name.lowercase(),
                 content = note.text,
+                handwriting = note.handwriting,
+                unreadableHandwriting = note.unreadableHandwriting,
                 caption = note.caption,
                 photoPresentation = note.photoPresentation,
                 mediaPath =
                     note.media?.toRestoreReference(note.id) ?: unavailableArchiveReference(note.id).takeUnless {
-                        note.type == ArchiveNoteType.TEXT
+                        note.type == ArchiveNoteType.TEXT || note.type == ArchiveNoteType.HANDWRITING
                     },
                 durationMs = note.durationMs,
                 transcription = note.transcription,
@@ -261,6 +263,16 @@ private fun buildLegacyRestoreBundle(
 
 private fun ArchiveLocation.toExportLocation() = ExportLocation(latitude, longitude, placeName, altitudeMeters, accuracyMeters?.toFloat())
 
+private fun ArchiveDraftBlock.toHandwritingBlock(id: Uuid) =
+    app.logdate.shared.model.SerializableHandwritingBlock(
+        id,
+        timestamp,
+        location?.latitude,
+        location?.longitude,
+        location?.altitudeMeters,
+        requireNotNull(handwriting),
+    )
+
 private fun toSerializableBlock(
     block: ArchiveDraftBlock,
     draftId: String,
@@ -269,6 +281,7 @@ private fun toSerializableBlock(
     val location = block.location
     val mediaPath = block.media?.toRestoreReference(draftId, block.id)
     return when (block.type) {
+        ArchiveBlockType.HANDWRITING -> block.toHandwritingBlock(id)
         ArchiveBlockType.TEXT ->
             SerializableTextBlock(
                 id,

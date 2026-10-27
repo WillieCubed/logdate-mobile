@@ -20,7 +20,7 @@ class CaptureLaunchTest {
     }
 
     @Test
-    fun `a missing or unknown mode falls back to text instead of failing`() {
+    fun `a missing or unknown mode uses the configured default`() {
         assertEquals(EntryEditorRoute(), captureRoute(mode = null, journalId = null))
         assertEquals(EntryEditorRoute(), captureRoute(mode = "hologram", journalId = null))
     }
@@ -52,7 +52,10 @@ class CaptureLaunchTest {
     @Test
     fun `widget photo prompts keep the photo and the chosen input`() {
         val photo = "content://media/external/images/media/42"
-        assertEquals(EntryEditorRoute(promptPhotoUri = photo), widgetCaptureRoute(photoUri = photo, record = false, camera = false))
+        assertEquals(
+            EntryEditorRoute(launchMode = EditorLaunchMode.Text, promptPhotoUri = photo),
+            widgetCaptureRoute(photoUri = photo, record = false, camera = false),
+        )
         assertEquals(
             EntryEditorRoute(launchMode = EditorLaunchMode.Voice, promptPhotoUri = photo),
             widgetCaptureRoute(photoUri = photo, record = true, camera = false),
@@ -70,9 +73,9 @@ class CaptureLaunchTest {
     @Test
     fun `a capture can start the entry with text such as an unsaved notification reply`() {
         assertEquals(
-            EntryEditorRoute(initialText = "Dinner on the steps"),
+            EntryEditorRoute(launchMode = EditorLaunchMode.Text, initialText = "Dinner on the steps"),
             captureRoute(mode = "text", journalId = null, text = "Dinner on the steps"),
         )
-        assertEquals(EntryEditorRoute(), captureRoute(mode = "text", journalId = null, text = "  "))
+        assertEquals(EntryEditorRoute(launchMode = EditorLaunchMode.Text), captureRoute(mode = "text", journalId = null, text = "  "))
     }
 }

@@ -2,9 +2,6 @@ package app.logdate.client.domain.export.archive
 
 import app.logdate.client.repository.transcription.TranscriptDocumentStatus
 import app.logdate.client.repository.transcription.TranscriptSource
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.descriptors.elementNames
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -21,11 +18,7 @@ import kotlinx.serialization.json.put
  * forgot.
  */
 object ArchiveSchemas {
-    private const val DIALECT = "https://json-schema.org/draft/2020-12/schema"
-    private const val UUID_PATTERN = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-    private const val INSTANT_PATTERN = "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$"
     private const val SHA256_PATTERN = "^[0-9a-f]{64}$"
-    private const val PATH_PATTERN = "^(?!/)(?!.*(^|/)\\.\\.?(/|$))[^\\\\:*?\"<>|\\u0000-\\u001f]+$"
 
     /** Schema text by the archive path it is written to. */
     val files: Map<ArchivePath, String> by lazy {
@@ -155,6 +148,8 @@ object ArchiveSchemas {
                                 "timeZone" to string(minLength = 1),
                                 "createdAtLocal" to string(minLength = 1),
                                 "text" to string(),
+                                "handwriting" to handwriting(),
+                                "unreadableHandwriting" to string(),
                                 "textFormat" to enumOf(ArchiveTextFormat.serializer()),
                                 "caption" to string(),
                                 "photoPresentation" to string(),
@@ -169,6 +164,39 @@ object ArchiveSchemas {
                                 "journalIds" to array(ref("uuid")),
                             )
                     ),
+        )
+
+    private fun handwriting() =
+        obj(
+            listOf("strokes"),
+            "version" to count(),
+            "width" to number(0.0, null),
+            "height" to number(0.0, null),
+            "strokes" to
+                array(
+                    obj(
+                        listOf("id", "tool", "color", "width", "points"),
+                        "id" to ref("uuid"),
+                        "tool" to string(),
+                        "color" to string(),
+                        "width" to number(0.0, null),
+                        "x" to number(null, null),
+                        "y" to number(null, null),
+                        "rotation" to number(null, null),
+                        "scaleX" to number(null, null),
+                        "scaleY" to number(null, null),
+                        "zIndex" to count(),
+                        "points" to
+                            array(
+                                obj(
+                                    listOf("x", "y"),
+                                    "x" to number(null, null),
+                                    "y" to number(null, null),
+                                    "pressure" to number(0.0, 1.0),
+                                ),
+                            ),
+                    ),
+                ),
         )
 
     private fun transcript() =
@@ -275,6 +303,8 @@ object ArchiveSchemas {
                                 "type" to enumOf(ArchiveBlockType.serializer()),
                                 "timestamp" to ref("instant"),
                                 "text" to string(),
+                                "handwriting" to handwriting(),
+                                "unreadableHandwriting" to string(),
                                 "media" to ref("mediaRef"),
                                 "thumbnail" to ref("mediaRef"),
                                 "caption" to string(),
@@ -400,137 +430,4 @@ object ArchiveSchemas {
                 ),
             defs = defs("path"),
         )
-
-    private fun document(
-        title: String,
-        required: List<String>,
-        properties: Map<String, JsonElement>,
-        defs: Map<String, JsonElement>,
-    ): JsonObject =
-        buildJsonObject {
-            put("\$schema", DIALECT)
-            put("title", title)
-            put("type", "object")
-            put("required", JsonArray(required.map { JsonPrimitive(it) }))
-            put("properties", JsonObject(properties))
-            if (defs.isNotEmpty()) put("\$defs", JsonObject(defs))
-        }
-
-    private fun defs(vararg names: String): Map<String, JsonElement> = names.associateWith(::shared)
-
-    private fun shared(name: String): JsonElement =
-        when (name) {
-            "uuid" ->
-                buildJsonObject {
-                    put("type", "string")
-                    put("pattern", UUID_PATTERN)
-                }
-            "instant" ->
-                buildJsonObject {
-                    put("type", "string")
-                    put("pattern", INSTANT_PATTERN)
-                }
-            "path" ->
-                buildJsonObject {
-                    put("type", "string")
-                    put("minLength", 1)
-                    put("maxLength", ArchivePath.MAX_PATH_LENGTH)
-                    put("pattern", PATH_PATTERN)
-                }
-            "location" ->
-                obj(
-                    listOf("latitude", "longitude"),
-                    "latitude" to number(-90.0, 90.0),
-                    "longitude" to number(-180.0, 180.0),
-                    "altitudeMeters" to number(null, null),
-                    "accuracyMeters" to number(0.0, null),
-                    "placeName" to string(),
-                )
-            "mediaRef" -> mediaRef()
-            else -> error("Unknown shared schema $name")
-        }
-
-    /** A media reference: an included file has a path and type, an omitted one has a reason. */
-    private fun mediaRef(): JsonElement =
-        buildJsonObject {
-            put("type", "object")
-            put("required", JsonArray(listOf(JsonPrimitive("status"))))
-            put(
-                "properties",
-                JsonObject(
-                    mapOf(
-                        "status" to enumOf(ArchiveMediaStatus.serializer()),
-                        "path" to ref("path"),
-                        "mediaType" to string(minLength = 1),
-                        "omittedReason" to enumOf(ArchiveOmissionReason.serializer()),
-                    ),
-                ),
-            )
-            put(
-                "allOf",
-                JsonArray(
-                    listOf(
-                        conditional("included", listOf("path", "mediaType")),
-                        conditional("omitted", listOf("omittedReason")),
-                    ),
-                ),
-            )
-        }
-
-    private fun conditional(
-        status: String,
-        required: List<String>,
-    ): JsonElement =
-        buildJsonObject {
-            put("if", buildJsonObject { put("properties", buildJsonObject { put("status", buildJsonObject { put("const", status) }) }) })
-            put("then", buildJsonObject { put("required", JsonArray(required.map { JsonPrimitive(it) })) })
-        }
-
-    private fun obj(
-        required: List<String>,
-        vararg properties: Pair<String, JsonElement>,
-    ): JsonObject =
-        buildJsonObject {
-            put("type", "object")
-            if (required.isNotEmpty()) put("required", JsonArray(required.map { JsonPrimitive(it) }))
-            put("properties", JsonObject(properties.toMap()))
-        }
-
-    private fun array(items: JsonElement): JsonObject =
-        buildJsonObject {
-            put("type", "array")
-            put("items", items)
-        }
-
-    private fun string(minLength: Int? = null): JsonObject =
-        buildJsonObject {
-            put("type", "string")
-            if (minLength != null) put("minLength", minLength)
-        }
-
-    private fun bool(): JsonObject = buildJsonObject { put("type", "boolean") }
-
-    private fun count(): JsonObject =
-        buildJsonObject {
-            put("type", "integer")
-            put("minimum", 0)
-        }
-
-    private fun number(
-        minimum: Double?,
-        maximum: Double?,
-    ): JsonObject =
-        buildJsonObject {
-            put("type", "number")
-            if (minimum != null) put("minimum", minimum)
-            if (maximum != null) put("maximum", maximum)
-        }
-
-    private fun ref(name: String): JsonObject = buildJsonObject { put("\$ref", "#/\$defs/$name") }
-
-    private fun enumOf(serializer: KSerializer<*>): JsonObject =
-        buildJsonObject {
-            put("type", "string")
-            put("enum", JsonArray(serializer.descriptor.elementNames.map { JsonPrimitive(it) }))
-        }
 }

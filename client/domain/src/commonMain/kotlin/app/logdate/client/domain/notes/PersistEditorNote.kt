@@ -41,6 +41,7 @@ private suspend fun JournalNotesRepository.persistNewEditorNote(
 
 private fun JournalNote.asNewCopy(id: kotlin.uuid.Uuid): JournalNote =
     when (this) {
+        is JournalNote.Handwriting -> copy(uid = id, syncVersion = 0)
         is JournalNote.Text -> copy(uid = id, syncVersion = 0)
         is JournalNote.Image -> copy(uid = id, syncVersion = 0)
         is JournalNote.Audio -> copy(uid = id, syncVersion = 0)
@@ -52,6 +53,16 @@ private fun JournalNote.withEditorChanges(
     updatedAt: kotlin.time.Instant = edited.lastUpdated,
 ): JournalNote =
     when (this) {
+        is JournalNote.Handwriting ->
+            (edited as JournalNote.Handwriting).let {
+                copy(
+                    document = it.document,
+                    unreadableContent = it.unreadableContent,
+                    creationTimestamp = it.creationTimestamp,
+                    lastUpdated = updatedAt,
+                    timeZoneId = it.timeZoneId ?: timeZoneId,
+                )
+            }
         is JournalNote.Text ->
             (edited as JournalNote.Text).let {
                 copy(

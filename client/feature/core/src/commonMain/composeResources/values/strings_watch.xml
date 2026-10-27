@@ -179,4 +179,5 @@
     <string name="watch_handoff_share_failed">Couldn’t open sharing for this moment. Try again.</string>
     <string name="watch_handoff_retry">Try again</string>
     <string name="watch_handoff_share_title">Share moment</string>
+    <string name="watch_v2_handwriting">Handwriting</string>
 </resources>

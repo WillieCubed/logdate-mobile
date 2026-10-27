@@ -127,12 +127,17 @@ private fun shareHandoffNote(
         val text =
             when (note) {
                 is JournalNote.Text -> note.content
+                is JournalNote.Handwriting -> null
                 is JournalNote.Audio -> note.caption
                 is JournalNote.Image -> note.caption
                 is JournalNote.Video -> note.caption
             }
-        sharing.shareContent(text = text, mediaUris = listOfNotNull(note.mediaRefOrNull()), chooserTitle = title)
-        true
+        if (text == null) {
+            false
+        } else {
+            sharing.shareContent(text = text, mediaUris = listOfNotNull(note.mediaRefOrNull()), chooserTitle = title)
+            true
+        }
     } catch (e: Exception) {
         Napier.w("Couldn't open sharing for the watch moment", e)
         false

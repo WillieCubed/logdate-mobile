@@ -62,6 +62,8 @@ data class ExportNote(
     val tags: List<String> = emptyList(),
     val people: List<String> = emptyList(),
     val syncVersion: Long = 0,
+    val handwriting: app.logdate.shared.model.HandwritingDocument? = null,
+    val unreadableHandwriting: String? = null,
 )
 
 /**

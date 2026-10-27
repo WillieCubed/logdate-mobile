@@ -133,6 +133,13 @@ class JournalContentPickerViewModel(
 
     private fun JournalNote.toPickerItem(): JournalContentPickerItem =
         when (this) {
+            is JournalNote.Handwriting ->
+                JournalContentPickerItem(
+                    uid,
+                    JournalContentPickerItemKind.WRITING,
+                    creationTimestamp,
+                    title = null,
+                )
             is JournalNote.Text ->
                 JournalContentPickerItem(uid, JournalContentPickerItemKind.WRITING, creationTimestamp, content)
             is JournalNote.Image ->

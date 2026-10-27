@@ -43,6 +43,7 @@ class WatchNoteArrivalNotifier(
 
     private fun contentFor(note: JournalNote): WatchNoteArrivalContent =
         when (note) {
+            is JournalNote.Handwriting -> openInEditor(NotificationResources.string.notification_watch_note_handwriting_title)
             is JournalNote.Audio -> openInEditor(NotificationResources.string.notification_watch_note_audio_title)
             is JournalNote.Image -> openInEditor(NotificationResources.string.notification_watch_note_photo_title)
             is JournalNote.Video -> openInEditor(NotificationResources.string.notification_watch_note_video_title)

@@ -51,6 +51,16 @@ sealed interface EntryDisplayData {
     /** What the person was doing when they captured the entry, or null when it was not recorded. */
     val capturedDuring: CaptureActivity?
 
+    data class HandwritingEntry(
+        override val id: Uuid,
+        override val timestamp: Instant,
+        val document: app.logdate.shared.model.HandwritingDocument,
+        override val otherJournals: List<JournalReference> = emptyList(),
+        override val capturedOnWatch: Boolean = false,
+        val unreadable: Boolean = false,
+        override val capturedDuring: CaptureActivity? = null,
+    ) : EntryDisplayData
+
     data class TextEntry(
         override val id: Uuid,
         override val timestamp: Instant,

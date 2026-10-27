@@ -52,6 +52,7 @@ import app.logdate.feature.editor.ui.layout.LocalEditorCorners
 import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.close
+import logdate.client.feature.editor.generated.resources.ink_add
 import logdate.client.feature.editor.generated.resources.memory_add
 import logdate.client.feature.editor.generated.resources.memory_add_photo
 import logdate.client.feature.editor.generated.resources.memory_add_video
@@ -76,6 +77,7 @@ internal fun EndOfEntryAddControl(
     onRevealHeightChanged: (Dp) -> Unit = {},
     blockIds: Map<BlockType, Uuid> = emptyMap(),
     consumedType: BlockType? = null,
+    allowHandwriting: Boolean = false,
 ) {
     val currentOnDrag by rememberUpdatedState(onDrag)
     val currentOnDragStopped by rememberUpdatedState(onDragStopped)
@@ -228,6 +230,18 @@ internal fun EndOfEntryAddControl(
                                     enabled = consumedType == null && expanded && fraction > 0.95f,
                                     visible = consumedType != BlockType.CAMERA,
                                 )
+                                if (allowHandwriting) {
+                                    CreationChoice(
+                                        BlockType.HANDWRITING,
+                                        stringResource(Res.string.ink_add),
+                                        PlatformIcons.edit(),
+                                        gatedAdd,
+                                        Modifier.weight(1f),
+                                        blockId = blockIds[BlockType.HANDWRITING],
+                                        enabled = consumedType == null && expanded && fraction > 0.95f,
+                                        visible = consumedType != BlockType.HANDWRITING,
+                                    )
+                                }
                             }
                         } else {
                             Column(Modifier.fillMaxWidth().height(choiceHeight).padding(horizontal = 12.dp)) {
@@ -284,6 +298,18 @@ internal fun EndOfEntryAddControl(
                                         enabled = consumedType == null && expanded && fraction > 0.95f,
                                         visible = consumedType != BlockType.CAMERA,
                                     )
+                                    if (allowHandwriting) {
+                                        CreationChoice(
+                                            BlockType.HANDWRITING,
+                                            stringResource(Res.string.ink_add),
+                                            PlatformIcons.edit(),
+                                            gatedAdd,
+                                            Modifier.weight(1f),
+                                            blockId = blockIds[BlockType.HANDWRITING],
+                                            enabled = consumedType == null && expanded && fraction > 0.95f,
+                                            visible = consumedType != BlockType.HANDWRITING,
+                                        )
+                                    }
                                 }
                             }
                         }

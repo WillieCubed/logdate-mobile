@@ -6,4 +6,5 @@
     <string name="watch_tile_voice">Voice note</string>
     <string name="watch_tile_photo">Photo</string>
     <string name="watch_tile_video">Video</string>
+    <string name="watch_tile_handwriting">Handwritten note</string>
 </resources>

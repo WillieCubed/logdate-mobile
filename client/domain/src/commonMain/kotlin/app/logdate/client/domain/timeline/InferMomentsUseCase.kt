@@ -39,7 +39,7 @@ class InferMomentsUseCase(
                         is JournalNote.Text -> note.content.length
                         is JournalNote.Image -> note.caption.length
                         is JournalNote.Video -> note.caption.length
-                        is JournalNote.Audio -> 0
+                        is JournalNote.Audio, is JournalNote.Handwriting -> 0
                     }
                 256L + contentLength + (note.location?.displayName?.length ?: 0)
             }
@@ -237,13 +237,13 @@ private fun JournalNote.toMomentMedia(): List<MomentMedia> =
     when (this) {
         is JournalNote.Image -> listOf(MomentMedia(uri = mediaRef, isVideo = false, sourceNoteId = uid))
         is JournalNote.Video -> listOf(MomentMedia(uri = mediaRef, isVideo = true, sourceNoteId = uid))
-        is JournalNote.Text, is JournalNote.Audio -> emptyList()
+        is JournalNote.Text, is JournalNote.Handwriting, is JournalNote.Audio -> emptyList()
     }
 
 private fun JournalNote.toMomentAudio(): List<MomentAudio> =
     when (this) {
         is JournalNote.Audio -> listOf(MomentAudio(uri = mediaRef, durationMs = durationMs, sourceNoteId = uid))
-        is JournalNote.Text, is JournalNote.Image, is JournalNote.Video -> emptyList()
+        is JournalNote.Text, is JournalNote.Handwriting, is JournalNote.Image, is JournalNote.Video -> emptyList()
     }
 
 private fun serializeEntries(
@@ -256,6 +256,7 @@ private fun serializeEntries(
         entries.sortedBy { it.creationTimestamp }.forEach { note ->
             appendLine("--- Entry [${note.uid}] at ${note.creationTimestamp} ---")
             when (note) {
+                is JournalNote.Handwriting -> appendLine("Type: original handwriting")
                 is JournalNote.Text -> {
                     appendLine("Type: text")
                     note.location?.displayName?.let { appendLine("Location: $it") }

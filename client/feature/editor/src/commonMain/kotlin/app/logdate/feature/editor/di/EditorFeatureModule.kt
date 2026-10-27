@@ -55,6 +55,7 @@ val editorFeatureModule: Module =
                 saveEntryUseCase = get(),
                 draftManager = get(),
                 contentLoader = get(),
+                preferences = get(),
                 pendingAudioRecoverer = get(),
                 audioDurationResolver = get(),
                 captureUsage = getOrNull<CaptureUsageReporter>() ?: CaptureUsageReporter.None,

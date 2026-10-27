@@ -2,6 +2,7 @@ package app.logdate.feature.editor.ui.blocks
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
@@ -32,13 +33,16 @@ import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.CameraBlockUiState
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
+import app.logdate.feature.editor.ui.editor.HandwritingBlockUiState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.MediaBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
 import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
+import app.logdate.feature.editor.ui.handwriting.HandwritingCanvas
 import app.logdate.feature.editor.ui.image.ImageBlockPreview
 import app.logdate.feature.editor.ui.image.ImagePickerContent
+import app.logdate.feature.editor.ui.state.EditorBlockPresentation
 import app.logdate.feature.editor.ui.text.TextBlockContent
 import app.logdate.feature.editor.ui.text.rememberInlineMarkdownVisualTransformation
 import app.logdate.feature.editor.ui.video.VideoPickerContent
@@ -47,6 +51,7 @@ import app.logdate.shared.model.PhotoPresentation
 import app.logdate.ui.common.MarkdownText
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.add_a_caption
+import logdate.client.feature.editor.generated.resources.ink_preview_description
 import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
 
@@ -66,9 +71,20 @@ internal fun MemoryBlockContent(
     focusedTextHeight: Dp = 0.dp,
     unfinishedRecordingHeight: Dp = 420.dp,
     availableAudioHeight: Dp = Dp.Infinity,
+    presentation: EditorBlockPresentation? = null,
 ) {
+    if (presentation != null) {
+        presentation.inline(onSelect)
+        return
+    }
     Column(Modifier.fillMaxWidth()) {
         when (block) {
+            is HandwritingBlockUiState ->
+                HandwritingCanvas(
+                    block.page,
+                    Modifier.fillMaxWidth().height(240.dp).clickable(onClick = onSelect),
+                    description = stringResource(Res.string.ink_preview_description),
+                )
             is TextBlockUiState ->
                 TextBlockContent(
                     block,

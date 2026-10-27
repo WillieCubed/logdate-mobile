@@ -63,6 +63,7 @@ val JournalNote.isCapturedOnWatch: Boolean
 fun JournalNote.withCapturedOn(capturedOn: CaptureDevice?): JournalNote =
     when (this) {
         is JournalNote.Text -> copy(capturedOn = capturedOn)
+        is JournalNote.Handwriting -> copy(capturedOn = capturedOn)
         is JournalNote.Image -> copy(capturedOn = capturedOn)
         is JournalNote.Video -> copy(capturedOn = capturedOn)
         is JournalNote.Audio -> copy(capturedOn = capturedOn)

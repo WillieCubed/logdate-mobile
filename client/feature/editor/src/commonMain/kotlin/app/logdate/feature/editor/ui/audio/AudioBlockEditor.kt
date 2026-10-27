@@ -23,6 +23,7 @@ import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.AudioCaptureState
 import app.logdate.feature.editor.ui.editor.RecordingState
 import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
+import app.logdate.feature.editor.ui.layout.EditorBlockCornerRadius
 import app.logdate.feature.editor.ui.layout.LocalEditorCorners
 import app.logdate.ui.audio.AudioContextProcessor
 import app.logdate.util.formatDateLocalized
@@ -261,7 +262,7 @@ fun AudioBlockEditor(
                 onOutputDeviceSelected = audioRouteRepository::selectOutputDevice,
                 waveformAmplitudes = waveformAmplitudes,
                 availableHeight = availableHeight,
-                cornerRadius = LocalEditorCorners.current.cardRadius,
+                cornerRadius = if (inline) EditorBlockCornerRadius else LocalEditorCorners.current.cardRadius,
                 trailingActionInset = if (inline) 40.dp else 0.dp,
                 modifier = Modifier.fillMaxWidth(),
             )

@@ -62,7 +62,7 @@ private fun JournalNote.mediaKind(): MediaKind =
     when (this) {
         is JournalNote.Video -> MediaKind.VIDEO
         is JournalNote.Audio -> MediaKind.AUDIO
-        is JournalNote.Image, is JournalNote.Text -> MediaKind.PHOTO
+        is JournalNote.Image, is JournalNote.Text, is JournalNote.Handwriting -> MediaKind.PHOTO
     }
 
 private fun SerializableEntryBlock.mediaReference(): String? =
@@ -71,7 +71,7 @@ private fun SerializableEntryBlock.mediaReference(): String? =
         is SerializableVideoBlock -> uri
         is SerializableAudioBlock -> uri
         is SerializableCameraBlock -> uri
-        is SerializableTextBlock -> null
+        is SerializableTextBlock, is app.logdate.shared.model.SerializableHandwritingBlock -> null
     }
 
 private fun SerializableEntryBlock.mediaKind(): MediaKind =
@@ -112,6 +112,8 @@ internal fun JournalNote.toArchiveNote(
         timeZone = timeZoneId,
         createdAtLocal = zone?.let { creationTimestamp.toRfc3339(it) },
         text = text,
+        handwriting = (this as? JournalNote.Handwriting)?.document,
+        unreadableHandwriting = (this as? JournalNote.Handwriting)?.unreadableContent,
         textFormat = ArchiveTextFormat.MARKDOWN.takeIf { text != null },
         caption = caption.takeUnless { this is JournalNote.Text },
         photoPresentation = (this as? JournalNote.Image)?.presentation?.name,
@@ -135,6 +137,7 @@ internal fun JournalNote.toArchiveNote(
 private fun JournalNote.archiveType(): ArchiveNoteType =
     when (this) {
         is JournalNote.Text -> ArchiveNoteType.TEXT
+        is JournalNote.Handwriting -> ArchiveNoteType.HANDWRITING
         is JournalNote.Image -> ArchiveNoteType.IMAGE
         is JournalNote.Video -> ArchiveNoteType.VIDEO
         is JournalNote.Audio -> ArchiveNoteType.AUDIO
@@ -177,6 +180,7 @@ private fun SerializableEntryBlock.toArchiveBlock(media: MediaReferences): Archi
     val base = ArchiveDraftBlock(id = id.toString(), type = ArchiveBlockType.TEXT, timestamp = timestamp, location = location)
     return when (this) {
         is SerializableTextBlock -> base.copy(text = content)
+        is app.logdate.shared.model.SerializableHandwritingBlock -> base.copy(type = ArchiveBlockType.HANDWRITING, handwriting = document)
         is SerializableImageBlock ->
             base.copy(
                 type = ArchiveBlockType.IMAGE,

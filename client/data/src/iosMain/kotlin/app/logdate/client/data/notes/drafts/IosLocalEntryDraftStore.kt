@@ -63,6 +63,7 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
     private fun JournalNote.toSerializable(): SerializableJournalNote {
         val noteContent =
             when (this) {
+                is JournalNote.Handwriting -> unreadableContent ?: document.encode()
                 is JournalNote.Text -> this.content
                 is JournalNote.Audio -> this.mediaRef
                 is JournalNote.Image -> this.mediaRef
@@ -83,6 +84,7 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
                 when (this) {
                     is JournalNote.Image -> caption
                     is JournalNote.Video -> caption
+                    is JournalNote.Handwriting,
                     is JournalNote.Text,
                     is JournalNote.Audio,
                     -> ""
@@ -109,6 +111,7 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
         val updatedTimestamp = Instant.fromEpochMilliseconds(lastUpdated ?: createdAt)
 
         return when (noteType) {
+            NoteType.HANDWRITING -> toHandwritingNote(noteId, timestamp, updatedTimestamp)
             NoteType.TEXT ->
                 JournalNote.Text(
                     uid = noteId,
@@ -155,6 +158,30 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
             NoteType.LOCATION ->
                 throw IllegalArgumentException("A draft cannot contain a LOCATION journal note")
         }
+    }
+
+    private fun SerializableJournalNote.toHandwritingNote(
+        noteId: Uuid,
+        created: Instant,
+        updated: Instant,
+    ): JournalNote.Handwriting {
+        val decoded =
+            runCatching {
+                app.logdate.shared.model.HandwritingDocument
+                    .decode(content)
+            }.getOrNull()
+        return JournalNote.Handwriting(
+            uid = noteId,
+            creationTimestamp = created,
+            lastUpdated = updated,
+            document =
+                decoded ?: app.logdate.shared.model
+                    .HandwritingDocument(),
+            unreadableContent = if (decoded == null) content else null,
+            syncVersion = syncVersion,
+            location = location,
+            timeZoneId = timeZoneId,
+        )
     }
 
     override suspend fun saveDraft(draft: EntryDraft) {

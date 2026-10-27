@@ -1,0 +1,34 @@
+<resources>
+    <string name="ink_write_action">Write</string>
+    <string name="ink_type_action">Type</string>
+    <string name="ink_handwrite_action">Handwrite</string>
+    <string name="ink_read_preview_description">Original handwriting. Open to view.</string>
+    <string name="ink_add">Add handwriting</string>
+    <string name="ink_title">Handwriting</string>
+    <string name="ink_entry">New entry</string>
+    <string name="ink_back">Back to entry</string>
+    <string name="ink_original">Keep it in your own hand</string>
+    <string name="ink_prototype">Handwriting prototype</string>
+    <string name="ink_touch">Draw with touch</string>
+    <string name="ink_pen">Pen</string>
+    <string name="ink_highlight">Highlight</string>
+    <string name="ink_erase">Erase</string>
+    <string name="ink_undo">Undo</string>
+    <string name="ink_redo">Redo</string>
+    <string name="ink_lines">Ruled page</string>
+    <string name="ink_context">Entry context</string>
+    <string name="ink_canvas_description">Handwriting canvas. Original pen strokes are preserved.</string>
+    <string name="ink_preview_description">Original handwriting. Open to continue writing.</string>
+    <string name="ink_hint">Write anywhere on the page with your pen.</string>
+    <string name="ink_black">Black ink</string>
+    <string name="ink_blue">Blue ink</string>
+    <string name="ink_berry">Berry ink</string>
+    <string name="ink_thin">Fine pen</string>
+    <string name="ink_medium">Medium pen</string>
+    <string name="ink_thick">Broad pen</string>
+    <string name="ink_example_title">A little more time outside</string>
+    <string name="ink_example_body">Took the long way home today. I want to remember how it felt to slow down.</string>
+    <string name="ink_journal">Everyday</string>
+    <string name="ink_options">Drawing options</string>
+    <string name="ink_style">Ink and stroke width</string>
+</resources>

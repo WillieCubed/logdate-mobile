@@ -1,7 +1,7 @@
 {
   "lexicon": 1,
   "id": "app.logdate.journal.entry",
-  "description": "A journal entry: one moment, made of ordered blocks of text, photos, video and audio.",
+  "description": "A journal entry: one moment, made of ordered blocks of text, handwriting, photos, video and audio.",
   "defs": {
     "main": {
       "type": "record",
@@ -20,6 +20,7 @@
               "type": "union",
               "refs": [
                 "#textBlock",
+                "#handwritingBlock",
                 "#imageBlock",
                 "#videoBlock",
                 "#audioBlock"
@@ -95,6 +96,23 @@
             "plain"
           ],
           "description": "How to interpret the text. Defaults to markdown, which is what LogDate's editor writes."
+        }
+      }
+    },
+    "handwritingBlock": {
+      "type": "object",
+      "description": "Original handwriting, retained as editable strokes rather than recognized text or a flattened image.",
+      "required": ["id", "document"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Identifier of the block, unique within its entry."
+        },
+        "document": {
+          "type": "string",
+          "maxLength": 1000000,
+          "description": "A versioned LogDate HandwritingDocument encoded as JSON. A string preserves fractional page coordinates, pressure and transforms without floating-point values in the DAG-CBOR record. Readers validate the document version and retain unreadable records for a newer reader. An oversized document fails sync explicitly and is never trimmed."
         }
       }
     },

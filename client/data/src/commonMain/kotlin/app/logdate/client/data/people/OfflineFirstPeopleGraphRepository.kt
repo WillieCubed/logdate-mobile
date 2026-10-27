@@ -8,7 +8,6 @@ import app.logdate.client.database.dao.people.InferredPersonEvidenceDao
 import app.logdate.client.database.dao.people.PersonDao
 import app.logdate.client.database.dao.people.PersonLinkDao
 import app.logdate.client.database.dao.people.PersonResolutionDecisionDao
-import app.logdate.client.database.entities.TranscriptionStatus
 import app.logdate.client.database.entities.people.InferredPersonClusterEntity
 import app.logdate.client.database.entities.people.InferredPersonEvidenceEntity
 import app.logdate.client.database.entities.people.PersonLinkEntity
@@ -119,7 +118,7 @@ class OfflineFirstPeopleGraphRepository(
 
             clearOpenInference()
 
-            val artifacts = loadArtifacts()
+            val artifacts = loadPeopleInferenceArtifacts(textNoteDao, transcriptionDao, eventDao)
             val canonicalEvidence = mutableMapOf<Uuid, MutableList<CandidateEvidence>>()
             val inferredEvidence = mutableMapOf<String, MutableList<CandidateEvidence>>()
 
@@ -247,48 +246,6 @@ class OfflineFirstPeopleGraphRepository(
         }
         inferredPersonClusterDao.deleteByStatus(InferredPersonClusterStatus.OPEN.name)
         personLinkDao.deleteByProvenance(PersonLinkProvenance.INFERRED.name)
-    }
-
-    private suspend fun loadArtifacts(): List<InferenceArtifact> {
-        val textArtifacts =
-            textNoteDao.getAll().map { note ->
-                InferenceArtifact(
-                    sourceType = InferredPersonEvidenceSourceType.ENTRY_TEXT,
-                    sourceId = note.uid,
-                    text = note.content,
-                    createdAt = note.created,
-                )
-            }
-        val transcriptArtifacts =
-            transcriptionDao
-                .getAllTranscriptions()
-                .filter { it.status == TranscriptionStatus.COMPLETED && !it.text.isNullOrBlank() }
-                .map { transcription ->
-                    InferenceArtifact(
-                        sourceType = InferredPersonEvidenceSourceType.TRANSCRIPT,
-                        sourceId = transcription.noteId,
-                        text = requireNotNull(transcription.text),
-                        createdAt = transcription.lastUpdated,
-                    )
-                }
-        val eventArtifacts =
-            eventDao.getAll().map { event ->
-                val eventText =
-                    buildString {
-                        append(event.title)
-                        event.description?.takeIf(String::isNotBlank)?.let {
-                            append(". ")
-                            append(it)
-                        }
-                    }
-                InferenceArtifact(
-                    sourceType = InferredPersonEvidenceSourceType.EVENT_TEXT,
-                    sourceId = event.id,
-                    text = eventText,
-                    createdAt = event.startTime,
-                )
-            }
-        return textArtifacts + transcriptArtifacts + eventArtifacts
     }
 
     private fun findCanonicalMatches(
@@ -468,13 +425,6 @@ class OfflineFirstPeopleGraphRepository(
         )
     }
 
-    private data class InferenceArtifact(
-        val sourceType: InferredPersonEvidenceSourceType,
-        val sourceId: Uuid,
-        val text: String,
-        val createdAt: Instant,
-    )
-
     private data class CandidateEvidence(
         val displayName: String,
         val normalizedName: String,
@@ -486,33 +436,6 @@ class OfflineFirstPeopleGraphRepository(
     )
 }
 
-private fun extractPotentialPersonNames(text: String): List<String> =
-    candidateNameRegex
-        .findAll(text)
-        .map { it.value.trim() }
-        .filterNot { candidate ->
-            candidate.contains('\n') ||
-                (candidate.indexOf(' ') == -1 && candidate in ignoredSingleWordCandidates)
-        }.distinct()
-        .toList()
-
-private fun containsWholeTerm(
-    normalizedText: String,
-    normalizedTerm: String,
-): Boolean {
-    if (normalizedTerm.isBlank()) {
-        return false
-    }
-    val regex = Regex("""(?<!\p{L})${Regex.escape(normalizedTerm)}(?!\p{L})""")
-    return regex.containsMatchIn(normalizedText)
-}
-
-private fun previewEvidenceLabel(text: String): String =
-    text
-        .trim()
-        .replace(Regex("\\s+"), " ")
-        .take(MAX_EVIDENCE_LABEL_LENGTH)
-
 private const val ACTION_CONFIRM = "CONFIRM"
 private const val ACTION_SUPPRESS = "SUPPRESS"
 private const val AUTO_PROMOTE_LINK_CONFIDENCE = 0.96
@@ -521,27 +444,4 @@ private const val AUTO_PROMOTE_MIN_DAYS = 2
 private const val CANONICAL_EVIDENCE_CONFIDENCE = 0.92
 private const val CANONICAL_LINK_CONFIDENCE = 0.94
 private const val CLUSTER_EVIDENCE_CONFIDENCE = 0.72
-private const val MAX_EVIDENCE_LABEL_LENGTH = 120
 private const val MIN_CANONICAL_LINK_ARTIFACTS = 2
-
-private val candidateNameRegex = Regex("""\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b""")
-private val ignoredSingleWordCandidates =
-    setOf(
-        "After",
-        "Before",
-        "April",
-        "August",
-        "Friday",
-        "January",
-        "July",
-        "June",
-        "LogDate",
-        "March",
-        "May",
-        "Monday",
-        "Saturday",
-        "Sunday",
-        "Thursday",
-        "Tuesday",
-        "Wednesday",
-    )

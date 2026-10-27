@@ -3,6 +3,7 @@ package app.logdate.feature.journals.ui.detail
 import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.shared.model.HandwritingDocument
 import app.logdate.shared.model.PhotoPresentation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -45,6 +46,29 @@ class EntryDisplayMappingTest {
             null,
             JournalNote.Text(creationTimestamp = at, lastUpdated = at, content = "Older").toEntryDisplayData().capturedDuring,
         )
+    }
+
+    @Test
+    fun `handwriting keeps ink compatibility and capture context`() {
+        val document = HandwritingDocument(width = 480f, height = 640f)
+        val note =
+            JournalNote.Handwriting(
+                creationTimestamp = at,
+                lastUpdated = at,
+                document = document,
+                unreadableContent = "original unsupported ink",
+                capturedOn = CaptureDevice.WATCH,
+                capturedDuring = CaptureActivity.IN_VEHICLE,
+            )
+        val journals = listOf(JournalReference(note.uid, "Travel"))
+
+        val entry = note.toEntryDisplayData(journals) as EntryDisplayData.HandwritingEntry
+
+        assertEquals(document, entry.document)
+        assertTrue(entry.unreadable)
+        assertTrue(entry.capturedOnWatch)
+        assertEquals(CaptureActivity.IN_VEHICLE, entry.capturedDuring)
+        assertEquals(journals, entry.otherJournals)
     }
 
     @Test
