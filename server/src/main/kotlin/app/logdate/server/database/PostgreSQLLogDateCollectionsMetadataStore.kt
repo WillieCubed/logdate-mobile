@@ -7,6 +7,7 @@ import app.logdate.server.logdate.LogDateCollectionsMetadataStore
 import app.logdate.server.logdate.LogDateCollectionsPurgeResult
 import app.logdate.server.logdate.LogDateCollectionsState
 import app.logdate.server.logdate.LogDateCollectionsStatus
+import app.logdate.server.sync.StaleWriteException
 import app.logdate.server.sync.changePageReadSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -196,6 +197,9 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
                         (LogDateCollectionRecordsTable.collection eq collection.storageName) and
                         (LogDateCollectionRecordsTable.recordKey eq recordKey)
                 }.singleOrNull()
+        if (collection != LogDateCollectionKind.MOMENT && existing != null && existing[LogDateCollectionRecordsTable.deleted]) {
+            throw StaleWriteException(recordKey, existing[LogDateCollectionRecordsTable.deletedAt] ?: 0L)
+        }
         if (existing == null) {
             LogDateCollectionRecordsTable.insert {
                 it[LogDateCollectionRecordsTable.userId] = userId
@@ -229,6 +233,7 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
     ): LogDateCollectionMetadata? =
         withContext(Dispatchers.IO) {
             transaction {
+                val state = nextState(userId, repoDid)
                 val existing =
                     LogDateCollectionRecordsTable
                         .selectAll()
@@ -238,7 +243,7 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
                                 (LogDateCollectionRecordsTable.recordKey eq recordKey)
                         }.singleOrNull()
                 if (existing == null && !allowMissing) return@transaction null
-                val state = nextState(userId, repoDid)
+                val retainedDeletedAt = maxOf(deletedAt, existing?.get(LogDateCollectionRecordsTable.deletedAt) ?: deletedAt)
                 if (existing == null) {
                     LogDateCollectionRecordsTable.insert {
                         it[LogDateCollectionRecordsTable.userId] = userId
@@ -246,7 +251,7 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
                         it[LogDateCollectionRecordsTable.recordKey] = recordKey
                         it[serverVersion] = state.lastVersion
                         it[deleted] = true
-                        it[LogDateCollectionRecordsTable.deletedAt] = deletedAt
+                        it[LogDateCollectionRecordsTable.deletedAt] = retainedDeletedAt
                     }
                 } else {
                     LogDateCollectionRecordsTable.update({
@@ -256,45 +261,22 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
                     }) {
                         it[serverVersion] = state.lastVersion
                         it[LogDateCollectionRecordsTable.deleted] = true
-                        it[LogDateCollectionRecordsTable.deletedAt] = deletedAt
+                        it[LogDateCollectionRecordsTable.deletedAt] = retainedDeletedAt
                     }
                 }
-                LogDateCollectionMetadata(recordKey, state.lastVersion, deletedAt)
+                LogDateCollectionMetadata(recordKey, state.lastVersion, retainedDeletedAt)
             }
         }
 
+    // Sync fences survive retention; Moments retain their separately defined expiry behavior.
     override suspend fun purgeAllTombstones(olderThan: Long): LogDateCollectionsPurgeResult =
         withContext(Dispatchers.IO) {
             transaction {
-                // This sweep is tenant-wide, so the expired set is bounded only by how many
-                // tombstones the whole deployment has accumulated. Count with aggregates rather
-                // than loading every row into the heap just to tally three numbers.
-                fun countOf(kind: LogDateCollectionKind): Int =
-                    LogDateCollectionRecordsTable
-                        .selectAll()
-                        .where {
-                            (LogDateCollectionRecordsTable.collection eq kind.storageName) and
-                                (LogDateCollectionRecordsTable.deleted eq true) and
-                                (LogDateCollectionRecordsTable.deletedAt less olderThan)
-                        }.count()
-                        .toInt()
-
-                // Counted before the delete; afterwards the rows are gone.
-                val entryPurged = countOf(LogDateCollectionKind.ENTRY)
-                val journalPurged = countOf(LogDateCollectionKind.JOURNAL)
-                val associationPurged = countOf(LogDateCollectionKind.ASSOCIATION)
-
                 LogDateCollectionRecordsTable.deleteWhere {
-                    (LogDateCollectionRecordsTable.deleted eq true) and
-                        (LogDateCollectionRecordsTable.deletedAt less olderThan)
+                    (collection eq LogDateCollectionKind.MOMENT.storageName) and
+                        (deleted eq true) and (deletedAt less olderThan)
                 }
-
-                LogDateCollectionsPurgeResult(
-                    entryPurged = entryPurged,
-                    journalPurged = journalPurged,
-                    associationPurged = associationPurged,
-                    cutoff = olderThan,
-                )
+                LogDateCollectionsPurgeResult(0, 0, 0, olderThan)
             }
         }
 
@@ -304,36 +286,12 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
     ): LogDateCollectionsPurgeResult =
         withContext(Dispatchers.IO) {
             transaction {
-                val rowsToRemove =
-                    LogDateCollectionRecordsTable
-                        .selectAll()
-                        .where {
-                            (LogDateCollectionRecordsTable.userId eq userId) and
-                                (LogDateCollectionRecordsTable.deleted eq true) and
-                                (LogDateCollectionRecordsTable.deletedAt less olderThan)
-                        }.toList()
-                rowsToRemove.forEach { row ->
-                    LogDateCollectionRecordsTable.deleteWhere {
-                        (LogDateCollectionRecordsTable.userId eq userId) and
-                            (LogDateCollectionRecordsTable.collection eq row[LogDateCollectionRecordsTable.collection]) and
-                            (LogDateCollectionRecordsTable.recordKey eq row[LogDateCollectionRecordsTable.recordKey])
-                    }
+                LogDateCollectionRecordsTable.deleteWhere {
+                    (LogDateCollectionRecordsTable.userId eq userId) and
+                        (collection eq LogDateCollectionKind.MOMENT.storageName) and
+                        (deleted eq true) and (deletedAt less olderThan)
                 }
-                LogDateCollectionsPurgeResult(
-                    entryPurged =
-                        rowsToRemove.count {
-                            it[LogDateCollectionRecordsTable.collection] == LogDateCollectionKind.ENTRY.storageName
-                        },
-                    journalPurged =
-                        rowsToRemove.count {
-                            it[LogDateCollectionRecordsTable.collection] == LogDateCollectionKind.JOURNAL.storageName
-                        },
-                    associationPurged =
-                        rowsToRemove.count {
-                            it[LogDateCollectionRecordsTable.collection] == LogDateCollectionKind.ASSOCIATION.storageName
-                        },
-                    cutoff = olderThan,
-                )
+                LogDateCollectionsPurgeResult(0, 0, 0, olderThan)
             }
         }
 
@@ -395,5 +353,7 @@ private fun ResultRow.toCollectionMetadata(): LogDateCollectionMetadata =
     LogDateCollectionMetadata(
         recordKey = this[LogDateCollectionRecordsTable.recordKey],
         version = this[LogDateCollectionRecordsTable.serverVersion],
-        deletedAt = this[LogDateCollectionRecordsTable.deletedAt],
+        deletedAt =
+            this[LogDateCollectionRecordsTable.deletedAt]
+                ?: this[LogDateCollectionRecordsTable.serverVersion].takeIf { this[LogDateCollectionRecordsTable.deleted] },
     )

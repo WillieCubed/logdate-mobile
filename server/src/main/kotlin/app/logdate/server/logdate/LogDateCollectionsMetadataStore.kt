@@ -1,6 +1,9 @@
 package app.logdate.server.logdate
 
+import app.logdate.server.sync.StaleWriteException
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import studio.hypertext.atproto.identity.AtprotoDid
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -47,6 +50,21 @@ internal interface LogDateCollectionsMetadataStore {
         recordKey: String,
     ): LogDateCollectionMetadata?
 
+    /** Returns the durable deletion fence even after its canonical payload has been cleaned. */
+    suspend fun deletionTimestamp(
+        userId: UUID,
+        collection: LogDateCollectionKind,
+        recordKey: String,
+    ): Long? = tombstone(userId, collection, recordKey)?.deletedAt
+
+    suspend fun requireWritable(
+        userId: UUID,
+        collection: LogDateCollectionKind,
+        recordKey: String,
+    ) {
+        deletionTimestamp(userId, collection, recordKey)?.let { throw StaleWriteException(recordKey, it) }
+    }
+
     suspend fun changes(
         userId: UUID,
         collection: LogDateCollectionKind,
@@ -70,7 +88,7 @@ internal interface LogDateCollectionsMetadataStore {
      * here would let a mid-batch failure leave some records with metadata and the rest without -
      * "phantom" repo records that are present in commit history but invisible to [listLive] and
      * [changes], which read from this store rather than the tree. Atomicity here lets the caller
-     * compensate by deleting the whole repo batch on any failure, keeping the repo and this store
+     * compensate by restoring each prior repo record on failure, keeping the repo and this store
      * in lockstep instead of just bounding how bad the divergence gets.
      *
      * The default is the naive loop, which is correct when nothing fails but gives none of that
@@ -99,7 +117,7 @@ internal interface LogDateCollectionsMetadataStore {
     ): LogDateCollectionsPurgeResult
 
     /**
-     * Purges expired tombstones for every user.
+     * Runs tenant-wide payload retention while preserving lightweight deletion delivery.
      *
      * The scheduled retention job has no user context, so it needs a tenant-wide sweep rather
      * than the per-user purge the maintenance endpoint uses.
@@ -108,6 +126,7 @@ internal interface LogDateCollectionsMetadataStore {
 }
 
 internal class InMemoryLogDateCollectionsMetadataStore : LogDateCollectionsMetadataStore {
+    private val mutationMutex = Mutex()
     private val initializedAt = System.currentTimeMillis()
     private val states = ConcurrentHashMap<UUID, LogDateCollectionsState>()
     private val lastVersions = ConcurrentHashMap<UUID, AtomicLong>()
@@ -153,6 +172,12 @@ internal class InMemoryLogDateCollectionsMetadataStore : LogDateCollectionsMetad
             ?.takeIf(LogDateCollectionRow::deleted)
             ?.toMetadata()
 
+    override suspend fun deletionTimestamp(
+        userId: UUID,
+        collection: LogDateCollectionKind,
+        recordKey: String,
+    ): Long? = metadataForUser(userId)[LogDateCollectionKey(collection, recordKey)]?.takeIf { it.deleted }?.let { it.deletedAt ?: 0L }
+
     override suspend fun changes(
         userId: UUID,
         collection: LogDateCollectionKind,
@@ -180,7 +205,10 @@ internal class InMemoryLogDateCollectionsMetadataStore : LogDateCollectionsMetad
         repoDid: AtprotoDid,
         collection: LogDateCollectionKind,
         recordKey: String,
-    ): LogDateCollectionMetadata = upsertRow(userId = userId, repoDid = repoDid, collection = collection, recordKey = recordKey)
+    ): LogDateCollectionMetadata =
+        mutationMutex.withLock {
+            upsertRow(userId = userId, repoDid = repoDid, collection = collection, recordKey = recordKey)
+        }
 
     override suspend fun upsertBatch(
         userId: UUID,
@@ -188,28 +216,32 @@ internal class InMemoryLogDateCollectionsMetadataStore : LogDateCollectionsMetad
         collection: LogDateCollectionKind,
         recordKeys: List<String>,
     ): List<LogDateCollectionMetadata> {
-        val userMetadata = metadataForUser(userId)
-        val keys = recordKeys.map { LogDateCollectionKey(collection = collection, recordKey = it) }
-        // Snapshot only the rows this batch might touch, and the version state, so a failure
-        // partway through can put back exactly what was there before - no more, no less - rather
-        // than leaving any of this batch's upserts behind as a record with no matching commit
-        // anywhere else.
-        val previousRows = keys.associateWith { userMetadata[it] }
-        val previousState = states[userId]
+        return mutationMutex.withLock {
+            val userMetadata = metadataForUser(userId)
+            val keys = recordKeys.map { LogDateCollectionKey(collection = collection, recordKey = it) }
+            // Snapshot only the rows this batch might touch, and the version state, so a failure
+            // partway through can put back exactly what was there before - no more, no less - rather
+            // than leaving any of this batch's upserts behind as a record with no matching commit
+            // anywhere else.
+            val previousRows = keys.associateWith { userMetadata[it] }
+            val previousState = states[userId]
 
-        return try {
-            recordKeys.map { recordKey -> upsertRow(userId = userId, repoDid = repoDid, collection = collection, recordKey = recordKey) }
-        } catch (failure: Throwable) {
-            keys.forEach { key ->
-                val previousRow = previousRows.getValue(key)
-                if (previousRow == null) {
-                    userMetadata.remove(key)
-                } else {
-                    userMetadata[key] = previousRow
+            return try {
+                recordKeys.map { recordKey ->
+                    upsertRow(userId = userId, repoDid = repoDid, collection = collection, recordKey = recordKey)
                 }
+            } catch (failure: Throwable) {
+                keys.forEach { key ->
+                    val previousRow = previousRows.getValue(key)
+                    if (previousRow == null) {
+                        userMetadata.remove(key)
+                    } else {
+                        userMetadata[key] = previousRow
+                    }
+                }
+                if (previousState == null) states.remove(userId) else states[userId] = previousState
+                throw failure
             }
-            if (previousState == null) states.remove(userId) else states[userId] = previousState
-            throw failure
         }
     }
 
@@ -219,6 +251,9 @@ internal class InMemoryLogDateCollectionsMetadataStore : LogDateCollectionsMetad
         collection: LogDateCollectionKind,
         recordKey: String,
     ): LogDateCollectionMetadata {
+        metadataForUser(userId)[LogDateCollectionKey(collection, recordKey)]
+            ?.takeIf { it.deleted && collection != LogDateCollectionKind.MOMENT }
+            ?.let { throw StaleWriteException(recordKey, it.deletedAt ?: 0L) }
         val version = nextVersion(userId = userId, repoDid = repoDid)
         val row =
             LogDateCollectionRow(
@@ -240,69 +275,49 @@ internal class InMemoryLogDateCollectionsMetadataStore : LogDateCollectionsMetad
         deletedAt: Long,
         allowMissing: Boolean,
     ): LogDateCollectionMetadata? {
-        val key = LogDateCollectionKey(collection = collection, recordKey = recordKey)
-        if (!allowMissing && metadataForUser(userId)[key] == null) {
-            return null
+        return mutationMutex.withLock {
+            val key = LogDateCollectionKey(collection = collection, recordKey = recordKey)
+            val existing = metadataForUser(userId)[key]
+            if (!allowMissing && existing == null) {
+                return null
+            }
+            val version = nextVersion(userId = userId, repoDid = repoDid)
+            val row =
+                LogDateCollectionRow(
+                    collection = collection,
+                    recordKey = recordKey,
+                    version = version,
+                    deleted = true,
+                    deletedAt = maxOf(deletedAt, existing?.deletedAt ?: deletedAt),
+                )
+            metadataForUser(userId)[key] = row
+            return row.toMetadata()
         }
-        val version = nextVersion(userId = userId, repoDid = repoDid)
-        val row =
-            LogDateCollectionRow(
-                collection = collection,
-                recordKey = recordKey,
-                version = version,
-                deleted = true,
-                deletedAt = deletedAt,
-            )
-        metadataForUser(userId)[key] = row
-        return row.toMetadata()
     }
 
+    // Sync fences survive retention; Moments retain their separately defined expiry behavior.
     override suspend fun purgeTombstones(
         userId: UUID,
         olderThan: Long,
-    ): LogDateCollectionsPurgeResult {
-        val rows = metadataForUser(userId)
-        val removed =
-            rows
-                .filterValues { row -> row.deleted && (row.deletedAt ?: Long.MAX_VALUE) < olderThan }
-                .values
-        removed.forEach { row ->
-            rows.remove(LogDateCollectionKey(collection = row.collection, recordKey = row.recordKey))
+    ): LogDateCollectionsPurgeResult =
+        mutationMutex.withLock {
+            purgeMomentTombstones(metadataForUser(userId), olderThan)
+            LogDateCollectionsPurgeResult(0, 0, 0, olderThan)
         }
-        return LogDateCollectionsPurgeResult(
-            entryPurged = removed.count { it.collection == LogDateCollectionKind.ENTRY },
-            journalPurged = removed.count { it.collection == LogDateCollectionKind.JOURNAL },
-            associationPurged = removed.count { it.collection == LogDateCollectionKind.ASSOCIATION },
-            cutoff = olderThan,
-        )
-    }
 
-    override suspend fun purgeAllTombstones(olderThan: Long): LogDateCollectionsPurgeResult {
-        var entry = 0
-        var journal = 0
-        var association = 0
-        metadata.values.forEach { rows ->
-            val removed =
-                rows
-                    .filterValues { row -> row.deleted && (row.deletedAt ?: Long.MAX_VALUE) < olderThan }
-                    .values
-                    .toList()
-            removed.forEach { row ->
-                rows.remove(LogDateCollectionKey(collection = row.collection, recordKey = row.recordKey))
-                when (row.collection) {
-                    LogDateCollectionKind.ENTRY -> entry++
-                    LogDateCollectionKind.JOURNAL -> journal++
-                    LogDateCollectionKind.ASSOCIATION -> association++
-                    else -> Unit
-                }
-            }
+    override suspend fun purgeAllTombstones(olderThan: Long): LogDateCollectionsPurgeResult =
+        mutationMutex.withLock {
+            metadata.values.forEach { purgeMomentTombstones(it, olderThan) }
+            LogDateCollectionsPurgeResult(0, 0, 0, olderThan)
         }
-        return LogDateCollectionsPurgeResult(
-            entryPurged = entry,
-            journalPurged = journal,
-            associationPurged = association,
-            cutoff = olderThan,
-        )
+
+    private fun purgeMomentTombstones(
+        rows: ConcurrentHashMap<LogDateCollectionKey, LogDateCollectionRow>,
+        olderThan: Long,
+    ) {
+        rows.entries.removeIf { (_, row) ->
+            row.collection == LogDateCollectionKind.MOMENT && row.deleted && (row.deletedAt ?: Long.MAX_VALUE) < olderThan
+        }
     }
 
     private fun metadataForUser(userId: UUID): ConcurrentHashMap<LogDateCollectionKey, LogDateCollectionRow> =
@@ -323,8 +338,14 @@ internal class InMemoryLogDateCollectionsMetadataStore : LogDateCollectionsMetad
             }
         states.compute(userId) { _, existing ->
             when {
-                existing == null -> LogDateCollectionsState(repoDid = repoDid, lastVersion = version)
-                existing.repoDid == repoDid -> existing.copy(lastVersion = version)
+                existing == null -> {
+                    LogDateCollectionsState(repoDid = repoDid, lastVersion = version)
+                }
+
+                existing.repoDid == repoDid -> {
+                    existing.copy(lastVersion = version)
+                }
+
                 else -> {
                     Napier.w("Preserving canonical repo DID ${existing.repoDid} for $userId instead of replacing it with $repoDid")
                     existing.copy(lastVersion = version)
@@ -358,6 +379,6 @@ internal data class LogDateCollectionRow(
         LogDateCollectionMetadata(
             recordKey = recordKey,
             version = version,
-            deletedAt = deletedAt,
+            deletedAt = deletedAt ?: version.takeIf { deleted },
         )
 }

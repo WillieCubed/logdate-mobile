@@ -59,6 +59,7 @@ data class LogDateCollectionsStatus(
     val lastTimestamp: Long,
 )
 
+/** Counts payload records scrubbed; lightweight deletion markers are retained for offline clients. */
 data class LogDateCollectionsPurgeResult(
     val entryPurged: Int,
     val journalPurged: Int,
@@ -262,7 +263,7 @@ interface LogDateCollectionsRepository {
 
     /**
      * Writes [entry] only if no live entry holds its ID. A deleted ID answers [ConditionalCreate.Deleted]
-     * when [respectTombstones] is set and is recreated otherwise. This fallback reads, then writes; stores
+     * when [respectTombstones] is set; other writes still obey the repository deletion fence. This fallback reads, then writes; stores
      * that can create atomically override it.
      */
     suspend fun createEntryIfAbsent(

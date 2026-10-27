@@ -9,6 +9,7 @@ import app.logdate.server.logdate.LogDateEntry
 import app.logdate.server.responses.error
 import app.logdate.server.routes.docs.SyncCollectionDocs
 import app.logdate.server.routes.docs.SyncDraftDocs
+import app.logdate.server.sync.StaleWriteException
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.shared.model.sync.ContentChangesResponse
 import app.logdate.shared.model.sync.ContentDeletion
@@ -120,6 +121,9 @@ private fun Route.contentRoutes(
                     call.respond(HttpStatusCode.OK, response)
                 }
                 success = true
+            } catch (_: StaleWriteException) {
+                metrics.recordConflict()
+                call.respond(HttpStatusCode.Conflict, error("DELETION_CONFLICT", "This item was deleted; keep the edit for review"))
             } finally {
                 metrics.recordOperation(METRIC_CONTENT_UPLOAD, System.currentTimeMillis() - start, success)
             }
@@ -209,6 +213,9 @@ private fun Route.contentRoutes(
                     )
                 call.respond(ContentUpdateResponse(contentId, updated.version, updated.lastUpdated))
                 success = true
+            } catch (_: StaleWriteException) {
+                metrics.recordConflict()
+                call.respond(HttpStatusCode.Conflict, error("DELETION_CONFLICT", "This item was deleted; keep the edit for review"))
             } finally {
                 metrics.recordOperation(METRIC_CONTENT_UPDATE, System.currentTimeMillis() - start, success)
             }
@@ -266,6 +273,12 @@ private fun Route.draftRoutes(
                                 encryptedBlocks = req.encryptedBlocks,
                             ),
                     )
+                } catch (_: StaleWriteException) {
+                    call.respond(
+                        HttpStatusCode.Conflict,
+                        error("DELETION_CONFLICT", "This draft was deleted; keep the edit for review"),
+                    )
+                    return@put
                 } catch (_: DraftFormatUpgradeRequiredException) {
                     call.respond(
                         HttpStatusCode.Conflict,

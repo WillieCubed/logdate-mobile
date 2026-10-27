@@ -13,6 +13,7 @@ import app.logdate.server.logdate.LogDateMediaBlobRepository
 import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.responses.error
 import app.logdate.server.routes.docs.SyncStorageDocs
+import app.logdate.server.sync.StaleWriteException
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.shared.model.sync.DeviceId
 import app.logdate.shared.model.sync.MediaMetadataResponse
@@ -168,6 +169,17 @@ internal fun Route.syncMediaRoutes(
                         )
                     }.getOrElse { error ->
                         if (error is CancellationException) throw error
+                        if (error is StaleWriteException) {
+                            if (storagePath != null) {
+                                runCatching { withContext(Dispatchers.IO) { mediaStorage?.deleteBlob(storagePath) } }
+                                    .onFailure { Napier.w("Rejected media cleanup failed") }
+                            }
+                            metrics.recordConflict()
+                            return@post call.respond(
+                                HttpStatusCode.Conflict,
+                                error("DELETION_CONFLICT", "This media was deleted; keep the edit for review"),
+                            )
+                        }
                         // The write may have committed before its acknowledgement failed.
                         // Retain this immutable blob rather than deleting committed media.
                         Napier.e("Media metadata persistence failed")
@@ -197,6 +209,9 @@ internal fun Route.syncMediaRoutes(
                 call.response.headers.append(HttpHeaders.Location, "/api/v1/media/${stored.mediaId}")
                 call.respond(HttpStatusCode.Created, response)
                 success = true
+            } catch (_: StaleWriteException) {
+                metrics.recordConflict()
+                call.respond(HttpStatusCode.Conflict, error("DELETION_CONFLICT", "This item was deleted; keep the edit for review"))
             } finally {
                 metrics.recordOperation(METRIC_MEDIA_UPLOAD, System.currentTimeMillis() - start, success, bytes)
             }
@@ -301,8 +316,8 @@ internal fun Route.syncMediaRoutes(
                             )
                         }
                     }
-                    mediaBlobRepository.deleteMedia(userId, mediaId, System.currentTimeMillis())
                 }
+                mediaBlobRepository.deleteMedia(userId, mediaId, System.currentTimeMillis())
                 call.respond(HttpStatusCode.NoContent)
                 success = true
             } finally {

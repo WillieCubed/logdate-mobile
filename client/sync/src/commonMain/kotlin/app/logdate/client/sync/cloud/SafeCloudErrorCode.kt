@@ -29,6 +29,7 @@ internal val SAFE_CLOUD_ERROR_CODES =
         "CONFLICT",
         "CONTENT_DELETED",
         "CONTENT_EXISTS",
+        "DELETION_CONFLICT",
         "DELETION_FAILED",
         "DELETION_UNAVAILABLE",
         "DEVICE_SESSION_REVOKED",

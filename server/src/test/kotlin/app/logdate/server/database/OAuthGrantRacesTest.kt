@@ -1,10 +1,10 @@
 package app.logdate.server.database
 
+import app.logdate.server.database.support.localTestPostgresDataSource
 import app.logdate.server.database.support.withH2Database
 import app.logdate.server.oauth.OAuthRuntimeStateRepository
 import app.logdate.server.oauth.StoredAuthorizationCode
 import app.logdate.server.oauth.StoredRefreshToken
-import com.zaxxer.hikari.HikariDataSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -14,7 +14,6 @@ import org.jetbrains.exposed.v1.core.like
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.transactions.TransactionManager
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
-import org.junit.Assume.assumeTrue
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -196,12 +195,10 @@ class OAuthGrantRacesTest {
             runBlocking { block() }
         }
 
-    /** Runs on the PostgreSQL CI declares in `DATABASE_URL`, after Flyway applies every migration. */
+    /** Runs on the safe local PostgreSQL test fixture, after Flyway applies every migration. */
     private fun withPostgres(block: suspend kotlinx.coroutines.CoroutineScope.(OAuthRuntimeStateRepository) -> Unit) {
-        val url = System.getenv("DATABASE_URL")
-        assumeTrue("DATABASE_URL is not set", !url.isNullOrBlank())
         val previous = TransactionManager.defaultDatabase
-        val source = DatabaseConfig.createDataSource() as HikariDataSource
+        val source = localTestPostgresDataSource()
         try {
             TransactionManager.defaultDatabase = DatabaseConfig.initializeDatabase(source, autoMigrate = true)
             runBlocking { block(PostgreSQLOAuthRuntimeStateRepository()) }

@@ -6,10 +6,10 @@ The Wear companion requires `deviceLinkingV1`, `conditionalCreateV1`, and `momen
 
 The same disposable passkey-account journey passed against:
 
-| Environment | Origin | Observed `/health` release |
-| --- | --- | --- |
-| Staging | `https://cloud-staging.logdate.app` | `logdate-server@bdf84d5dc1191e20cab1264e522210c1bbd33f4a` |
-| Production backend used by internal Play builds | `https://cloud.logdate.app` | `logdate-server@3a4288bf7ab10b25a483c5946655c4f3d562ccec` |
+| Environment                                     | Origin                              | Observed `/health` release                                |
+| ----------------------------------------------- | ----------------------------------- | --------------------------------------------------------- |
+| Staging                                         | `https://cloud-staging.logdate.app` | `logdate-server@bdf84d5dc1191e20cab1264e522210c1bbd33f4a` |
+| Production backend used by internal Play builds | `https://cloud.logdate.app`         | `logdate-server@3a4288bf7ab10b25a483c5946655c4f3d562ccec` |
 
 Each account was created and signed back in using the real WebAuthn verifier, then deleted with HTTP 204 after the journey. No retained user account or user content was used.
 
@@ -21,7 +21,13 @@ The journey proved:
 - Phone moment deletion produces a tombstone; a strict watch retry returns 410.
 - Removing the watch denies its access and refresh tokens (401), while the phone retains the uploaded capture.
 
-Strict Wear create uses `?ifAbsent=true`. `If-None-Match: *` alone intentionally allows recreation of deleted records for existing Mac clients; do not use that compatibility contract to test Wear deletion protection.
+Strict Wear create uses `?ifAbsent=true` and returns HTTP 410 for a deleted record. The hosted observations above used an older compatibility contract in which `If-None-Match: *` alone allowed same-ID recreation for Mac clients.
+
+## Deletion recovery compatibility
+
+Deletion-safe server candidates also reject ordinary same-ID writes to tombstoned entries, journals, associations and media with HTTP 409 and `DELETION_CONFLICT`. Saving a retained edit requires fresh identifiers and encryption contexts; the original tombstones remain intact.
+
+The existing native Mac “Keep My Edit” path still retries deleted entries and journals under their original IDs. It must adopt fresh-copy recovery before these server changes are promoted to the shared production backend. Android internal publication and local client/server contract tests do not establish native Mac recovery acceptance.
 
 These hosted observations establish the existing deployed protocol behavior. They **do not prove deployment of the newly added atomic repo/index transaction** or paired phone/watch UI and transport acceptance.
 

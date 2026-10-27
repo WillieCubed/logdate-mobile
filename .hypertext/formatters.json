@@ -312,6 +312,13 @@
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
     },
     {
+      "include": [
+        "client/feature/core/src/desktopTest/resources/recovery/photo.jpg"
+      ],
+      "kind": "binary",
+      "reason": "Binary media, font, signing, or tool archive; no text formatter applies."
+    },
+    {
       "include": ["app/android-main/src/debug/assets/sample_note_photo.jpg"],
       "kind": "binary",
       "reason": "Binary media, font, signing, or tool archive; no text formatter applies."

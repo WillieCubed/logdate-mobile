@@ -1,9 +1,9 @@
 package app.logdate.server.database
 
+import app.logdate.server.database.support.localTestPostgresDataSource
 import app.logdate.server.database.support.withH2Database
 import app.logdate.server.oauth.MutableClock
 import app.logdate.server.oauth.replayKeyHash
-import com.zaxxer.hikari.HikariDataSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -13,7 +13,6 @@ import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.TransactionManager
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
-import org.junit.Assume.assumeTrue
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -65,15 +64,13 @@ class PostgreSQLOAuthReplayStoreTest {
         }
 
     /**
-     * Runs against the PostgreSQL that CI declares in `DATABASE_URL`, after Flyway applies every
-     * migration, so the real table and the real insert-if-absent are what is checked.
+     * Runs against the safe local PostgreSQL test fixture, after Flyway applies every migration,
+     * so the real table and the real insert-if-absent are what is checked.
      */
     @Test
     fun `instances racing on PostgreSQL accept a value exactly once`() {
-        val url = System.getenv("DATABASE_URL")
-        assumeTrue("DATABASE_URL is not set", !url.isNullOrBlank())
         val previous = TransactionManager.defaultDatabase
-        val source = DatabaseConfig.createDataSource() as HikariDataSource
+        val source = localTestPostgresDataSource()
         val key = "dpop:race:${UUID.randomUUID()}"
         try {
             TransactionManager.defaultDatabase = DatabaseConfig.initializeDatabase(source, autoMigrate = true)

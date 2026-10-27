@@ -7,11 +7,13 @@ import app.logdate.server.auth.AccountRepository
 import app.logdate.server.database.toKotlinUuid
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.sync.StaleWriteException
 import io.github.aakira.napier.Napier
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.repo.DefaultRepoEngine
 import studio.hypertext.atproto.repo.RepoBlockStore
 import studio.hypertext.atproto.repo.RepoRecordId
+import studio.hypertext.atproto.repo.RepoWriteResult
 import studio.hypertext.atproto.syntax.RecordKey
 import java.util.UUID
 import kotlin.uuid.ExperimentalUuidApi
@@ -55,6 +57,7 @@ internal class RepoBackedLogDateCollectionsRepository(
         entry: LogDateEntry,
     ): LogDateEntry =
         transaction.write {
+            metadataStore.requireWritable(userId, LogDateCollectionKind.ENTRY, entry.id)
             val repoDid = canonicalRepoDid(userId)
             val preserved =
                 entry.copy(
@@ -64,14 +67,9 @@ internal class RepoBackedLogDateCollectionsRepository(
                                 it.type == entry.type && it.mediaUri == entry.mediaUri && it.durationMs == entry.durationMs
                             }?.transcript,
                 )
-            repoEngine.putRecord(entryRecordId(repoDid, entry.id), preserved.toRepoJson()).getOrThrow()
-            val metadata =
-                metadataStore.upsert(
-                    userId = userId,
-                    repoDid = repoDid,
-                    collection = LogDateCollectionKind.ENTRY,
-                    recordKey = entry.id,
-                )
+            val recordId = entryRecordId(repoDid, entry.id)
+            val written = repoEngine.putRecord(recordId, preserved.toRepoJson()).getOrThrow()
+            val metadata = indexWrittenRecord(userId, repoDid, LogDateCollectionKind.ENTRY, recordId, written)
             return@write preserved.copy(version = metadata.version, lastUpdated = System.currentTimeMillis())
         }
 
@@ -79,6 +77,41 @@ internal class RepoBackedLogDateCollectionsRepository(
         userId: UUID,
         id: String,
     ): Boolean = metadataStore.metadata(userId, LogDateCollectionKind.ENTRY, id) != null
+
+    internal suspend fun indexWrittenRecord(
+        userId: UUID,
+        repoDid: AtprotoDid,
+        collection: LogDateCollectionKind,
+        recordId: RepoRecordId,
+        written: RepoWriteResult,
+    ): LogDateCollectionMetadata =
+        try {
+            metadataStore.upsert(userId, repoDid, collection, recordId.recordKey.toString())
+        } catch (deleted: StaleWriteException) {
+            // Remove only this rejected write; a later canonical write must never be overwritten.
+            runCatching { repoEngine.deleteRecord(recordId, swapRecord = written.cid).getOrThrow() }
+                .onFailure { Napier.e("Could not remove a canonical write rejected by a deletion fence", it) }
+            throw deleted
+        }
+
+    internal suspend fun deleteCanonicalRecord(
+        userId: UUID,
+        repoDid: AtprotoDid,
+        collection: LogDateCollectionKind,
+        recordId: RepoRecordId,
+        deletedAt: Long,
+    ) {
+        // Publish the fence first so every server rejects writes while canonical cleanup runs.
+        metadataStore.delete(
+            userId = userId,
+            repoDid = repoDid,
+            collection = collection,
+            recordKey = recordId.recordKey.toString(),
+            deletedAt = deletedAt,
+            allowMissing = true,
+        )
+        transaction.write { repoEngine.deleteRecord(recordId).getOrThrow() }
+    }
 
     override suspend fun journalExists(
         userId: UUID,
@@ -179,23 +212,10 @@ internal class RepoBackedLogDateCollectionsRepository(
         userId: UUID,
         id: String,
         deletedAt: Long,
-    ): Unit =
-        transaction.write {
-            val existing = metadataStore.metadata(userId, LogDateCollectionKind.ENTRY, id) ?: return@write
-            val repoDid = canonicalRepoDid(userId)
-            val deleted = repoEngine.deleteRecord(entryRecordId(repoDid, id)).getOrThrow()
-            if (!deleted) {
-                Napier.w("Expected canonical repo entry $id for user $userId before tombstoning it")
-            }
-            metadataStore.delete(
-                userId = userId,
-                repoDid = repoDid,
-                collection = LogDateCollectionKind.ENTRY,
-                recordKey = existing.recordKey,
-                deletedAt = deletedAt,
-            )
-            Unit
-        }
+    ) {
+        val repoDid = canonicalRepoDid(userId)
+        deleteCanonicalRecord(userId, repoDid, LogDateCollectionKind.ENTRY, entryRecordId(repoDid, id), deletedAt)
+    }
 
     override suspend fun entryChanges(
         userId: UUID,
@@ -243,15 +263,11 @@ internal class RepoBackedLogDateCollectionsRepository(
         journal: LogDateJournal,
     ): LogDateJournal =
         transaction.write {
+            metadataStore.requireWritable(userId, LogDateCollectionKind.JOURNAL, journal.id)
             val repoDid = canonicalRepoDid(userId)
-            repoEngine.putRecord(journalRecordId(repoDid, journal.id), journal.toRepoJson()).getOrThrow()
-            val metadata =
-                metadataStore.upsert(
-                    userId = userId,
-                    repoDid = repoDid,
-                    collection = LogDateCollectionKind.JOURNAL,
-                    recordKey = journal.id,
-                )
+            val recordId = journalRecordId(repoDid, journal.id)
+            val written = repoEngine.putRecord(recordId, journal.toRepoJson()).getOrThrow()
+            val metadata = indexWrittenRecord(userId, repoDid, LogDateCollectionKind.JOURNAL, recordId, written)
             return@write journal.copy(version = metadata.version, lastUpdated = System.currentTimeMillis())
         }
 
@@ -277,23 +293,10 @@ internal class RepoBackedLogDateCollectionsRepository(
         userId: UUID,
         id: String,
         deletedAt: Long,
-    ): Unit =
-        transaction.write {
-            val existing = metadataStore.metadata(userId, LogDateCollectionKind.JOURNAL, id) ?: return@write
-            val repoDid = canonicalRepoDid(userId)
-            val deleted = repoEngine.deleteRecord(journalRecordId(repoDid, id)).getOrThrow()
-            if (!deleted) {
-                Napier.w("Expected canonical repo journal $id for user $userId before tombstoning it")
-            }
-            metadataStore.delete(
-                userId = userId,
-                repoDid = repoDid,
-                collection = LogDateCollectionKind.JOURNAL,
-                recordKey = existing.recordKey,
-                deletedAt = deletedAt,
-            )
-            Unit
-        }
+    ) {
+        val repoDid = canonicalRepoDid(userId)
+        deleteCanonicalRecord(userId, repoDid, LogDateCollectionKind.JOURNAL, journalRecordId(repoDid, id), deletedAt)
+    }
 
     override suspend fun recordJournalMergeDeletion(
         userId: UUID,
@@ -356,7 +359,7 @@ internal class RepoBackedLogDateCollectionsRepository(
         userId: UUID,
         associations: List<LogDateAssociationRef>,
         deletedAt: Long,
-    ) = transaction.write { repoDeleteAssociations(userId, associations, deletedAt) }
+    ) = repoDeleteAssociations(userId, associations, deletedAt)
 
     override suspend fun associationChanges(
         userId: UUID,
@@ -378,7 +381,7 @@ internal class RepoBackedLogDateCollectionsRepository(
         userId: UUID,
         id: String,
         deletedAt: Long,
-    ) = transaction.write { repoDeleteDraft(userId, id, deletedAt) }
+    ) = repoDeleteDraft(userId, id, deletedAt)
 
     override suspend fun draftChanges(
         userId: UUID,

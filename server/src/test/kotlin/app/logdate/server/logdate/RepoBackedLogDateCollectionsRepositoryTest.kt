@@ -177,7 +177,7 @@ class RepoBackedLogDateCollectionsRepositoryTest {
                 listOf(LogDateEntryDeletion(id = "entry-1", deletedAt = deletedAt, serverVersion = deleted.lastTimestamp)),
                 deleted.deletions,
             )
-            assertEquals(1, purged.entryPurged)
+            assertEquals(0, purged.entryPurged)
         }
 
     @Test
@@ -296,7 +296,7 @@ class RepoBackedLogDateCollectionsRepositoryTest {
         }
 
     @Test
-    fun `tenant-wide purge removes expired tombstones for every user`() =
+    fun `tenant-wide cleanup retains deletion delivery for long-offline clients`() =
         runTest {
             val accountRepository = InMemoryAccountRepository()
             val repository =
@@ -319,11 +319,11 @@ class RepoBackedLogDateCollectionsRepositoryTest {
             // The scheduled retention job runs without a user, so it must reach both tenants.
             val purged = repository.purgeTombstones(olderThan = 2L)
 
-            assertEquals(2, purged.entryPurged)
+            assertEquals(0, purged.entryPurged)
             listOf(first, second).forEach { userId ->
                 assertTrue(
-                    repository.entryChanges(userId, since = 0, limit = 50).deletions.isEmpty(),
-                    "expected tombstones to be purged for $userId",
+                    repository.entryChanges(userId, since = 0, limit = 50).deletions.any { it.id == "doomed-$userId" },
+                    "Long-offline clients still need the tombstone for $userId",
                 )
                 assertNotNull(repository.getEntry(userId, "kept-$userId"))
             }

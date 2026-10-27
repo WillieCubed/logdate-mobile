@@ -8,6 +8,7 @@ import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.sync.InMemorySyncRepository
+import app.logdate.server.sync.StaleWriteException
 import app.logdate.shared.model.sync.DeviceId
 import kotlinx.coroutines.test.runTest
 import studio.hypertext.atproto.identity.AtprotoDid
@@ -15,6 +16,7 @@ import studio.hypertext.atproto.repo.InMemoryRepoBlockStore
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -87,16 +89,16 @@ class ConditionalCreateProbeTest {
         }
 
     @Test
-    fun `a create that does not respect tombstones may recreate a deleted entry`() =
+    fun `a legacy create cannot recreate a deleted entry`() =
         runTest {
             bothStores { store ->
                 store.repository.createEntryIfAbsent(store.userId, entry("e3", "first"), respectTombstones = false).createdRecord()
                 store.repository.deleteEntry(store.userId, "e3", deletedAt = 43L)
 
-                val recreated = store.repository.createEntryIfAbsent(store.userId, entry("e3", "again"), respectTombstones = false)
-
-                assertEquals("again", recreated.createdRecord().content)
-                assertEquals("again", store.repository.getEntry(store.userId, "e3")?.content)
+                assertFailsWith<StaleWriteException> {
+                    store.repository.createEntryIfAbsent(store.userId, entry("e3", "again"), respectTombstones = false)
+                }
+                assertIs<LogDateRecordState.Deleted>(store.repository.entryState(store.userId, "e3"))
             }
         }
 

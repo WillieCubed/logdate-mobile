@@ -21,6 +21,7 @@ import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -321,7 +322,8 @@ class MacTextClientServerE2ETest {
                             """{"associations":[{"journalId":"$journalID","contentId":"$ENTRY_ID","createdAt":${now + 1},"deviceId":"mac"}]}""",
                         )
                     }
-                assertEquals(HttpStatusCode.OK, restoredAssociation.status)
+                assertEquals(HttpStatusCode.Conflict, restoredAssociation.status)
+                assertTrue(restoredAssociation.bodyAsText().contains("DELETION_CONFLICT"))
 
                 val journals = DefaultCloudJournalDataSource(apiClient, androidCipher).getJournalChanges(token, start).getOrThrow()
                 assertEquals("Everyday", journals.changes.single { it.id.toString() == journalID }.title)
@@ -382,7 +384,7 @@ class MacTextClientServerE2ETest {
                 assertEquals("", clearedEntry.content)
 
                 val links = DefaultCloudAssociationDataSource(apiClient).getAssociationChanges(token, start).getOrThrow()
-                assertTrue(links.additions.any { it.journalId.toString() == journalID && it.contentId.toString() == ENTRY_ID })
+                assertTrue(links.deletions.any { it.journalId.toString() == journalID && it.contentId.toString() == ENTRY_ID })
 
                 val deletion =
                     httpClient.delete("$baseUrl/contents/$ENTRY_ID") {
@@ -390,8 +392,7 @@ class MacTextClientServerE2ETest {
                     }
                 assertEquals(HttpStatusCode.NoContent, deletion.status)
 
-                // Choosing "Keep My Edit" after a deletion resets the Mac's local version to zero.
-                // It must be able to recreate the same content ID and restore its journal link.
+                // An older Mac's same-ID retry cannot restore deleted content or relationships.
                 val restoredText = androidCipher.encryptString("sync:note:$ENTRY_ID:text", "Kept on my Mac")
                 val restoration =
                     httpClient.put("$baseUrl/contents/$ENTRY_ID") {
@@ -405,23 +406,43 @@ class MacTextClientServerE2ETest {
                             """.trimIndent(),
                         )
                     }
-                assertEquals(HttpStatusCode.Created, restoration.status)
+                assertEquals(HttpStatusCode.Conflict, restoration.status)
+                assertTrue(restoration.bodyAsText().contains("DELETION_CONFLICT"))
+
+                val recoveredID = Uuid.random().toString()
+                val recoveredText = androidCipher.encryptString("sync:note:$recoveredID:text", "Kept on my Mac")
+                val recoveredCopy =
+                    httpClient.put("$baseUrl/contents/$recoveredID") {
+                        header(HttpHeaders.Authorization, "Bearer $token")
+                        header(HttpHeaders.IfNoneMatch, "*")
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                            """
+                            {"id":"$recoveredID","type":"TEXT","content":${Json.encodeToString(recoveredText)},
+                            "mediaUri":null,"createdAt":$now,"lastUpdated":${now + 3},"deviceId":"mac"}
+                            """.trimIndent(),
+                        )
+                    }
+                assertEquals(HttpStatusCode.Created, recoveredCopy.status)
                 val restoredLink =
                     httpClient.post("$baseUrl/associations") {
                         header(HttpHeaders.Authorization, "Bearer $token")
                         contentType(ContentType.Application.Json)
                         setBody(
-                            """{"associations":[{"journalId":"$journalID","contentId":"$ENTRY_ID","createdAt":${now + 3},"deviceId":"mac"}]}""",
+                            """{"associations":[{"journalId":"$journalID","contentId":"$recoveredID","createdAt":${now + 3},"deviceId":"mac"}]}""",
                         )
                     }
                 assertEquals(HttpStatusCode.OK, restoredLink.status)
 
                 val restoredChanges =
                     DefaultCloudContentDataSource(apiClient, androidCipher).getContentChanges(token, start).getOrThrow()
-                val restoredEntry = restoredChanges.changes.single { it.uid.toString() == ENTRY_ID } as JournalNote.Text
+                val restoredEntry = restoredChanges.changes.single { it.uid.toString() == recoveredID } as JournalNote.Text
+                assertTrue(restoredChanges.changes.none { it.uid.toString() == ENTRY_ID })
+                assertTrue(restoredChanges.deletions.any { it.toString() == ENTRY_ID })
                 assertEquals("Kept on my Mac", restoredEntry.content)
                 val restoredLinks = DefaultCloudAssociationDataSource(apiClient).getAssociationChanges(token, start).getOrThrow()
-                assertTrue(restoredLinks.additions.any { it.journalId.toString() == journalID && it.contentId.toString() == ENTRY_ID })
+                assertTrue(restoredLinks.additions.any { it.journalId.toString() == journalID && it.contentId.toString() == recoveredID })
+                assertTrue(restoredLinks.deletions.any { it.journalId.toString() == journalID && it.contentId.toString() == ENTRY_ID })
             }
         }
 }

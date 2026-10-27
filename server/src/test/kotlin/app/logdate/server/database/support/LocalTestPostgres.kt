@@ -24,11 +24,19 @@ private const val CONNECT_TIMEOUT_MILLIS = 1_000
  * database can't pass by skipping every test. It also fails for a database that isn't on this
  * machine, so a test can never write to a shared or production server.
  *
+ * An explicitly disposable LOGDATE_DIAGNOSTIC_TEST_DATABASE_URL fixture may be used instead,
+ * leaving the application DATABASE_URL unset. It is accepted only on loopback.
+ *
  * Other tests use the same database at the same time, so a test must not assume it's empty and must
  * delete the rows it adds. A test that can't do that runs in its own database with [withOwnPostgresDatabase].
  */
 fun localTestPostgresUrl(): String {
-    val url = System.getenv("DATABASE_URL")?.trim()?.takeIf { it.isNotEmpty() }
+    val url =
+        configuredLocalTestPostgresUrl(
+            System.getenv("DATABASE_URL"),
+            System.getenv("LOGDATE_DIAGNOSTIC_TEST_DATABASE_URL"),
+            System.getenv("LOGDATE_DIAGNOSTIC_TEST_DISPOSABLE") == "true",
+        )
     check(url != null || !runsInCi()) {
         "CI runs the PostgreSQL tests, so it must set DATABASE_URL; a job without it would skip them and still pass"
     }
@@ -106,4 +114,18 @@ private fun withDatabaseName(
     val uri = postgresUri(url)
     val renamed = URI(uri.scheme, uri.userInfo, uri.host, uri.port, "/$name", uri.query, uri.fragment).toString()
     return if (url.startsWith("jdbc:")) "jdbc:$renamed" else renamed
+}
+
+internal fun configuredLocalTestPostgresUrl(
+    applicationUrl: String?,
+    disposableUrl: String?,
+    allowDisposable: Boolean,
+): String? {
+    val dedicated = disposableUrl?.trim()?.takeIf { it.isNotEmpty() }
+    if (dedicated != null) {
+        require(allowDisposable) { "Dedicated PostgreSQL tests require explicit disposable fixture permission" }
+        require(postgresUri(dedicated).host in LOOPBACK_HOSTS) { "Disposable PostgreSQL tests require a loopback host" }
+        return dedicated
+    }
+    return applicationUrl?.trim()?.takeIf { it.isNotEmpty() }
 }

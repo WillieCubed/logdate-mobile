@@ -1,5 +1,7 @@
 package app.logdate.server.database
 
+import app.logdate.server.database.support.localTestPostgresDataSource
+import app.logdate.server.database.support.localTestPostgresUrl
 import com.zaxxer.hikari.HikariDataSource
 import org.flywaydb.core.Flyway
 import org.junit.Assume.assumeTrue
@@ -10,22 +12,20 @@ import kotlin.test.assertEquals
 /**
  * Adding storage modes leaves every account that already exists in `legacy`, against a real
  * PostgreSQL. It runs in its own schema, migrated to the version before storage modes, seeded, and
- * then migrated to the latest version. It uses the database CI declares in `DATABASE_URL`,
- * `DATABASE_USER` and `DATABASE_PASSWORD`, and skips without one or for a database that isn't on
- * this machine.
+ * then migrated to the latest version. It uses the safe local PostgreSQL test fixture, including
+ * an explicitly disposable diagnostic database, and never migrates a database on another machine.
  */
 class AccountStorageModeMigrationPostgresTest {
     @Test
     fun `accounts that exist before storage modes stay in legacy`() {
-        val url = System.getenv("DATABASE_URL")
-        assumeTrue("DATABASE_URL isn't set, so there is no PostgreSQL to migrate", !url.isNullOrBlank())
-        val host = java.net.URI(requireNotNull(url).removePrefix("jdbc:")).host
+        val url = localTestPostgresUrl()
+        val host = java.net.URI(url.removePrefix("jdbc:")).host
         assumeTrue(
             "DATABASE_URL points at $host; this test only migrates a database on this machine",
             host in setOf("localhost", "127.0.0.1"),
         )
         val schema = "storage_mode_${UUID.randomUUID().toString().replace("-", "")}"
-        val source = DatabaseConfig.createDataSource(databaseUrl = url) as HikariDataSource
+        val source = localTestPostgresDataSource(url)
         try {
             migrate(source, schema, target = versionBeforeStorageModes())
             val existing = UUID.randomUUID()

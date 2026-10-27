@@ -96,7 +96,7 @@ class SyncConditionalCreateRoutesTest {
         }
 
     @Test
-    fun `If-None-Match still recreates deleted content for the Mac app`() =
+    fun `If-None-Match rejects deleted content with a typed conflict`() =
         bothHarnesses { auth ->
             assertEquals(HttpStatusCode.Created, client.putContent(auth, "mac-1", "first", ifNoneMatch = true).status)
             val duplicate = client.putContent(auth, "mac-1", "again", ifNoneMatch = true)
@@ -105,7 +105,17 @@ class SyncConditionalCreateRoutesTest {
 
             assertEquals(HttpStatusCode.NoContent, client.deleteAs(auth, "/api/v1/contents/mac-1").status)
 
-            assertEquals(HttpStatusCode.Created, client.putContent(auth, "mac-1", "recreated", ifNoneMatch = true).status)
+            val rejected = client.putContent(auth, "mac-1", "recreated", ifNoneMatch = true)
+            assertEquals(HttpStatusCode.Conflict, rejected.status)
+            assertEquals(
+                "DELETION_CONFLICT",
+                rejected
+                    .json()
+                    .getValue("code")
+                    .jsonPrimitive
+                    .content,
+            )
+            assertEquals(HttpStatusCode.NotFound, client.getAs(auth, "/api/v1/contents/mac-1").status)
         }
 
     @Test

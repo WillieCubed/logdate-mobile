@@ -18,12 +18,28 @@ class TestDatabaseEnvironmentPlugin : Plugin<Project> {
     override fun apply(project: Project) {
         val url = project.providers.environmentVariable("DATABASE_URL").orElse("")
         val user = project.providers.environmentVariable("DATABASE_USER").orElse("")
-        val hasPassword = project.providers.environmentVariable("DATABASE_PASSWORD").map { it.isNotEmpty() }.orElse(false)
-        val fingerprint = url.zip(user) { u, name -> u to name }.zip(hasPassword) { (u, name), password ->
-            databaseFingerprint(u, name, password)
-        }
+        val hasPassword =
+            project.providers
+                .environmentVariable("DATABASE_PASSWORD")
+                .map { it.isNotEmpty() }
+                .orElse(false)
+        val fingerprint =
+            url.zip(user) { u, name -> u to name }.zip(hasPassword) { (u, name), password ->
+                databaseFingerprint(u, name, password)
+            }
         project.tasks.withType(Test::class.java).configureEach {
             inputs.property("databaseEnvironment", fingerprint)
+            inputs.property(
+                "disposableDatabaseEnvironment",
+                project.providers
+                    .environmentVariable("LOGDATE_DIAGNOSTIC_TEST_DATABASE_URL")
+                    .orElse("")
+                    .map { databaseFingerprint(it, "", false) },
+            )
+            inputs.property(
+                "disposableDatabaseAllowed",
+                project.providers.environmentVariable("LOGDATE_DIAGNOSTIC_TEST_DISPOSABLE").orElse(""),
+            )
         }
     }
 }
