@@ -142,6 +142,25 @@ commit messages.
 Keep modifications focused on the task. Don't add comments that restate code. Don't refactor
 surrounding code unless asked. Don't over-engineer.
 
+### Background automation and foreground focus
+
+The Studio company standard requires routine agent, build, test, and rendering work to
+preserve the operator's active app, keyboard focus, and Spaces/desktops. Use background
+commands, APIs, files, and supported offscreen/headless modes. Never open or activate an
+app, browser, visible terminal, or emulator window as an implicit build/test step.
+
+LogDate's shared root Gradle configuration sets `java.awt.headless=true` on the
+offscreen `desktopTest` JVMs. Preserve that worker setting; a flag on the Gradle daemon
+alone is insufficient. Tests that genuinely require a display need a separate interactive
+task, explicit opt-in for the run, and authorization for visible interaction. Do not
+silently fall back to headed execution or claim headless renders prove native-window
+coverage. Run Android emulators without a window where supported and retain all device
+and app-data protections below. Report unrun interactive checks as unverified.
+
+For the shared policy and configuration-only Gradle check, see Hypertext Studio
+`product-standards/docs/repository-standards.md`, **Background automation**, and
+`product-standards/docs/product-standards.md`, **Background automation and foreground focus**.
+
 ### Android Device Safety
 
 Physical Android devices are forbidden test and deployment targets for agent-driven work in this

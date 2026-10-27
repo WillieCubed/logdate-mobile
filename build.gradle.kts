@@ -188,6 +188,15 @@ subprojects {
     }
 }
 
+// Compose desktop tests render offscreen; do not register a foreground Java app on macOS.
+subprojects {
+    tasks.withType<Test>().configureEach {
+        if (name == "desktopTest") {
+            systemProperty("java.awt.headless", "true")
+        }
+    }
+}
+
 val atprotoModulePaths =
     listOf(
         ":shared:atproto-crypto",
