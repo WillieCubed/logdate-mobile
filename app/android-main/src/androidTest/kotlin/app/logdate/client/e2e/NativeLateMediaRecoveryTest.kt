@@ -30,6 +30,10 @@ import app.logdate.client.device.restore.NativeJournalRestoreAuthority
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.restore.retainedJournalWorkspace
 import app.logdate.client.device.restore.writeNativeJournalSourceReceipt
+import app.logdate.client.domain.export.archive.ArchiveExportOptions
+import app.logdate.client.domain.export.archive.ArchiveExportProgress
+import app.logdate.client.domain.export.archive.ArchiveOmissionReason
+import app.logdate.client.domain.export.archive.ExportArchiveUseCase
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
 import app.logdate.client.media.storage.UnavailableMediaReferences
@@ -37,6 +41,7 @@ import app.logdate.client.media.storage.androidMediaFileResolver
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.feature.core.export.ZipStreamArchiveContainer
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.CoroutineScope
@@ -45,6 +50,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withTimeout
@@ -55,9 +61,12 @@ import org.junit.runner.RunWith
 import org.koin.core.context.GlobalContext
 import java.io.File
 import java.io.FileOutputStream
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
 import kotlin.io.encoding.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -133,6 +142,42 @@ class NativeLateMediaRecoveryTest {
                 assertEquals(expected, notes.getNoteById(expected.uid), "A second reconciliation must preserve the existing note")
                 assertEquals(1, notes.allNotesObserved.first().count { it.uid == expected.uid })
                 assertTrue(koin.get<JournalRepository>().getJournalById(Uuid.parse(state.getString("journalId"))) != null)
+            }
+        }
+
+    @Test
+    fun consumedOriginalExportsWithoutUnreadableOmissions() =
+        runBlocking {
+            requireStage("export")
+            RetainedJournalMergeFixtureSupport.requireAcceptanceDevice(context)
+            val state = JSONObject(stateFile.readText())
+            ActivityScenario.launch(MainActivity::class.java).use {
+                awaitReady()
+                awaitRecovered(state)
+                val archive = File.createTempFile("native-retained-export-", ".zip", context.cacheDir)
+                try {
+                    ZipOutputStream(archive.outputStream()).use { zip ->
+                        val completed =
+                            assertIs<ArchiveExportProgress.Completed>(
+                                koin.get<ExportArchiveUseCase>().export(ArchiveExportOptions(), ZipStreamArchiveContainer(zip)).last(),
+                            )
+                        assertFalse(
+                            completed.summary.scope.omitted
+                                .any { it.reason == ArchiveOmissionReason.UNREADABLE },
+                        )
+                    }
+                    ZipFile(archive).use { zip ->
+                        assertTrue(
+                            zip.entries().asSequence().filter { !it.isDirectory && it.name.startsWith("media/") }.any { entry ->
+                                state.getString("sha256") ==
+                                    RetainedJournalMergeFixtureSupport.sha256(zip.getInputStream(entry).use { input -> input.readBytes() })
+                            },
+                            "The actual export must retain the recovered original bytes",
+                        )
+                    }
+                } finally {
+                    check(archive.delete())
+                }
             }
         }
 
