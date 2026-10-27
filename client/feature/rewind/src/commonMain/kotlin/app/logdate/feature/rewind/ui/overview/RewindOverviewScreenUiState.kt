@@ -112,6 +112,8 @@ sealed interface RewindOverviewScreenUiState {
     data class Ready(
         val pastRewinds: List<RewindHistoryUiState>,
         val mostRecentRewind: RewindPreviewUiState,
+        val isRefreshing: Boolean = false,
+        val refreshFailed: Boolean = false,
     ) : RewindOverviewScreenUiState
 }
 

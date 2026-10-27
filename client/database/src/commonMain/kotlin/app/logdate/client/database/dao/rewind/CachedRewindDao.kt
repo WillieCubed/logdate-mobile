@@ -256,6 +256,18 @@ interface CachedRewindDao {
         }
     }
 
+    /** Publishes a newly generated story only when all its panels have been stored. */
+    @Transaction
+    suspend fun insertRewindWithContent(
+        rewind: RewindEntity,
+        textContent: List<RewindTextContentEntity>,
+        imageContent: List<RewindImageContentEntity>,
+        videoContent: List<RewindVideoContentEntity>,
+    ) {
+        insertRewind(rewind)
+        insertRewindContent(textContent, imageContent, videoContent)
+    }
+
     /** Updates panels without deleting the parent row or its attached replies. */
     @Transaction
     suspend fun replaceRewind(

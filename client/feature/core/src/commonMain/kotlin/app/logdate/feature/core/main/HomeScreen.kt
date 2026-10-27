@@ -295,7 +295,11 @@ fun HomeScreen(
                         }
 
                         HomeRouteDestination.Rewind -> {
-                            RewindOverviewScreen(onOpenRewind, modifier = Modifier.fillMaxSize())
+                            RewindOverviewScreen(
+                                onOpenRewind,
+                                modifier = Modifier.fillMaxSize(),
+                                onCreateMemory = onNewEntry,
+                            )
                         }
                     }
                 }
@@ -483,6 +487,7 @@ fun HomeScreen(
                             HomeRouteDestination.Rewind -> {
                                 RewindOverviewScreen(
                                     onOpenRewind = onOpenRewind,
+                                    onCreateMemory = onNewEntry,
                                     modifier = Modifier.applyScreenStyles(),
                                 )
                             }

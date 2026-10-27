@@ -82,12 +82,14 @@ import app.logdate.client.domain.rewind.EntitlementRewindAIAvailability
 import app.logdate.client.domain.rewind.GenerateAnnualRewindUseCase
 import app.logdate.client.domain.rewind.GenerateBasicRewindUseCase
 import app.logdate.client.domain.rewind.GenerateRewindTitleUseCase
+import app.logdate.client.domain.rewind.GetCurrentWeekRewindUseCase
 import app.logdate.client.domain.rewind.GetPastRewindsUseCase
 import app.logdate.client.domain.rewind.GetRewindUseCase
 import app.logdate.client.domain.rewind.GetWeekRewindUseCase
 import app.logdate.client.domain.rewind.MarkRewindViewedUseCase
 import app.logdate.client.domain.rewind.ObserveReflectionPromptResponsesUseCase
 import app.logdate.client.domain.rewind.PreferencesCurationConfigProvider
+import app.logdate.client.domain.rewind.RefreshCurrentWeekRewindUseCase
 import app.logdate.client.domain.rewind.RegenerateRewindUseCase
 import app.logdate.client.domain.rewind.SaveReflectionPromptResponseUseCase
 import app.logdate.client.domain.search.ObserveRecentSearchesUseCase
@@ -200,6 +202,22 @@ val domainModule: Module =
         // Rewind
         factory { GetPastRewindsUseCase(get()) }
         factory { GetRewindUseCase(get(), get(), get()) }
+        factory {
+            val query: GetRewindUseCase = get()
+            val repository: app.logdate.client.repository.rewind.RewindRepository = get()
+            val prefs: LogdatePreferencesDataSource = get()
+            GetCurrentWeekRewindUseCase(query::invoke, repository::getRewindsInRange, prefs.observeFirstDayOfWeek())
+        }
+        factory {
+            val generate: GenerateBasicRewindUseCase = get()
+            val repository: app.logdate.client.repository.rewind.RewindRepository = get()
+            val prefs: LogdatePreferencesDataSource = get()
+            RefreshCurrentWeekRewindUseCase(
+                { start, end, existing -> generate(start, end, replaceExisting = existing) },
+                repository::getRewindsInRange,
+                prefs.observeFirstDayOfWeek(),
+            )
+        }
         factory {
             val prefs: LogdatePreferencesDataSource = get()
             GetWeekRewindUseCase(get(), prefs.observeFirstDayOfWeek())

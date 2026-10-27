@@ -19,8 +19,11 @@ import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.shared.model.Rewind
 import app.logdate.shared.model.RewindGenerationRequest
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
@@ -89,6 +92,8 @@ class GenerateBasicRewindUseCase(
         val request =
             try {
                 generationManager.requestGeneration(startTime, endTime)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Napier.e("Failed to create generation request", e)
                 return GenerateBasicRewindResult.Error(
@@ -97,6 +102,7 @@ class GenerateBasicRewindUseCase(
                 )
             }
 
+        var persisted = false
         try {
             val allTextEntries = mutableListOf<JournalNote.Text>()
             val allAudioEntries = mutableListOf<JournalNote.Audio>()
@@ -237,16 +243,30 @@ class GenerateBasicRewindUseCase(
                     viewCount = replaceExisting?.viewCount ?: 0,
                 )
 
-            if (replaceExisting == null) {
-                rewindRepository.saveRewind(rewind)
-            } else {
-                rewindRepository.replaceRewind(replaceExisting.uid, rewind)
+            // A saved story can immediately replace this collector. Finish its short local
+            // commit and request completion together before honoring that cancellation.
+            withContext(NonCancellable) {
+                if (replaceExisting == null) {
+                    rewindRepository.saveRewind(rewind)
+                } else {
+                    rewindRepository.replaceRewind(replaceExisting.uid, rewind)
+                }
+                persisted = true
+                updateGenerationStatus(request.id, RewindGenerationRequest.Status.COMPLETED)
             }
-            updateGenerationStatus(request.id, RewindGenerationRequest.Status.COMPLETED)
             return GenerateBasicRewindResult.Success(rewind)
+        } catch (cancelled: CancellationException) {
+            if (!persisted) {
+                withContext(NonCancellable) {
+                    updateGenerationStatus(request.id, RewindGenerationRequest.Status.CANCELLED)
+                }
+            }
+            throw cancelled
         } catch (e: Exception) {
             Napier.e("Failed to generate rewind", e)
-            updateGenerationStatus(request.id, RewindGenerationRequest.Status.FAILED, e.message)
+            withContext(NonCancellable) {
+                updateGenerationStatus(request.id, RewindGenerationRequest.Status.FAILED, e.message)
+            }
             return GenerateBasicRewindResult.Error(
                 "Failed to generate rewind: ${e.message ?: "Unknown error"}",
                 e,
@@ -283,6 +303,8 @@ class GenerateBasicRewindUseCase(
             } else {
                 generationManager.updateRequestStatus(requestId, status, details)
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Napier.e("Failed to update generation status", e)
         }

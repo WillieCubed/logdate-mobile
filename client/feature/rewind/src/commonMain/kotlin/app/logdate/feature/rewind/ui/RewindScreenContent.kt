@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
@@ -52,6 +54,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -61,10 +64,12 @@ import app.logdate.feature.rewind.ui.components.CollapsingRewindAppBar
 import app.logdate.feature.rewind.ui.components.RewindCoverCard
 import app.logdate.feature.rewind.ui.detail.rewindAccentColor
 import app.logdate.feature.rewind.ui.overview.RewindHistoryUiState
+import app.logdate.feature.rewind.ui.overview.RewindOverviewPeriod
 import app.logdate.feature.rewind.ui.overview.RewindOverviewScreenUiState
 import app.logdate.feature.rewind.ui.overview.RewindPreviewUiState
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.AspectRatios
+import app.logdate.ui.common.formatting.LocalToday
 import app.logdate.ui.content.ImageScrimOverlay
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.rememberSystemReduceMotion
@@ -72,11 +77,13 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.ui.workspace.PanelContainment
 import app.logdate.ui.workspace.WorkspacePanel
+import app.logdate.ui.workspace.WorkspaceSectionSwitch
 import app.logdate.util.getLocaleFirstDayOfWeek
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
@@ -122,15 +129,46 @@ fun RewindScreenContent(
     onRetryRewind: (() -> Unit)? = null,
     onGenerateAnnualRewind: ((year: Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
+    selectedPeriod: RewindOverviewPeriod = RewindOverviewPeriod.PreviousWeek,
+    onSelectPeriod: ((RewindOverviewPeriod) -> Unit)? = null,
+    onRefreshCurrentWeek: (() -> Unit)? = null,
+    firstDayOfWeek: DayOfWeek = getLocaleFirstDayOfWeek(),
+    onCreateMemory: (() -> Unit)? = null,
 ) {
     // Combine current and past rewinds into a single list, always showing at least current week placeholder
     val generationFailedMessage = stringResource(Res.string.rewind_generation_failed)
     val generatingMessage = stringResource(Res.string.rewind_current_week_generating)
-    val emptyWeekMessage = stringResource(Res.string.rewind_current_week_empty)
-    val currentWeekLabel = stringResource(Res.string.rewind_current_week_label)
-    val currentWeekTitle = stringResource(Res.string.rewind_current_week_title)
+    val isThisWeek = selectedPeriod == RewindOverviewPeriod.ThisWeek
+    val emptyWeekMessage = stringResource(if (isThisWeek) Res.string.rewind_this_week_empty else Res.string.rewind_current_week_empty)
+    val currentWeekLabel = stringResource(if (isThisWeek) Res.string.rewind_this_week_so_far else Res.string.rewind_last_week)
+    val currentWeekTitle = stringResource(if (isThisWeek) Res.string.rewind_current_week_title else Res.string.rewind_last_week_title)
     val loadingMessage = stringResource(Res.string.rewind_loading_message)
     val loadingTitle = stringResource(Res.string.rewind_loading_title)
+    val emptyPeriod = state is RewindOverviewScreenUiState.NotReady && !state.isGeneratingRewind && !state.generationFailed
+    val preparationAction =
+        when {
+            emptyPeriod && !isThisWeek && onSelectPeriod != null -> ({ onSelectPeriod(RewindOverviewPeriod.ThisWeek) })
+            emptyPeriod && isThisWeek && onCreateMemory != null -> onCreateMemory
+            else -> onRetryRewind
+        }
+    val preparationLabel =
+        stringResource(
+            when {
+                emptyPeriod && !isThisWeek && onSelectPeriod != null -> Res.string.rewind_this_week_so_far
+                emptyPeriod && isThisWeek && onCreateMemory != null -> Res.string.rewind_add_memory
+                state is RewindOverviewScreenUiState.NotReady && state.generationFailed -> Res.string.rewind_retry_generation
+                else -> Res.string.rewind_create_selected_week
+            },
+        )
+    val today =
+        if (LocalInspectionMode.current) {
+            LocalToday.current
+        } else {
+            Clock.System
+                .now()
+                .toLocalDateTime(TimeZone.currentSystemDefault())
+                .date
+        }
     val rewindItems =
         remember(
             state,
@@ -141,13 +179,21 @@ fun RewindScreenContent(
             currentWeekTitle,
             loadingMessage,
             loadingTitle,
+            selectedPeriod,
+            firstDayOfWeek,
+            today,
         ) {
             when (state) {
                 is RewindOverviewScreenUiState.Ready -> {
-                    listOf(state.mostRecentRewind) + state.pastRewinds.map { it.toPreview() }
+                    listOf(
+                        state.mostRecentRewind.copy(
+                            label = currentWeekLabel,
+                            title = if (isThisWeek) currentWeekTitle else state.mostRecentRewind.title,
+                        ),
+                    ) + state.pastRewinds.map { it.toPreview() }
                 }
                 is RewindOverviewScreenUiState.NotReady -> {
-                    val (weekStart, weekEnd) = lastWeekBounds()
+                    val (weekStart, weekEnd) = selectedWeekBounds(selectedPeriod, firstDayOfWeek, today)
                     val currentWeekPlaceholder =
                         RewindPreviewUiState(
                             message =
@@ -169,7 +215,7 @@ fun RewindScreenContent(
                     listOf(currentWeekPlaceholder) + state.pastRewinds.map { it.toPreview() }
                 }
                 RewindOverviewScreenUiState.Loading -> {
-                    val (weekStart, weekEnd) = lastWeekBounds()
+                    val (weekStart, weekEnd) = selectedWeekBounds(selectedPeriod, firstDayOfWeek, today)
                     listOf(
                         RewindPreviewUiState(
                             message = loadingMessage,
@@ -215,6 +261,7 @@ fun RewindScreenContent(
         val reduceMotion by rememberSystemReduceMotion()
         WorkspacePanel(modifier, containment = PanelContainment.Collection) {
             Column(Modifier.fillMaxSize()) {
+                PeriodControls(state, selectedPeriod, onSelectPeriod, onRefreshCurrentWeek)
                 RewindCardScrollPane(
                     rewinds = uniqueRewindPreviews(rewindItems),
                     onOpenRewind = onOpenRewind,
@@ -223,15 +270,9 @@ fun RewindScreenContent(
                     animateCards = !reduceMotion,
                     modifier = Modifier.weight(1f),
                 )
-                if (state is RewindOverviewScreenUiState.NotReady && !state.isGeneratingRewind && onRetryRewind != null) {
-                    Button(onClick = onRetryRewind, modifier = Modifier.padding(Spacing.lg)) {
-                        Text(
-                            if (state.generationFailed) {
-                                stringResource(Res.string.rewind_retry_generation)
-                            } else {
-                                stringResource(Res.string.rewind_create_this_week)
-                            },
-                        )
+                if (state is RewindOverviewScreenUiState.NotReady && !state.isGeneratingRewind && preparationAction != null) {
+                    Button(onClick = preparationAction, modifier = Modifier.padding(Spacing.lg)) {
+                        Text(preparationLabel)
                     }
                 }
             }
@@ -240,27 +281,20 @@ fun RewindScreenContent(
     }
     Scaffold(
         topBar = {
-            // Use our new collapsing app bar component
-            CollapsingRewindAppBar(
-                title = stringResource(Res.string.rewind_title),
-                scrollBehavior = scrollBehavior,
-            )
+            Column {
+                CollapsingRewindAppBar(title = stringResource(Res.string.rewind_title), scrollBehavior = scrollBehavior)
+                PeriodControls(state, selectedPeriod, onSelectPeriod, onRefreshCurrentWeek)
+            }
         },
         containerColor = Color.Transparent,
         modifier = modifier,
         bottomBar = {
-            if (state is RewindOverviewScreenUiState.NotReady && !state.isGeneratingRewind && onRetryRewind != null) {
+            if (state is RewindOverviewScreenUiState.NotReady && !state.isGeneratingRewind && preparationAction != null) {
                 Button(
-                    onClick = onRetryRewind,
+                    onClick = preparationAction,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg),
                 ) {
-                    Text(
-                        if (state.generationFailed) {
-                            stringResource(Res.string.rewind_retry_generation)
-                        } else {
-                            stringResource(Res.string.rewind_create_this_week)
-                        },
-                    )
+                    Text(preparationLabel)
                 }
             }
         },
@@ -278,6 +312,44 @@ fun RewindScreenContent(
                     .padding(paddingValues)
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
         )
+    }
+}
+
+@Composable
+private fun PeriodControls(
+    state: RewindOverviewScreenUiState,
+    selectedPeriod: RewindOverviewPeriod,
+    onSelectPeriod: ((RewindOverviewPeriod) -> Unit)?,
+    onRefreshCurrentWeek: (() -> Unit)?,
+) {
+    if (onSelectPeriod == null) return
+    Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.md)) {
+        FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            WorkspaceSectionSwitch(
+                labels = listOf(stringResource(Res.string.rewind_last_week), stringResource(Res.string.rewind_this_week_so_far)),
+                selectedIndex = selectedPeriod.ordinal,
+                onSelect = { onSelectPeriod(RewindOverviewPeriod.entries[it]) },
+            )
+            if (selectedPeriod == RewindOverviewPeriod.ThisWeek &&
+                state is RewindOverviewScreenUiState.Ready &&
+                onRefreshCurrentWeek != null
+            ) {
+                TextButton(onClick = onRefreshCurrentWeek, enabled = !state.isRefreshing) {
+                    Text(stringResource(if (state.isRefreshing) Res.string.rewind_updating else Res.string.rewind_update))
+                }
+            }
+        }
+        if (state is RewindOverviewScreenUiState.Ready && state.refreshFailed) {
+            Text(
+                stringResource(Res.string.rewind_update_failed),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
     }
 }
 
@@ -364,6 +436,7 @@ private fun RewindCardScrollPane(
     val snapFlingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
 
     val workspace = LocalWorkspaceEnabled.current
+    val animateEntrance = animateCards && !LocalInspectionMode.current
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val coverLayout = rewindCoverLayout(maxWidth, maxHeight)
         val cardWidth = if (workspace) coverLayout.width else 360.dp
@@ -398,9 +471,9 @@ private fun RewindCardScrollPane(
         ) {
             itemsIndexed(rewinds) { index, rewind ->
                 val alreadyAnimated = index in animatedIndices
-                var visible by remember { mutableStateOf(!animateCards || alreadyAnimated) }
-                LaunchedEffect(animateCards) {
-                    if (animateCards && !alreadyAnimated) {
+                var visible by remember { mutableStateOf(!animateEntrance || alreadyAnimated) }
+                LaunchedEffect(animateEntrance) {
+                    if (animateEntrance && !alreadyAnimated) {
                         delay((index * 80L).coerceAtMost(480L))
                         visible = true
                         animatedIndices += index
@@ -1011,18 +1084,16 @@ fun EmptyRewindContent(
 /**
  * Computes the start and end of the previous complete week, matching [GetWeekRewindUseCase].
  */
-private fun lastWeekBounds(): Pair<LocalDate, LocalDate> {
-    val today =
-        Clock.System
-            .now()
-            .toLocalDateTime(TimeZone.currentSystemDefault())
-            .date
-    val weekStartDay = getLocaleFirstDayOfWeek()
+private fun selectedWeekBounds(
+    period: RewindOverviewPeriod,
+    weekStartDay: DayOfWeek,
+    today: LocalDate,
+): Pair<LocalDate, LocalDate> {
     val daysFromWeekStart = (today.dayOfWeek.ordinal - weekStartDay.ordinal + 7) % 7
     val startOfThisWeek = today.minus(daysFromWeekStart, DateTimeUnit.DAY)
     val startOfLastWeek = startOfThisWeek.minus(7, DateTimeUnit.DAY)
     val endOfLastWeek = startOfThisWeek.minus(1, DateTimeUnit.DAY)
-    return startOfLastWeek to endOfLastWeek
+    return if (period == RewindOverviewPeriod.ThisWeek) startOfThisWeek to today else startOfLastWeek to endOfLastWeek
 }
 
 @OptIn(ExperimentalUuidApi::class, ExperimentalMaterial3Api::class)
