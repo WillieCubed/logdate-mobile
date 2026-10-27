@@ -323,6 +323,21 @@ class NativeLateMediaRepairTest {
             }
         }
 
+    @Test
+    fun `late original repairs quarantined canonical file URI before its local file exists`() =
+        runTest {
+            fixture { f ->
+                val source = "file:/data/user/0/studio.hypertext.logdate/files/media/${f.relative}"
+                f.write(Document("entry", "keep edits", listOf(UnavailableMediaReferences.nativeRestore(source))))
+                val result = f.engine().repair(listOf(f.target()))
+                assertEquals(1, result.repaired)
+                assertEquals(Document("entry", "keep edits", listOf(f.original)), f.read())
+                assertEquals("original bytes", f.live.readText())
+                assertEquals(1, f.imports)
+                assertTrue(f.payload.exists())
+            }
+        }
+
     private data class Document(
         val id: String,
         val caption: String,
