@@ -44,6 +44,10 @@ internal class NoteMediaUpload(
                 val error =
                     mediaUpload.exceptionOrNull()
                         ?: Exception("Unknown media upload error")
+                if (error is CloudApiException && error.statusCode == 409 && error.errorCode == "DELETION_CONFLICT") {
+                    errors += retryCoordinator.handleUploadConflict(EntityType.NOTE, pending, error, note.syncVersion, note.lastUpdated)
+                    return null
+                }
                 // This used to `continue` without recording an attempt, so a
                 // note whose media file no longer exists on disk retried for
                 // ever and held the whole queue behind it - the upload can

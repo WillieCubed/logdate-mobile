@@ -76,7 +76,7 @@ class DownloadInbox(
             for (type in listOf("NOTE", "JOURNAL")) {
                 dao.checkpoint(DownloadCheckpointEntity(selected.owner, selected.origin, type, 0))
             }
-            dao.release(selected.owner, selected.origin)
+            dao.release(selected.owner, selected.origin, DiagnosticReason.entries.map { it.name })
         }
     }
 
@@ -213,7 +213,7 @@ class DownloadInbox(
             deleted = record.deleted,
             payload = record.payload,
             operationId = Uuid.random().toString(),
-            state = "WAITING",
+            state = DownloadInboxState.WAITING.name,
             attempts = 0,
             nextAttemptAt = 0,
             reason = DiagnosticReason.NONE.name,
@@ -405,7 +405,7 @@ class DownloadInbox(
     ): Boolean {
         if (selected != scope()) return false
         val row = dao.get(selected.owner, selected.origin, type, id) ?: return false
-        return row.version == version && row.state == "APPLIED" && !row.deleted
+        return row.version == version && row.state == DownloadInboxState.APPLIED.name && !row.deleted
     }
 
     suspend fun skipped(
@@ -425,42 +425,7 @@ class DownloadInbox(
         transactions.withTransaction {
             val row = dao.get(selected.owner, selected.origin, type, id) ?: return@withTransaction
             if (row.version != version) return@withTransaction
-            if (enqueueMedia && type == "NOTE" && !row.deleted && row.payload.startsWith("{")) {
-                val mediaRef = Json.decodeFromString<ContentChange>(row.payload).mediaUri
-                if (mediaRef != null && (mediaRef.startsWith("https://") || mediaRef.startsWith("http://"))) {
-                    val prior = dao.get(selected.owner, selected.origin, "MEDIA_NOTE", id)
-                    if (prior == null || prior.version < row.version) {
-                        dao.put(
-                            row.copy(
-                                entityType = "MEDIA_NOTE",
-                                operationId = Uuid.random().toString(),
-                                state = "WAITING",
-                                attempts = 0,
-                                nextAttemptAt = 0,
-                                reason = DiagnosticReason.NONE.name,
-                            ),
-                        )
-                    }
-                }
-            }
-            if (enqueueMedia && type == "DRAFT" && !row.deleted && row.payload.startsWith("{")) {
-                val wire = Json.decodeFromString<DraftChange>(row.payload)
-                if (wire.encryptedBlocks != null) {
-                    val prior = dao.get(selected.owner, selected.origin, "MEDIA_DRAFT", id)
-                    if (prior == null || prior.version < row.version) {
-                        dao.put(
-                            row.copy(
-                                entityType = "MEDIA_DRAFT",
-                                operationId = Uuid.random().toString(),
-                                state = "WAITING",
-                                attempts = 0,
-                                nextAttemptAt = 0,
-                                reason = DiagnosticReason.NONE.name,
-                            ),
-                        )
-                    }
-                }
-            }
+            if (enqueueMedia) enqueueAppliedMedia(type, id, row, selected)
             val retainedPayload =
                 if (type == "DRAFT" && !row.deleted && row.payload.startsWith("{")) {
                     val wire = Json.decodeFromString<DraftChange>(row.payload)
@@ -477,7 +442,58 @@ class DownloadInbox(
                 } else {
                     ""
                 }
-            dao.put(row.copy(payload = retainedPayload, state = "APPLIED", reason = DiagnosticReason.NONE.name, nextAttemptAt = 0))
+            dao.put(
+                row.copy(
+                    payload = retainedPayload,
+                    state = DownloadInboxState.APPLIED.name,
+                    reason = DiagnosticReason.NONE.name,
+                    nextAttemptAt = 0,
+                ),
+            )
+        }
+    }
+
+    private suspend fun enqueueAppliedMedia(
+        type: String,
+        id: String,
+        row: DownloadInboxEntity,
+        selected: DownloadScope,
+    ) {
+        if (type == "NOTE" && !row.deleted && row.payload.startsWith("{")) {
+            val mediaRef = Json.decodeFromString<ContentChange>(row.payload).mediaUri
+            if (mediaRef != null && (mediaRef.startsWith("https://") || mediaRef.startsWith("http://"))) {
+                val prior = dao.get(selected.owner, selected.origin, "MEDIA_NOTE", id)
+                if (prior == null || prior.version < row.version) {
+                    dao.put(
+                        row.copy(
+                            entityType = "MEDIA_NOTE",
+                            operationId = Uuid.random().toString(),
+                            state = DownloadInboxState.WAITING.name,
+                            attempts = 0,
+                            nextAttemptAt = 0,
+                            reason = DiagnosticReason.NONE.name,
+                        ),
+                    )
+                }
+            }
+        }
+        if (type == "DRAFT" && !row.deleted && row.payload.startsWith("{")) {
+            val wire = Json.decodeFromString<DraftChange>(row.payload)
+            if (wire.encryptedBlocks != null) {
+                val prior = dao.get(selected.owner, selected.origin, "MEDIA_DRAFT", id)
+                if (prior == null || prior.version < row.version) {
+                    dao.put(
+                        row.copy(
+                            entityType = "MEDIA_DRAFT",
+                            operationId = Uuid.random().toString(),
+                            state = DownloadInboxState.WAITING.name,
+                            attempts = 0,
+                            nextAttemptAt = 0,
+                            reason = DiagnosticReason.NONE.name,
+                        ),
+                    )
+                }
+            }
         }
     }
 
@@ -491,12 +507,38 @@ class DownloadInbox(
         source: DiagnosticSource? = captureDiagnosticSource(selected),
     ) = failures.record(type, id, reason, version, selected, attemptId, source)
 
-    suspend fun release() {
-        scope().let { dao.release(it.owner, it.origin) }
+    suspend fun release(afterRecovery: Boolean = false) {
+        val reasons = if (afterRecovery) DiagnosticReason.entries else RELEASABLE_REASONS
+        scope().let { dao.release(it.owner, it.origin, reasons.map { reason -> reason.name }, afterRecovery) }
     }
 
     suspend fun count(): Int = scope().let { dao.count(it.owner, it.origin) }
 
     internal suspend fun recoveryCounts(includePolicyDeferred: Boolean = false) =
         scope().let { dao.recoveryCounts(it.owner, it.origin, now(), includePolicyDeferred) }
+
+    /** Rows that have failed at least once and are not applied: retrying, or parked for a user decision. */
+    suspend fun needingAttentionCount(): Int = scope().let { dao.countNeedingAttention(it.owner, it.origin) }
+
+    /** Rows a pass can retry now. Backed-off and parked rows are excluded. */
+    suspend fun dueCount(): Int = scope().let { dao.countDue(it.owner, it.origin, now()) }
+
+    companion object {
+        const val MAX_ATTEMPTS = 9
+
+        /** Failures a manual backup may retry. Device-wide and permanent failures wait for their own fix. */
+        private val RELEASABLE_REASONS =
+            setOf(
+                DiagnosticReason.NONE,
+                DiagnosticReason.NETWORK_POLICY,
+                DiagnosticReason.OFFLINE,
+                DiagnosticReason.SIGN_IN_REQUIRED,
+                DiagnosticReason.SERVER_UNAVAILABLE,
+                DiagnosticReason.RATE_LIMITED,
+                DiagnosticReason.QUOTA_EXCEEDED,
+                DiagnosticReason.LOCAL_STORAGE,
+                DiagnosticReason.PERSISTENCE_FAILED,
+                DiagnosticReason.UNKNOWN,
+            )
+    }
 }

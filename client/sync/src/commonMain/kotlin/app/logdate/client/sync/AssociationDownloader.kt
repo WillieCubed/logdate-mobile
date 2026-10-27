@@ -122,7 +122,7 @@ internal class AssociationDownloader(
                 val page = staged.page()
                 val pending = syncMetadataService.getPendingUploads(EntityType.ASSOCIATION).associateBy { it.entityId }
                 page.changes.forEach { applyFromSpace(staged, it, pending, selected, tally) }
-                page.deletions.forEach { removeFromSpace(staged, it, pending, selected, tally) }
+                page.deletions.forEach { removeFromSpace(staged, it, selected, tally) }
             } while (page.hasMore)
             SyncResult(
                 success = tally.errors.isEmpty(),
@@ -169,7 +169,8 @@ internal class AssociationDownloader(
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            throwIfDeviceBlocked(error)
             staged.settleFailed(key)
             tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to apply remote relationship")
             Napier.e("Failed to apply remote relationship")
@@ -179,7 +180,6 @@ internal class AssociationDownloader(
     private suspend fun removeFromSpace(
         staged: SpaceStagedRecords<JournalMembership>,
         key: String,
-        pending: Map<String, PendingUpload>,
         selected: DownloadScope?,
         tally: Tally,
     ) {
@@ -187,28 +187,31 @@ internal class AssociationDownloader(
         try {
             transactionManager.withTransaction {
                 ensureScope(selected)
-                val local = pending[key]
-                val outcome =
-                    when {
-                        ids == null -> RemoteOutcome.DECLINED
-                        local?.operation == PendingOperation.DELETE -> RemoteOutcome.DELETED
-                        local != null -> {
-                            recordConflict(key, null)
-                            tally.conflicts++
-                            RemoteOutcome.DECLINED
-                        }
-                        else -> {
-                            removeMembership(ids)
-                            tally.downloaded++
-                            RemoteOutcome.DELETED
-                        }
-                    }
-                staged.settle(key, outcome)
+                val idsToRemove = requireNotNull(ids) { "A membership deletion must name a journal and an entry" }
+                val local = syncMetadataService.getPendingUploads(EntityType.ASSOCIATION).firstOrNull { it.entityId == key }
+                if (local != null && local.operation != PendingOperation.DELETE) {
+                    downloadEngine.preserveDeletionConflict(EntityType.ASSOCIATION, key)
+                    tally.conflicts++
+                } else if (local != null) {
+                    check(
+                        syncMetadataService.settleIfCurrent(
+                            EntityType.ASSOCIATION,
+                            local,
+                            kotlin.time.Clock.System
+                                .now(),
+                            0L,
+                        ),
+                    )
+                }
+                removeMembership(idsToRemove)
+                staged.settle(key, RemoteOutcome.DELETED)
+                tally.downloaded++
                 ensureScope(selected)
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            throwIfDeviceBlocked(error)
             staged.settleFailed(key)
             tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to remove remote relationship")
             Napier.e("Failed to remove remote relationship")
@@ -291,7 +294,8 @@ internal class AssociationDownloader(
         } catch (cancelled: CancellationException) {
             recordApply(row, attemptId, context, DiagnosticOutcome.INTERRUPTED)
             throw cancelled
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            throwIfDeviceBlocked(error)
             if (row != null && context.selected != null) {
                 downloadInbox?.failed(
                     "ASSOCIATION",
@@ -318,8 +322,22 @@ internal class AssociationDownloader(
     ): Boolean =
         transactionManager.withTransaction {
             ensureScope(selected)
-            val hasPending = syncMetadataService.hasPending(EntityType.ASSOCIATION, key)
-            if (hasPending) {
+            val pending = syncMetadataService.getPendingUploads(EntityType.ASSOCIATION).firstOrNull { it.entityId == key }
+            val hasPending = pending != null
+            val matchingDelete = deletion && pending?.operation == app.logdate.client.sync.metadata.PendingOperation.DELETE
+            if (matchingDelete) {
+                check(
+                    syncMetadataService.settleIfCurrent(
+                        EntityType.ASSOCIATION,
+                        requireNotNull(pending),
+                        kotlin.time.Clock.System
+                            .now(),
+                        0L,
+                    ),
+                )
+            } else if (hasPending && deletion) {
+                downloadEngine.preserveDeletionConflict(EntityType.ASSOCIATION, key)
+            } else if (hasPending) {
                 downloadEngine.recordConflict(
                     EntityType.ASSOCIATION,
                     key,
@@ -329,13 +347,14 @@ internal class AssociationDownloader(
                     null,
                     null,
                 )
-            } else if (deletion) {
+            }
+            if (deletion) {
                 if (syncable != null) {
                     syncable.removeContentFromJournalFromSync(association.contentId, association.journalId)
                 } else {
                     journalContentRepository.removeContentFromJournal(association.contentId, association.journalId)
                 }
-            } else {
+            } else if (!hasPending) {
                 if (syncable != null) {
                     syncable.addContentToJournalFromSync(association.contentId, association.journalId)
                 } else {
@@ -344,7 +363,7 @@ internal class AssociationDownloader(
             }
             ensureScope(selected)
             if (row != null && selected != null) downloadInbox?.applied("ASSOCIATION", key, row.version, selected)
-            hasPending
+            hasPending && !matchingDelete
         }
 
     private suspend fun recordRemoteFailures(

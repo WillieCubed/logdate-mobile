@@ -58,25 +58,13 @@ class AndroidLogDateSyncWorker(
             }
             val result = if (promoted) withProgressNotification(run) else run()
 
-            if (result.success && result.hasMorePending) {
-                Napier.i("Sync has unfinished work; continuing through durable retry")
-                Result.retry()
-            } else if (result.success) {
-                Napier.i("Sync completed successfully")
-                val current = sessionStorage.getOriginBoundSession()?.let { UploadScope(it.session.accountId, it.origin) }
-                Result.success(mediaRecoveryCompletionOutput(syncType, result.recoveredMediaScope?.takeIf { it == current }))
-            } else {
-                Napier.w("Sync did not complete")
-
-                // Retry on transient errors, fail permanently on auth errors
-                val hasAuthError = result.errors.any { it.type == SyncErrorType.AUTHENTICATION_ERROR }
-                if (hasAuthError) {
-                    Napier.e("Authentication error in sync, not retrying")
-                    Result.failure()
-                } else {
-                    Napier.w("Transient sync error, will retry")
-                    Result.retry()
+            when (SyncWorkerRetryPolicy.decide(result, runAttemptCount)) {
+                SyncWorkerRetryPolicy.Outcome.SUCCESS -> {
+                    val current = sessionStorage.getOriginBoundSession()?.let { UploadScope(it.session.accountId, it.origin) }
+                    Result.success(mediaRecoveryCompletionOutput(syncType, result.recoveredMediaScope?.takeIf { it == current }))
                 }
+                SyncWorkerRetryPolicy.Outcome.RETRY -> Result.retry()
+                SyncWorkerRetryPolicy.Outcome.FAILURE -> Result.failure()
             }
         } catch (e: CancellationException) {
             // WorkManager cancellation is terminal. Propagating it prevents a cancelled job from
@@ -84,7 +72,7 @@ class AndroidLogDateSyncWorker(
             throw e
         } catch (e: Exception) {
             Napier.e("Unexpected error in sync worker")
-            Result.retry()
+            if (runAttemptCount < SyncWorkerRetryPolicy.MAX_ATTEMPTS - 1) Result.retry() else Result.failure()
         }
 
     private suspend fun runSync(syncType: String): SyncResult =
@@ -93,14 +81,17 @@ class AndroidLogDateSyncWorker(
                 Napier.d("Performing upload sync")
                 syncManager.uploadPendingChanges()
             }
+
             SYNC_TYPE_DOWNLOAD -> {
                 Napier.d("Performing download sync")
                 syncManager.downloadRemoteChanges()
             }
+
             SYNC_TYPE_FULL -> {
                 Napier.d("Performing full sync")
                 syncManager.fullSync()
             }
+
             else -> {
                 Napier.w("Unknown sync type, defaulting to full sync")
                 syncManager.fullSync()

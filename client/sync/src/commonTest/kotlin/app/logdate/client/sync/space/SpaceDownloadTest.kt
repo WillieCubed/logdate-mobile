@@ -85,6 +85,73 @@ class SpaceDownloadTest {
         }
 
     @Test
+    fun `a space journal deletion preserves a queued edit before deleting its original identity`() =
+        runTest {
+            val device = SpaceDevice(FakeDataHome())
+            val id = Uuid.random()
+            device.home.putFromAnotherDevice(JOURNAL_COLLECTION, id.toString(), journalRecord("Original"))
+            device.manager.downloadRemoteChanges()
+            val edited = assertNotNull(device.journal(id)).copy(title = "Local edit")
+            device.edit(edited)
+            device.home.deleteFromAnotherDevice(JOURNAL_COLLECTION, id.toString())
+
+            val result = device.manager.downloadRemoteChanges()
+
+            assertTrue(result.success, result.errors.toString())
+            assertNull(device.journal(id))
+            assertTrue(device.pendingJournals().isEmpty())
+            assertEquals(
+                edited,
+                device.manager.deletionRecovery
+                    .list()
+                    .single()
+                    .deletedEdit
+                    ?.journal,
+            )
+            assertNull(device.swapStore.get(device.scope, JOURNAL_COLLECTION, id.toString()))
+            assertEquals(0, device.inbox.count())
+        }
+
+    @Test
+    fun `a space note deletion preserves a queued edit before deleting its original identity`() =
+        runTest {
+            val home = FakeDataHome()
+            val phone = SpaceDevice(home)
+            val tablet = SpaceDevice(home)
+            val time = Instant.parse("2026-10-01T09:00:00Z")
+            val note =
+                app.logdate.client.repository.journals.JournalNote.Text(
+                    creationTimestamp = time,
+                    lastUpdated = time,
+                    content = "Original",
+                )
+            phone.saveNote(note)
+            assertTrue(phone.manager.uploadPendingChanges().success)
+            assertTrue(tablet.manager.downloadRemoteChanges().success)
+            val edited =
+                (assertNotNull(tablet.note(note.uid)) as app.logdate.client.repository.journals.JournalNote.Text)
+                    .copy(content = "Local edit")
+            tablet.saveNote(edited, app.logdate.client.sync.metadata.PendingOperation.UPDATE)
+            home.deleteFromAnotherDevice(ENTRY_COLLECTION, note.uid.toString())
+
+            val result = tablet.manager.downloadRemoteChanges()
+
+            assertTrue(result.success, result.errors.toString())
+            assertNull(tablet.note(note.uid))
+            assertTrue(tablet.pendingNotes().isEmpty())
+            assertEquals(
+                edited,
+                tablet.manager.deletionRecovery
+                    .list()
+                    .single()
+                    .deletedEdit
+                    ?.note,
+            )
+            assertNull(tablet.swapStore.get(tablet.scope, ENTRY_COLLECTION, note.uid.toString()))
+            assertEquals(0, tablet.inbox.count())
+        }
+
+    @Test
     fun `a record sealed with a key this device lacks is kept until the key is recovered`() =
         runTest {
             val device = SpaceDevice(FakeDataHome()).apply { identityKey = ByteArray(32) { 7 } }

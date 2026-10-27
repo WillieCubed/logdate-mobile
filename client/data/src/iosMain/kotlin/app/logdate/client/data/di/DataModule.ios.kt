@@ -97,6 +97,8 @@ import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.repository.user.devices.UserDeviceRepository
 import app.logdate.client.sync.RoomSyncTransactionManager
+import app.logdate.client.sync.conflict.SyncConflictStore
+import app.logdate.client.sync.conflict.retainedMediaReferences
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.config.configModule
 import kotlinx.coroutines.flow.combine
@@ -188,6 +190,7 @@ actual val dataModule: Module =
                     app.logdate.client.data.journals.RoomArchiveRecoveryReceipts(
                         get<app.logdate.client.database.LogDateDatabase>().downloadInboxDao(),
                     ),
+                retainedMedia = { getOrNull<SyncConflictStore>()?.retainedMediaReferences().orEmpty() },
             )
         }
         single {

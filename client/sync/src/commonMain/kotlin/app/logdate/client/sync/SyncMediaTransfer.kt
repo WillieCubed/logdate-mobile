@@ -77,7 +77,8 @@ internal class SyncMediaTransfer(
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            throwIfDeviceBlocked(error)
             false
         }
     }
@@ -97,11 +98,13 @@ internal class SyncMediaTransfer(
                 blocks =
                     draft.blocks.map { block ->
                         when (block) {
-                            is SerializableImageBlock ->
+                            is SerializableImageBlock -> {
                                 block.copy(
                                     uri = uploadDraftAsset(accessToken, draft.id, block.id, "image", block.uri, reusable),
                                 )
-                            is SerializableVideoBlock ->
+                            }
+
+                            is SerializableVideoBlock -> {
                                 block.copy(
                                     uri = uploadDraftAsset(accessToken, draft.id, block.id, "video", block.uri, reusable),
                                     thumbnailUri =
@@ -114,15 +117,23 @@ internal class SyncMediaTransfer(
                                             reusable,
                                         ),
                                 )
-                            is SerializableAudioBlock ->
+                            }
+
+                            is SerializableAudioBlock -> {
                                 block.copy(
                                     uri = uploadDraftAsset(accessToken, draft.id, block.id, "audio", block.uri, reusable),
                                 )
-                            is SerializableCameraBlock ->
+                            }
+
+                            is SerializableCameraBlock -> {
                                 block.copy(
                                     uri = uploadDraftAsset(accessToken, draft.id, block.id, "camera", block.uri, reusable),
                                 )
-                            else -> block
+                            }
+
+                            else -> {
+                                block
+                            }
                         }
                     },
             )
@@ -280,7 +291,8 @@ internal class SyncMediaTransfer(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                throwIfDeviceBlocked(error)
                 throw DraftMediaFailure(DiagnosticReason.LOCAL_STORAGE)
             }
         if (!originalAvailable(localUri)) throw DraftMediaFailure(DiagnosticReason.LOCAL_STORAGE)
@@ -382,7 +394,12 @@ internal class SyncMediaTransfer(
         mediaRef: String,
         error: Throwable,
     ): Result<JournalNote> {
-        val stillOnDisk = runCatching { mediaManager.exists(mediaRef) }.getOrDefault(false)
+        throwIfDeviceBlocked(error)
+        val stillOnDisk =
+            runCatching { mediaManager.exists(mediaRef) }.getOrElse {
+                throwIfDeviceBlocked(it)
+                false
+            }
         return if (!stillOnDisk) {
             Result.failure(MissingMediaException(mediaRef, error))
         } else {
@@ -399,7 +416,10 @@ internal class SyncMediaTransfer(
                 result.mapping?.let { mediaSyncRefStore.upsert(it) }
                 result.note
             }
-            is MediaHydrationResult.Pending -> throw MediaRecoveryException(result.reason)
+
+            is MediaHydrationResult.Pending -> {
+                throw MediaRecoveryException(result.reason)
+            }
         }
 
     suspend fun hydrate(
@@ -460,7 +480,8 @@ internal class SyncMediaTransfer(
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            throwIfDeviceBlocked(error)
             MediaHydrationResult.Pending(DiagnosticReason.LOCAL_STORAGE)
         }
     }
@@ -501,7 +522,8 @@ internal class SyncMediaTransfer(
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
-                } catch (_: Exception) {
+                } catch (error: Exception) {
+                    throwIfDeviceBlocked(error)
                     return MediaHydrationResult.Pending(DiagnosticReason.LOCAL_STORAGE)
                 }
             publicationCustody.publish(ticket, localUri)
@@ -542,8 +564,9 @@ internal class SyncMediaTransfer(
         ?.downloadReferencedMedia(accessToken, reference, mediaId)
         ?: cloudMediaDataSource.downloadMedia(accessToken, mediaId)
 
-    private fun mediaFailureReason(error: Throwable): DiagnosticReason =
-        when {
+    private fun mediaFailureReason(error: Throwable): DiagnosticReason {
+        throwIfDeviceBlocked(error)
+        return when {
             error is IdentityKeyNotFoundException -> DiagnosticReason.KEY_RECOVERY_REQUIRED
             error is CloudApiException && error.statusCode == 404 -> DiagnosticReason.MISSING_MEDIA
             error is CloudApiException && error.statusCode == 401 -> DiagnosticReason.SIGN_IN_REQUIRED
@@ -551,6 +574,7 @@ internal class SyncMediaTransfer(
             error is app.logdate.client.sync.cloud.MediaIntegrityException -> DiagnosticReason.CORRUPT_PAYLOAD
             else -> DiagnosticReason.UNKNOWN
         }
+    }
 
     private fun matchesLocalFile(
         mapping: MediaSyncRef,

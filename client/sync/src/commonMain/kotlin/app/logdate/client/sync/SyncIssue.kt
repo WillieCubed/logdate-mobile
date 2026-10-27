@@ -46,13 +46,25 @@ sealed interface SyncIssue {
 fun SyncStatus.issue(): SyncIssue? {
     if (isSyncing || requestState == BackupRequestState.RUNNING) return null
     when (pausedReason) {
-        SyncPausedReason.NOT_SIGNED_IN -> return SyncIssue.Failure.SignIn
-        SyncPausedReason.OFFLINE -> return SyncIssue.Waiting.Network
-        SyncPausedReason.BACKGROUND_DATA_OFF -> return SyncIssue.Waiting.BackgroundData
-        SyncPausedReason.MEDIA_WAITING_FOR_WIFI ->
+        SyncPausedReason.NOT_SIGNED_IN -> {
+            return SyncIssue.Failure.SignIn
+        }
+
+        SyncPausedReason.OFFLINE -> {
+            return SyncIssue.Waiting.Network
+        }
+
+        SyncPausedReason.BACKGROUND_DATA_OFF -> {
+            return SyncIssue.Waiting.BackgroundData
+        }
+
+        SyncPausedReason.MEDIA_WAITING_FOR_WIFI -> {
             return if (backgroundWorkLimited) SyncIssue.Waiting.BackgroundData else SyncIssue.Waiting.WiFi
+        }
+
         SyncPausedReason.NEEDS_RECOVERY_PHRASE -> return SyncIssue.Failure.KeyRecovery
         SyncPausedReason.NEEDS_DEVICE_LINK -> return SyncIssue.Failure.DeviceLink
+        SyncPausedReason.LOCAL_STORAGE_UNAVAILABLE -> return SyncIssue.Failure.LocalData
         null -> Unit
     }
     if (!queueReadable) return SyncIssue.Failure.LocalData

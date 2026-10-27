@@ -5,6 +5,7 @@ import app.logdate.client.database.dao.sync.DownloadRecoveryCounts
 import app.logdate.client.database.entities.sync.DownloadCheckpointEntity
 import app.logdate.client.database.entities.sync.DownloadInboxEntity
 import app.logdate.client.sync.SyncTransactionManager
+import app.logdate.shared.model.diagnostics.DiagnosticReason
 import app.logdate.shared.model.sync.DeviceId
 import app.logdate.shared.model.sync.DraftChange
 import kotlinx.coroutines.test.runTest
@@ -29,6 +30,59 @@ class DownloadInboxTest {
             assertEquals("WAITING", retained.state)
             inbox.release()
             assertEquals(1, inbox.pending("MEDIA_NATIVE_NOTE").size)
+        }
+
+    @Test
+    fun `a record encrypted by an older identity remains a record repair`() =
+        runTest {
+            val db = Database()
+            val inbox = DownloadInbox(db, db, { DownloadScope("owner", "origin") }, { 1L })
+            inbox.stage("NOTE", 1, listOf(WireDownload("legacy", 1, false, "ciphertext")))
+
+            inbox.failed("NOTE", "legacy", DiagnosticReason.KEY_RECOVERY_REQUIRED.name, 1)
+
+            val row = db.rows.single()
+            assertEquals(1, row.attempts)
+            assertEquals(DiagnosticReason.KEY_RECOVERY_REQUIRED.name, row.reason)
+        }
+
+    @Test
+    fun `identity recovery releases a parked record while manual backup leaves it retained`() =
+        runTest {
+            val db = Database()
+            val inbox = DownloadInbox(db, db, { DownloadScope("owner", "origin") }, { 1L })
+            inbox.stage("NOTE", 1, listOf(WireDownload("legacy", 1, false, "ciphertext")))
+            repeat(DownloadInbox.MAX_ATTEMPTS) { inbox.failed("NOTE", "legacy", DiagnosticReason.KEY_RECOVERY_REQUIRED.name) }
+            assertEquals("PARKED", db.rows.single().state)
+
+            inbox.release()
+            assertTrue(inbox.pending("NOTE").isEmpty())
+            inbox.release(afterRecovery = true)
+
+            assertEquals(1, inbox.pending("NOTE").size)
+            assertEquals(0, db.rows.single().attempts)
+        }
+
+    @Test
+    fun `due failures remain visible until explicitly released without resetting their attempt budget`() =
+        runTest {
+            val db = Database()
+            var now = 1L
+            val inbox = DownloadInbox(db, db, { DownloadScope("owner", "origin") }, { now })
+            inbox.stage("NOTE", 1, listOf(WireDownload("offline", 1, false, "ciphertext")))
+            inbox.failed("NOTE", "offline", DiagnosticReason.OFFLINE.name)
+            now = db.rows.single().nextAttemptAt + 1
+
+            assertEquals(1, inbox.dueCount())
+            assertEquals(1, inbox.needingAttentionCount())
+            assertEquals(DownloadRecoveryCounts(retained = 1, retryable = 1, failed = 1), inbox.recoveryCounts())
+
+            inbox.release()
+
+            assertEquals("WAITING", db.rows.single().state)
+            assertEquals(1, db.rows.single().attempts)
+            assertEquals(0, inbox.needingAttentionCount())
+            assertEquals(DownloadRecoveryCounts(retained = 1, retryable = 1, failed = 0), inbox.recoveryCounts())
         }
 
     @Test
@@ -94,6 +148,67 @@ class DownloadInboxTest {
             )
         }
 
+    @Test
+    fun `failed rows are not due until their retry time`() =
+        runTest {
+            val db = Database()
+            var clock = 1_000L
+            val inbox = DownloadInbox(db, db, { DownloadScope("owner", "origin") }, { clock })
+            inbox.stage("NOTE", 2, listOf(WireDownload("bad", 1, false, "ciphertext")))
+            inbox.failed("NOTE", "bad", DiagnosticReason.OFFLINE.name)
+
+            assertEquals(0, inbox.dueCount())
+            assertEquals(1, inbox.count())
+
+            clock += DownloadInbox.MAX_ATTEMPTS * 60 * 60 * 1000L
+            assertEquals(1, inbox.dueCount())
+        }
+
+    @Test
+    fun `rows that exhaust their attempts park and a manual backup does not retry them`() =
+        runTest {
+            val db = Database()
+            val inbox = DownloadInbox(db, db, { DownloadScope("owner", "origin") }, { 1_000L })
+            inbox.stage("NOTE", 2, listOf(WireDownload("flaky", 1, false, "ciphertext")))
+            repeat(DownloadInbox.MAX_ATTEMPTS - 1) {
+                inbox.failed("NOTE", "flaky", DiagnosticReason.OFFLINE.name)
+            }
+            assertEquals(DownloadInboxState.FAILED.name, db.rows.single().state)
+
+            inbox.failed("NOTE", "flaky", DiagnosticReason.OFFLINE.name)
+
+            assertEquals(DownloadInboxState.PARKED.name, db.rows.single().state)
+            inbox.release()
+            assertEquals(0, inbox.dueCount())
+            assertEquals(1, inbox.count())
+        }
+
+    @Test
+    fun `manual backup does not make a corrupt payload row due`() =
+        runTest {
+            val db = Database()
+            val inbox = DownloadInbox(db, db, { DownloadScope("owner", "origin") }, { 1_000L })
+            inbox.stage("NOTE", 2, listOf(WireDownload("broken", 1, false, "ciphertext")))
+            inbox.failed("NOTE", "broken", DiagnosticReason.CORRUPT_PAYLOAD.name)
+
+            inbox.release()
+
+            assertEquals(0, inbox.dueCount())
+        }
+
+    @Test
+    fun `manual backup makes a transient failure due again`() =
+        runTest {
+            val db = Database()
+            val inbox = DownloadInbox(db, db, { DownloadScope("owner", "origin") }, { 1_000L })
+            inbox.stage("NOTE", 2, listOf(WireDownload("offline", 1, false, "ciphertext")))
+            inbox.failed("NOTE", "offline", DiagnosticReason.OFFLINE.name)
+
+            inbox.release()
+
+            assertEquals(1, inbox.dueCount())
+        }
+
     internal class Database :
         DownloadInboxDao,
         SyncTransactionManager {
@@ -152,8 +267,15 @@ class DownloadInboxTest {
         ): DownloadRecoveryCounts {
             val retained = rows.filter { it.ownerId == owner && it.serverOrigin == origin && it.state != "APPLIED" }
             val supported = retained.filter { it.reason != "UNSUPPORTED_FORMAT" }
-            val retryable = supported.filter { it.reason != "NETWORK_POLICY" || (includePolicyDeferred && it.nextAttemptAt <= now) }
-            val failed = supported.count { it.state == "FAILED" && it.nextAttemptAt > now && it.reason != "NETWORK_POLICY" }
+            val retryable =
+                supported.filter {
+                    (it.state == "WAITING" || it.state == "FAILED") &&
+                        (it.reason != "NETWORK_POLICY" || (includePolicyDeferred && it.nextAttemptAt <= now))
+                }
+            val failed =
+                retained.count {
+                    it.state == "PARKED" || (it.state == "FAILED" && it.reason !in listOf("NETWORK_POLICY", "UNSUPPORTED_FORMAT"))
+                }
             return DownloadRecoveryCounts(retained.size, retryable.size, failed)
         }
 
@@ -197,12 +319,47 @@ class DownloadInboxTest {
             checkpoints.add(row)
         }
 
+        override suspend fun countNeedingAttention(
+            owner: String,
+            origin: String,
+        ) = rows.count {
+            it.ownerId == owner &&
+                it.serverOrigin == origin &&
+                (it.state == "PARKED" || (it.state == "FAILED" && it.reason != "UNSUPPORTED_FORMAT"))
+        }
+
+        override suspend fun countDue(
+            owner: String,
+            origin: String,
+            now: Long,
+        ) = rows.count {
+            it.ownerId == owner &&
+                it.serverOrigin == origin &&
+                (it.state == "WAITING" || it.state == "FAILED") &&
+                it.nextAttemptAt <= now
+        }
+
         override suspend fun release(
             owner: String,
             origin: String,
+            reasons: List<String>,
+            afterRecovery: Boolean,
         ) {
             rows =
-                rows.map { if (it.ownerId == owner && it.serverOrigin == origin) it.copy(nextAttemptAt = 0) else it }.toMutableList()
+                rows
+                    .map {
+                        val retryable = it.state == "WAITING" || it.state == "FAILED" || (afterRecovery && it.state == "PARKED")
+                        val releasable = it.reason in reasons
+                        if (it.ownerId == owner && it.serverOrigin == origin && retryable && releasable) {
+                            it.copy(
+                                nextAttemptAt = 0,
+                                state = "WAITING",
+                                attempts = if (afterRecovery) 0 else it.attempts,
+                            )
+                        } else {
+                            it
+                        }
+                    }.toMutableList()
         }
 
         override suspend fun <T> withTransaction(block: suspend () -> T): T {

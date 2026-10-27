@@ -61,7 +61,7 @@ class RecoverIdentityUseCase(
             mediaPayloadKeyProvider.clearCachedKey()
             syncMetadataService.resetAllCursors()
             identityRecoveryNeededStore.setNeeded(false)
-            downloadInbox?.release()
+            downloadInbox?.release(afterRecovery = true)
             Result.success(Unit)
         } catch (cancelled: CancellationException) {
             throw cancelled

@@ -1,5 +1,9 @@
 package app.logdate.client.sync
 
+import app.logdate.client.sync.SyncRetryPolicy.DEAD_LETTER_RETRY_INTERVAL_MS
+import app.logdate.client.sync.SyncRetryPolicy.MAX_RETRY_ATTEMPTS
+import app.logdate.client.sync.SyncRetryPolicy.MAX_UNFINISHED_ATTEMPTS
+import app.logdate.client.sync.SyncRetryPolicy.TRANSIENT_REASONS
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.diagnostics.DiagnosticSource
 import app.logdate.client.sync.metadata.EntityType
@@ -51,6 +55,7 @@ internal class SyncRetryCoordinator(
     ) -> Unit,
     private val diagnosticSource: () -> DiagnosticSource? = { null },
     private val diagnostics: (SyncDiagnosticEvent, DiagnosticSource?) -> Unit = { _, _ -> },
+    private val preserveDeletedEdit: suspend (EntityType, String) -> Unit = { _, _ -> error("Recovery storage unavailable") },
 ) {
     /**
      * Reconsiders transient failures when connectivity returns. A new build also reconsiders
@@ -69,6 +74,7 @@ internal class SyncRetryCoordinator(
                 if (!syncMetadataService.isCurrentOperation(entityType, pending)) continue
                 if (afterUpgrade) {
                     retryScheduleStore.clear(entityType, pending.retryKey())
+                    if (retained?.effectiveReason() == SyncDeadLetterReason.APP_CLOSED) deadLetterStore.remove(retained.id)
                     clearFailureKind(entityType, pending.retryKey())
                     continue
                 }
@@ -91,6 +97,8 @@ internal class SyncRetryCoordinator(
         entityType: EntityType,
         pending: PendingUpload,
     ): Boolean {
+        val retained = deadLetterStore.list().firstOrNull { it.entityType == entityType.name && it.matches(pending) }
+        if (retained != null && retained.effectiveReason() !in TRANSIENT_REASONS) return false
         val nextAttemptAt = retryScheduleStore.nextAttemptAt(entityType, pending.retryKey()) ?: return true
         return Clock.System.now().toEpochMilliseconds() >= nextAttemptAt
     }
@@ -182,6 +190,7 @@ internal class SyncRetryCoordinator(
         permanent: Boolean = false,
     ): Boolean {
         val attempt = endAttempt(entityType, pending.retryKey())
+        throwIfDeviceBlocked(error)
         if (!syncMetadataService.incrementRetryIfCurrent(entityType, pending)) {
             report(DiagnosticOutcome.INTERRUPTED, attempt)
             return false
@@ -430,6 +439,11 @@ internal class SyncRetryCoordinator(
                 retryable = true,
             )
         }
+        if (error is CloudApiException && error.errorCode == "DELETION_CONFLICT") {
+            preserveDeletedEdit(entityType, pending.entityId)
+            markUploadSettled(entityType, pending, Clock.System.now(), localVersion, DiagnosticOutcome.CONFLICT)
+            return SyncError(SyncErrorType.CONFLICT_ERROR, "An edit to a deleted item was saved for review", retryable = false)
+        }
         recordConflict(
             entityType,
             pending.entityId,
@@ -472,20 +486,4 @@ internal class SyncRetryCoordinator(
             operationId == pending.operationId &&
             operation == pending.operation.name &&
             expectedServerVersion == pending.expectedServerVersion
-
-    private companion object {
-        val TRANSIENT_REASONS =
-            setOf(
-                SyncDeadLetterReason.NETWORK_UNAVAILABLE,
-                SyncDeadLetterReason.SERVER_UNAVAILABLE,
-                SyncDeadLetterReason.SIGN_IN_REQUIRED,
-            )
-        const val MAX_RETRY_ATTEMPTS = 9
-
-        /** Consecutive attempts that never finished before an entry is set aside. */
-        const val MAX_UNFINISHED_ATTEMPTS = 2
-
-        /** How long a dead-lettered entry waits before it is quietly tried again. */
-        const val DEAD_LETTER_RETRY_INTERVAL_MS = 24L * 60 * 60 * 1000
-    }
 }

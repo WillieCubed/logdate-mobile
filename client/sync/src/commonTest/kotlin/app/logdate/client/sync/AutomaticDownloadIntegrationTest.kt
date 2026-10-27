@@ -18,6 +18,7 @@ import app.logdate.client.sync.test.InMemoryMediaSyncRefStore
 import app.logdate.client.sync.test.InMemorySyncConflictStore
 import app.logdate.client.sync.test.InMemorySyncDeadLetterStore
 import app.logdate.client.sync.test.InMemorySyncRetryScheduleStore
+import app.logdate.client.sync.test.failingCloudApiClient
 import app.logdate.client.sync.test.fakeAccountRepository
 import app.logdate.client.sync.test.fakeCloudApiClient
 import app.logdate.client.sync.test.fakeDataUsagePolicy
@@ -29,11 +30,13 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
 
+/** Regression coverage for scoped remote downloads and retained edits. */
 class AutomaticDownloadIntegrationTest {
     @Test
     fun `download remote media content saves local media for all supported types`() =
@@ -349,5 +352,97 @@ class AutomaticDownloadIntegrationTest {
             assertTrue(result.success, "Download should succeed")
             assertTrue(result.downloadedItems > 0, "Should have processed deletions")
             assertTrue(mockApiClient.wasMethodCalled("getContentChanges"), "Should have called getContentChanges")
+        }
+
+    @Test
+    fun `download fails with unauthenticated user`() =
+        runTest {
+            // Given: A sync manager with unauthenticated user
+            val mockApiClient = fakeCloudApiClient()
+            val mockAccountRepository = fakeAccountRepository(authenticated = false)
+            val mockJournalNotesRepository = FakeJournalNotesRepository()
+            val mockJournalRepository = FakeJournalRepository()
+            val mockJournalContentRepository = FakeJournalContentRepository()
+
+            val syncManager =
+                DefaultSyncManager(
+                    cloudContentDataSource = DefaultCloudContentDataSource(mockApiClient),
+                    cloudJournalDataSource = DefaultCloudJournalDataSource(mockApiClient),
+                    cloudAssociationDataSource = DefaultCloudAssociationDataSource(mockApiClient),
+                    cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(mockApiClient),
+                    cloudAccountRepository = mockAccountRepository,
+                    sessionStorage = fakeSessionStorage(authenticated = false),
+                    mediaManager = InMemoryMediaManager(),
+                    mediaSyncRefStore = InMemoryMediaSyncRefStore(),
+                    journalRepository = mockJournalRepository,
+                    journalNotesRepository = mockJournalNotesRepository,
+                    journalContentRepository = mockJournalContentRepository,
+                    journalConflictResolver = lastWriteWinsResolver(),
+                    noteConflictResolver = lastWriteWinsResolver(),
+                    conflictStore = InMemorySyncConflictStore(),
+                    deadLetterStore = InMemorySyncDeadLetterStore(),
+                    retryScheduleStore = InMemorySyncRetryScheduleStore(),
+                    syncMetadataService = fakeSyncMetadataService(),
+                    transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
+                )
+
+            // When: We attempt to download without authentication
+            val result = syncManager.downloadRemoteChanges()
+
+            // Then: The download should fail with authentication error
+            assertFalse(result.success, "Download should fail without authentication")
+            assertTrue(
+                result.errors.any { it.type == SyncErrorType.AUTHENTICATION_ERROR },
+                "Should have authentication error",
+            )
+            assertFalse(
+                mockApiClient.wasMethodCalled("getContentChanges"),
+                "Should not attempt API calls without authentication",
+            )
+        }
+
+    @Test
+    fun `download handles api errors`() =
+        runTest {
+            // Given: A sync manager with failing API client
+            val mockApiClient = failingCloudApiClient()
+            val mockAccountRepository = fakeAccountRepository()
+            val mockJournalNotesRepository = FakeJournalNotesRepository()
+            val mockJournalRepository = FakeJournalRepository()
+            val mockJournalContentRepository = FakeJournalContentRepository()
+
+            val syncManager =
+                DefaultSyncManager(
+                    cloudContentDataSource = DefaultCloudContentDataSource(mockApiClient),
+                    cloudJournalDataSource = DefaultCloudJournalDataSource(mockApiClient),
+                    cloudAssociationDataSource = DefaultCloudAssociationDataSource(mockApiClient),
+                    cloudMediaDataSource = DefaultCloudMediaDataSource(mockApiClient),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(mockApiClient),
+                    cloudAccountRepository = mockAccountRepository,
+                    sessionStorage = fakeSessionStorage(),
+                    mediaManager = InMemoryMediaManager(),
+                    mediaSyncRefStore = InMemoryMediaSyncRefStore(),
+                    journalRepository = mockJournalRepository,
+                    journalNotesRepository = mockJournalNotesRepository,
+                    journalContentRepository = mockJournalContentRepository,
+                    journalConflictResolver = lastWriteWinsResolver(),
+                    noteConflictResolver = lastWriteWinsResolver(),
+                    conflictStore = InMemorySyncConflictStore(),
+                    deadLetterStore = InMemorySyncDeadLetterStore(),
+                    retryScheduleStore = InMemorySyncRetryScheduleStore(),
+                    syncMetadataService = fakeSyncMetadataService(),
+                    transactionManager = testSyncTransactionManager(),
+                    dataUsagePolicy = fakeDataUsagePolicy(),
+                )
+
+            // When: We attempt to download with failing API
+            val result = syncManager.downloadRemoteChanges()
+
+            // Then: The download should fail gracefully
+            assertFalse(result.success, "Download should fail with API errors")
+            assertTrue(result.errors.isNotEmpty(), "Should have error information")
+            assertTrue(mockApiClient.wasMethodCalled("getContentChanges"), "Should still attempt API calls")
         }
 }

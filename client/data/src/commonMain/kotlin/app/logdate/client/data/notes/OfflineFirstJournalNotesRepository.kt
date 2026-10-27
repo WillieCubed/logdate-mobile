@@ -67,6 +67,7 @@ class OfflineFirstJournalNotesRepository(
     private val draftSnapshots: suspend () -> List<EntryDraft>? = { null },
     private val journalCoverUris: suspend () -> List<String?>? = { null },
     private val mediaReclamation: MediaReclamationJournal = MediaReclamationJournal.None,
+    private val retainedMedia: suspend () -> Set<String> = { emptySet() },
 ) : JournalNotesRepository,
     ExportableJournalContentRepository,
     SyncableJournalNotesRepository {
@@ -125,13 +126,19 @@ class OfflineFirstJournalNotesRepository(
      */
     override suspend fun notesReferencingMediaPaths(paths: Set<String>): Set<String> {
         if (paths.isEmpty()) return emptySet()
-        val referenced =
-            queries.allNotesObserved
-                .first()
-                .mapNotNull(JournalNote::mediaRefOrNull)
-                .map(mediaReferences::storedReference)
-                .toSet()
-        return paths.filterTo(mutableSetOf()) { path -> mediaReferences.storedReference(path) in referenced }
+        return try {
+            val protected = retainedMedia() + journalRepository.allJournalsObserved.first().mapNotNull { it.coverImageUri }
+            val referenced =
+                (queries.allNotesObserved.first().mapNotNull(JournalNote::mediaRefOrNull) + protected)
+                    .flatMap { mediaReferences.spellingsOf(it) }
+                    .toSet()
+            paths.filterTo(mutableSetOf()) { path -> mediaReferences.spellingsOf(path).any(referenced::contains) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Napier.w("Could not verify media references; keeping media", error)
+            paths
+        }
     }
 
     override suspend fun getNoteById(noteId: Uuid): JournalNote? = queries.getNoteById(noteId)
@@ -298,7 +305,7 @@ class OfflineFirstJournalNotesRepository(
                         draft.pendingMedia.flatMap { pending ->
                             listOfNotNull(pending.filePath, pending.fallbackFilePath)
                         }
-                } + covers.filterNotNull()
+                } + covers.filterNotNull() + retainedMedia()
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Exception) {

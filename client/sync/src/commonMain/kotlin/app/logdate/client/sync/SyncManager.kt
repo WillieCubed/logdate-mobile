@@ -221,6 +221,7 @@ enum class SyncPausedReason {
      * matches its account. It never makes its own; sync waits until the phone links it again.
      */
     NEEDS_DEVICE_LINK,
+    LOCAL_STORAGE_UNAVAILABLE,
 }
 
 /**

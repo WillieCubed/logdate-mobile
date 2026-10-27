@@ -216,6 +216,13 @@ class LocationHistorySyncEngine(
         store.putBatch(moved.scope.owner, moved.scope.origin, requeued)
     }
 
+    /** Whether local location records are waiting to upload for the signed-in account. */
+    suspend fun hasPendingUploads(accessToken: String): Boolean {
+        if (!isEnabled()) return false
+        val namespace = captureNamespace(accessToken)
+        return store.pending(namespace.owner, namespace.origin, 1).isNotEmpty()
+    }
+
     /** Checked before minting an identity key on a fresh device, including location-only accounts. */
     suspend fun hasRemoteRecords(accessToken: String): Boolean {
         val namespace = captureNamespace(accessToken)
@@ -245,6 +252,8 @@ class LocationHistorySyncEngine(
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
+            app.logdate.client.sync
+                .throwIfDeviceBlocked(error)
             val type =
                 when ((error as? LocationHistoryTransportException)?.statusCode) {
                     401, 403 -> SyncErrorType.AUTHENTICATION_ERROR

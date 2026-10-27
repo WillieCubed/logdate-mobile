@@ -72,7 +72,7 @@ class DefaultSyncManager(
     internal val cloudMediaDataSource: CloudMediaDataSource,
     private val cloudDraftDataSource: CloudDraftDataSource,
     private val cloudAccountRepository: CloudAccountRepository,
-    private val sessionStorage: SessionStorage,
+    internal val sessionStorage: SessionStorage,
     internal val mediaManager: MediaManager,
     internal val mediaSyncRefStore: MediaSyncRefStore,
     internal val journalRepository: JournalRepository,
@@ -136,6 +136,7 @@ class DefaultSyncManager(
     /** Which store this device last synced each account through, to notice when the account moves. */
     internal val syncRouteStore: SyncRouteStore = InMemorySyncRouteStore(),
     private val publicationCustody: ManagedMediaPublicationCustody = ManagedMediaPublicationCustody.None,
+    val readinessGate: SyncReadinessGate = SyncReadinessGate(),
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     internal val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -143,6 +144,46 @@ class DefaultSyncManager(
     internal val syncMutex = Mutex()
 
     internal var isEnabled = true
+    internal val remoteRefreshSchedule = RemoteSyncRefreshSchedule()
+
+    internal fun hasRemoteRefreshDue(): Boolean {
+        if (!isEnabled || !readinessGate.canProbe()) return false
+        val bound = sessionStorage.getOriginBoundSession() ?: return false
+        return remoteRefreshSchedule.isDue(
+            app.logdate.client.sync.metadata
+                .UploadScope(bound.session.accountId, bound.origin),
+        )
+    }
+
+    /** Work a periodic cycle can attempt now; backed-off and parked records do not count. */
+    suspend fun hasDueWork(): Boolean {
+        if (!isEnabled || !readinessGate.canProbe()) return false
+        for (type in EntityType.entries) {
+            if (syncMetadataService.getPendingUploads(type).any { retryCoordinator.shouldAttempt(type, it) }) return true
+        }
+        if ((downloadInbox?.dueCount() ?: 0) > 0) return true
+        val token = sessionStorage.getSession()?.accessToken ?: return false
+        return historyEngine?.hasPendingUploads(token) == true
+    }
+
+    val deletionRecovery =
+        app.logdate.client.sync.conflict.DeletionConflictRecovery(
+            conflictStore,
+            journalNotesRepository,
+            journalRepository,
+            journalContentRepository,
+            transactionManager,
+            {
+                sessionStorage.getOriginBoundSession()?.let {
+                    app.logdate.client.sync.metadata
+                        .UploadScope(it.session.accountId, it.origin)
+                }
+            },
+            mediaManager = mediaManager,
+            mediaRefs = mediaSyncRefStore,
+            metadata = syncMetadataService,
+            mediaFiles = mediaReferences as? app.logdate.client.media.storage.MediaFileResolver,
+        )
 
     internal val momentDownloader by lazy { momentSyncConfig?.let(::createMomentDownloader) }
     internal val momentUploader by lazy { momentSyncConfig?.let(::createMomentUploader) }
@@ -178,6 +219,8 @@ class DefaultSyncManager(
             identityRecoveryNeededStore = identityRecoveryNeededStore,
             unreadableCloudRecordStore = unreadableCloudRecordStore,
             pendingRecoveryCount = { downloadInbox?.count() ?: 0 },
+            attentionRecoveryCount = { downloadInbox?.needingAttentionCount() ?: 0 },
+            readinessGate = readinessGate,
             linkedDevice = !profile.mintsIdentityKey,
             identityKeyMissing = { identityKeyManager?.hasIdentityKey() == false },
         )
@@ -188,6 +231,7 @@ class DefaultSyncManager(
             transactionManager = transactionManager,
             syncMetadataService = syncMetadataService,
             conflictStore = conflictStore,
+            retainDeletedEdit = deletionRecovery::retain,
             mapCloudApiError = statusPublisher::handleCloudApiError,
             mapException = statusPublisher::handleSyncException,
             unreadableCloudRecordStore = unreadableCloudRecordStore,
@@ -207,11 +251,7 @@ class DefaultSyncManager(
         if (startNow) {
             syncScope.launch {
                 releaseUploadBackoff()
-                do {
-                    val result = fullSync()
-                    if (!result.success || !result.hasMorePending) break
-                    kotlinx.coroutines.delay(1_000)
-                } while (true)
+                SyncPassLoop(runPass = { fullSync() }).runUntilSettled()
             }
         }
     }
@@ -220,7 +260,12 @@ class DefaultSyncManager(
 
     override suspend fun downloadRemoteChanges(): SyncResult = runRemoteDownload()
 
-    override suspend fun fullSync(): SyncResult = runCompleteSync()
+    override suspend fun fullSync(): SyncResult =
+        try {
+            runCompleteSync()
+        } catch (error: Exception) {
+            statusPublisher.handleSyncException(error, "Sync failed")
+        }
 
     private val enrollment by lazy {
         SyncDeviceEnrollment(sessionStorage, deviceIdProvider, tokenRefresher::isAuthenticated, deviceEnrollment)
@@ -336,6 +381,7 @@ class DefaultSyncManager(
     /** Reconsider transient work after connectivity returns or an immediate backup is requested. */
     suspend fun releaseUploadBackoff() {
         syncMutex.withLock {
+            readinessGate.allowProbe(manual = true)
             diagnostics?.record(SyncDiagnosticEvent(DiagnosticPhase.SCHEDULING, DiagnosticOutcome.QUEUED))
             retryCoordinator.releaseBackoff()
             downloadInbox?.release()
@@ -434,6 +480,7 @@ class DefaultSyncManager(
             deadLetterStore = deadLetterStore,
             backoff = backoff,
             recordConflict = downloadEngine::recordConflict,
+            preserveDeletedEdit = downloadEngine::preserveDeletionConflict,
             diagnosticSource = diagnosticSource,
             diagnostics = { event, source -> diagnostics?.record(event, source?.scope, source?.epoch) },
         )

@@ -11,6 +11,9 @@ import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
 import app.logdate.client.sync.cloud.JournalChange
 import app.logdate.client.sync.cloud.JournalChangesResponse
 import app.logdate.client.sync.cloud.JournalDeletion
+import app.logdate.client.sync.conflict.KeyValueSyncConflictStore
+import app.logdate.client.sync.conflict.SyncConflictRecord
+import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
@@ -33,6 +36,8 @@ import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -41,10 +46,11 @@ import kotlin.uuid.Uuid
 
 class JournalDownloadReconciliationTest {
     @Test
-    fun `download skips pending association deletion`() =
+    fun `download settles matching pending association deletion without conflict`() =
         runTest {
             val mockApiClient = fakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
+            val conflictStore = InMemorySyncConflictStore()
             val mockJournalRepository = FakeJournalRepository()
             val mockNotesRepository = FakeJournalNotesRepository()
             val trackingContentRepository = TrackingJournalContentRepository()
@@ -91,7 +97,7 @@ class JournalDownloadReconciliationTest {
                     journalContentRepository = trackingContentRepository,
                     journalConflictResolver = lastWriteWinsResolver(),
                     noteConflictResolver = lastWriteWinsResolver(),
-                    conflictStore = InMemorySyncConflictStore(),
+                    conflictStore = conflictStore,
                     deadLetterStore = InMemorySyncDeadLetterStore(),
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
@@ -101,11 +107,11 @@ class JournalDownloadReconciliationTest {
 
             val result = syncManager.downloadRemoteChanges()
 
-            assertTrue(
-                trackingContentRepository.hasAssociation(contentId, journalId),
-                "Pending association should not be deleted",
-            )
-            assertTrue(result.conflictsResolved > 0, "Should register a conflict when skipping association deletion")
+            assertTrue(result.success)
+            assertFalse(trackingContentRepository.hasAssociation(contentId, journalId), "Matching deletion removes the relationship")
+            assertTrue(syncMetadataService.getPendingUploads(EntityType.ASSOCIATION).isEmpty(), "Matching delete must settle")
+            assertEquals(0, result.conflictsResolved, "A matching delete does not conflict")
+            assertTrue(conflictStore.list().isEmpty(), "Matching deletion needs no recovery record")
         }
 
     @Test
@@ -181,13 +187,29 @@ class JournalDownloadReconciliationTest {
         }
 
     @Test
-    fun `download skips pending journal deletion`() =
+    fun `download retains pending journal edit before applying deletion`() =
         runTest {
             val mockApiClient = fakeCloudApiClient()
             val mockNotesRepository = FakeJournalNotesRepository()
             val mockJournalRepository = FakeJournalRepository()
             val mockJournalContentRepository = FakeJournalContentRepository()
             val syncMetadataService = fakeSyncMetadataService()
+            val recoveryStorage = InMemoryKeyValueStorage()
+            val conflictStore =
+                preservingStore(recoveryStorage) { record ->
+                    val snapshot = assertNotNull(record.deletedEdit?.journal)
+                    assertEquals(
+                        snapshot,
+                        mockJournalRepository.getJournalById(snapshot.id),
+                        "Snapshot must be saved before original deletion",
+                    )
+                    assertTrue(
+                        syncMetadataService
+                            .getPendingUploads(EntityType.JOURNAL)
+                            .any { it.entityId == record.entityId && it.operation != PendingOperation.DELETE },
+                        "The edit must still be pending when its recovery snapshot is saved",
+                    )
+                }
 
             val localJournal =
                 Journal(
@@ -232,7 +254,7 @@ class JournalDownloadReconciliationTest {
                     journalContentRepository = mockJournalContentRepository,
                     journalConflictResolver = lastWriteWinsResolver(),
                     noteConflictResolver = lastWriteWinsResolver(),
-                    conflictStore = InMemorySyncConflictStore(),
+                    conflictStore = conflictStore,
                     deadLetterStore = InMemorySyncDeadLetterStore(),
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
@@ -243,18 +265,39 @@ class JournalDownloadReconciliationTest {
             val result = syncManager.downloadRemoteChanges()
             val remainingJournals = mockJournalRepository.allJournalsObserved.first()
 
-            assertTrue(remainingJournals.any { it.id == localJournal.id }, "Pending journal should not be deleted")
-            assertTrue(result.conflictsResolved > 0, "Should register a conflict when skipping deletion")
+            assertTrue(result.success, "Preservation and deletion should both succeed")
+            assertFalse(remainingJournals.any { it.id == localJournal.id }, "Original deleted ID must be removed")
+            val retained = KeyValueSyncConflictStore(recoveryStorage).list().single()
+            assertEquals("DELETION_CONFLICT", retained.reason)
+            assertEquals(localJournal, retained.deletedEdit?.journal, "A fresh store must recover the complete local edit")
+            assertTrue(syncMetadataService.getPendingUploads(EntityType.JOURNAL).isEmpty(), "The rejected edit must stop uploading")
+            assertEquals(1, result.conflictsResolved, "The preserved edit must be visible as one recovery conflict")
         }
 
     @Test
-    fun `download skips deletion when local journal updated after last sync`() =
+    fun `download retains later journal edit before applying deletion`() =
         runTest {
             val mockApiClient = fakeCloudApiClient()
             val mockNotesRepository = FakeJournalNotesRepository()
             val mockJournalRepository = FakeJournalRepository()
             val mockJournalContentRepository = FakeJournalContentRepository()
             val syncMetadataService = fakeSyncMetadataService()
+            val recoveryStorage = InMemoryKeyValueStorage()
+            val conflictStore =
+                preservingStore(recoveryStorage) { record ->
+                    val snapshot = assertNotNull(record.deletedEdit?.journal)
+                    assertEquals(
+                        snapshot,
+                        mockJournalRepository.getJournalById(snapshot.id),
+                        "Snapshot must be saved before original deletion",
+                    )
+                    assertTrue(
+                        syncMetadataService
+                            .getPendingUploads(EntityType.JOURNAL)
+                            .any { it.entityId == record.entityId && it.operation != PendingOperation.DELETE },
+                        "The edit must still be pending when its recovery snapshot is saved",
+                    )
+                }
 
             val syncManager =
                 DefaultSyncManager(
@@ -272,7 +315,7 @@ class JournalDownloadReconciliationTest {
                     journalContentRepository = mockJournalContentRepository,
                     journalConflictResolver = lastWriteWinsResolver(),
                     noteConflictResolver = lastWriteWinsResolver(),
-                    conflictStore = InMemorySyncConflictStore(),
+                    conflictStore = conflictStore,
                     deadLetterStore = InMemorySyncDeadLetterStore(),
                     retryScheduleStore = InMemorySyncRetryScheduleStore(),
                     syncMetadataService = syncMetadataService,
@@ -323,7 +366,25 @@ class JournalDownloadReconciliationTest {
             val result = syncManager.downloadRemoteChanges()
             val remainingJournals = mockJournalRepository.allJournalsObserved.first()
 
-            assertTrue(remainingJournals.any { it.id == localJournal.id }, "Updated journal should not be deleted")
-            assertTrue(result.conflictsResolved > 0, "Should register a conflict when skipping deletion")
+            assertTrue(result.success, "Preservation and deletion should both succeed")
+            assertFalse(remainingJournals.any { it.id == localJournal.id }, "Original deleted ID must be removed")
+            val retained = KeyValueSyncConflictStore(recoveryStorage).list().single()
+            assertEquals("DELETION_CONFLICT", retained.reason)
+            assertEquals(localJournal, retained.deletedEdit?.journal, "A fresh store must recover the complete local edit")
+            assertTrue(syncMetadataService.getPendingUploads(EntityType.JOURNAL).isEmpty(), "The rejected edit must stop uploading")
+            assertEquals(1, result.conflictsResolved, "The preserved edit must be visible as one recovery conflict")
         }
+
+    private fun preservingStore(
+        storage: InMemoryKeyValueStorage,
+        beforeSave: suspend (SyncConflictRecord) -> Unit,
+    ): SyncConflictStore {
+        val persisted = KeyValueSyncConflictStore(storage)
+        return object : SyncConflictStore by persisted {
+            override suspend fun add(record: SyncConflictRecord) {
+                beforeSave(record)
+                persisted.add(record)
+            }
+        }
+    }
 }

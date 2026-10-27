@@ -75,13 +75,17 @@ internal class IdentityKeyProvisioner(
             mediaPayloadKeyProvider?.clearCachedKey()
             syncMetadataService.resetAllCursors()
             identityRecoveryNeededStore.setNeeded(false)
-            downloadInbox?.release()
+            downloadInbox?.release(afterRecovery = true)
             return
         }
 
         if (client == null) {
             runCatching { manager.setupNewIdentity() }
-                .onFailure { Napier.e("Could not provision an identity key; uploads will fail") }
+                .onFailure {
+                    if (it is kotlinx.coroutines.CancellationException) throw it
+                    throwIfDeviceBlocked(it)
+                    Napier.e("Could not provision an identity key")
+                }
             return
         }
 
@@ -95,7 +99,11 @@ internal class IdentityKeyProvisioner(
             }
             false -> {
                 runCatching { manager.setupNewIdentity() }
-                    .onFailure { Napier.e("Could not provision an identity key; uploads will fail") }
+                    .onFailure {
+                        if (it is kotlinx.coroutines.CancellationException) throw it
+                        throwIfDeviceBlocked(it)
+                        Napier.e("Could not provision an identity key")
+                    }
                 if (manager.hasIdentityKey() && accountId != null) manager.bindToAccount(accountId)
             }
             null -> {
@@ -120,6 +128,8 @@ internal class IdentityKeyProvisioner(
                 drafts.deletions.isNotEmpty() ||
                 locationHistorySyncEngine?.hasRemoteRecords(accessToken) == true
         }.getOrElse {
+            if (it is kotlinx.coroutines.CancellationException) throw it
+            throwIfDeviceBlocked(it)
             Napier.w("Could not check whether the account already has cloud data")
             null
         }

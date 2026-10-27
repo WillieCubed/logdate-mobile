@@ -33,10 +33,18 @@ internal class DownloadInboxFailureRecorder(
             if (row.state == "APPLIED" || (version != null && row.version != version)) return@withTransaction
             val policyDeferred = reason == DiagnosticReason.NETWORK_POLICY.name
             val attempt = if (policyDeferred) row.attempts else (row.attempts + 1).coerceAtMost(30)
+            val parks = !policyDeferred && reason != DiagnosticReason.UNSUPPORTED_FORMAT.name && attempt >= DownloadInbox.MAX_ATTEMPTS
             val delay = if (policyDeferred) 30_000L else (1000L shl attempt.coerceAtMost(12)).coerceAtMost(60 * 60 * 1000L)
             val updated =
                 row.copy(
-                    state = if (policyDeferred) "WAITING" else "FAILED",
+                    state =
+                        if (policyDeferred) {
+                            "WAITING"
+                        } else if (parks) {
+                            "PARKED"
+                        } else {
+                            "FAILED"
+                        },
                     attempts = attempt,
                     nextAttemptAt = now() + delay,
                     reason = DiagnosticReason.entries.firstOrNull { it.name == reason }?.name ?: DiagnosticReason.UNKNOWN.name,
@@ -55,14 +63,14 @@ internal class DownloadInboxFailureRecorder(
                         ) {
                             DiagnosticOutcome.PAUSED
                         } else {
-                            DiagnosticOutcome.RETRY_SCHEDULED
+                            if (row.state == "PARKED") DiagnosticOutcome.FAILED else DiagnosticOutcome.RETRY_SCHEDULED
                         },
                     reason = classified,
                     action = actionFor(classified),
                     operationId = row.operationId,
                     attemptId = attemptId ?: Uuid.random().toString(),
                     attemptCount = row.attempts,
-                    retryable = true,
+                    retryable = row.state != "PARKED",
                 ),
                 source,
             )

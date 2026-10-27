@@ -8,6 +8,7 @@ import app.logdate.client.sync.KeyValueSyncRouteStore
 import app.logdate.client.sync.RecoverIdentityUseCase
 import app.logdate.client.sync.RoomSyncTransactionManager
 import app.logdate.client.sync.SyncManager
+import app.logdate.client.sync.SyncReadinessGate
 import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.cloud.di.cloudAccountModule
 import app.logdate.client.sync.conflict.KeyValueSyncConflictStore
@@ -41,6 +42,7 @@ actual val syncModule: Module =
         single<IdentityRecoveryNeededStore> { KeyValueIdentityRecoveryNeededStore(get()) }
         single<UnreadableCloudRecordStore> { KeyValueUnreadableCloudRecordStore(get()) }
         single { RecoverIdentityUseCase(get(), get(), get(), get(), get(), get(), get(), get()) }
+        single { SyncReadinessGate() }
         single<SyncConflictStore> { KeyValueSyncConflictStore(get()) }
         single<MediaSyncRefStore> {
             val configRepository = get<LogDateConfigRepository>()
@@ -56,6 +58,7 @@ actual val syncModule: Module =
         single<JournalStorageMove> { get<DefaultSyncManager>().journalStorageMove }
         single<DefaultSyncManager> {
             DefaultSyncManager(
+                readinessGate = get(),
                 cloudContentDataSource = get(),
                 cloudJournalDataSource = get(),
                 cloudAssociationDataSource = get(),

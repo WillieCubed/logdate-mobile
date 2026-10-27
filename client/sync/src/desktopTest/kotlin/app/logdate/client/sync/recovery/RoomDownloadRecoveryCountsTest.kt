@@ -42,7 +42,19 @@ class RoomDownloadRecoveryCountsTest {
                     DownloadRecoveryCounts(retained = 4, retryable = 2, failed = 1),
                     inbox.recoveryCounts(includePolicyDeferred = true),
                 )
+                assertEquals(
+                    DownloadRecoveryCounts(retained = 4, retryable = 2, failed = 1),
+                    database.downloadInboxDao().recoveryCounts(selected.owner, selected.origin, Long.MAX_VALUE),
+                    "A due failed record remains a failure until it is retried or explicitly released",
+                )
+                assertEquals(1, inbox.needingAttentionCount(), "Unsupported formats alone do not fail backup status")
                 inbox.release()
+                assertEquals(
+                    "WAITING",
+                    database.downloadInboxDao().get(selected.owner, selected.origin, "MEDIA_NATIVE_NOTE", "storage")?.state,
+                )
+                assertEquals(1, database.downloadInboxDao().get(selected.owner, selected.origin, "MEDIA_NATIVE_NOTE", "storage")?.attempts)
+                assertEquals(0, inbox.needingAttentionCount())
                 assertEquals(
                     DownloadRecoveryCounts(retained = 4, retryable = 3, failed = 0),
                     inbox.recoveryCounts(includePolicyDeferred = true),

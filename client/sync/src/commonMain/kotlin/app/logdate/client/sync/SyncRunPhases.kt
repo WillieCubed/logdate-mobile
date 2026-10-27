@@ -47,16 +47,21 @@ internal suspend fun DefaultSyncManager.runFullSyncPhase(
 
         accountStorageBlocked()?.let { return it }
 
+        if (!readinessGate.allowProbe()) return SyncResult(success = false)
         syncStateFlow.value = SyncState.Syncing
-        beforeAccessToken()
 
         try {
+            beforeAccessToken()
             val accessToken = tokenRefresher.getAccessToken() ?: return authError()
             identityProvisioner.provision(accessToken)
             if (identityRecoveryNeededStore.isNeeded() || identityKeyManager?.hasIdentityKey() == false) {
+                readinessGate.pause(
+                    app.logdate.client.device.crypto
+                        .IdentityKeyNotFoundException("Encryption identity unavailable"),
+                )
                 return SyncResult(success = false)
             }
-            body(accessToken)
+            body(accessToken).also { if (it.success) readinessGate.ready() }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             statusPublisher.handleSyncException(e, exceptionLabel)
@@ -93,16 +98,22 @@ internal suspend fun DefaultSyncManager.runPendingUploads(): SyncResult =
         // reachable, so it silently disappears. Running them in parallel bought nothing
         // (they contend on one repo) and cost entries.
         val journalResult = uploader.uploadJournals(accessToken)
+        if (readinessGate.reason.value != null) return@runFullSyncPhase journalResult
         val contentResult = uploader.uploadContent(accessToken)
+        if (readinessGate.reason.value != null) return@runFullSyncPhase contentResult
         val mergeResult =
             if (journalResult.success && contentResult.success) {
                 mergeUploader.uploadPending()
             } else {
                 SyncResult(success = false)
             }
+        if (readinessGate.reason.value != null) return@runFullSyncPhase mergeResult
         val associationResult = uploader.uploadAssociations(accessToken)
+        if (readinessGate.reason.value != null) return@runFullSyncPhase associationResult
         val draftResult = if (profile.syncsDrafts) uploader.uploadDrafts(accessToken) else SyncResult(success = true)
+        if (readinessGate.reason.value != null) return@runFullSyncPhase draftResult
         val historyResult = uploadLocationHistory(accessToken)
+        if (readinessGate.reason.value != null) return@runFullSyncPhase historyResult
         val momentResult = momentUploader?.upload() ?: SyncResult(success = true)
         val totalUploaded =
             journalResult.uploadedItems +
@@ -159,33 +170,69 @@ private suspend fun DefaultSyncManager.downloadLocationHistory(accessToken: Stri
     return engine.downloadFromSpace(accessToken, viaSpace)
 }
 
+private fun RemoteDownloads.blockedResult(): SyncResult =
+    listOf(journals, content, associations, locationHistory, moments).firstOrNull { it.errors.isNotEmpty() }
+        ?: SyncResult(success = false)
+
+private suspend fun DefaultSyncManager.fetchRemoteDownloads(accessToken: String): RemoteDownloads {
+    val journalSince = cursorFor(EntityType.JOURNAL)
+    val contentSince = cursorFor(EntityType.NOTE)
+    val associationSince = cursorFor(EntityType.ASSOCIATION)
+
+    // Sequential for the same reason as the upload side: these share one server
+    // instance whose per-request cost is proportional to repo size, and fanning out
+    // was enough on its own to starve every request thread it had.
+    val downloads =
+        downloader.downloadPass {
+            val journals = downloader.downloadJournals(accessToken, journalSince)
+            val content =
+                if (readinessGate.reason.value ==
+                    null
+                ) {
+                    downloader.downloadContent(accessToken, contentSince)
+                } else {
+                    SyncResult(success = false)
+                }
+            val associations =
+                if (readinessGate.reason.value ==
+                    null
+                ) {
+                    downloader.downloadAssociations(accessToken, associationSince)
+                } else {
+                    SyncResult(success = false)
+                }
+            val history = if (readinessGate.reason.value == null) downloadLocationHistory(accessToken) else SyncResult(success = false)
+            val moments =
+                if (readinessGate.reason.value ==
+                    null
+                ) {
+                    momentDownloader?.download() ?: SyncResult(success = true)
+                } else {
+                    SyncResult(success = false)
+                }
+            RemoteDownloads(journals, content, associations, history, moments)
+        }
+    return downloads
+}
+
 internal suspend fun DefaultSyncManager.runRemoteDownload(): SyncResult =
     runFullSyncPhase(
         operationName = "Download",
         exceptionLabel = "Download failed",
     ) { accessToken ->
+        sessionStorage.getOriginBoundSession()?.let {
+            remoteRefreshSchedule.recordAttempt(
+                app.logdate.client.sync.metadata
+                    .UploadScope(it.session.accountId, it.origin),
+            )
+        }
         auditLegacyRecordsIfNeeded()
-        val journalSince = cursorFor(EntityType.JOURNAL)
-        val contentSince = cursorFor(EntityType.NOTE)
-        val associationSince = cursorFor(EntityType.ASSOCIATION)
-
-        // Sequential for the same reason as the upload side: these share one server
-        // instance whose per-request cost is proportional to repo size, and fanning out
-        // was enough on its own to starve every request thread it had.
-        val downloads =
-            downloader.downloadPass {
-                RemoteDownloads(
-                    downloader.downloadJournals(accessToken, journalSince),
-                    downloader.downloadContent(accessToken, contentSince),
-                    downloader.downloadAssociations(accessToken, associationSince),
-                    downloadLocationHistory(accessToken),
-                    momentDownloader?.download() ?: SyncResult(success = true),
-                )
-            }
+        val downloads = fetchRemoteDownloads(accessToken)
         val (journalResult, contentResult, associationResult, historyResult, momentResult) = downloads
         if (journalResult.remoteInventoryComplete) legacyBackfill?.enqueueRecordsIfNeeded(EntityType.JOURNAL)
         if (contentResult.remoteInventoryComplete) legacyBackfill?.enqueueRecordsIfNeeded(EntityType.NOTE)
         if (associationResult.success) legacyBackfill?.enqueueMembershipsIfNeeded()
+        if (readinessGate.reason.value != null) return@runFullSyncPhase downloads.blockedResult()
         recoverMedia(accessToken, EntityType.NOTE)
         recoverMedia(accessToken, EntityType.JOURNAL)
         val totalDownloaded =
@@ -256,11 +303,16 @@ internal suspend fun DefaultSyncManager.syncEntityType(
         disabledOrUnauthenticated()?.let { return@withLock it }
         accountStorageBlocked()?.let { return@withLock it }
 
+        if (!readinessGate.allowProbe()) return@withLock SyncResult(success = false)
         syncStateFlow.value = SyncState.Syncing
         try {
             val accessToken = tokenRefresher.getAccessToken() ?: return@withLock authError()
             identityProvisioner.provision(accessToken)
             if (identityRecoveryNeededStore.isNeeded() || identityKeyManager?.hasIdentityKey() == false) {
+                readinessGate.pause(
+                    app.logdate.client.device.crypto
+                        .IdentityKeyNotFoundException("Encryption identity unavailable"),
+                )
                 return@withLock SyncResult(success = false)
             }
 
@@ -268,6 +320,7 @@ internal suspend fun DefaultSyncManager.syncEntityType(
             val since = cursorFor(entityType)
             val downloadResult = download(accessToken, since)
             recoverMedia(accessToken, entityType)
+            if (readinessGate.reason.value != null) return@withLock downloadResult
 
             statusPublisher.beginRunForPending(entityType)
             val uploadResult = upload(accessToken)
@@ -292,7 +345,15 @@ internal suspend fun DefaultSyncManager.syncEntityType(
             )
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            if (onException != null) onException(e) else throw e
+            if (deviceBlockReason(e) !=
+                null
+            ) {
+                statusPublisher.handleSyncException(e, quotaContext)
+            } else if (onException != null) {
+                onException(e)
+            } else {
+                throw e
+            }
         } finally {
             syncStateFlow.value = SyncState.Idle
         }
@@ -312,9 +373,12 @@ internal suspend fun DefaultSyncManager.runCompleteSync(): SyncResult {
             if (profile.sweepsOnFirstSync) uploader.enqueueEverythingOnFirstSync()
             val downloadResult = run.phase(DiagnosticPhase.FETCH) { downloadRemoteChanges() }
             if (!tokenRefresher.isFullSyncScopeCurrent()) return@recovery SyncResult(success = false, hasMorePending = true)
+            if (readinessGate.reason.value != null) return@recovery downloadResult
             val uploadResult = run.phase(DiagnosticPhase.UPLOAD) { uploadPendingChanges() }
             if (!tokenRefresher.isFullSyncScopeCurrent()) return@recovery SyncResult(success = false, hasMorePending = true)
+            if (readinessGate.reason.value != null) return@recovery uploadResult
             val draftResult = run.phase(DiagnosticPhase.RECOVERY) { syncDrafts() }
+            if (readinessGate.reason.value != null) return@recovery draftResult
             if (!tokenRefresher.isFullSyncScopeCurrent()) return@recovery SyncResult(success = false, hasMorePending = true)
 
             enrollDeviceIfPossible()
