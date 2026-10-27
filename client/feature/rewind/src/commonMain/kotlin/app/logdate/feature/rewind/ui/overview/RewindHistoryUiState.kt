@@ -48,6 +48,8 @@ data class RewindHistoryUiState(
 
 fun List<RewindHistoryUiState>.forWeeklyLaunch(): List<RewindHistoryUiState> =
     filterNot { rewind -> rewind.label.length == 4 && rewind.label.all(Char::isDigit) }
+        .groupBy { it.startDate to it.uid.takeIf { _ -> it.milestone != null } }
+        .map { (_, versions) -> versions.maxBy { it.endDate } }
 
 /**
  * Optional milestone marker rendered on a past-rewind card.

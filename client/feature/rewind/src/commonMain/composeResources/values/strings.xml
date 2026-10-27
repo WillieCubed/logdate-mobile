@@ -1,39 +1,77 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8" ?>
 <resources>
     <!-- Accessibility -->
     <string name="cd_rewind_journal_photo">Photo from %1$s</string>
     <string name="cd_rewind_video_frame">Video moment from %1$s</string>
     <string name="rewind_video_frame_label">Video still</string>
-    <string name="rewind_media_unavailable">This memory could not be loaded. Check that it is still on this device, then refresh your Rewind.</string>
+    <string
+    name="rewind_media_unavailable"
+  >This memory could not be loaded. Check that it is still on this device, then refresh your Rewind.</string>
 
     <!-- Rewind settings -->
     <string name="rewind_settings_title">Rewind</string>
-    <string name="rewind_settings_auto_generation_label">Generate weekly rewinds automatically</string>
-    <string name="rewind_settings_auto_generation_helper">Each week, LogDate quietly stitches your entries into a story so it&apos;s waiting for you when you open the app. Turn this off and rewinds only get made when you ask for them.</string>
-    <string name="rewind_settings_notifications_label">Notify me when a Rewind is ready</string>
-    <string name="rewind_settings_notifications_helper">Sent when your weekly Rewind finishes. Off stops LogDate from posting it at all.</string>
-    <string name="rewind_settings_replies_label">Let me reply to noticing prompts</string>
-    <string name="rewind_settings_replies_helper">Type answers to each Rewind&apos;s questions inside the story. Off shows the questions only.</string>
+    <string
+    name="rewind_settings_auto_generation_label"
+  >Generate weekly rewinds automatically</string>
+    <string
+    name="rewind_settings_auto_generation_helper"
+  >Each week, LogDate quietly stitches your entries into a story so it&apos;s waiting for you when you open the app. Turn this off and rewinds only get made when you ask for them.</string>
+    <string
+    name="rewind_settings_notifications_label"
+  >Notify me when a Rewind is ready</string>
+    <string
+    name="rewind_settings_notifications_helper"
+  >Sent when your weekly Rewind finishes. Off stops LogDate from posting it at all.</string>
+    <string
+    name="rewind_settings_replies_label"
+  >Let me reply to noticing prompts</string>
+    <string
+    name="rewind_settings_replies_helper"
+  >Type answers to each Rewind&apos;s questions inside the story. Off shows the questions only.</string>
     <string name="rewind_settings_strictness_label">Photo selection</string>
-    <string name="rewind_settings_strictness_helper">Choose how aggressively borderline photos get filtered out. Strict trims to your best moments; Lenient keeps more of your camera roll.</string>
+    <string
+    name="rewind_settings_strictness_helper"
+  >Choose how aggressively borderline photos get filtered out. Strict trims to your best moments; Lenient keeps more of your camera roll.</string>
     <string name="rewind_settings_strictness_lenient">Lenient</string>
     <string name="rewind_settings_strictness_standard">Standard</string>
     <string name="rewind_settings_strictness_strict">Strict</string>
-    <string name="rewind_settings_include_screenshots_label">Include screenshots</string>
-    <string name="rewind_settings_include_screenshots_helper">Let saved screenshots appear in your Rewinds alongside your real photos.</string>
-    <string name="rewind_upgrade_chip_message">Your Rewind is built locally.</string>
-    <string name="rewind_upgrade_chip_action">Upgrade for AI-written stories</string>
+    <string
+    name="rewind_settings_include_screenshots_label"
+  >Include screenshots</string>
+    <string
+    name="rewind_settings_include_screenshots_helper"
+  >Let saved screenshots appear in your Rewinds alongside your real photos.</string>
+    <string
+    name="rewind_upgrade_chip_message"
+  >Your Rewind is built locally.</string>
+    <string
+    name="rewind_upgrade_chip_action"
+  >Upgrade for AI-written stories</string>
     <string name="first_rewind_onboarding_title">Welcome to Rewind</string>
-    <string name="first_rewind_onboarding_cadence_heading">Every week, a story</string>
-    <string name="first_rewind_onboarding_cadence_body">Every Sunday, LogDate weaves your week&apos;s entries and photos into a short story you can replay.</string>
-    <string name="first_rewind_onboarding_share_heading">Share what stood out</string>
-    <string name="first_rewind_onboarding_share_body">Tap any moment in a Rewind to share it as a card. The rest stays on your phone.</string>
-    <string name="first_rewind_onboarding_strictness_heading">Tune the photo picker</string>
-    <string name="first_rewind_onboarding_strictness_body">Choose how aggressively borderline shots get filtered from Settings. Strict for the best of the best, Lenient to keep more.</string>
+    <string
+    name="first_rewind_onboarding_cadence_heading"
+  >Every week, a story</string>
+    <string
+    name="first_rewind_onboarding_cadence_body"
+  >Every Sunday, LogDate weaves your week&apos;s entries and photos into a short story you can replay.</string>
+    <string
+    name="first_rewind_onboarding_share_heading"
+  >Share what stood out</string>
+    <string
+    name="first_rewind_onboarding_share_body"
+  >Tap any moment in a Rewind to share it as a card. The rest stays on your phone.</string>
+    <string
+    name="first_rewind_onboarding_strictness_heading"
+  >Tune the photo picker</string>
+    <string
+    name="first_rewind_onboarding_strictness_body"
+  >Choose how aggressively borderline shots get filtered from Settings. Strict for the best of the best, Lenient to keep more.</string>
     <string name="first_rewind_onboarding_got_it">Got it</string>
 
     <!-- Annual rewind -->
-    <string name="annual_rewind_generate">Create your %1$d Year in Review</string>
+    <string
+    name="annual_rewind_generate"
+  >Create your %1$d Year in Review</string>
 
     <!-- Weather chip on title panel -->
     <string name="weather_chip_sunny">Sunny week</string>
@@ -47,8 +85,12 @@
     <string name="reflection_prompt_reply">Reply</string>
     <string name="reflection_prompt_reply_edit">Edit your reply</string>
     <string name="reflection_prompt_reply_sheet_title">Your reply</string>
-    <string name="reflection_prompt_reply_field_label">What you want to say</string>
-    <string name="reflection_prompt_reply_field_placeholder">Whatever comes to mind. Nobody else sees this.</string>
+    <string
+    name="reflection_prompt_reply_field_label"
+  >What you want to say</string>
+    <string
+    name="reflection_prompt_reply_field_placeholder"
+  >Whatever comes to mind. Nobody else sees this.</string>
     <string name="reflection_prompt_reply_save">Save</string>
     <string name="reflection_prompt_reply_cancel">Cancel</string>
     <string name="reflection_prompt_reply_clear">Clear reply</string>
@@ -56,45 +98,86 @@
 
     <!-- Rewind screens -->
     <string name="close_rewind">Close rewind</string>
-    <string name="rewind_generation_failed">Your Rewind couldn&apos;t be finished. Try again.</string>
-    <string name="rewind_detail_load_failed">This Rewind couldn&apos;t be loaded. Try again later.</string>
+    <string
+    name="rewind_generation_failed"
+  >Your Rewind couldn&apos;t be finished. Try again.</string>
+    <string
+    name="rewind_detail_load_failed"
+  >This Rewind couldn&apos;t be loaded. Try again later.</string>
     <string name="rewind_title">Rewind</string>
-    <string name="rewind_current_week_generating">Putting your week together...</string>
-    <string name="rewind_current_week_empty">No entries from last week yet.</string>
+    <string
+    name="rewind_current_week_generating"
+  >Putting your week together...</string>
+    <string
+    name="rewind_current_week_empty"
+  >No entries from last week yet.</string>
+    <string name="rewind_last_week">Last week</string>
+    <string name="rewind_last_week_title">Last week&apos;s story</string>
+    <string name="rewind_this_week_so_far">This week so far</string>
+    <string
+    name="rewind_this_week_empty"
+  >Save a memory this week, then come back to see your Rewind.</string>
+    <string name="rewind_create_selected_week">Create Rewind</string>
+    <string name="rewind_add_memory">Add a memory</string>
+    <string name="rewind_update">Update Rewind</string>
+    <string name="rewind_updating">Updating…</string>
+    <string
+    name="rewind_update_failed"
+  >Your saved Rewind is still here. The update couldn&apos;t be finished. Try again.</string>
     <string name="rewind_current_week_label">This Week</string>
     <string name="rewind_current_week_title">This week&apos;s story</string>
     <string name="rewind_loading_message">Loading your rewinds...</string>
     <string name="rewind_loading_title">Your stories</string>
     <string name="rewind_retry_generation">Try Rewind again</string>
-    <string name="rewind_create_this_week">Create this week&apos;s Rewind</string>
+    <string
+    name="rewind_create_this_week"
+  >Create this week&apos;s Rewind</string>
     <string name="delete_rewind">Delete this Rewind</string>
     <string name="delete_rewind_dialog_title">Delete this Rewind?</string>
-    <string name="delete_rewind_dialog_message">The story, the photos and notes pulled into it, and any replies you typed back at it will all be removed from this device. Your original journal entries are not touched.</string>
+    <string
+    name="delete_rewind_dialog_message"
+  >The story, the photos and notes pulled into it, and any replies you typed back at it will all be removed from this device. Your original journal entries are not touched.</string>
     <string name="delete_rewind_dialog_confirm">Delete</string>
     <string name="delete_rewind_dialog_cancel">Keep it</string>
     <string name="past_rewind">Past rewinds</string>
-    <string name="past_rewinds_empty">No past rewinds yet. Your weekly stories will show up here once they&apos;re generated.</string>
+    <string
+    name="past_rewinds_empty"
+  >No past rewinds yet. Your weekly stories will show up here once they&apos;re generated.</string>
     <string name="more_rewinds_below">More rewinds below</string>
-    <string name="youve_reviewed_all_your_weekly_rewinds">You&apos;ve reviewed all your weekly rewinds</string>
+    <string
+    name="youve_reviewed_all_your_weekly_rewinds"
+  >You&apos;ve reviewed all your weekly rewinds</string>
 
     <!-- State messages -->
-    <string name="congrats_youve_reached_the_end">That&apos;s your story so far</string>
-    <string name="go_live_a_little_will_ya">Your story starts with your first entry</string>
-    <string name="rewind_empty_description">Your entries are being woven into a story. Check back soon.</string>
+    <string
+    name="congrats_youve_reached_the_end"
+  >That&apos;s your story so far</string>
+    <string
+    name="go_live_a_little_will_ya"
+  >Your story starts with your first entry</string>
+    <string
+    name="rewind_empty_description"
+  >Your entries are being woven into a story. Check back soon.</string>
     <string name="unsupported_panel_type">Unsupported panel type</string>
 
     <!-- Actions -->
     <string name="share_something">Share something</string>
     <string name="share_rewind_panel">Share this moment</string>
     <string name="share_rewind_chooser_title">Share moment</string>
-    <string name="share_rewind_panel_text_template">From my LogDate Rewind: %1$s</string>
+    <string
+    name="share_rewind_panel_text_template"
+  >From my LogDate Rewind: %1$s</string>
     <string name="share_rewind_panel_caption">A moment from my Rewind</string>
 
     <!-- Stats summary share -->
     <string name="share_rewind_stats">Share Rewind summary</string>
-    <string name="share_rewind_stats_chooser_title">Share Rewind summary</string>
+    <string
+    name="share_rewind_stats_chooser_title"
+  >Share Rewind summary</string>
     <string name="share_rewind_stats_caption">My Rewind</string>
-    <string name="share_rewind_stats_text_template">My latest Rewind: %1$s</string>
+    <string
+    name="share_rewind_stats_text_template"
+  >My latest Rewind: %1$s</string>
     <string name="share_rewind_stats_subtitle_template">%1$s — %2$s</string>
     <string name="share_rewind_stats_label_entries">entries</string>
     <string name="share_rewind_stats_label_photos">photos</string>

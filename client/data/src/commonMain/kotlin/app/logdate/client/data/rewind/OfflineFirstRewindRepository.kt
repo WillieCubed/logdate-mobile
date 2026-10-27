@@ -133,13 +133,9 @@ class OfflineFirstRewindRepository(
         withContext(ioDispatcher) {
             try {
                 val rewindEntity = rewind.toEntity()
-                cachedRewindDao.insertRewind(rewindEntity)
-
-                // Separate and convert content by type
                 val (textEntities, imageEntities, videoEntities) = rewind.content.toEntities(rewind.uid)
-
-                // Save content by type
-                cachedRewindDao.insertRewindContent(
+                cachedRewindDao.insertRewindWithContent(
+                    rewind = rewindEntity,
                     textContent = textEntities,
                     imageContent = imageEntities,
                     videoContent = videoEntities,
