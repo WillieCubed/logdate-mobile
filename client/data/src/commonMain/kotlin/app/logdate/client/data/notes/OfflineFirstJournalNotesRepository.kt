@@ -11,6 +11,7 @@ import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.entities.MediaCaptionEntity
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.storage.MediaClaimFence
 import app.logdate.client.media.storage.MediaReclamationJournal
 import app.logdate.client.media.storage.MediaReference
 import app.logdate.client.media.storage.StoredMediaReferences
@@ -66,6 +67,7 @@ class OfflineFirstJournalNotesRepository(
     private val journalCoverUris: suspend () -> List<String?>? = { null },
     private val mediaReclamation: MediaReclamationJournal = MediaReclamationJournal.None,
     private val retainedMedia: suspend () -> Set<String> = { emptySet() },
+    private val mediaClaimFence: MediaClaimFence = MediaClaimFence.Disabled,
 ) : JournalNotesRepository,
     ExportableJournalContentRepository,
     SyncableJournalNotesRepository {
@@ -143,23 +145,23 @@ class OfflineFirstJournalNotesRepository(
 
     override suspend fun getNoteById(noteId: Uuid): JournalNote? = queries.getNoteById(noteId)
 
-    override suspend fun create(note: JournalNote): Uuid {
-        val storedNote = note.withStoredMediaRef(mediaReferences)
-        val pendingMediaIndex = mediaIndexer.buildPendingMediaIndex(storedNote)
-        val noteId =
-            transactionManager.withTransaction {
-                // Keep note persistence, optional index creation, and sync metadata aligned so a
-                // local write failure cannot leave orphaned indexed media behind.
-                createNoteRecord(
-                    note = storedNote,
-                    pendingMediaIndex = pendingMediaIndex,
-                )
-            }
+    override suspend fun create(note: JournalNote): Uuid =
+        mediaClaimFence.withClaim {
+            val storedNote = note.withStoredMediaRef(mediaReferences)
+            val pendingMediaIndex = mediaIndexer.buildPendingMediaIndex(storedNote)
+            val noteId =
+                transactionManager.withTransaction {
+                    // Keep note persistence, optional index creation, and sync metadata aligned so a
+                    // local write failure cannot leave orphaned indexed media behind.
+                    createNoteRecord(
+                        note = storedNote,
+                        pendingMediaIndex = pendingMediaIndex,
+                    )
+                }
 
-        triggerContentSync()
-
-        return noteId
-    }
+            triggerContentSync()
+            noteId
+        }
 
     private suspend fun createNoteRecord(
         note: JournalNote,
@@ -269,76 +271,80 @@ class OfflineFirstJournalNotesRepository(
     }
 
     private suspend fun removeLocalNote(noteId: Uuid) {
-        val journalIds =
-            transactionManager.withTransaction {
-                val scope = currentRecoveryScope()
-                val affectedJournals = journalContentDao.getJournalsForContent(noteId).first()
-                val mediaRef = getNoteById(noteId)?.mediaRefOrNull()
-                if (
-                    mediaReclamation !== MediaReclamationJournal.None &&
-                    mediaRef != null &&
-                    MediaReference.parse(mediaRef) !is MediaReference.External
-                ) {
-                    mediaReclamation.recordCandidate(mediaRef)
+        mediaClaimFence.withClaim {
+            val journalIds =
+                transactionManager.withTransaction {
+                    val scope = currentRecoveryScope()
+                    val affectedJournals = journalContentDao.getJournalsForContent(noteId).first()
+                    val mediaRef = getNoteById(noteId)?.mediaRefOrNull()
+                    if (
+                        mediaReclamation !== MediaReclamationJournal.None &&
+                        mediaRef != null &&
+                        MediaReference.parse(mediaRef) !is MediaReference.External
+                    ) {
+                        mediaReclamation.recordCandidate(mediaRef)
+                    }
+                    if (scope != null) {
+                        recoveryReceipts.recordLocalDeletion(scope, LocalDeletionType.NOTE, noteId.toString())
+                    }
+                    textNoteDao.removeNote(noteId)
+                    imageNoteDao.removeNote(noteId)
+                    transcriptionRepository?.deleteTranscription(noteId)
+                    audioNoteDao.removeNote(noteId)
+                    videoNoteDao.removeNote(noteId)
+                    mediaCaptionDao.deleteCaption(noteId)
+                    affectedJournals.forEach { journalId ->
+                        val key = AssociationPendingKey(journalId, noteId).toPendingId()
+                        if (scope != null) recoveryReceipts.recordLocalDeletion(scope, LocalDeletionType.ASSOCIATION, key)
+                        syncMetadataService.enqueuePending(key, EntityType.ASSOCIATION, PendingOperation.DELETE)
+                    }
+                    journalContentDao.removeContentFromAllJournals(noteId)
+                    syncMetadataService.enqueuePending(noteId.toString(), EntityType.NOTE, PendingOperation.DELETE)
+                    transactionManager.afterCommit { deleteMediaIfUnreferenced(mediaRef) }
+                    check(currentRecoveryScope() == scope) { "Note deletion account changed" }
+                    affectedJournals
                 }
-                if (scope != null) {
-                    recoveryReceipts.recordLocalDeletion(scope, LocalDeletionType.NOTE, noteId.toString())
-                }
-                textNoteDao.removeNote(noteId)
-                imageNoteDao.removeNote(noteId)
-                transcriptionRepository?.deleteTranscription(noteId)
-                audioNoteDao.removeNote(noteId)
-                videoNoteDao.removeNote(noteId)
-                mediaCaptionDao.deleteCaption(noteId)
-                affectedJournals.forEach { journalId ->
-                    val key = AssociationPendingKey(journalId, noteId).toPendingId()
-                    if (scope != null) recoveryReceipts.recordLocalDeletion(scope, LocalDeletionType.ASSOCIATION, key)
-                    syncMetadataService.enqueuePending(key, EntityType.ASSOCIATION, PendingOperation.DELETE)
-                }
-                journalContentDao.removeContentFromAllJournals(noteId)
-                syncMetadataService.enqueuePending(noteId.toString(), EntityType.NOTE, PendingOperation.DELETE)
-                transactionManager.afterCommit { deleteMediaIfUnreferenced(mediaRef) }
-                check(currentRecoveryScope() == scope) { "Note deletion account changed" }
-                affectedJournals
-            }
-        triggerContentSync()
-        if (journalIds.isNotEmpty()) triggerAssociationSync()
+            triggerContentSync()
+            if (journalIds.isNotEmpty()) triggerAssociationSync()
+        }
     }
 
     override suspend fun create(
         note: JournalNote,
         journalId: Uuid,
     ) {
-        val storedNote = note.withStoredMediaRef(mediaReferences)
-        val pendingMediaIndex = mediaIndexer.buildPendingMediaIndex(storedNote)
-        transactionManager.withTransaction {
-            val scope = currentRecoveryScope()
-            scope?.let {
-                recoveryReceipts.clearLocalDeletion(it, LocalDeletionType.NOTE, note.uid.toString())
-            }
-            createNoteRecord(
-                note = storedNote,
-                pendingMediaIndex = pendingMediaIndex,
-            )
-            val destination = journalRepository.resolveJournalId(journalId)
-            journalContentDao.addContentToJournal(JournalContentEntityLink(destination, note.uid))
-            scope?.let {
-                recoveryReceipts.clearLocalDeletion(
-                    it,
-                    LocalDeletionType.ASSOCIATION,
-                    AssociationPendingKey(destination, note.uid).toPendingId(),
+        mediaClaimFence.withClaim {
+            val storedNote = note.withStoredMediaRef(mediaReferences)
+            val pendingMediaIndex = mediaIndexer.buildPendingMediaIndex(storedNote)
+            transactionManager.withTransaction {
+                val scope = currentRecoveryScope()
+                scope?.let {
+                    recoveryReceipts.clearLocalDeletion(it, LocalDeletionType.NOTE, note.uid.toString())
+                }
+                createNoteRecord(
+                    note = storedNote,
+                    pendingMediaIndex = pendingMediaIndex,
                 )
+                val destination = journalRepository.resolveJournalId(journalId)
+                journalContentDao.addContentToJournal(JournalContentEntityLink(destination, note.uid))
+                scope?.let {
+                    recoveryReceipts.clearLocalDeletion(
+                        it,
+                        LocalDeletionType.ASSOCIATION,
+                        AssociationPendingKey(destination, note.uid).toPendingId(),
+                    )
+                }
+                syncMetadataService.enqueuePending(
+                    entityId = AssociationPendingKey(destination, note.uid).toPendingId(),
+                    entityType = EntityType.ASSOCIATION,
+                    operation = PendingOperation.CREATE,
+                )
+                check(currentRecoveryScope() == scope) { "Note creation account changed" }
             }
-            syncMetadataService.enqueuePending(
-                entityId = AssociationPendingKey(destination, note.uid).toPendingId(),
-                entityType = EntityType.ASSOCIATION,
-                operation = PendingOperation.CREATE,
-            )
-            check(currentRecoveryScope() == scope) { "Note creation account changed" }
-        }
 
-        triggerContentSync()
-        triggerAssociationSync()
+            triggerContentSync()
+            triggerAssociationSync()
+        }
     }
 
     override suspend fun removeFromJournal(
