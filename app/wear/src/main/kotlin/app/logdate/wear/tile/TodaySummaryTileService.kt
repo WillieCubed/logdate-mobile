@@ -142,6 +142,7 @@ internal fun latestEntryPreview(
         is JournalNote.Audio -> context.getString(R.string.wear_tile_summary_voice_note)
         is JournalNote.Image -> context.getString(R.string.wear_tile_summary_photo)
         is JournalNote.Video -> context.getString(R.string.wear_tile_summary_video)
+        is JournalNote.Handwriting -> context.getString(R.string.wear_moment_handwriting)
     }
 
 internal fun MaterialScope.todaySummaryLayout(summary: TodaySummary): LayoutElementBuilders.LayoutElement {

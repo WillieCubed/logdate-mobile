@@ -11,6 +11,7 @@ enum class MomentNoteKind {
     VOICE,
     PHOTO,
     VIDEO,
+    HANDWRITING,
 }
 
 /**
@@ -34,6 +35,7 @@ object MomentNoteCodec {
             is JournalNote.Audio -> MomentNoteKind.VOICE
             is JournalNote.Image -> MomentNoteKind.PHOTO
             is JournalNote.Video -> MomentNoteKind.VIDEO
+            is JournalNote.Handwriting -> MomentNoteKind.HANDWRITING
         }
 
     /**

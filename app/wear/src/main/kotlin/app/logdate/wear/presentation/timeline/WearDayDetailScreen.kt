@@ -253,6 +253,21 @@ private fun NoteEntryCard(
             }
         }
 
+        is JournalNote.Handwriting -> {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(
+                            RoundedCornerShape(20.dp),
+                        ).background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .padding(12.dp),
+            ) {
+                Text(text = stringResource(R.string.wear_moment_handwriting), style = MaterialTheme.typography.bodySmall)
+                Text(text = timeLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
         is JournalNote.Video -> {
             Column(
                 modifier =
