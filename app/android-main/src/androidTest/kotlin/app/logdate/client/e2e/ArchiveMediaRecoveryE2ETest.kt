@@ -105,6 +105,7 @@ class ArchiveMediaRecoveryE2ETest {
                 mode in
                     setOf(
                         "seed",
+                        "source-before-backup",
                         "repair",
                         "automatic",
                         "waiting",
@@ -120,20 +121,65 @@ class ArchiveMediaRecoveryE2ETest {
                 require(arguments.getString("archiveCancellationAcceptance") == "true")
             }
             when (mode) {
-                "seed" -> seed(recoverableSource = arguments.getString("archiveCancellationAcceptance") == "true")
-                "repair" -> repair()
-                "automatic" -> automaticRepair()
-                "waiting" -> verifyRetainedWaitingState()
-                "verify" -> verify()
-                "cleanup-rejected-fixture" -> cleanupRejectedFixture()
-                "cancel-running" -> cancelRunningRecovery()
-                "paused" -> verifyCancelledAfterRestart()
-                "resume-cancelled" -> resumeCancelledRecovery()
+                "seed" -> {
+                    seed(recoverableSource = arguments.getString("archiveCancellationAcceptance") == "true")
+                }
+
+                "source-before-backup" -> {
+                    val state = JSONObject(fixture.readText())
+                    val manager = WorkManager.getInstance(context)
+                    kotlinx.coroutines.withTimeout(30_000) {
+                        while (manager
+                                .getWorkInfosForUniqueWork("archive_media_recovery_${state.getString("recoveryId")}")
+                                .get()
+                                .any { !it.state.isFinished }
+                        ) {
+                            kotlinx.coroutines.delay(100)
+                        }
+                    }
+                    verifyRetainedWaitingState()
+                }
+
+                "repair" -> {
+                    repair()
+                }
+
+                "automatic" -> {
+                    automaticRepair()
+                }
+
+                "waiting" -> {
+                    verifyRetainedWaitingState()
+                }
+
+                "verify" -> {
+                    verify()
+                }
+
+                "cleanup-rejected-fixture" -> {
+                    cleanupRejectedFixture()
+                }
+
+                "cancel-running" -> {
+                    cancelRunningRecovery()
+                }
+
+                "paused" -> {
+                    verifyCancelledAfterRestart()
+                }
+
+                "resume-cancelled" -> {
+                    resumeCancelledRecovery()
+                }
+
                 "verify-cancelled" -> {
                     verifyCancelledCompletion()
                     verify()
                 }
-                else -> error("Choose seed, repair, or verify for the owned emulator")
+
+                else -> {
+                    error("Choose seed, repair, or verify for the owned emulator")
+                }
             }
         }
 

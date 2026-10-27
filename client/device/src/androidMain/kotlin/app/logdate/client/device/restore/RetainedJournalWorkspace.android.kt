@@ -87,6 +87,7 @@ fun requireRetainedJournalBackupReady(
     context: Context,
     deviceTransfer: Boolean,
 ) {
+    check(!NativeInitialSelectedMedia(context).hasInputs()) { "Pending initial native media must remain in custody before another backup" }
     check(!NativeJournalReplayCustody(context).hasInputs()) {
         "Pending native source custody must be preserved before another backup"
     }

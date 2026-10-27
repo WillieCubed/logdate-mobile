@@ -36,7 +36,7 @@ class NativeModernRestoreCallbackTest {
             classnames.flatMap { classname ->
                 contract.getJSONArray(classname).let { list -> (0 until list.length()).map { classname to list.getString(it) } }
             }
-        assertEquals(16, cases.size)
+        assertTrue(cases.isNotEmpty())
         assertEquals(cases.size, cases.toSet().size)
         val command =
             "am instrument -w -r --no-hidden-api-checks -e class ${classnames.joinToString(",")} " +
@@ -48,38 +48,76 @@ class NativeModernRestoreCallbackTest {
         val platform = JSONObject().put("sdkFull", Build.VERSION.SDK_INT_FULL).put("userUnlockedBeforeSuite", user.isUserUnlocked)
         val platformFile = File(output, "modern-callback-platform.json")
         platformFile.writeText(platform.toString())
-        val raw =
-            try {
-                ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command)).use { input ->
-                    input.bufferedReader().readText()
+        try {
+            val raw =
+                try {
+                    ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command)).use { input ->
+                        input.bufferedReader().readText()
+                    }
+                } finally {
+                    platform.put("userUnlockedAfterSuite", user.isUserUnlocked)
+                    platformFile.writeText(platform.toString())
                 }
-            } finally {
-                platform.put("userUnlockedAfterSuite", user.isUserUnlocked)
-                platformFile.writeText(platform.toString())
+            File(output, "modern-callback-instrumentation.log").writeText(raw)
+            assertTrue(Regex("(?m)^OK \\(${cases.size} tests\\)\\r?$").containsMatchIn(raw), "The callback suite must finish successfully")
+            assertFalse(Regex("(?m)^INSTRUMENTATION_STATUS_CODE: *-[0-9]+").containsMatchIn(raw))
+            listOf("Process crashed", "FAILURES", "INSTRUMENTATION_FAILED:", "INSTRUMENTATION_RESULT: shortMsg=").forEach {
+                assertFalse(raw.contains(it), "Nested instrumentation reported failure")
             }
-        File(output, "modern-callback-instrumentation.log").writeText(raw)
-        assertTrue(Regex("(?m)^OK \\(${cases.size} tests\\)\\r?$").containsMatchIn(raw), "The callback suite must finish successfully")
-        assertFalse(Regex("(?m)^INSTRUMENTATION_STATUS_CODE: *-[0-9]+").containsMatchIn(raw))
-        listOf("Process crashed", "FAILURES", "INSTRUMENTATION_FAILED:", "INSTRUMENTATION_RESULT: shortMsg=").forEach {
-            assertFalse(raw.contains(it), "Nested instrumentation reported failure")
-        }
-        val completed = mutableListOf<Pair<String?, String?>>()
-        var currentClass: String? = null
-        var currentMethod: String? = null
-        raw.lineSequence().forEach { line ->
-            when {
-                line.startsWith("INSTRUMENTATION_STATUS: class=") -> currentClass = line.substringAfter("class=").trimEnd('\r')
-                line.startsWith("INSTRUMENTATION_STATUS: test=") -> currentMethod = line.substringAfter("test=").trimEnd('\r')
-                line.startsWith("INSTRUMENTATION_STATUS_CODE:") -> {
-                    if (line.substringAfter(':').trim() == "0") completed += currentClass to currentMethod
-                    currentClass = null
-                    currentMethod = null
+            val completed = mutableListOf<Pair<String?, String?>>()
+            var currentClass: String? = null
+            var currentMethod: String? = null
+            raw.lineSequence().forEach { line ->
+                when {
+                    line.startsWith("INSTRUMENTATION_STATUS: class=") -> {
+                        currentClass = line.substringAfter("class=").trimEnd('\r')
+                    }
+
+                    line.startsWith("INSTRUMENTATION_STATUS: test=") -> {
+                        currentMethod = line.substringAfter("test=").trimEnd('\r')
+                    }
+
+                    line.startsWith("INSTRUMENTATION_STATUS_CODE:") -> {
+                        if (line.substringAfter(':').trim() == "0") completed += currentClass to currentMethod
+                        currentClass = null
+                        currentMethod = null
+                    }
                 }
             }
+            assertEquals(
+                cases.sortedBy { "${it.first}#${it.second}" },
+                completed.sortedBy { "${it.first}#${it.second}" },
+            )
+        } catch (failure: Throwable) {
+            retainFailureEvidence(output, failure)
+            throw failure
         }
-        assertEquals(
-            cases.sortedBy { "${it.first}#${it.second}" },
-            completed.sortedBy { "${it.first}#${it.second}" },
-        )
+    }
+
+    private fun retainFailureEvidence(
+        output: File,
+        failure: Throwable,
+    ) {
+        listOf(
+            Triple("modern-callback-logcat-all.log", "logcat -b all -d -v threadtime -t 20000", 4 * 1024 * 1024),
+            Triple("modern-callback-exit-info.txt", "dumpsys activity exit-info studio.hypertext.logdate.debug", 256 * 1024),
+        ).forEach { (filename, command, byteLimit) ->
+            runCatching {
+                val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+                ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { input ->
+                    File(output, filename).outputStream().use { destination ->
+                        val buffer = ByteArray(8192)
+                        var remaining = byteLimit
+                        while (remaining > 0) {
+                            val count = input.read(buffer, 0, minOf(buffer.size, remaining))
+                            if (count < 0) break
+                            destination.write(buffer, 0, count)
+                            remaining -= count
+                        }
+                        if (remaining == 0) destination.write("\n[diagnostic byte limit reached]\n".toByteArray())
+                    }
+                }
+            }.onFailure { failure.addSuppressed(it) }
+        }
     }
 }

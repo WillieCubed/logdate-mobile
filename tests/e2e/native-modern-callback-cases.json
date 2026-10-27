@@ -17,7 +17,7 @@
     "iosAndVersionedInputsPreserveEveryNativeDestination",
     "rejectedDeliveryCannotCompleteOrFallBackAfterAgentRecreation",
     "rejectedFirstDeliveryCreatesNoRecoveryReceipts",
-    "explicitNativeTransportFlagsRecoverOnANewAgent",
+    "explicitNativeTransportFlagsRetainIncomingWithoutOverwritingWorkingJournal",
     "interruptedMarkersAndFailedRejectionWritesPreserveRetainedContent"
   ]
 }

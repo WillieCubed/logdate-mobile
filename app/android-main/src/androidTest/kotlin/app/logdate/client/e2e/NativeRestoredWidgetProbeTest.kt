@@ -21,6 +21,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
+import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.ensureLogDateApplicationStarted
 import app.logdate.client.feature.widgets.FixedMemoryWidgetReceiver
 import app.logdate.client.feature.widgets.PhotoWidgetShape
@@ -64,7 +65,7 @@ class NativeRestoredWidgetProbeTest {
         runBlocking {
             val stage = arguments.getString("nativeWidgetStage")
             assumeTrue(stage != null)
-            require(stage in setOf("seed", "restore", "restart", "cleanup"))
+            require(stage in setOf("seed", "restore", "restart", "cleanup", "checkpoint"))
             require(Build.HARDWARE == "ranchu" || Build.HARDWARE == "goldfish")
             require(context.packageName.endsWith(".debug"))
             var host: AppWidgetHost? = null
@@ -85,6 +86,19 @@ class NativeRestoredWidgetProbeTest {
             )
             val note = assertNotNull(koin.get<JournalNotesRepository>().getNoteById(Uuid.parse(noteId)))
             assertEquals(text, (note as JournalNote.Text).content)
+            if (stage == "checkpoint") {
+                val sourceId = requireNotNull(arguments.getString("nativeOldWidgetId")).toInt()
+                val restored = restoredSystemWidget(ownedHost, sourceId)
+                assertNotEquals(sourceId, restored, "The checkpoint requires the actual platform remap")
+                // Persist startup's WAL into the same encrypted database on both sides
+                // of replay. A busy checkpoint must fail rather than bless racing bytes.
+                koin.get<LogDateDatabase>().openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { cursor ->
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals(0, cursor.getInt(0), "The widget replay database checkpoint remained busy")
+                    assertEquals(0, cursor.getInt(1), "The widget replay database retained WAL pages")
+                }
+                return@runBlocking
+            }
             var retained = false
             try {
                 val widgetId =

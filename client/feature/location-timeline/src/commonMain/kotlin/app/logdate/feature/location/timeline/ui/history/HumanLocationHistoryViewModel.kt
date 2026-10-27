@@ -391,18 +391,7 @@ class HumanLocationHistoryViewModel(
                 selectedItemId = selection,
                 detailVisible = current.detailVisible && selection != null,
                 dateLabel = selectedDateLabel().toUiText(),
-                daySummary =
-                    data.items.filterIsInstance<PlaceVisit>().let { visits ->
-                        val confirmed = visits.count { it.confirmedStay }
-                        val clues = visits.size - confirmed
-                        val visitCount = Res.plurals.history_visit_count.toUiText(confirmed, confirmed)
-                        if (clues > 0) {
-                            val clueCount = Res.plurals.history_location_clue_count.toUiText(clues, clues)
-                            Res.string.history_day_summary.toUiText(visitCount, clueCount)
-                        } else {
-                            visitCount
-                        }
-                    },
+                daySummary = daySummary(data),
                 items =
                     data.items.map { item ->
                         item.toHistoryUi(
@@ -421,17 +410,46 @@ class HumanLocationHistoryViewModel(
                 canRetry = failedAction != null || data.failedSections.isNotEmpty(),
                 recoveryMessage =
                     when {
-                        failedAction != null -> Res.string.history_change_not_saved.toUiText()
-                        data.failedSections.isNotEmpty() -> Res.string.history_sections_failed.toUiText()
-                        data.conflicts.isNotEmpty() -> Res.string.history_conflicts_message.toUiText()
-                        !tracking.backgroundTrackingEnabled && tracking.captureMode == LocationCaptureMode.PASSIVE ->
+                        failedAction != null -> {
+                            Res.string.history_change_not_saved.toUiText()
+                        }
+
+                        data.failedSections.isNotEmpty() -> {
+                            Res.string.history_sections_failed.toUiText()
+                        }
+
+                        data.conflicts.isNotEmpty() -> {
+                            Res.string.history_conflicts_message.toUiText()
+                        }
+
+                        !tracking.backgroundTrackingEnabled && tracking.captureMode == LocationCaptureMode.PASSIVE -> {
                             Res.string.history_recording_off.toUiText()
-                        !tracking.backgroundTrackingEnabled -> Res.string.history_recording_paused.toUiText()
-                        else -> null
+                        }
+
+                        !tracking.backgroundTrackingEnabled -> {
+                            Res.string.history_recording_paused.toUiText()
+                        }
+
+                        else -> {
+                            null
+                        }
                     },
             )
         }
     }
+
+    private fun daySummary(data: LocationHistorySnapshot) =
+        data.items.filterIsInstance<PlaceVisit>().let { visits ->
+            val confirmed = visits.count { it.confirmedStay }
+            val clues = visits.size - confirmed
+            val visitCount = Res.plurals.history_visit_count.toUiText(confirmed, confirmed)
+            if (clues > 0) {
+                val clueCount = Res.plurals.history_location_clue_count.toUiText(clues, clues)
+                Res.string.history_day_summary.toUiText(visitCount, clueCount)
+            } else {
+                visitCount
+            }
+        }
 
     private fun enrich(data: LocationHistorySnapshot) {
         if (state.value.tab != HistoryTab.Day) return
@@ -465,17 +483,27 @@ class HumanLocationHistoryViewModel(
     ): SemanticPlace? {
         val name =
             when (result) {
-                is PlaceResolutionResult.UserDefinedPlace -> result.place.name
-                is PlaceResolutionResult.ExternalSuggestion -> getString(Res.string.places_near, result.suggestion.name)
-                is PlaceResolutionResult.CoarseLocation ->
+                is PlaceResolutionResult.UserDefinedPlace -> {
+                    result.place.name
+                }
+
+                is PlaceResolutionResult.ExternalSuggestion -> {
+                    getString(Res.string.places_near, result.suggestion.name)
+                }
+
+                is PlaceResolutionResult.CoarseLocation -> {
                     result.address.thoroughfare?.let { getString(Res.string.places_near, it) }
                         ?: result.address.locality?.let { getString(Res.string.places_somewhere_in, it) }
-                else -> null
+                }
+
+                else -> {
+                    null
+                }
             }
         if (name != null) {
             val place =
                 when (result) {
-                    is PlaceResolutionResult.UserDefinedPlace ->
+                    is PlaceResolutionResult.UserDefinedPlace -> {
                         SemanticPlace(
                             result.place.uid.toString(),
                             result.place.name,
@@ -483,7 +511,9 @@ class HumanLocationHistoryViewModel(
                             result.place.longitude,
                             userConfirmed = true,
                         )
-                    is PlaceResolutionResult.ExternalSuggestion ->
+                    }
+
+                    is PlaceResolutionResult.ExternalSuggestion -> {
                         SemanticPlace(
                             result.suggestion.externalId?.let {
                                 resolvedExternalPlaces.getOrPut(
@@ -497,7 +527,11 @@ class HumanLocationHistoryViewModel(
                             locality = result.suggestion.address,
                             externalId = result.suggestion.externalId,
                         )
-                    else -> SemanticPlace("evidence:${visit.evidenceIds.first()}", name, visit.latitude, visit.longitude)
+                    }
+
+                    else -> {
+                        SemanticPlace("evidence:${visit.evidenceIds.first()}", name, visit.latitude, visit.longitude)
+                    }
                 }
             return place
         }

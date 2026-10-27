@@ -120,6 +120,7 @@ open class NativeBackupAgent : BackupAgent() {
             finishCompletedNativeJournalCleanup()
             if (finishRetainedNativeDelivery()) {
                 // A late delivery must not reset the accepted working installation or its account.
+                finishNativeRestoreAuxiliaryUnderDeliveryLock()
                 scheduleRetainedJournalReconciliationSafely()
                 super.onRestoreFinished()
                 return
@@ -132,7 +133,9 @@ open class NativeBackupAgent : BackupAgent() {
                     finishStagedNativeJournalTransfer()
                     return
                 }
-                if (!completedReplay.finish()) scheduleRetainedJournalReconciliationSafely()
+                val replayComplete = completedReplay.finish()
+                finishNativeRestoreAuxiliaryUnderDeliveryLock()
+                if (!replayComplete) scheduleRetainedJournalReconciliationSafely()
                 super.onRestoreFinished()
                 return
             }
@@ -149,12 +152,7 @@ open class NativeBackupAgent : BackupAgent() {
                     }
                 }
             if (duplicateCompletion) {
-                val retainedCameraSource = finishNativeJournalTransferRestore()
-                super.onRestoreFinished()
-                retryAccountRecovery()
-                if (retainedCameraSource && scheduleRetainedJournalReconciliationSafely()) {
-                    retainedNativeCameraReconciliationScheduled()
-                }
+                finishDuplicateNativeRestore()
                 return
             }
             val journalInstalled = restoreNativeJournalTransferSnapshot()
@@ -167,6 +165,16 @@ open class NativeBackupAgent : BackupAgent() {
             nativeRestoreSession.finish()
             incomingRestoreSession.finish()
             AndroidNativeRestoreDeliveryGate.endRestore()
+        }
+    }
+
+    private fun finishDuplicateNativeRestore() {
+        val retainedCameraSource = finishNativeJournalTransferRestore()
+        finishNativeRestoreAuxiliaryUnderDeliveryLock()
+        super.onRestoreFinished()
+        retryAccountRecovery()
+        if (retainedCameraSource && scheduleRetainedJournalReconciliationSafely()) {
+            retainedNativeCameraReconciliationScheduled()
         }
     }
 
@@ -186,6 +194,7 @@ open class NativeBackupAgent : BackupAgent() {
         }
         detector.recordRestoreCompletedUnderDeliveryLock()
         val retainedCameraSource = finishNativeJournalTransferRestore()
+        finishNativeRestoreAuxiliaryUnderDeliveryLock()
         synchronized(callbackLock) { restoreCompletionRecorded = true }
         try {
             runBlocking(Dispatchers.IO) {
@@ -216,6 +225,7 @@ open class NativeBackupAgent : BackupAgent() {
         detector.markNativePrivacyPayloadReceived()
         detector.recordRestoreCompletedUnderDeliveryLock()
         synchronized(callbackLock) { restoreCompletionRecorded = true }
+        finishNativeRestoreAuxiliaryUnderDeliveryLock()
         scheduleRetainedJournalReconciliationSafely()
     }
 
@@ -304,6 +314,15 @@ open class NativeBackupAgent : BackupAgent() {
                 completedReplay.capture(retainedNativeDestination(this, destination), size, input)
             }
             scheduleRetainedJournalReconciliationSafely()
+            return
+        }
+        NativeInitialSelectedMedia.destinationPath(this, destination)?.let { path ->
+            if (fileType == TYPE_DIRECTORY) return
+            check(fileType == TYPE_FILE) { "Selected native media must be a regular file" }
+            ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.dup(data.fileDescriptor)).use { input ->
+                NativeInitialSelectedMedia(this).capture(path, size, input)
+            }
+            PostRestoreDetector(this).markNativeRestorePayloadReceived(databaseDelivered = false)
             return
         }
         val frameworkDatabase =
@@ -423,6 +442,14 @@ open class NativeBackupAgent : BackupAgent() {
             return false
         }
     }
+
+    private fun finishNativeRestoreAuxiliaryUnderDeliveryLock() {
+        if (NativeInitialSelectedMedia(this).promoteCompleted()) scheduleRetainedJournalReconciliationSafely()
+        repairRetainedNativePrivacyUnderDeliveryLock()
+    }
+
+    /** Completion has sealed incoming cohorts and still owns the native delivery gate. */
+    protected open fun repairRetainedNativePrivacyUnderDeliveryLock() = Unit
 
     protected open fun scheduleRetainedJournalReconciliation(): Boolean = false
 

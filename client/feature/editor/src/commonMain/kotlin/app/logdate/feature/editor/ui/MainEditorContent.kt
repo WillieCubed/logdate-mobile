@@ -101,12 +101,19 @@ fun MainEditorContent(
 
     val displayState: EditorDisplay =
         when {
-            uiState.blocks.isEmpty() -> EditorDisplay.Empty
-            focusState is EditorFocus.Camera && expandedBlock is CameraBlockUiState && expandedBlock.uri == null ->
+            uiState.blocks.isEmpty() -> {
+                EditorDisplay.Empty
+            }
+
+            focusState is EditorFocus.Camera && expandedBlock is CameraBlockUiState && expandedBlock.uri == null -> {
                 EditorDisplay.Expanded(
                     expandedBlock,
                 )
-            else -> EditorDisplay.List
+            }
+
+            else -> {
+                EditorDisplay.List
+            }
         }
 
     // SeekableTransitionState lets the predictive back gesture scrub the transition
@@ -275,7 +282,7 @@ private fun BlockContentInner(
     modifier: Modifier = Modifier,
 ) {
     when (block) {
-        is TextBlockUiState ->
+        is TextBlockUiState -> {
             TextBlockContent(
                 block = block,
                 isExpanded = isExpanded,
@@ -283,8 +290,9 @@ private fun BlockContentInner(
                 onFocused = { onBlockFocused(block.id) },
                 modifier = modifier,
             )
+        }
 
-        is ImageBlockUiState ->
+        is ImageBlockUiState -> {
             app.logdate.feature.editor.ui.image.ImageBlockEditor(
                 block = block,
                 onBlockUpdated = onBlockUpdated,
@@ -292,8 +300,9 @@ private fun BlockContentInner(
                 isExpanded = isExpanded,
                 modifier = modifier,
             )
+        }
 
-        is AudioBlockUiState ->
+        is AudioBlockUiState -> {
             AudioBlockEditor(
                 block = block,
                 onBlockUpdated = onBlockUpdated,
@@ -302,8 +311,9 @@ private fun BlockContentInner(
                 onPersistRecordingTarget = onPersistAudioRecordingTarget,
                 modifier = modifier,
             )
+        }
 
-        is CameraBlockUiState ->
+        is CameraBlockUiState -> {
             CameraBlockEditor(
                 block = block,
                 onBlockUpdated = onBlockUpdated,
@@ -311,14 +321,16 @@ private fun BlockContentInner(
                 onPersistCaptureTarget = onPersistCameraCaptureTarget,
                 modifier = modifier,
             )
+        }
 
-        is VideoBlockUiState ->
+        is VideoBlockUiState -> {
             VideoBlockEditor(
                 block = block,
                 onBlockUpdated = onBlockUpdated,
                 onDeleteRequested = { onBlockDeleted(block.id) },
                 modifier = modifier,
             )
+        }
     }
 }
 

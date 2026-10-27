@@ -18,6 +18,8 @@ on:
       - 'app/android-main/src/androidTest/**/NativeCurrentDraftRecoveryProbeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeNetworkPolicyHandoff.kt'
       - 'app/android-main/src/androidTest/**/NativeEmulatorUiObstructions.kt'
+      - 'app/android-main/src/androidTest/**/NativeEmulatorUiObstructionsTest.kt'
+      - 'app/android-main/src/androidTest/**/NativePartialMediaIdentityTest.kt'
       - 'app/android-main/src/androidTest/**/NativeRestoredWidgetProbeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeReleasedUpgradeProbeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeRetainedDraftShortcutProbeTest.kt'
@@ -450,7 +452,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [partial, archive, publication, contracts, missing-keys, credentials-only, data-only, privacy, work-restart, d2d, enrollment, widget]
+        scenario:
+          [
+            partial,
+            archive,
+            publication,
+            contracts,
+            missing-keys,
+            credentials-only,
+            data-only,
+            privacy,
+            work-restart,
+            d2d,
+            enrollment,
+            widget,
+          ]
     env:
       LOGDATE_CI_BUILD_CACHE_DIR: ${{ github.workspace }}/ci-native-build-cache
       ANDROID_AVD_HOME: ${{ github.workspace }}/.native-managed-avds

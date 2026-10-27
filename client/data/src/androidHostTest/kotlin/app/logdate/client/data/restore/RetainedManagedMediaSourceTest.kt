@@ -1,6 +1,11 @@
 package app.logdate.client.data.restore
 
+import app.logdate.client.media.InMemoryMediaManager
+import app.logdate.client.media.MediaFileSource
+import app.logdate.client.media.storage.StoredMediaReferences
+import app.logdate.client.media.storage.isRecoveredOriginal
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.Buffer
 import java.io.File
 import java.nio.file.Files
 import java.security.MessageDigest
@@ -35,6 +40,47 @@ class RetainedManagedMediaSourceTest {
             )
         } finally {
             root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `native debug file URI and its quarantine marker resolve retained originals`() {
+        val root = Files.createTempDirectory("retained-debug-media").toFile()
+        try {
+            val payload = File(root, "sealed-original").apply { writeText("original bytes") }
+            val digest = MessageDigest.getInstance("SHA-256").digest(payload.readBytes()).joinToString("") { "%02x".format(it) }
+            val relative = "media/objects/sha256/${digest.take(2)}/$digest.png"
+            val source = RetainedManagedMediaSource(mapOf("files/$relative" to payload))
+            for (packageName in listOf("studio.hypertext.logdate", "studio.hypertext.logdate.debug", "co.reasonabletech.logdate")) {
+                val reference = "file:/data/user/0/$packageName/files/$relative"
+                assertEquals(payload.canonicalFile, source.resolve(reference)?.file)
+                assertEquals(payload.canonicalFile, source.resolve(retainedUnavailableMediaReference(reference))?.file)
+            }
+            assertNull(source.resolve("file:/data/user/0/unrelated.app/files/$relative"))
+            assertNull(source.resolve("file:/tmp/studio.hypertext.logdate.debug/files/$relative"))
+        } finally {
+            check(root.deleteRecursively())
+        }
+    }
+
+    @Test
+    fun `canonical private file URI recovers across cohorts only with its exact digest`() {
+        val root = Files.createTempDirectory("retained-file-digest").toFile()
+        try {
+            val payload = File(root, "payload").apply { writeText("original bytes") }
+            val digest = MessageDigest.getInstance("SHA-256").digest(payload.readBytes()).joinToString("") { "%02x".format(it) }
+            val relative = "media/objects/sha256/${digest.take(2)}/$digest.png"
+            val reference = "file:/data/user/0/studio.hypertext.logdate.debug/files/$relative"
+            val source = RetainedManagedMediaSource(emptyMap(), listOf(mapOf("files/$relative" to payload)))
+            assertEquals(digest, retainedCanonicalMediaDigest(reference))
+            assertEquals(payload.canonicalFile, source.resolve(retainedUnavailableMediaReference(reference))?.file)
+            payload.writeText("corrupted bytes")
+            assertNull(source.resolve(reference))
+            assertNull(RetainedManagedMediaSource(mapOf("files/$relative" to payload)).resolve(reference))
+            assertNull(retainedCanonicalMediaDigest(reference.replace("studio.hypertext.logdate.debug", "unrelated.app")))
+            assertNull(retainedCanonicalMediaDigest(reference.replace("/files/media/", "/files/media/../media/")))
+        } finally {
+            check(root.deleteRecursively())
         }
     }
 
@@ -113,6 +159,39 @@ class RetainedManagedMediaSourceTest {
             assertNull(verifiedCanonicalMediaReference("logdate-media://library/objects/sha256/bb/$digest.png", ::verify))
             assertEquals(1, checks)
             assertNull(verifiedCanonicalMediaReference(canonical) { false })
+        }
+
+    @Test
+    fun `consumed retained bytes reuse a verified live original without quarantining its legacy URI`() =
+        runTest {
+            val digest = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+            val relative = "objects/sha256/ba/$digest.png"
+            val original = "file:/data/user/0/studio.hypertext.logdate.debug/files/media/$relative"
+            val canonical = "logdate-media://library/$relative"
+            var bytes = "abc"
+            val checked = mutableListOf<String>()
+            val media =
+                object : InMemoryMediaManager() {
+                    override suspend fun exists(mediaId: String): Boolean {
+                        checked += mediaId
+                        return mediaId == canonical
+                    }
+
+                    override suspend fun openMedia(uri: String): MediaFileSource {
+                        assertEquals(canonical, uri)
+                        return MediaFileSource("original.png", "image/png", bytes.length.toLong()) {
+                            Buffer().apply { write(bytes.encodeToByteArray()) }
+                        }
+                    }
+                }
+
+            suspend fun verify(reference: String) = media.isRecoveredOriginal(reference, StoredMediaReferences.Unchanged)
+            assertNull(RetainedManagedMediaSource(emptyMap()).resolve(original))
+            assertEquals(original, verifiedCanonicalMediaReference(original, ::verify))
+            assertEquals(original, verifiedCanonicalMediaReference(retainedUnavailableMediaReference(original), ::verify))
+            assertEquals(listOf(canonical, canonical), checked)
+            bytes = "abd"
+            assertNull(verifiedCanonicalMediaReference(original, ::verify))
         }
 
     @Test

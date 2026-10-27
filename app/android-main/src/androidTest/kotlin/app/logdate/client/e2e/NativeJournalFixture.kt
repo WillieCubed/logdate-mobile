@@ -10,7 +10,11 @@ import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
 import app.logdate.client.media.audio.CrashSafeRecording
+import app.logdate.client.media.storage.LocalMediaRef
+import app.logdate.client.media.storage.MediaCollection
+import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.media.storage.UnavailableMediaReferences
+import app.logdate.client.media.storage.androidMediaFileResolver
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
@@ -274,36 +278,37 @@ internal class NativeJournalFixture(
         assertEquals("Second transferred journal", journals.getJournalById(id(2))?.title)
         assertEquals("Text retained through native backup", (notes.getNoteById(id(3)) as? JournalNote.Text)?.content)
         assertNull(notes.getNoteById(id(7)), "deleted content reappeared")
-        val image = assertNotNull(notes.getNoteById(id(4)) as? JournalNote.Image)
-        val audio = assertNotNull(notes.getNoteById(id(5)) as? JournalNote.Audio)
-        val video = assertNotNull(notes.getNoteById(id(6)) as? JournalNote.Video)
-        val draft = assertNotNull(journals.getDraft(id(10)))
-        assertEquals("Unfinished native-transfer draft", (draft.blocks[0] as? SerializableTextBlock)?.content)
-
-        val mediaReferences =
-            listOf(
-                image.mediaRef to "proof.png",
-                audio.mediaRef to "proof.wav",
-                video.mediaRef to "proof.mp4",
-                assertNotNull((draft.blocks[1] as? SerializableImageBlock)?.uri) to "proof.png",
-                assertNotNull((draft.blocks[2] as? SerializableAudioBlock)?.uri) to "proof.wav",
-                assertNotNull((draft.blocks[3] as? SerializableVideoBlock)?.uri) to "proof.mp4",
-            )
+        require(expectedMissingMediaPath.startsWith("files/media/objects/"))
+        val missingReference = LocalMediaRef(MediaCollection.Library, expectedMissingMediaPath.removePrefix("files/media/")).toString()
         val missingFile =
             File(
                 InstrumentationRegistry.getInstrumentation().targetContext.filesDir,
                 expectedMissingMediaPath.removePrefix("files/"),
             )
         assertFalse(missingFile.exists(), "The native transport unexpectedly delivered its deliberately omitted original")
-        withTimeout(30_000) {
-            while (
-                mediaReferences.any { (reference, _) ->
-                    !media.exists(reference) && !UnavailableMediaReferences.isUnavailable(reference)
+        val mediaFiles = androidMediaFileResolver(InstrumentationRegistry.getInstrumentation().targetContext)
+        val mediaReferences =
+            withTimeout(30_000) {
+                var references = readPartialMediaReferences()
+
+                suspend fun settled(): Boolean =
+                    references.any { (reference, _) ->
+                        nativePartialMediaIdentity(reference, mediaFiles) == missingReference
+                    } &&
+                        references.all { (reference, _) ->
+                            val original = nativePartialMediaIdentity(reference, mediaFiles)
+                            if (original == missingReference) {
+                                UnavailableMediaReferences.isUnavailable(reference)
+                            } else {
+                                !UnavailableMediaReferences.isUnavailable(reference) && media.exists(reference)
+                            }
+                        }
+                while (!settled()) {
+                    delay(50)
+                    references = readPartialMediaReferences()
                 }
-            ) {
-                delay(50)
+                references
             }
-        }
         val unavailable = mediaReferences.filter { (reference, _) -> UnavailableMediaReferences.isUnavailable(reference) }
         val available = mediaReferences.filterNot { (reference, _) -> UnavailableMediaReferences.isUnavailable(reference) }
         assertTrue(unavailable.isNotEmpty(), "The omitted original was not retained as recoverable media")
@@ -315,11 +320,27 @@ internal class NativeJournalFixture(
 
         val missingNote =
             listOf(
-                Triple(image.uid, "image", image.mediaRef),
-                Triple(audio.uid, "audio", audio.mediaRef),
-                Triple(video.uid, "video", video.mediaRef),
+                assertNotNull(notes.getNoteById(id(4)) as? JournalNote.Image).let { Triple(it.uid, "image", it.mediaRef) },
+                assertNotNull(notes.getNoteById(id(5)) as? JournalNote.Audio).let { Triple(it.uid, "audio", it.mediaRef) },
+                assertNotNull(notes.getNoteById(id(6)) as? JournalNote.Video).let { Triple(it.uid, "video", it.mediaRef) },
             ).first { (_, _, reference) -> UnavailableMediaReferences.isUnavailable(reference) }
         verifyMissingOriginalCanWaitForSignIn(missingNote.first, missingNote.second, missingNote.third, missingNote.third)
+    }
+
+    private suspend fun readPartialMediaReferences(): List<Pair<String, String>> {
+        val image = assertNotNull(notes.getNoteById(id(4)) as? JournalNote.Image)
+        val audio = assertNotNull(notes.getNoteById(id(5)) as? JournalNote.Audio)
+        val video = assertNotNull(notes.getNoteById(id(6)) as? JournalNote.Video)
+        val draft = assertNotNull(journals.getDraft(id(10)))
+        assertEquals("Unfinished native-transfer draft", (draft.blocks[0] as? SerializableTextBlock)?.content)
+        return listOf(
+            image.mediaRef to "proof.png",
+            audio.mediaRef to "proof.wav",
+            video.mediaRef to "proof.mp4",
+            assertNotNull((draft.blocks[1] as? SerializableImageBlock)?.uri) to "proof.png",
+            assertNotNull((draft.blocks[2] as? SerializableAudioBlock)?.uri) to "proof.wav",
+            assertNotNull((draft.blocks[3] as? SerializableVideoBlock)?.uri) to "proof.mp4",
+        )
     }
 
     private suspend fun verifyMissingOriginalCanWaitForSignIn(
@@ -410,3 +431,11 @@ internal class NativeJournalFixture(
 }
 
 private const val MAX_NATIVE_TRANSFER_FIXTURE_DATABASE_BYTES = 24L * 1024 * 1024
+
+internal fun nativePartialMediaIdentity(
+    reference: String,
+    files: MediaFileResolver,
+): String {
+    val original = UnavailableMediaReferences.nativeSource(reference) ?: reference
+    return files.filePath(original)?.let(files::refFor)?.toString() ?: original
+}

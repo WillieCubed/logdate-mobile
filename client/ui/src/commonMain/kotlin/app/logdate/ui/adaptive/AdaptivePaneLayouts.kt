@@ -137,6 +137,7 @@ fun AdaptivePaneLayout(
                     }
                 }
             }
+
             is FoldableSplitLayout.Horizontal -> {
                 val splitLayoutInfo = layoutInfo.copy(showSupportingPane = true)
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -183,6 +184,7 @@ fun AdaptivePaneLayout(
                     }
                 }
             }
+
             FoldableSplitLayout.None -> {
                 if (layoutInfo.showSupportingPane) {
                     Row(

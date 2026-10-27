@@ -314,13 +314,19 @@ private fun resolveAudioCardState(
                 AudioCardState.Idle
             }
         }
+
         is WearPlaybackUiState.BlockedOutput -> {
             if (playbackState.noteId == noteId) AudioCardState.NoOutput else AudioCardState.Idle
         }
+
         is WearPlaybackUiState.Error -> {
             if (playbackState.noteId == noteId) AudioCardState.Error else AudioCardState.Idle
         }
-        is WearPlaybackUiState.Idle -> AudioCardState.Idle
+
+        is WearPlaybackUiState.Idle -> {
+            AudioCardState.Idle
+        }
+
         is WearPlaybackUiState.Preparing -> {
             if (playbackState.noteId == noteId) AudioCardState.Preparing else AudioCardState.Idle
         }
@@ -452,6 +458,7 @@ private fun AudioNoteCard(
                             .padding(top = 4.dp),
                 )
             }
+
             is AudioCardState.NoOutput,
             is AudioCardState.Preparing,
             is AudioCardState.Error,

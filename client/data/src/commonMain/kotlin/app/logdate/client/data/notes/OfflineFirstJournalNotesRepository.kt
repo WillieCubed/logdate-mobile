@@ -248,7 +248,9 @@ class OfflineFirstJournalNotesRepository(
                 )
             }
 
-            else -> null
+            else -> {
+                null
+            }
         }
     }
 
@@ -258,17 +260,20 @@ class OfflineFirstJournalNotesRepository(
         if (repository.isIndexed(pending.uri)) return
 
         when (pending) {
-            is PendingMediaIndex.Image ->
+            is PendingMediaIndex.Image -> {
                 repository.indexImage(
                     uri = pending.uri,
                     timestamp = pending.timestamp,
                 )
-            is PendingMediaIndex.Video ->
+            }
+
+            is PendingMediaIndex.Video -> {
                 repository.indexVideo(
                     uri = pending.uri,
                     timestamp = pending.timestamp,
                     duration = pending.duration,
                 )
+            }
         }
     }
 

@@ -7,56 +7,167 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-MODULE = runpy.run_path(str(Path(__file__).with_name("native-widget-transfer-acceptance.py")))
-PNG = (Path(__file__).resolve().parents[2] / "app/android-main/src/androidTest/assets/recovery/proof.png").read_bytes()
+MODULE = runpy.run_path(
+    str(Path(__file__).with_name("native-widget-transfer-acceptance.py"))
+)
+PNG = (
+    Path(__file__).resolve().parents[2]
+    / "app/android-main/src/androidTest/assets/recovery/proof.png"
+).read_bytes()
 
 
 class NativeWidgetTransferAcceptanceTest(unittest.TestCase):
     def dataset(self, *names):
         output = io.BytesIO()
-        with tarfile.open(fileobj=output, mode="w", format=tarfile.USTAR_FORMAT) as archive:
+        with tarfile.open(
+            fileobj=output, mode="w", format=tarfile.USTAR_FORMAT
+        ) as archive:
             for name in names:
                 item = tarfile.TarInfo(name)
                 item.size = 1
                 archive.addfile(item, io.BytesIO(b"x"))
         return output.getvalue()
 
-    def test_only_owned_app_data_and_package_metadata_can_enter_full_system_restore(self):
+    def test_only_owned_app_data_and_package_metadata_can_enter_full_system_restore(
+        self,
+    ):
         native = MODULE["NATIVE"]
         own = "1/_full/" + native["PACKAGE"]
-        native["validate_widget_restore_dataset"](self.dataset(own, "1/_delta/@pm@/metadata"))
-        for extra in ("1/_full/other.app", "1/_delta/other.app/data", "../outside", "/1/_full/other.app", "1//_full/other.app", "././1/_full/other.app", own):
+        native["validate_widget_restore_dataset"](
+            self.dataset(own, "1/_delta/@pm@/metadata")
+        )
+        for extra in (
+            "1/_full/other.app",
+            "1/_delta/other.app/data",
+            "../outside",
+            "/1/_full/other.app",
+            "1//_full/other.app",
+            "././1/_full/other.app",
+            own,
+        ):
             with self.subTest(extra=extra), self.assertRaises(RuntimeError):
                 native["validate_widget_restore_dataset"](self.dataset(own, extra))
         with self.assertRaisesRegex(RuntimeError, "missing"):
-            native["validate_widget_restore_dataset"](self.dataset("1/_delta/@pm@/metadata"))
+            native["validate_widget_restore_dataset"](
+                self.dataset("1/_delta/@pm@/metadata")
+            )
         with self.assertRaisesRegex(RuntimeError, "metadata"):
             native["validate_widget_restore_dataset"](self.dataset(own))
 
-    def test_system_restore_uses_real_finish_lifecycle_only_after_inspecting_actual_dataset(self):
+    def test_system_restore_uses_real_finish_lifecycle_only_after_inspecting_actual_dataset(
+        self,
+    ):
         native = MODULE["NATIVE"]
         calls = []
+
         def adb(serial, *args):
             calls.append(args)
-            return self.dataset("1/_full/" + native["PACKAGE"], "1/_delta/@pm@/metadata") if args[0] == "exec-out" else b"restoreFinished: 0"
+            return (
+                self.dataset("1/_full/" + native["PACKAGE"], "1/_delta/@pm@/metadata")
+                if args[0] == "exec-out"
+                else b"restoreFinished: 0"
+            )
+
         with patch.dict(native["restore_transport"].__globals__, adb=adb):
             native["restore_transport"]("emulator-5556", system_widgets=True)
         self.assertEqual("exec-out", calls[0][0])
         self.assertEqual(("shell", "bmgr", "restore", "1"), calls[1])
         calls.clear()
-        with patch.dict(native["restore_transport"].__globals__, adb=lambda *args: self.dataset("1/_full/unrelated.app")):
+        with patch.dict(
+            native["restore_transport"].__globals__,
+            adb=lambda *args: self.dataset("1/_full/unrelated.app"),
+        ):
             with self.assertRaises(RuntimeError):
                 native["restore_transport"]("emulator-5556", system_widgets=True)
-    def test_a_passing_probe_must_also_confirm_the_automatic_platform_restore_before_injection(self):
+
+    def test_a_passing_probe_must_also_confirm_the_automatic_platform_restore_before_injection(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as folder:
             output = Path(folder) / "restore.log"
-            native = {"adb": lambda *args: b"passed without the required phase",
-                      "private_file": lambda path, raw: path.write_bytes(raw),
-                      "instrumentation_passed": lambda raw: True}
-            with patch.dict(MODULE["NATIVE"], native), self.assertRaisesRegex(RuntimeError, "Registered widget restore"):
+            native = {
+                "adb": lambda *args: b"passed without the required phase",
+                "private_file": lambda path, raw: path.write_bytes(raw),
+                "instrumentation_passed": lambda raw: True,
+            }
+            with (
+                patch.dict(MODULE["NATIVE"], native),
+                self.assertRaisesRegex(RuntimeError, "Registered widget restore"),
+            ):
                 MODULE["probe"]("emulator-5556", "restore", output, 1)
 
-    def exercise(self, directory, *, fail_stage=None, fail_cleanup=False, invalid_screenshot=False):
+    def test_replay_checkpoint_verifies_content_then_widget_and_stops_writers(self):
+        native = MODULE["NATIVE"]
+        events = []
+        metadata = {"owner": "source"}
+        output = Path("/private/checkpoint.log")
+        with patch.dict(
+            native["checkpoint_widget_replay"].__globals__,
+            probe=lambda *args: events.append(("journal", args)),
+            adb=lambda *args: events.append(("stop", args)),
+        ):
+            native["checkpoint_widget_replay"](
+                "emulator-5556",
+                output,
+                metadata,
+                "phrase",
+                lambda *args: events.append(("widget", args)),
+            )
+        self.assertEqual(["journal", "widget", "stop"], [event[0] for event in events])
+        self.assertEqual(
+            "verify-restored",
+            events[0][1][1],
+            "The checkpoint must verify without editing the journal",
+        )
+        self.assertEqual(metadata, events[0][1][3])
+        self.assertEqual(("emulator-5556", output), events[1][1])
+        self.assertEqual(
+            ("shell", "am", "force-stop", native["PACKAGE"]), events[2][1][1:]
+        )
+
+    def test_system_widget_replay_refuses_to_take_an_unverified_startup_snapshot(self):
+        with self.assertRaisesRegex(ValueError, "verified durable checkpoint"):
+            MODULE["NATIVE"]["transfer"](
+                "emulator-5554",
+                "emulator-5556",
+                Path("/private/app.apk"),
+                Path("/private/probe.apk"),
+                Path("/private/output"),
+                "phrase",
+                exercise_system_widgets=True,
+                exercise_duplicate_restore=True,
+            )
+
+    def test_failed_logical_checkpoint_does_not_advance_to_widget_or_snapshot(self):
+        native = MODULE["NATIVE"]
+        events = []
+
+        def failed(*args):
+            raise RuntimeError("restored content differs")
+
+        with patch.dict(
+            native["checkpoint_widget_replay"].__globals__,
+            probe=failed,
+            adb=lambda *args: events.append("stop"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "restored content differs"):
+                native["checkpoint_widget_replay"](
+                    "emulator-5556",
+                    Path("/private/checkpoint.log"),
+                    {},
+                    "phrase",
+                    lambda *args: events.append("widget"),
+                )
+        self.assertEqual([], events)
+
+    def exercise(
+        self,
+        directory,
+        *,
+        fail_stage=None,
+        fail_cleanup=False,
+        invalid_screenshot=False,
+    ):
         events = []
 
         def probe(serial, stage, output, old_id=None):
@@ -73,17 +184,39 @@ class NativeWidgetTransferAcceptanceTest(unittest.TestCase):
             return b""
 
         def transfer(*args, **kwargs):
-            self.assertTrue(kwargs.get("exercise_duplicate_restore"), "Android must deliver the original widget backup twice")
-            self.assertTrue(kwargs.get("exercise_system_widgets"), "Widget delivery must include Android's system restore finish")
+            self.assertTrue(
+                kwargs.get("exercise_duplicate_restore"),
+                "Android must deliver the original widget backup twice",
+            )
+            self.assertTrue(
+                kwargs.get("exercise_system_widgets"),
+                "Widget delivery must include Android's system restore finish",
+            )
+            checkpoint = kwargs["widget_replay_checkpoint"]
+            checkpoint(options.destination, directory / "initial-checkpoint.log")
+            checkpoint(options.destination, directory / "replay-checkpoint.log")
             events.append(("both", "native-transfer"))
 
-        native = {"prepare": lambda serial, **kwargs: events.append((serial, "prepare")),
-                  "prepare_source": lambda *args: events.append((args[0], "journal-seed")),
-                  "transfer": transfer,
-                  "adb": adb, "private_file": lambda path, raw: path.write_bytes(raw), "PACKAGE": "fixture.debug"}
-        options = SimpleNamespace(source="emulator-5556", destination="emulator-5558", seed_empty_source=True,
-                                  app_apk=Path("/private/app.apk"), test_apk=Path("/private/probe.apk"), output=directory)
-        with patch.dict(MODULE["NATIVE"], native), patch.dict(MODULE["run"].__globals__, probe=probe):
+        native = {
+            "prepare": lambda serial, **kwargs: events.append((serial, "prepare")),
+            "prepare_source": lambda *args: events.append((args[0], "journal-seed")),
+            "transfer": transfer,
+            "adb": adb,
+            "private_file": lambda path, raw: path.write_bytes(raw),
+            "PACKAGE": "fixture.debug",
+        }
+        options = SimpleNamespace(
+            source="emulator-5556",
+            destination="emulator-5558",
+            seed_empty_source=True,
+            app_apk=Path("/private/app.apk"),
+            test_apk=Path("/private/probe.apk"),
+            output=directory,
+        )
+        with (
+            patch.dict(MODULE["NATIVE"], native),
+            patch.dict(MODULE["run"].__globals__, probe=probe),
+        ):
             try:
                 MODULE["run"](options)
             except BaseException as error:
@@ -91,17 +224,34 @@ class NativeWidgetTransferAcceptanceTest(unittest.TestCase):
                 raise
         return events
 
-    def test_native_payload_carries_source_choice_before_real_destination_restore_and_restart(self):
+    def test_native_payload_carries_source_choice_before_real_destination_restore_and_restart(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as folder:
             events = self.exercise(Path(folder))
-            self.assertLess(events.index(("emulator-5556", "seed")), events.index(("both", "native-transfer")))
-            self.assertLess(events.index(("both", "native-transfer")), events.index(("emulator-5558", "restore")))
-            self.assertLess(events.index(("emulator-5558", "restore")), events.index(("emulator-5558", "force-stop")))
-            self.assertLess(events.index(("emulator-5558", "force-stop")), events.index(("emulator-5558", "restart")))
+            self.assertLess(
+                events.index(("emulator-5556", "seed")),
+                events.index(("both", "native-transfer")),
+            )
+            self.assertEqual(2, events.count(("emulator-5558", "checkpoint")))
+            self.assertLess(
+                events.index(("both", "native-transfer")),
+                events.index(("emulator-5558", "restore")),
+            )
+            self.assertLess(
+                events.index(("emulator-5558", "restore")),
+                events.index(("emulator-5558", "force-stop")),
+            )
+            self.assertLess(
+                events.index(("emulator-5558", "force-stop")),
+                events.index(("emulator-5558", "restart")),
+            )
             self.assertIn(("emulator-5556", "cleanup"), events)
             self.assertIn(("emulator-5558", "cleanup"), events)
 
-    def test_a_failed_tap_never_publishes_acceptance_and_still_cleans_up_both_hosts(self):
+    def test_a_failed_tap_never_publishes_acceptance_and_still_cleans_up_both_hosts(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as folder:
             output = Path(folder)
             with self.assertRaisesRegex(RuntimeError, "restore failure") as failure:
@@ -118,7 +268,18 @@ class NativeWidgetTransferAcceptanceTest(unittest.TestCase):
             self.assertIn(("emulator-5556", "cleanup"), failure.exception.events)
             self.assertIn(("emulator-5558", "cleanup"), failure.exception.events)
 
-    def test_a_corrupt_rendered_artifact_fails_without_acceptance_and_cleans_both_hosts(self):
+    def test_failed_checkpoint_never_publishes_acceptance_and_cleans_both_hosts(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder)
+            with self.assertRaisesRegex(RuntimeError, "checkpoint failure") as failure:
+                self.exercise(output, fail_stage="checkpoint")
+            self.assertFalse((output / "widget-acceptance.json").exists())
+            self.assertIn(("emulator-5556", "cleanup"), failure.exception.events)
+            self.assertIn(("emulator-5558", "cleanup"), failure.exception.events)
+
+    def test_a_corrupt_rendered_artifact_fails_without_acceptance_and_cleans_both_hosts(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as folder:
             output = Path(folder)
             with self.assertRaisesRegex(RuntimeError, "rendered screenshot") as failure:

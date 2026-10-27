@@ -287,12 +287,15 @@ class RewindOverviewViewModel(
                         Napier.i("Successfully generated rewind: ${result.rewind.uid}")
                         generationFailedState.value = false
                     }
+
                     is GenerateBasicRewindResult.AlreadyInProgress -> {
                         Napier.d("Rewind generation already in progress")
                     }
+
                     is GenerateBasicRewindResult.NoContent -> {
                         Napier.w("No content available for rewind")
                     }
+
                     is GenerateBasicRewindResult.Error -> {
                         Napier.e("Failed to generate rewind: ${result.error}", result.exception)
                         generationFailedState.value = true
@@ -316,14 +319,21 @@ class RewindOverviewViewModel(
         viewModelScope.launch {
             try {
                 when (val result = generateAnnualRewindUseCase(year)) {
-                    is GenerateBasicRewindResult.Success ->
+                    is GenerateBasicRewindResult.Success -> {
                         Napier.i("Generated annual rewind for $year: ${result.rewind.uid}")
-                    is GenerateBasicRewindResult.NoContent ->
+                    }
+
+                    is GenerateBasicRewindResult.NoContent -> {
                         Napier.w("Not enough weekly rewinds for annual rewind $year")
-                    is GenerateBasicRewindResult.Error ->
+                    }
+
+                    is GenerateBasicRewindResult.Error -> {
                         Napier.e("Annual rewind generation failed: ${result.error}")
-                    is GenerateBasicRewindResult.AlreadyInProgress ->
+                    }
+
+                    is GenerateBasicRewindResult.AlreadyInProgress -> {
                         Napier.d("Annual rewind generation already in progress for $year")
+                    }
                 }
             } catch (e: Exception) {
                 Napier.e("Error generating annual rewind for $year", e)

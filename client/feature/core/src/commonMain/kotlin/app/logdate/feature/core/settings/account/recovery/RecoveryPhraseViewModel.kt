@@ -142,9 +142,12 @@ class RecoveryPhraseViewModel(
                             val current = _state.value
                             when {
                                 phrase == null -> RecoveryPhraseUiState.NotOnThisDevice
+
                                 verified -> RecoveryPhraseUiState.Verified
+
                                 // A screen rebuilt mid-reveal, such as after a rotation, keeps what the person confirmed.
                                 current is RecoveryPhraseUiState.Revealed || current is RecoveryPhraseUiState.Confirming -> current
+
                                 else -> RecoveryPhraseUiState.Hidden
                             }
                         },

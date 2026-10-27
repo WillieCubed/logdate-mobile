@@ -112,25 +112,39 @@ private fun StatusItem(
     SettingsRow(
         leadingContent = {
             when (health) {
-                null -> CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                is ServerHealth.Reachable ->
+                null -> {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                }
+
+                is ServerHealth.Reachable -> {
                     Icon(
                         Icons.Outlined.CheckCircle,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                     )
-                ServerHealth.Unreachable -> Icon(Icons.Outlined.CloudOff, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                }
+
+                ServerHealth.Unreachable -> {
+                    Icon(Icons.Outlined.CloudOff, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                }
             }
         },
         overlineContent = { Text(stringResource(Res.string.hosting_status)) },
         headlineContent = {
             Text(
                 when (health) {
-                    null -> stringResource(Res.string.hosting_checking)
-                    is ServerHealth.Reachable ->
+                    null -> {
+                        stringResource(Res.string.hosting_checking)
+                    }
+
+                    is ServerHealth.Reachable -> {
                         health.version?.let { stringResource(Res.string.hosting_connected_version, it) }
                             ?: stringResource(Res.string.hosting_connected)
-                    ServerHealth.Unreachable -> stringResource(Res.string.hosting_unreachable)
+                    }
+
+                    ServerHealth.Unreachable -> {
+                        stringResource(Res.string.hosting_unreachable)
+                    }
                 },
             )
         },

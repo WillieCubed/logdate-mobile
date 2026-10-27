@@ -238,6 +238,7 @@ internal class SyncUploader(
                             }
                         }
                     }
+
                     PendingOperation.CREATE,
                     PendingOperation.UPDATE,
                     -> {

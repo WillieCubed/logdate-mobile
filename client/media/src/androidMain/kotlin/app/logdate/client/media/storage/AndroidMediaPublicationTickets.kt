@@ -42,6 +42,8 @@ class AndroidMediaPublicationTickets(
     private val directory = File(root, "tickets")
     private val mutex = processMutexes.getOrPut(root.absolutePath) { Mutex() }
 
+    internal suspend fun <T> withClaim(block: suspend () -> T): T = claimFence.withClaim(block)
+
     suspend fun reserve(
         destination: String,
         sourcePath: String,

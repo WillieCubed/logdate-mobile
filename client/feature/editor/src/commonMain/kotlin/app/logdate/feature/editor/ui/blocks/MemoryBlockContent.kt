@@ -69,7 +69,7 @@ internal fun MemoryBlockContent(
 ) {
     Column(Modifier.fillMaxWidth()) {
         when (block) {
-            is TextBlockUiState ->
+            is TextBlockUiState -> {
                 TextBlockContent(
                     block,
                     isExpanded = false,
@@ -79,6 +79,8 @@ internal fun MemoryBlockContent(
                     onTextChanged = { onUpdate(block.copy(content = it)) },
                     onFocused = onSelect,
                 )
+            }
+
             is ImageBlockUiState -> {
                 if (block.uri == null) {
                     ImagePickerContent({ onUpdate(block.copy(uri = it)) }, Modifier.fillMaxWidth().height(220.dp))
@@ -105,6 +107,7 @@ internal fun MemoryBlockContent(
                     }
                 }
             }
+
             is VideoBlockUiState -> {
                 if (block.uri == null) {
                     VideoPickerContent(
@@ -115,7 +118,8 @@ internal fun MemoryBlockContent(
                     VideoPlayerContent(block.uri, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
                 }
             }
-            is AudioBlockUiState ->
+
+            is AudioBlockUiState -> {
                 AudioBlockEditor(
                     block,
                     onUpdate,
@@ -134,6 +138,8 @@ internal fun MemoryBlockContent(
                     selected = isSelected,
                     availableHeight = availableAudioHeight,
                 )
+            }
+
             is CameraBlockUiState -> {
                 if (block.mediaType == CapturedMediaType.VIDEO && block.uri != null) {
                     VideoPlayerContent(block.uri, Modifier.fillMaxWidth().aspectRatio(16f / 9f))

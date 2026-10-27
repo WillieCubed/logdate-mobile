@@ -8,8 +8,10 @@ import app.logdate.client.database.requirePortableCloudBackupKey
 import app.logdate.client.device.restore.NativeBackupAgent
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.media.storage.AndroidMediaClaimFence
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
 /** The restricted callback retains a nonsecret request; the system job performs authentication. */
@@ -48,6 +50,14 @@ class NativeAccountBackupAgent : NativeBackupAgent() {
 
     override fun retainedNativeCameraReconciliationScheduled() =
         runBlocking { AndroidMediaClaimFence(noBackupFilesDir).withClaim { journalRestore.reconciliationScheduled() } }
+
+    override fun repairRetainedNativePrivacyUnderDeliveryLock() {
+        runBlocking(Dispatchers.IO) {
+            withTimeoutOrNull(15_000) {
+                RetainedNativePrivacyRepair(this@NativeAccountBackupAgent).repairUnderDeliveryLock()
+            }
+        }
+    }
 
     override fun scheduleRetainedJournalReconciliation(): Boolean =
         app.logdate.client.data.restore

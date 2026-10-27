@@ -2,8 +2,10 @@ package app.logdate.client.sync.cloud
 
 import app.logdate.shared.model.diagnostics.DiagnosticOutcome
 import app.logdate.shared.model.diagnostics.DiagnosticReportCodec
+import app.logdate.shared.model.diagnostics.DiagnosticRoute
 import app.logdate.shared.model.diagnostics.SyncDiagnosticEvent
 import app.logdate.shared.model.diagnostics.SyncDiagnosticReport
+import app.logdate.shared.model.diagnostics.diagnosticRoute
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -18,6 +20,22 @@ import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
 class SafeCloudTransportTest {
+    @Test
+    fun `diagnostic report routes classify only the collection and one report`() {
+        val routes =
+            mapOf(
+                "/api/v1/diagnostics/reports" to DiagnosticRoute.DIAGNOSTIC_REPORTS,
+                "/api/v1/diagnostics/reports/private-report" to DiagnosticRoute.DIAGNOSTIC_REPORT,
+                "/api/v1/diagnostics" to DiagnosticRoute.UNKNOWN,
+                "/api/v1/diagnostics/private-report" to DiagnosticRoute.UNKNOWN,
+                "/api/v1/diagnostics/private-report/child" to DiagnosticRoute.UNKNOWN,
+                "/api/v1/diagnostics/reports/private-report/child" to DiagnosticRoute.UNKNOWN,
+            )
+        routes.forEach { (path, expected) ->
+            assertEquals(expected, diagnosticRoute(path), path)
+        }
+    }
+
     @Test
     fun `known archive and media routes keep their phase without exposing identifiers`() =
         runTest {

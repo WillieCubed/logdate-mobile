@@ -68,16 +68,21 @@ class UserDataRestoreViewModel(
         }
         restoreLauncher.setRestoreCompletionCallback { outcome ->
             when (outcome) {
-                is RestoreOutcome.Started -> _restoreState.update { RestoreState.Restoring() }
+                is RestoreOutcome.Started -> {
+                    _restoreState.update { RestoreState.Restoring() }
+                }
+
                 is RestoreOutcome.Cancelled -> {
                     _restoreState.update { RestoreState.Idle }
                     _isSheetVisible.value = false
                 }
+
                 is RestoreOutcome.Success -> {
                     selectionRecoveryState = null
                     _restoreState.update { RestoreState.Completed(outcome.summary) }
                     _isSheetVisible.value = true
                 }
+
                 is RestoreOutcome.Failure -> {
                     _restoreState.update {
                         RestoreState.Failed(outcome.error, recoveryId = outcome.recoveryId ?: recoveryIdentity(selectionRecoveryState))
@@ -131,7 +136,10 @@ class UserDataRestoreViewModel(
                             }
                         }
                     }
-                    RestoreProgressInfo.Idle -> Unit
+
+                    RestoreProgressInfo.Idle -> {
+                        Unit
+                    }
                 }
             }
         }
@@ -198,6 +206,7 @@ class UserDataRestoreViewModel(
             is RestoreState.Completed,
             is RestoreState.Failed,
             -> _restoreState.update { selectionRecoveryState ?: RestoreState.Idle }
+
             else -> Unit
         }
     }

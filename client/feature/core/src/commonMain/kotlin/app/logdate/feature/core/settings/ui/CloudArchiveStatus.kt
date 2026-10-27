@@ -65,16 +65,29 @@ fun resolveCloudArchiveStatus(
     val confirmedAt = if (serverLookupFailed) null else serverCompletedAt
     val phase =
         when (workState) {
-            ArchiveWorkState.RUNNING -> CloudArchivePhase.RUNNING
-            ArchiveWorkState.RETRYING -> CloudArchivePhase.RETRYING
-            ArchiveWorkState.QUEUED -> CloudArchivePhase.QUEUED
-            ArchiveWorkState.FAILED -> CloudArchivePhase.FAILED
-            ArchiveWorkState.IDLE, ArchiveWorkState.SUCCEEDED ->
+            ArchiveWorkState.RUNNING -> {
+                CloudArchivePhase.RUNNING
+            }
+
+            ArchiveWorkState.RETRYING -> {
+                CloudArchivePhase.RETRYING
+            }
+
+            ArchiveWorkState.QUEUED -> {
+                CloudArchivePhase.QUEUED
+            }
+
+            ArchiveWorkState.FAILED -> {
+                CloudArchivePhase.FAILED
+            }
+
+            ArchiveWorkState.IDLE, ArchiveWorkState.SUCCEEDED -> {
                 when {
                     serverLookupFailed -> CloudArchivePhase.UNAVAILABLE
                     confirmedAt != null -> CloudArchivePhase.COMPLETE
                     else -> CloudArchivePhase.NEVER_BACKED_UP
                 }
+            }
         }
     return CloudArchiveStatus(phase, confirmedAt)
 }

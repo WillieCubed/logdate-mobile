@@ -82,7 +82,9 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
             caption =
                 when (this) {
                     is JournalNote.Image -> caption
+
                     is JournalNote.Video -> caption
+
                     is JournalNote.Text,
                     is JournalNote.Audio,
                     -> ""
@@ -109,7 +111,7 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
         val updatedTimestamp = Instant.fromEpochMilliseconds(lastUpdated ?: createdAt)
 
         return when (noteType) {
-            NoteType.TEXT ->
+            NoteType.TEXT -> {
                 JournalNote.Text(
                     uid = noteId,
                     creationTimestamp = timestamp,
@@ -119,7 +121,9 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
                     location = location,
                     timeZoneId = timeZoneId,
                 )
-            NoteType.AUDIO ->
+            }
+
+            NoteType.AUDIO -> {
                 JournalNote.Audio(
                     uid = noteId,
                     creationTimestamp = timestamp,
@@ -130,7 +134,9 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
                     location = location,
                     timeZoneId = timeZoneId,
                 )
-            NoteType.IMAGE ->
+            }
+
+            NoteType.IMAGE -> {
                 JournalNote.Image(
                     uid = noteId,
                     creationTimestamp = timestamp,
@@ -141,7 +147,9 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
                     location = location,
                     timeZoneId = timeZoneId,
                 )
-            NoteType.VIDEO ->
+            }
+
+            NoteType.VIDEO -> {
                 JournalNote.Video(
                     uid = noteId,
                     creationTimestamp = timestamp,
@@ -152,8 +160,11 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
                     location = location,
                     timeZoneId = timeZoneId,
                 )
-            NoteType.LOCATION ->
+            }
+
+            NoteType.LOCATION -> {
                 throw IllegalArgumentException("A draft cannot contain a LOCATION journal note")
+            }
         }
     }
 

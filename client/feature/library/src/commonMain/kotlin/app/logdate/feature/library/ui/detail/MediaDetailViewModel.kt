@@ -159,14 +159,7 @@ class MediaDetailViewModel(
             val primaryNote = media.matchingNotes.firstOrNull()
 
             val journalsDeferred = async { loadJournals(media.matchingNotes) }
-            val exifDeferred =
-                async {
-                    if (media.indexedMedia is IndexedMedia.Image) {
-                        loadExif(media.indexedMedia.uid)
-                    } else {
-                        null
-                    }
-                }
+            val exifDeferred = async { loadImageExif(media) }
             val locationDeferred = async { resolveLocationName(primaryNote?.location) }
 
             val journals = journalsDeferred.await()
@@ -175,7 +168,7 @@ class MediaDetailViewModel(
 
             _uiState.value =
                 when {
-                    media.isVideo ->
+                    media.isVideo -> {
                         MediaDetailUiState.VideoContent(
                             mediaId = media.id,
                             mediaRef = media.uri,
@@ -184,7 +177,9 @@ class MediaDetailViewModel(
                             locationDisplayName = locationDisplayName,
                             journals = journals,
                         )
-                    media.isAudio ->
+                    }
+
+                    media.isAudio -> {
                         MediaDetailUiState.AudioContent(
                             mediaId = media.id,
                             mediaRef = media.uri,
@@ -194,7 +189,9 @@ class MediaDetailViewModel(
                             locationDisplayName = locationDisplayName,
                             journals = journals,
                         )
-                    media.indexedMedia is IndexedMedia.Image ->
+                    }
+
+                    media.indexedMedia is IndexedMedia.Image -> {
                         MediaDetailUiState.ImageContent(
                             mediaId = media.id,
                             mediaRef = media.uri,
@@ -204,7 +201,9 @@ class MediaDetailViewModel(
                             journals = journals,
                             exif = exif,
                         )
-                    else ->
+                    }
+
+                    else -> {
                         MediaDetailUiState.ImageContent(
                             mediaId = media.id,
                             mediaRef = media.uri,
@@ -214,7 +213,15 @@ class MediaDetailViewModel(
                             journals = journals,
                             exif = exif,
                         )
+                    }
                 }
+        }
+
+    private suspend fun loadImageExif(media: LibraryMediaSource): ExifDisplayData? =
+        if (media.indexedMedia is IndexedMedia.Image) {
+            loadExif(media.indexedMedia.uid)
+        } else {
+            null
         }
 
     private suspend fun loadJournals(notes: List<JournalNote>): List<JournalReference> =
@@ -265,15 +272,24 @@ class MediaDetailViewModel(
                     )
                 val resolved =
                     when (val result = resolveLocationToPlaceUseCase(location)) {
-                        is PlaceResolutionResult.UserDefinedPlace -> result.place.name
-                        is PlaceResolutionResult.ExternalSuggestion -> result.suggestion.name
+                        is PlaceResolutionResult.UserDefinedPlace -> {
+                            result.place.name
+                        }
+
+                        is PlaceResolutionResult.ExternalSuggestion -> {
+                            result.suggestion.name
+                        }
+
                         is PlaceResolutionResult.CoarseLocation -> {
                             val addr = result.address
                             listOfNotNull(addr.locality, addr.adminArea)
                                 .joinToString(", ")
                                 .ifEmpty { null }
                         }
-                        is PlaceResolutionResult.UnknownLocation -> null
+
+                        is PlaceResolutionResult.UnknownLocation -> {
+                            null
+                        }
                     }
                 if (resolved != null) return resolved
             } catch (e: Exception) {

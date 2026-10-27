@@ -156,12 +156,16 @@ internal class AssociationDownloader(
                             addMembership(membership)
                             RemoteOutcome.STORED
                         }
+
                         local.operation == PendingOperation.DELETE -> {
                             recordConflict(key, membership.syncVersion)
                             tally.conflicts++
                             RemoteOutcome.DECLINED
                         }
-                        else -> RemoteOutcome.KEPT_LOCAL
+
+                        else -> {
+                            RemoteOutcome.KEPT_LOCAL
+                        }
                     }
                 if (outcome == RemoteOutcome.STORED) tally.downloaded++
                 staged.settle(key, outcome)
@@ -190,13 +194,20 @@ internal class AssociationDownloader(
                 val local = pending[key]
                 val outcome =
                     when {
-                        ids == null -> RemoteOutcome.DECLINED
-                        local?.operation == PendingOperation.DELETE -> RemoteOutcome.DELETED
+                        ids == null -> {
+                            RemoteOutcome.DECLINED
+                        }
+
+                        local?.operation == PendingOperation.DELETE -> {
+                            RemoteOutcome.DELETED
+                        }
+
                         local != null -> {
                             recordConflict(key, null)
                             tally.conflicts++
                             RemoteOutcome.DECLINED
                         }
+
                         else -> {
                             removeMembership(ids)
                             tally.downloaded++

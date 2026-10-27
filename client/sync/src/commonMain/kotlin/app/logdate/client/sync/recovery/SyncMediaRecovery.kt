@@ -54,8 +54,10 @@ internal class SyncMediaRecovery(
             started = true
             inbox.recordMediaAttempt(row, attemptId, DiagnosticOutcome.STARTED, source)
             when (val result = transfer.hydrate(accessToken, owner)) {
-                is MediaHydrationResult.Pending ->
+                is MediaHydrationResult.Pending -> {
                     inbox.failed("MEDIA_NOTE", row.entityId, result.reason.name, row.version, scope, attemptId, source)
+                }
+
                 is MediaHydrationResult.Available -> {
                     val attached = attach(scope, row, id, owner, result)
                     inbox.recordMediaAttempt(

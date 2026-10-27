@@ -20,6 +20,7 @@ import app.logdate.client.device.crypto.link.BouncyCastleLinkHandshake
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.device.storage.SecureStorage
+import app.logdate.client.domain.export.archive.ArchiveExportProgress
 import app.logdate.client.domain.export.archive.ExportArchiveUseCase
 import app.logdate.client.ensureLogDateApplicationStarted
 import app.logdate.client.repository.journals.JournalRepository
@@ -43,6 +44,7 @@ import app.logdate.feature.core.export.CloudBackupWorker
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Test
@@ -146,7 +148,7 @@ class NativeTransferredPublicationProbeTest : CloudArchiveWorkerFixture() {
         assertNull(koin.get<SecureStorage>().getString(sentinel), "The source vault must not transfer")
         val oldPeer = PeerDeliveryContext(source.getString("link"), source.getString("device"), peer, LinkMode.PAIR)
         val manifests = koin.get<WindowManifestStore>()
-        assertEquals(3L, manifests.revision(oldPeer), "The native payload must deliver the old scoped counter")
+        assertEquals(0L, manifests.revision(oldPeer), "A replacement installation must not inherit source publication counters")
         val links = koin.get<PhoneWatchLinkStore>()
         val keys = koin.get<PairKeyVault>()
         if (replay || receipt.exists()) {
@@ -187,7 +189,7 @@ class NativeTransferredPublicationProbeTest : CloudArchiveWorkerFixture() {
         val completed = JSONObject(receipt.readText()).put("published", true)
         writeReceipt(completed)
         assertNull(koin.get<SessionStorage>().getSession(), "The capture transport must not install authentication")
-        assertEquals(3L, manifests.revision(oldPeer))
+        assertEquals(0L, manifests.revision(oldPeer))
     }
 
     private suspend fun verifyOutgoingArchive(current: JSONObject) {
@@ -213,11 +215,12 @@ class NativeTransferredPublicationProbeTest : CloudArchiveWorkerFixture() {
             }
         try {
             val cipher = koin.get<CloudArchiveCipher>()
+            val exportEvents = mutableListOf<String>()
             val worker =
                 CloudBackupWorker(
                     context,
                     params,
-                    koin.get<ExportArchiveUseCase>(),
+                    observedExporter(exportEvents),
                     transport,
                     FakeSessionStorage(
                         UserSession("synthetic-publication-access", "synthetic-publication-refresh", current.getString("owner")),
@@ -226,7 +229,11 @@ class NativeTransferredPublicationProbeTest : CloudArchiveWorkerFixture() {
                     koin.get<IdentityKeyManager>(),
                     cipher,
                 )
-            assertTrue(worker.doWork() is ListenableWorker.Result.Success)
+            val result = worker.doWork()
+            assertTrue(
+                result is ListenableWorker.Result.Success,
+                "Publication result=${result.javaClass.simpleName}; uploads=$uploads; export=$exportEvents",
+            )
             assertEquals(1, uploads)
             cipher.decrypt(encrypted, plaintext)
             ZipFile(plaintext).use { zip ->
@@ -241,6 +248,39 @@ class NativeTransferredPublicationProbeTest : CloudArchiveWorkerFixture() {
         } finally {
             encrypted.delete()
             plaintext.delete()
+        }
+    }
+
+    /** Observe the real export without replacing its data, progress, failures, or container. */
+    private fun observedExporter(events: MutableList<String>): ExportArchiveUseCase {
+        val real = koin.get<ExportArchiveUseCase>()
+        return mockk<ExportArchiveUseCase>().also { observer ->
+            every { observer.export(any(), any()) } answers {
+                real.export(firstArg(), secondArg()).onEach { progress ->
+                    events +=
+                        when (progress) {
+                            is ArchiveExportProgress.Starting -> {
+                                "starting"
+                            }
+
+                            is ArchiveExportProgress.InProgress -> {
+                                progress.stage.name
+                            }
+
+                            is ArchiveExportProgress.Failed -> {
+                                "failed:${progress.error}"
+                            }
+
+                            is ArchiveExportProgress.Completed -> {
+                                val omissions =
+                                    progress.summary.scope.omitted
+                                        .groupingBy { it.reason }
+                                        .eachCount()
+                                "completed:omissions=$omissions"
+                            }
+                        }
+                }
+            }
         }
     }
 

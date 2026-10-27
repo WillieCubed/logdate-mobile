@@ -183,7 +183,10 @@ internal class SpaceGate(
         account: Account,
     ): Boolean {
         when (holds.spaceWriteRefusal(account.id.toJavaUUID(), account.storageMode)) {
-            null -> return true
+            null -> {
+                return true
+            }
+
             SpaceWriteRefusal.Held -> {
                 call.response.header(HttpHeaders.RetryAfter, SPACE_HOLD_RETRY_AFTER_SECONDS.toString())
                 call.respond(
@@ -191,11 +194,13 @@ internal class SpaceGate(
                     PdsErrorResponse(SERVER_BUSY, "This journal is being switched back; send this change again later"),
                 )
             }
-            SpaceWriteRefusal.StorageChanged ->
+
+            SpaceWriteRefusal.StorageChanged -> {
                 call.respond(
                     HttpStatusCode.Conflict,
                     PdsErrorResponse(ACCOUNT_STORAGE_CHANGED, "This account's journal is no longer kept in its personal space"),
                 )
+            }
         }
         return false
     }

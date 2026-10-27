@@ -166,6 +166,7 @@ class LogDateCloudQuotaManager(
                 quotaStateFlow.value = serverQuota
                 serverQuota
             }
+
             is QuotaResult.Error -> {
                 throw Exception("Failed to sync with server: ${result.message}", result.throwable)
             }

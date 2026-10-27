@@ -244,13 +244,17 @@ internal class SyncStatusPublisher(
         if (identityRecoveryNeededStore.isNeeded()) return SyncPausedReason.NEEDS_RECOVERY_PHRASE
         val restriction = runCatching { dataUsagePolicy.currentRestriction() }.getOrNull()
         return when (restriction) {
-            DataRestriction.OFFLINE -> SyncPausedReason.OFFLINE
-            DataRestriction.BACKGROUND_DATA_BLOCKED, DataRestriction.NONE, null ->
+            DataRestriction.OFFLINE -> {
+                SyncPausedReason.OFFLINE
+            }
+
+            DataRestriction.BACKGROUND_DATA_BLOCKED, DataRestriction.NONE, null -> {
                 // Only after something was actually held back - being on cellular with nothing
                 // waiting is not a pause, and saying so would train the user to ignore the line.
                 SyncPausedReason.MEDIA_WAITING_FOR_WIFI.takeIf {
                     mediaDeferredForNetwork && !dataUsagePolicy.currentMode().shouldSyncMedia()
                 }
+            }
         }
     }
 
