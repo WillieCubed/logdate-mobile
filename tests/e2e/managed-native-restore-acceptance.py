@@ -121,8 +121,20 @@ def stop_owned_setup_guest(
             check=False,
         ).stdout.decode()
 
-    endpoint = console_endpoint(listeners())
+    observed_listeners = listeners()
+    endpoint = console_endpoint(observed_listeners)
     if endpoint is None:
+        save(
+            output / f"setup-console-pending-{pid}.json",
+            {
+                "pid": pid,
+                "candidate": candidate,
+                "identity": identity,
+                "listeners": observed_listeners[:4096],
+            },
+        )
+        if not console_ports(observed_listeners):
+            raise ConnectionError("The owned setup console has already closed")
         raise RuntimeError("Setup guest has no unique owned console port")
     host, port = endpoint
     serial = f"emulator-{port}"
@@ -344,6 +356,17 @@ def prepare_managed_setup(
                             continue
                         stopped.add(pid)
                 if clock() >= deadline:
+                    save(
+                        output / "setup-live-processes.json",
+                        {
+                            "nonce": nonce,
+                            "stoppedPids": sorted(stopped),
+                            "invocations": invocations,
+                            "processes": setup_live_processes(
+                                lines, invocations, managed_sdk
+                            ),
+                        },
+                    )
                     raise RuntimeError(
                         "Owned managed setup processes are still live; the pair was not started"
                     )
@@ -763,6 +786,26 @@ def save(path, contents):
     temporary.replace(path)
 
 
+def setup_live_processes(lines, invocations, sdk):
+    pids = {str(invocation["launcherPid"]) for invocation in invocations}
+    managed_ids = {
+        argument
+        for invocation in invocations
+        for argument in invocation["arguments"]
+        if argument.endswith("_GradleManagedDevice")
+    }
+    return [
+        line[:4096]
+        for line in (lines or [])
+        if line.strip()
+        and (
+            line.strip().split(None, 1)[0] in pids
+            or str(sdk) in line
+            or any(identifier in line for identifier in managed_ids)
+        )
+    ][:32]
+
+
 def console_endpoint(listeners):
     port = console_port(listeners)
     if port is None:
@@ -772,14 +815,18 @@ def console_endpoint(listeners):
 
 
 def console_port(listeners):
-    ports = {
+    ports = console_ports(listeners)
+    if len(ports) != 1:
+        return None
+    return ports.pop()
+
+
+def console_ports(listeners):
+    return {
         int(p)
         for p in re.findall(r"^n(?:127\.0\.0\.1|\[::1\]):(\d+)$", listeners, re.M)
         if 5554 <= int(p) <= 5682 and int(p) % 2 == 0
     }
-    if len(ports) != 1:
-        return None
-    return ports.pop()
 
 
 def require_outer_results(directory):

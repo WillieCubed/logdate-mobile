@@ -12,7 +12,9 @@ import app.logdate.client.media.MediaPayload
 import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.media.storage.LocalMediaRef
 import app.logdate.client.media.storage.MediaCollection
+import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.media.storage.UnavailableMediaReferences
+import app.logdate.client.media.storage.androidMediaFileResolver
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
@@ -284,16 +286,17 @@ internal class NativeJournalFixture(
                 expectedMissingMediaPath.removePrefix("files/"),
             )
         assertFalse(missingFile.exists(), "The native transport unexpectedly delivered its deliberately omitted original")
+        val mediaFiles = androidMediaFileResolver(InstrumentationRegistry.getInstrumentation().targetContext)
         val mediaReferences =
             withTimeout(30_000) {
                 var references = readPartialMediaReferences()
 
                 suspend fun settled(): Boolean =
                     references.any { (reference, _) ->
-                        (UnavailableMediaReferences.nativeSource(reference) ?: reference) == missingReference
+                        nativePartialMediaIdentity(reference, mediaFiles) == missingReference
                     } &&
                         references.all { (reference, _) ->
-                            val original = UnavailableMediaReferences.nativeSource(reference) ?: reference
+                            val original = nativePartialMediaIdentity(reference, mediaFiles)
                             if (original == missingReference) {
                                 UnavailableMediaReferences.isUnavailable(reference)
                             } else {
@@ -428,3 +431,11 @@ internal class NativeJournalFixture(
 }
 
 private const val MAX_NATIVE_TRANSFER_FIXTURE_DATABASE_BYTES = 24L * 1024 * 1024
+
+internal fun nativePartialMediaIdentity(
+    reference: String,
+    files: MediaFileResolver,
+): String {
+    val original = UnavailableMediaReferences.nativeSource(reference) ?: reference
+    return files.filePath(original)?.let(files::refFor)?.toString() ?: original
+}

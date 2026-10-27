@@ -36,8 +36,16 @@ class ManagedDriverControllerTest(unittest.TestCase):
             "birth": "original",
             "command": "/sdk/qemu-system-x86_64 @owned -id validation_GradleManagedDevice",
         }
-        for exits in (True, False):
-            with self.subTest(exits=exits), tempfile.TemporaryDirectory() as folder:
+        for exits, listener_closed in (
+            (True, False),
+            (False, False),
+            (True, True),
+            (False, True),
+        ):
+            with (
+                self.subTest(exits=exits, listener_closed=listener_closed),
+                tempfile.TemporaryDirectory() as folder,
+            ):
                 output = Path(folder)
                 receipts = output / "managed-emulator-invocations"
                 receipts.mkdir()
@@ -68,7 +76,7 @@ class ManagedDriverControllerTest(unittest.TestCase):
                             else f"41 {identity['command']}".encode()
                         )
                     elif arguments[0] == "lsof":
-                        data = b"n127.0.0.1:5554\n"
+                        data = b"" if listener_closed else b"n127.0.0.1:5554\n"
                     elif arguments[-3:] == ("emu", "avd", "name"):
                         raise ConnectionRefusedError("console is closing")
                     else:
@@ -105,6 +113,12 @@ class ManagedDriverControllerTest(unittest.TestCase):
                     ):
                         prepare()
                     self.assertFalse((output / "setup-teardown.json").exists())
+                    evidence = json.loads(
+                        (output / "setup-live-processes.json").read_text()
+                    )
+                    self.assertEqual(
+                        [f"41 {identity['command']}"], evidence["processes"]
+                    )
 
     def test_console_name_reads_one_response_after_either_console_banner(self):
         for banner in (
@@ -395,7 +409,7 @@ class ManagedDriverControllerTest(unittest.TestCase):
         workflow = (
             root / ".github/workflows/native-restore-acceptance.yml"
         ).read_text()
-        matrix = re.search(r"scenario: \[([^\]]+)\]", workflow)
+        matrix = re.search(r"scenario:\s*\[([^\]]+)\]", workflow)
         self.assertIsNotNone(matrix, "Native restore scenarios must be enumerated")
         dispatch = re.search(
             r'          case "\$NATIVE_SCENARIO" in\n(.*?)          esac',
