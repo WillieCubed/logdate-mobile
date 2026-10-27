@@ -2,6 +2,7 @@ package app.logdate.client.data.people
 
 import app.logdate.client.database.dao.people.PersonDao
 import app.logdate.client.database.entities.people.PersonEntity
+import app.logdate.client.media.storage.MediaClaimFence
 import app.logdate.client.repository.knowledge.ContactImportSummary
 import app.logdate.client.repository.knowledge.DeviceContact
 import app.logdate.client.repository.knowledge.PeopleContactsRepository
@@ -22,6 +23,7 @@ import kotlin.uuid.Uuid
 class OfflineFirstPeopleRepository(
     private val personDao: PersonDao,
     private val dispatcher: CoroutineDispatcher = platformIODispatcher,
+    private val mediaClaimFence: MediaClaimFence = MediaClaimFence.Disabled,
 ) : PeopleRepository,
     PeopleContactsRepository {
     override suspend fun getPerson(uid: Uuid): Person =
@@ -54,25 +56,27 @@ class OfflineFirstPeopleRepository(
 
     override suspend fun addPerson(person: Person) {
         withContext(dispatcher) {
-            personDao.insert(person.toEntity(createdAt = Clock.System.now()))
+            mediaClaimFence.withClaim { personDao.insert(person.toEntity(createdAt = Clock.System.now())) }
         }
     }
 
     override suspend fun updatePerson(person: Person) {
         withContext(dispatcher) {
             val existing = personDao.getById(person.uid) ?: return@withContext
-            personDao.update(
-                person.toEntity(
-                    createdAt = existing.created,
-                    contactLookupKey = existing.contactLookupKey,
-                ),
-            )
+            mediaClaimFence.withClaim {
+                personDao.update(
+                    person.toEntity(
+                        createdAt = existing.created,
+                        contactLookupKey = existing.contactLookupKey,
+                    ),
+                )
+            }
         }
     }
 
     override suspend fun deletePerson(uid: Uuid) {
         withContext(dispatcher) {
-            personDao.softDelete(uid, Clock.System.now())
+            mediaClaimFence.withClaim { personDao.softDelete(uid, Clock.System.now()) }
         }
     }
 
@@ -87,12 +91,14 @@ class OfflineFirstPeopleRepository(
                 return@withContext
             }
 
-            personDao.update(
-                existing.copy(
-                    aliases = existing.aliases + normalizedAlias,
-                    lastUpdated = Clock.System.now(),
-                ),
-            )
+            mediaClaimFence.withClaim {
+                personDao.update(
+                    existing.copy(
+                        aliases = existing.aliases + normalizedAlias,
+                        lastUpdated = Clock.System.now(),
+                    ),
+                )
+            }
         }
     }
 
@@ -102,12 +108,14 @@ class OfflineFirstPeopleRepository(
     ) {
         withContext(dispatcher) {
             val existing = personDao.getById(personUid) ?: return@withContext
-            personDao.update(
-                existing.copy(
-                    aliases = existing.aliases.filterNot { it.equals(alias, ignoreCase = true) },
-                    lastUpdated = Clock.System.now(),
-                ),
-            )
+            mediaClaimFence.withClaim {
+                personDao.update(
+                    existing.copy(
+                        aliases = existing.aliases.filterNot { it.equals(alias, ignoreCase = true) },
+                        lastUpdated = Clock.System.now(),
+                    ),
+                )
+            }
         }
     }
 
@@ -121,42 +129,44 @@ class OfflineFirstPeopleRepository(
             var importedCount = 0
             var updatedCount = 0
 
-            contacts.forEach { contact ->
-                val normalizedName = normalizePersonName(contact.displayName)
-                val normalizedLookupKey = normalizeOptionalText(contact.lookupKey)
-                if (normalizedName.isBlank() || normalizedLookupKey == null) {
-                    return@forEach
-                }
+            mediaClaimFence.withClaim {
+                contacts.forEach { contact ->
+                    val normalizedName = normalizePersonName(contact.displayName)
+                    val normalizedLookupKey = normalizeOptionalText(contact.lookupKey)
+                    if (normalizedName.isBlank() || normalizedLookupKey == null) {
+                        return@forEach
+                    }
 
-                val normalizedAliases = normalizePersonAliases(contact.aliases, normalizedName)
-                val normalizedPhotoUri = normalizeOptionalText(contact.photoUri)
-                val existing = personDao.getByContactLookupKey(normalizedLookupKey)
-                val now = Clock.System.now()
-                if (existing == null) {
-                    personDao.insert(
-                        app.logdate.client.database.entities.people.PersonEntity(
-                            id = Uuid.random(),
-                            name = normalizedName,
-                            photoUri = normalizedPhotoUri,
-                            aliases = normalizedAliases,
-                            origin = origin.name,
-                            contactLookupKey = normalizedLookupKey,
-                            created = now,
-                            lastUpdated = now,
-                        ),
-                    )
-                    importedCount += 1
-                } else {
-                    val updated =
-                        existing.copy(
-                            name = normalizedName,
-                            photoUri = normalizedPhotoUri ?: existing.photoUri,
-                            aliases = normalizePersonAliases(existing.aliases + normalizedAliases, normalizedName),
-                            origin = mergeImportedPersonOrigin(existing.origin, origin).name,
-                            lastUpdated = now,
+                    val normalizedAliases = normalizePersonAliases(contact.aliases, normalizedName)
+                    val normalizedPhotoUri = normalizeOptionalText(contact.photoUri)
+                    val existing = personDao.getByContactLookupKey(normalizedLookupKey)
+                    val now = Clock.System.now()
+                    if (existing == null) {
+                        personDao.insert(
+                            app.logdate.client.database.entities.people.PersonEntity(
+                                id = Uuid.random(),
+                                name = normalizedName,
+                                photoUri = normalizedPhotoUri,
+                                aliases = normalizedAliases,
+                                origin = origin.name,
+                                contactLookupKey = normalizedLookupKey,
+                                created = now,
+                                lastUpdated = now,
+                            ),
                         )
-                    personDao.update(updated)
-                    updatedCount += 1
+                        importedCount += 1
+                    } else {
+                        val updated =
+                            existing.copy(
+                                name = normalizedName,
+                                photoUri = normalizedPhotoUri ?: existing.photoUri,
+                                aliases = normalizePersonAliases(existing.aliases + normalizedAliases, normalizedName),
+                                origin = mergeImportedPersonOrigin(existing.origin, origin).name,
+                                lastUpdated = now,
+                            )
+                        personDao.update(updated)
+                        updatedCount += 1
+                    }
                 }
             }
 

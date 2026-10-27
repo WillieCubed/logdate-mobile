@@ -5,6 +5,7 @@ import app.logdate.client.database.entities.rewind.RewindEntity
 import app.logdate.client.database.entities.rewind.RewindImageContentEntity
 import app.logdate.client.database.entities.rewind.RewindTextContentEntity
 import app.logdate.client.database.entities.rewind.RewindVideoContentEntity
+import app.logdate.client.media.storage.MediaClaimFence
 import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.ActivityType
@@ -44,6 +45,7 @@ import kotlin.uuid.Uuid
 class OfflineFirstRewindRepository(
     private val cachedRewindDao: CachedRewindDao,
     private val ioDispatcher: CoroutineDispatcher = platformIODispatcher,
+    private val mediaClaimFence: MediaClaimFence = MediaClaimFence.Disabled,
 ) : RewindRepository {
     private val contentJson = Json { ignoreUnknownKeys = true }
 
@@ -131,23 +133,25 @@ class OfflineFirstRewindRepository(
      */
     override suspend fun saveRewind(rewind: Rewind): Unit =
         withContext(ioDispatcher) {
-            try {
-                val rewindEntity = rewind.toEntity()
-                val (textEntities, imageEntities, videoEntities) = rewind.content.toEntities(rewind.uid)
-                cachedRewindDao.insertRewindWithContent(
-                    rewind = rewindEntity,
-                    textContent = textEntities,
-                    imageContent = imageEntities,
-                    videoContent = videoEntities,
-                )
+            mediaClaimFence.withClaim {
+                try {
+                    val rewindEntity = rewind.toEntity()
+                    val (textEntities, imageEntities, videoEntities) = rewind.content.toEntities(rewind.uid)
+                    cachedRewindDao.insertRewindWithContent(
+                        rewind = rewindEntity,
+                        textContent = textEntities,
+                        imageContent = imageEntities,
+                        videoContent = videoEntities,
+                    )
 
-                Napier.d(
-                    "Saved rewind: ${rewind.uid} with ${rewind.content.size} content items " +
-                        "(${textEntities.size} text, ${imageEntities.size} images, ${videoEntities.size} videos)",
-                )
-            } catch (e: Exception) {
-                Napier.e("Failed to save rewind", e)
-                throw e
+                    Napier.d(
+                        "Saved rewind: ${rewind.uid} with ${rewind.content.size} content items " +
+                            "(${textEntities.size} text, ${imageEntities.size} images, ${videoEntities.size} videos)",
+                    )
+                } catch (e: Exception) {
+                    Napier.e("Failed to save rewind", e)
+                    throw e
+                }
             }
         }
 
@@ -157,14 +161,16 @@ class OfflineFirstRewindRepository(
     ): Unit =
         withContext(ioDispatcher) {
             require(replacement.uid == existingUid)
-            val (textEntities, imageEntities, videoEntities) = replacement.content.toEntities(replacement.uid)
-            cachedRewindDao.replaceRewind(
-                existingUid = existingUid,
-                replacement = replacement.toEntity(),
-                textContent = textEntities,
-                imageContent = imageEntities,
-                videoContent = videoEntities,
-            )
+            mediaClaimFence.withClaim {
+                val (textEntities, imageEntities, videoEntities) = replacement.content.toEntities(replacement.uid)
+                cachedRewindDao.replaceRewind(
+                    existingUid = existingUid,
+                    replacement = replacement.toEntity(),
+                    textContent = textEntities,
+                    imageContent = imageEntities,
+                    videoContent = videoEntities,
+                )
+            }
         }
 
     override fun getRewindsInRange(
@@ -190,7 +196,7 @@ class OfflineFirstRewindRepository(
 
     override suspend fun deleteRewind(uid: Uuid): Unit =
         withContext(ioDispatcher) {
-            cachedRewindDao.deleteRewind(uid)
+            mediaClaimFence.withClaim { cachedRewindDao.deleteRewind(uid) }
             Napier.d("Deleted rewind: $uid")
         }
 

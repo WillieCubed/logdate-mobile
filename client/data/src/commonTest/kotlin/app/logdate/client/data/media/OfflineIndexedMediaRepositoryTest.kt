@@ -1,5 +1,6 @@
 package app.logdate.client.data.media
 
+import app.logdate.client.data.fakes.RecordingMediaClaimFence
 import app.logdate.client.database.dao.media.IndexedMediaContent
 import app.logdate.client.database.dao.media.IndexedMediaDao
 import app.logdate.client.database.dao.media.MediaExifDao
@@ -27,6 +28,17 @@ import kotlin.uuid.Uuid
  * correctly reflected in the resulting flow.
  */
 class OfflineIndexedMediaRepositoryTest {
+    @Test
+    fun `indexed media owner writes execute inside the media claim fence`() =
+        runTest {
+            val fence = RecordingMediaClaimFence()
+            val repository = OfflineIndexedMediaRepository(FakeIndexedMediaDao(), FakeMediaExifDao(), fence)
+
+            repository.indexImage("logdate-media://library/objects/photo.jpg", PERIOD_START)
+
+            assertEquals(1, fence.claims)
+        }
+
     @Test
     fun `getForPeriod emits empty list initially`() =
         runTest {

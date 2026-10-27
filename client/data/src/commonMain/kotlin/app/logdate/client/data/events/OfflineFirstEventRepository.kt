@@ -3,6 +3,7 @@ package app.logdate.client.data.events
 import app.logdate.client.database.dao.EventDao
 import app.logdate.client.database.dao.EventNoteLinkDao
 import app.logdate.client.database.entities.EventNoteLinkEntity
+import app.logdate.client.media.storage.MediaClaimFence
 import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.Event
@@ -34,6 +35,7 @@ class OfflineFirstEventRepository(
     private val eventDao: EventDao,
     private val eventNoteLinkDao: EventNoteLinkDao,
     private val dispatcher: CoroutineDispatcher = platformIODispatcher,
+    private val mediaClaimFence: MediaClaimFence = MediaClaimFence.Disabled,
 ) : EventRepository {
     override fun observeAllEvents(): Flow<List<Event>> = eventDao.observeAll().map { entities -> entities.map { it.toModel() } }
 
@@ -60,21 +62,21 @@ class OfflineFirstEventRepository(
     override suspend fun createEvent(event: Event): Result<Unit> =
         withContext(dispatcher) {
             runCatching {
-                eventDao.insert(event.toEntity())
+                mediaClaimFence.withClaim { eventDao.insert(event.toEntity()) }
             }.onFailure { error -> Napier.e("Failed to create event ${event.id}", error) }
         }
 
     override suspend fun updateEvent(event: Event): Result<Unit> =
         withContext(dispatcher) {
             runCatching {
-                eventDao.update(event.copy(lastUpdated = Clock.System.now()).toEntity())
+                mediaClaimFence.withClaim { eventDao.update(event.copy(lastUpdated = Clock.System.now()).toEntity()) }
             }.onFailure { error -> Napier.e("Failed to update event ${event.id}", error) }
         }
 
     override suspend fun deleteEvent(eventId: Uuid): Result<Unit> =
         withContext(dispatcher) {
             runCatching {
-                eventDao.softDelete(eventId, Clock.System.now().toEpochMilliseconds())
+                mediaClaimFence.withClaim { eventDao.softDelete(eventId, Clock.System.now().toEpochMilliseconds()) }
             }.onFailure { error -> Napier.e("Failed to delete event $eventId", error) }
         }
 

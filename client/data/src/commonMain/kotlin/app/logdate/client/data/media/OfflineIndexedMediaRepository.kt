@@ -5,6 +5,7 @@ import app.logdate.client.database.dao.media.MediaExifDao
 import app.logdate.client.database.entities.media.IndexedImageEntity
 import app.logdate.client.database.entities.media.IndexedVideoEntity
 import app.logdate.client.database.entities.media.MediaDimensions
+import app.logdate.client.media.storage.MediaClaimFence
 import app.logdate.client.repository.media.ExifMetadata
 import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
@@ -26,8 +27,14 @@ import kotlin.uuid.Uuid
 class OfflineIndexedMediaRepository(
     private val indexedMediaDao: IndexedMediaDao,
     private val mediaExifDao: MediaExifDao,
+    private val mediaClaimFence: MediaClaimFence = MediaClaimFence.Disabled,
 ) : IndexedMediaRepository {
     override suspend fun indexImage(
+        uri: String,
+        timestamp: Instant,
+    ): IndexedMedia.Image = mediaClaimFence.withClaim { indexImageWhileClaimed(uri, timestamp) }
+
+    private suspend fun indexImageWhileClaimed(
         uri: String,
         timestamp: Instant,
     ): IndexedMedia.Image {
@@ -41,7 +48,7 @@ class OfflineIndexedMediaRepository(
             // If we got here, something went wrong with the existing image - proceed to reindex
         }
 
-        try {
+        return try {
             val uid = Uuid.random()
 
             // For a basic implementation, we'll create an image entity with default values
@@ -64,7 +71,7 @@ class OfflineIndexedMediaRepository(
 
             indexedMediaDao.insertImage(imageEntity)
 
-            return IndexedMedia.Image(
+            IndexedMedia.Image(
                 uid = uid,
                 uri = uri,
                 timestamp = timestamp,
@@ -80,6 +87,12 @@ class OfflineIndexedMediaRepository(
         uri: String,
         timestamp: Instant,
         duration: Duration,
+    ): IndexedMedia.Video = mediaClaimFence.withClaim { indexVideoWhileClaimed(uri, timestamp, duration) }
+
+    private suspend fun indexVideoWhileClaimed(
+        uri: String,
+        timestamp: Instant,
+        duration: Duration,
     ): IndexedMedia.Video {
         // Check if already indexed
         if (indexedMediaDao.isVideoIndexed(uri)) {
@@ -91,7 +104,7 @@ class OfflineIndexedMediaRepository(
             // If we got here, something went wrong with the existing video - proceed to reindex
         }
 
-        try {
+        return try {
             val uid = Uuid.random()
 
             // For a basic implementation, we'll create a video entity with default values
@@ -115,7 +128,7 @@ class OfflineIndexedMediaRepository(
 
             indexedMediaDao.insertVideo(videoEntity)
 
-            return IndexedMedia.Video(
+            IndexedMedia.Video(
                 uid = uid,
                 uri = uri,
                 timestamp = timestamp,
@@ -160,7 +173,9 @@ class OfflineIndexedMediaRepository(
 
     override suspend fun isIndexed(uri: String): Boolean = indexedMediaDao.isMediaIndexed(uri)
 
-    override suspend fun remove(uid: Uuid): Boolean =
+    override suspend fun remove(uid: Uuid): Boolean = mediaClaimFence.withClaim { removeWhileClaimed(uid) }
+
+    private suspend fun removeWhileClaimed(uid: Uuid): Boolean =
         try {
             // Try to remove as both types - only one will succeed
             val imageDeleted = indexedMediaDao.removeImage(uid)
