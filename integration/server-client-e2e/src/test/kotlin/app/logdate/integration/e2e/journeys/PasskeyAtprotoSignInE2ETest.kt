@@ -86,9 +86,9 @@ class PasskeyAtprotoSignInE2ETest {
                         assertEquals(did, session.subject)
                         assertEquals("atproto transition:generic", session.scope)
 
-                        // The app uses the identity: the token's subject resolves to the account's public handle.
+                        // Explicit sign-in does not make the identity discoverable to strangers.
                         val description = http.get("$logDate/xrpc/com.atproto.repo.describeRepo?repo=${session.subject}").json()
-                        assertEquals(handle, description["handle"]?.jsonPrimitive?.content)
+                        assertEquals("RepoNotFound", description["error"]?.jsonPrimitive?.content)
 
                         // Uploads stay closed to apps until a collection open to apps refers to files.
                         val upload =
@@ -165,12 +165,8 @@ class PasskeyAtprotoSignInE2ETest {
                         assertEquals(HttpStatusCode.Forbidden, export.status, export.bodyAsText())
 
                         val description = http.get("$logDate/xrpc/com.atproto.repo.describeRepo?repo=$did").json()
-                        assertFalse(
-                            description
-                                .getValue("collections")
-                                .jsonArray
-                                .any { it.jsonPrimitive.content.startsWith("studio.hypertext.logdate.") },
-                        )
+                        assertEquals("RepoNotFound", description["error"]?.jsonPrimitive?.content)
+                        assertFalse(description.containsKey("collections"))
                     }
                 }
             }

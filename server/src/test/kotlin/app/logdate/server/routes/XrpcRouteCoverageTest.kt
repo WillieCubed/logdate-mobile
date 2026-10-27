@@ -37,7 +37,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -687,7 +686,7 @@ class XrpcRouteCoverageTest {
         }
 
     @Test
-    fun `xrpc routes surface auth validation repo errors and non atproto describe collections`() =
+    fun `xrpc routes surface auth validation repo errors and hide private descriptions`() =
         testApplication {
             val store = StubRepoRecordStore()
             val env = configureXrpcApp(repoRecordStore = store)
@@ -729,14 +728,14 @@ class XrpcRouteCoverageTest {
                 )
             val describeRepo =
                 client.get("/xrpc/com.atproto.repo.describeRepo?repo=alice.logdate.app")
-            assertEquals(HttpStatusCode.OK, describeRepo.status)
+            assertEquals(HttpStatusCode.BadRequest, describeRepo.status)
             assertEquals(
-                emptyList<String>(),
+                "RepoNotFound",
                 json
                     .parseToJsonElement(describeRepo.bodyAsText())
-                    .jsonObject["collections"]
-                    ?.jsonArray
-                    ?.map { it.jsonPrimitive.content },
+                    .jsonObject["error"]
+                    ?.jsonPrimitive
+                    ?.content,
             )
 
             val invalidBearer =

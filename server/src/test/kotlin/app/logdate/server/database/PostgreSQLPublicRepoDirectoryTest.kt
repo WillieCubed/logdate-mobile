@@ -48,6 +48,7 @@ class PostgreSQLPublicRepoDirectoryTest {
         active: Boolean = true,
         head: Boolean = true,
         moderation: AccountModeration? = null,
+        publicIdentity: Boolean = true,
     ) {
         val accounts = PostgreSQLAccountRepository()
         val account =
@@ -56,6 +57,7 @@ class PostgreSQLPublicRepoDirectoryTest {
                 username = "u" + Uuid.random().toHexString().take(12),
                 displayName = "x",
                 did = did,
+                publicIdentityDid = if (publicIdentity) did else null,
                 createdAt = Clock.System.now(),
                 storageMode = mode,
                 isActive = active,
@@ -81,6 +83,14 @@ class PostgreSQLPublicRepoDirectoryTest {
         assertEquals(7, first.revision)
         assertEquals(cid.toString(), first.commitCid)
     }
+
+    @Test
+    fun `h2 never lists private identities even when PLC publishing is enabled`() =
+        onH2 {
+            seed("did:web:private.example.com", publicIdentity = false)
+            seed("did:plc:ewvi7nxzyoun6zhxrhs64oiz", publicIdentity = false)
+            assertEquals(emptyList(), PostgreSQLPublicRepoDirectory(publishesPlc = true).after(null, 10))
+        }
 
     @Test
     fun `h2 lists only accounts that may be shown, in DID order`() = onH2 { scenario(PostgreSQLPublicRepoDirectory(publishesPlc = false)) }

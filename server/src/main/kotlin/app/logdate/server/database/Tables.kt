@@ -37,6 +37,9 @@ object AccountsTable : Table("accounts") {
     /** The [app.logdate.server.auth.AccountModeration.wireValue] when operators suspended or took down the account; null otherwise. */
     val moderation = varchar("moderation", 16).nullable()
 
+    /** The exact DID the owner made public; null until the informed publication flow completes. */
+    val publicIdentityDid = varchar("public_identity_did", 255).nullable()
+
     override val primaryKey = PrimaryKey(id)
 }
 

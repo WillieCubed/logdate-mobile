@@ -44,6 +44,7 @@ class PostgreSQLPublicRepoDirectory(
                         (AccountsTable.isActive eq true) and
                             AccountsTable.moderation.isNull() and
                             (AccountsTable.storageMode eq AccountStorageMode.PERSONAL_SPACE_V1.wireValue) and
+                            (AccountsTable.publicIdentityDid eq AccountsTable.did) and
                             publicIdentity and
                             (if (afterDid == null) Op.TRUE else AtprotoRepoHeadsTable.repoDid greater afterDid)
                     }.orderBy(AtprotoRepoHeadsTable.repoDid, SortOrder.ASC)

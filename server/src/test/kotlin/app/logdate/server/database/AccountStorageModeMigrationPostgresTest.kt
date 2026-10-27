@@ -8,6 +8,7 @@ import org.junit.Assume.assumeTrue
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 /**
  * Adding storage modes leaves every account that already exists in `legacy`, against a real
@@ -48,6 +49,9 @@ class AccountStorageModeMigrationPostgresTest {
                         modes,
                         "every account that existed is backfilled to legacy, and a new row without a mode starts in legacy",
                     )
+                }
+                executeQuery("SELECT public_identity_did FROM accounts").use { rows ->
+                    while (rows.next()) assertNull(rows.getString(1), "upgrading never grants publication consent")
                 }
             }
         } finally {
