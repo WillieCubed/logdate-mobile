@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.PlatformTextInputSession
 import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
 import androidx.core.view.inputmethod.InputContentInfoCompat
+import app.logdate.client.media.ManagedMediaPublicationCustody
 import app.logdate.client.media.MediaManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
@@ -31,14 +32,17 @@ actual fun EntryKeyboardContentReceiver(
 ) {
     val context = LocalContext.current
     val mediaManager: MediaManager = koinInject()
+    val publicationCustody: ManagedMediaPublicationCustody = koinInject()
     val scope = rememberCoroutineScope()
     val currentOnMediaImported by rememberUpdatedState(onMediaImported)
     val interceptor =
-        remember(context, mediaManager, scope) {
+        remember(context, mediaManager, publicationCustody, scope) {
             KeyboardContentInterceptor { info ->
                 scope.launch {
                     try {
-                        currentOnMediaImported(importIntoEntry(context, mediaManager, listOf(info.contentUri.toString())))
+                        currentOnMediaImported(
+                            importIntoEntry(context, mediaManager, publicationCustody, listOf(info.contentUri.toString())),
+                        )
                     } finally {
                         info.releasePermission()
                     }

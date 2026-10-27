@@ -273,12 +273,12 @@ actual val dataModule: Module =
         }
 
         // Rewind
-        single<RewindRepository> { OfflineFirstRewindRepository(get()) }
+        single<RewindRepository> { OfflineFirstRewindRepository(get(), mediaClaimFence = get()) }
         single<RewindGenerationManager> { DefaultRewindGenerationManager(get()) }
         single<ReflectionPromptResponseRepository> { OfflineFirstReflectionPromptResponseRepository(get()) }
 
         // Media
-        single<IndexedMediaRepository> { OfflineIndexedMediaRepository(get(), get()) }
+        single<IndexedMediaRepository> { OfflineIndexedMediaRepository(get(), get(), get()) }
 
         // Timeline
         single<ActivityTimelineRepository> { OfflineFirstActivityTimelineRepository() }
@@ -329,10 +329,10 @@ actual val dataModule: Module =
         }
 
         // Events
-        single<EventRepository> { OfflineFirstEventRepository(get(), get()) }
+        single<EventRepository> { OfflineFirstEventRepository(get(), get(), mediaClaimFence = get()) }
 
         // People
-        single { OfflineFirstPeopleRepository(get()) }
+        single { OfflineFirstPeopleRepository(get(), mediaClaimFence = get()) }
         single {
             OfflineFirstPeopleGraphRepository(
                 personDao = get(),

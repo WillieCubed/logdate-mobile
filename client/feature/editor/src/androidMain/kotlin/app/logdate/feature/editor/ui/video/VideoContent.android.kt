@@ -78,6 +78,7 @@ import androidx.media3.ui.PlayerView
 import app.logdate.client.media.AndroidManagedMediaDiscarder
 import app.logdate.client.media.AndroidManagedMediaImportSource
 import app.logdate.client.media.ManagedMediaImporter
+import app.logdate.client.media.ManagedMediaPublicationCustody
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.client.media.device.MediaDeviceKind
@@ -497,16 +498,18 @@ actual fun VideoPickerContent(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val mediaManager: MediaManager = koinInject()
+    val publicationCustody: ManagedMediaPublicationCustody = koinInject()
     val mediaFiles: MediaFileResolver = koinInject()
     val currentOnVideoSelected by rememberUpdatedState(onVideoSelected)
     val managedMediaDiscarder =
         remember(context, mediaManager) { AndroidManagedMediaDiscarder(context.applicationContext, mediaManager) }
     val managedMediaImporter =
-        remember(context, mediaManager, managedMediaDiscarder) {
+        remember(context, mediaManager, managedMediaDiscarder, publicationCustody) {
             ManagedMediaImporter(
                 mediaManager = mediaManager,
                 source = AndroidManagedMediaImportSource(context.applicationContext),
                 discardManagedMedia = managedMediaDiscarder::discard,
+                publicationCustody = publicationCustody,
             )
         }
     val selectionController =

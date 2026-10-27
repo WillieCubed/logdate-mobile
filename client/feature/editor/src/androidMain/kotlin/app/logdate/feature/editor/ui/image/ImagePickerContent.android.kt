@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.logdate.client.media.AndroidManagedMediaDiscarder
 import app.logdate.client.media.AndroidManagedMediaImportSource
 import app.logdate.client.media.ManagedMediaImporter
+import app.logdate.client.media.ManagedMediaPublicationCustody
 import app.logdate.client.media.MediaManager
 import app.logdate.client.permissions.PermissionManager
 import app.logdate.feature.editor.ui.common.findActivity
@@ -45,6 +46,7 @@ actual fun ImagePickerContent(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val mediaManager: MediaManager = koinInject()
+    val publicationCustody: ManagedMediaPublicationCustody = koinInject()
     val permissionManager: PermissionManager = koinInject()
     val imagePermissions = remember { imageLibraryPermissions() }
     val coroutineScope = rememberCoroutineScope()
@@ -52,11 +54,12 @@ actual fun ImagePickerContent(
     val managedMediaDiscarder =
         remember(context, mediaManager) { AndroidManagedMediaDiscarder(context.applicationContext, mediaManager) }
     val managedMediaImporter =
-        remember(context, mediaManager, managedMediaDiscarder) {
+        remember(context, mediaManager, managedMediaDiscarder, publicationCustody) {
             ManagedMediaImporter(
                 mediaManager = mediaManager,
                 source = AndroidManagedMediaImportSource(context.applicationContext),
                 discardManagedMedia = managedMediaDiscarder::discard,
+                publicationCustody = publicationCustody,
             )
         }
     val selectionController =

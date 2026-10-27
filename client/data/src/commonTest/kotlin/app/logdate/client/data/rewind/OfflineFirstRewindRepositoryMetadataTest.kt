@@ -2,6 +2,7 @@
 
 package app.logdate.client.data.rewind
 
+import app.logdate.client.data.fakes.RecordingMediaClaimFence
 import app.logdate.client.database.dao.rewind.CachedRewindDao
 import app.logdate.client.database.entities.rewind.RewindEntity
 import app.logdate.client.database.entities.rewind.RewindImageContentEntity
@@ -37,6 +38,35 @@ import kotlin.uuid.Uuid
  * [RewindMetadata] when saving and retrieving rewinds.
  */
 class OfflineFirstRewindRepositoryMetadataTest {
+    @Test
+    fun `rewind media owner writes execute inside the media claim fence`() =
+        runTest {
+            val fence = RecordingMediaClaimFence()
+            var atomicInserts = 0
+            val dao =
+                FakeCachedRewindDao {
+                    assertEquals(1, fence.claims, "The claim must be acquired before the atomic insert")
+                    atomicInserts++
+                }
+            val repository = OfflineFirstRewindRepository(dao, UnconfinedTestDispatcher(testScheduler), fence)
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val rewind =
+                Rewind(
+                    uid = Uuid.random(),
+                    startDate = now,
+                    endDate = now,
+                    generationDate = now,
+                    label = "2025#01",
+                    title = "Media owners",
+                    content = emptyList(),
+                )
+
+            repository.saveRewind(rewind)
+
+            assertEquals(1, fence.claims)
+            assertEquals(1, atomicInserts, "The claim must surround the atomic story-and-panels insert")
+        }
+
     @Test
     fun `metadata round-trips through save and retrieve`() =
         runTest {
@@ -348,7 +378,9 @@ class OfflineFirstRewindRepositoryMetadataTest {
         }
 }
 
-private class FakeCachedRewindDao : CachedRewindDao {
+private class FakeCachedRewindDao(
+    private val onAtomicInsert: () -> Unit = {},
+) : CachedRewindDao {
     private val rewinds = MutableStateFlow<List<RewindEntity>>(emptyList())
     private val textContent = mutableListOf<RewindTextContentEntity>()
     private val imageContent = mutableListOf<RewindImageContentEntity>()
@@ -388,6 +420,16 @@ private class FakeCachedRewindDao : CachedRewindDao {
     override suspend fun insertRewind(rewind: RewindEntity) {
         if (rewinds.value.any { it.uid == rewind.uid }) deleteRewind(rewind.uid)
         rewinds.value = rewinds.value.filterNot { it.uid == rewind.uid } + rewind
+    }
+
+    override suspend fun insertRewindWithContent(
+        rewind: RewindEntity,
+        textContent: List<RewindTextContentEntity>,
+        imageContent: List<RewindImageContentEntity>,
+        videoContent: List<RewindVideoContentEntity>,
+    ) {
+        onAtomicInsert()
+        super<CachedRewindDao>.insertRewindWithContent(rewind, textContent, imageContent, videoContent)
     }
 
     override suspend fun updateRewind(rewind: RewindEntity): Int {
