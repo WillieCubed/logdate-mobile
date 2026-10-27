@@ -40,8 +40,8 @@ class IdentityRoutesTest {
     fun `well known identity routes resolve host mapped account`() =
         testApplication {
             val env = configureAuthV1TestApp()
-            // Signing in assigns an identity; resolving a handle never does.
-            runBlocking { env.provisionedAccount("alice") }
+            // This fixture represents an identity its owner has explicitly made public.
+            runBlocking { env.publicAccount("alice") }
 
             val didResponse =
                 client.get("/.well-known/atproto-did") {
@@ -78,6 +78,7 @@ class IdentityRoutesTest {
                         createdAt = Clock.System.now(),
                         handle = "didweb.logdate.app",
                         did = "did:web:didweb.logdate.app",
+                        publicIdentityDid = "did:web:didweb.logdate.app",
                         signingKeyPublic = "zDidWebKey",
                     ),
                 )
@@ -97,14 +98,7 @@ class IdentityRoutesTest {
     fun `handle resolution follows a changed handle and stops after account deletion`() =
         testApplication {
             val env = configureAuthV1TestApp()
-            val account =
-                runBlocking {
-                    env.atprotoIdentityService.ensureIdentity(
-                        env.accountRepository.save(
-                            Account(id = Uuid.random(), username = "dana", displayName = "Dana", createdAt = Clock.System.now()),
-                        ),
-                    )
-                }
+            val account = runBlocking { env.publicAccount("dana") }
             val did = requireNotNull(account.did)
 
             suspend fun wellKnownDid(host: String) =
@@ -133,8 +127,8 @@ class IdentityRoutesTest {
     fun `xrpc resolveHandle returns expected success and errors`() =
         testApplication {
             val env = configureAuthV1TestApp()
-            // Signing in assigns an identity; resolving a handle never does.
-            runBlocking { env.provisionedAccount("brie") }
+            // This fixture represents an identity its owner has explicitly made public.
+            runBlocking { env.publicAccount("brie") }
 
             val success = client.get("/xrpc/com.atproto.identity.resolveHandle?handle=brie.logdate.app")
             assertEquals(HttpStatusCode.OK, success.status)
@@ -154,8 +148,14 @@ class IdentityRoutesTest {
     fun `xrpc describeServer and describeRepo expose identity metadata`() =
         testApplication {
             val env = configureAuthV1TestApp()
-            // Signing in assigns an identity; resolving a handle never does.
-            runBlocking { env.provisionedAccount("cora") }
+            // This fixture represents an identity its owner has explicitly made public.
+            runBlocking { env.publicAccount("cora") }
+            env.atprotoIdentityService.setRepoCollectionsResolver {
+                listOf(
+                    studio.hypertext.atproto.syntax.Nsid
+                        .require("studio.hypertext.logdate.content"),
+                )
+            }
 
             val describeServer = client.get("/xrpc/com.atproto.server.describeServer")
             assertEquals(HttpStatusCode.OK, describeServer.status)
@@ -174,6 +174,7 @@ class IdentityRoutesTest {
             assertEquals(HttpStatusCode.OK, describeRepo.status)
             val repoPayload = json.parseToJsonElement(describeRepo.bodyAsText()).jsonObject
             assertEquals("cora.logdate.app", repoPayload["handle"]?.jsonPrimitive?.content)
+            assertEquals(0, repoPayload["collections"]?.jsonArray?.size)
             assertTrue(repoPayload["did"]?.jsonPrimitive?.content?.startsWith("did:plc:") == true)
         }
 
@@ -219,10 +220,17 @@ class IdentityRoutesTest {
             assertEquals(HttpStatusCode.InternalServerError, wellKnown.status)
         }
 
-    private suspend fun AuthV1TestEnvironment.provisionedAccount(username: String): Account =
-        atprotoIdentityService.ensureIdentity(
-            accountRepository.save(
-                Account(id = Uuid.random(), username = username, displayName = username, createdAt = Clock.System.now()),
+    private suspend fun AuthV1TestEnvironment.publicAccount(username: String): Account =
+        accountRepository.save(
+            Account(
+                id = Uuid.random(),
+                username = username,
+                displayName = username,
+                createdAt = Clock.System.now(),
+                handle = "$username.logdate.app",
+                did = "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
+                signingKeyPublic = "zPublicFixtureKey",
+                publicIdentityDid = "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
             ),
         )
 }

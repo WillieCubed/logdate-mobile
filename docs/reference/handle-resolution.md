@@ -39,8 +39,8 @@ The server answers with a single indexed query that never writes:
 
 | Case | Response |
 |---|---|
-| An account with a handle, a DID and a signing key owns the handle. | The server returns status 200 with the DID. |
-| No such account exists. | The server returns status 400 with `HandleNotFound`. |
+| An active account with a complete identity owns the handle, and its owner explicitly made that exact DID public. | The server returns status 200 with the DID. |
+| No such account exists, or its current identity is private. | The server returns status 400 with `HandleNotFound`. |
 | The lookup fails, for example because the database is unreachable. | The server returns status 500 with `InternalServerError` and logs `SERVER_HANDLE_RESOLUTION_FAILED`. |
 
 ## Naming rules
@@ -79,9 +79,34 @@ Whether a handle resolves depends on the state of the account that holds it:
 
 | Account state | Result |
 |---|---|
-| The account has a handle, a DID and a signing key. | The handle resolves. |
+| The account is active, has a handle, a DID and a signing key, and `public_identity_did` matches its DID. | The handle resolves. |
+| The owner has not made the current DID public, or the account is inactive. | The handle does not resolve. |
 | The account was created before AT Protocol identities and lacks any of the three. | The handle doesn't resolve, because lookups by handle and by DID both skip the account. |
 | The account was deleted. | The handle doesn't resolve: the server answers `HandleNotFound` and the website answers 404. |
+
+Public discovery is independent of internal identity lookup. Account-owned journal, device and key
+operations can still find a private identity. Anonymous `describeRepo` and per-account `did:web`
+documents require the same consent as handle resolution; the server's own DID document remains
+available.
+
+Public repository listings, reads and identity announcements also require this exact-DID consent,
+even when the event stream is enabled. Turning on a stream or using `did:web` never opts an account in.
+
+The nullable `accounts.public_identity_did` records the exact DID the owner explicitly made public,
+after publication completed. Existing accounts start with no value, including accounts with stored
+PLC operations or recovery keys. Ordinary account saves preserve it. If the account adopts another
+DID, consent for the old DID does not expose the new one. Neither `ATPROTO_PLC_PUBLISH_ENABLED` nor
+the existence of a PLC operation counts as consent.
+
+This intentionally stops public discovery for existing accounts until the informed per-person
+publication flow exists. This change supplies the read gate and persistence, not that flow, and
+adds no endpoint or command for making an identity public. Hiding discovery cannot remove identity
+information that another service has already copied.
+
+The internal `AccountRepository.recordPublicIdentity` write is conditional on the current DID.
+Only a trusted publication flow may call it after consent and publication; it is not an API action
+and does not itself prove either precondition. An identity change during publication makes that
+write fail rather than exposing the replacement DID.
 
 A handle change takes effect on the next request. LogDate has no screen for changing a handle, and
 changing a username doesn't change the handle.

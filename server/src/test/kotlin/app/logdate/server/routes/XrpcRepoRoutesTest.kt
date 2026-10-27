@@ -130,9 +130,9 @@ class XrpcRepoRoutesTest {
             assertEquals(HttpStatusCode.OK, delete.status)
 
             val describeRepo = client.get("/xrpc/com.atproto.repo.describeRepo?repo=alice.logdate.app")
-            assertEquals(HttpStatusCode.OK, describeRepo.status)
+            assertEquals(HttpStatusCode.BadRequest, describeRepo.status)
             val describePayload = json.parseToJsonElement(describeRepo.bodyAsText()).jsonObject
-            assertTrue(describePayload["collections"]?.jsonArray?.isEmpty() == true)
+            assertEquals("RepoNotFound", describePayload["error"]?.jsonPrimitive?.content)
         }
 
     @Test

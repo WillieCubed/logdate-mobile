@@ -157,21 +157,17 @@ class OAuthXrpcAccessTest {
         }
 
     @Test
-    fun `describing a repository never lists journal collections`() =
+    fun `describing a private repository reveals no identity or journal collections`() =
         testApplication {
             setUp()
 
             val description = client.get("/xrpc/com.atproto.repo.describeRepo?repo=$HANDLE")
 
-            assertEquals(HttpStatusCode.OK, description.status)
-            val collections =
-                json
-                    .parseToJsonElement(description.bodyAsText())
-                    .jsonObject
-                    .getValue("collections")
-                    .jsonArray
-                    .map { it.jsonPrimitive.content }
-            assertFalse(collections.any { it.startsWith("studio.hypertext.logdate.") }, collections.toString())
+            assertEquals(HttpStatusCode.BadRequest, description.status)
+            val payload = json.parseToJsonElement(description.bodyAsText()).jsonObject
+            assertEquals("RepoNotFound", payload["error"]?.jsonPrimitive?.content)
+            assertFalse(payload.containsKey("did"))
+            assertFalse(payload.containsKey("collections"))
         }
 
     private class Fixture(

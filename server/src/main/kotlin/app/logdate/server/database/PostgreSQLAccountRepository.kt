@@ -48,6 +48,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[isActive] = account.isActive
                     it[preferences] = account.preferences ?: "{}"
                     it[storageMode] = account.newAccountStorageMode()
+                    it[publicIdentityDid] = account.publicIdentityDid
                 }.insertedCount > 0
         }
 
@@ -77,7 +78,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[isActive] = account.isActive
                     it[preferences] = account.preferences ?: "{}"
                 }
-                account
+                account.copy(publicIdentityDid = existingAccount[AccountsTable.publicIdentityDid])
             } else {
                 // Insert new account
                 AccountsTable.insert {
@@ -98,6 +99,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[isActive] = account.isActive
                     it[preferences] = account.preferences ?: "{}"
                     it[storageMode] = account.newAccountStorageMode()
+                    it[publicIdentityDid] = account.publicIdentityDid
                 }
                 account
             }
@@ -124,6 +126,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[isActive] = account.isActive
                     it[preferences] = account.preferences ?: "{}"
                     it[storageMode] = account.newAccountStorageMode()
+                    it[publicIdentityDid] = account.publicIdentityDid
                 }.insertedCount == 1
         }
 
@@ -158,6 +161,16 @@ class PostgreSQLAccountRepository : AccountRepository {
                 .where { AccountsTable.id eq id.toJavaUUID() }
                 .singleOrNull()
                 ?.toAccount()
+        }
+
+    override suspend fun recordPublicIdentity(
+        accountId: Uuid,
+        expectedDid: String,
+    ): Boolean =
+        transaction {
+            AccountsTable.update({ (AccountsTable.id eq accountId.toJavaUUID()) and (AccountsTable.did eq expectedDid) }) {
+                it[publicIdentityDid] = expectedDid
+            } == 1
         }
 
     override suspend fun findByDid(did: String): Account? =
@@ -351,5 +364,6 @@ class PostgreSQLAccountRepository : AccountRepository {
             preferences = this[AccountsTable.preferences],
             storageMode = AccountStorageMode.fromWireValue(this[AccountsTable.storageMode]),
             moderation = AccountModeration.fromWireValue(this[AccountsTable.moderation]),
+            publicIdentityDid = this[AccountsTable.publicIdentityDid],
         )
 }
