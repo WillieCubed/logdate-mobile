@@ -83,6 +83,17 @@ class JournalNoteConflictResolver : ConflictResolver<JournalNote> {
         }
 
         return when (local) {
+            is JournalNote.Handwriting -> {
+                remote as JournalNote.Handwriting
+                if (local.document == remote.document &&
+                    local.unreadableContent == remote.unreadableContent &&
+                    local.location == remote.location
+                ) {
+                    ConflictResolution.KeepRemote(remote)
+                } else {
+                    ConflictResolution.RequiresManualResolution(local, remote, "Handwriting differs between local and remote versions.")
+                }
+            }
             is JournalNote.Text -> resolveText(local, remote as JournalNote.Text, localTimestamp, remoteTimestamp)
             is JournalNote.Image -> resolveMedia(local, remote as JournalNote.Image, "Image")
             is JournalNote.Video -> resolveMedia(local, remote as JournalNote.Video, "Video")

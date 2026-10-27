@@ -35,6 +35,7 @@ internal fun JournalNote.withRepairVersion(version: Long?): JournalNote =
     } else {
         when (this) {
             is JournalNote.Text -> copy(syncVersion = version)
+            is JournalNote.Handwriting -> copy(syncVersion = version)
             is JournalNote.Image -> copy(syncVersion = version)
             is JournalNote.Video -> copy(syncVersion = version)
             is JournalNote.Audio -> copy(syncVersion = version)

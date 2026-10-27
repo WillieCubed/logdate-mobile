@@ -9,6 +9,7 @@ import app.logdate.feature.editor.ui.editor.AudioCaptureState
 import app.logdate.feature.editor.ui.editor.CameraBlockUiState
 import app.logdate.feature.editor.ui.editor.EditorState
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
+import app.logdate.feature.editor.ui.editor.HandwritingBlockUiState
 import kotlin.uuid.Uuid
 
 sealed interface EditorFocus {
@@ -20,6 +21,10 @@ sealed interface EditorFocus {
 
     data class Recording(
         val blockId: Uuid? = null,
+    ) : EditorFocus
+
+    data class Drawing(
+        val blockId: Uuid,
     ) : EditorFocus
 
     data class Camera(
@@ -39,6 +44,7 @@ internal fun editorFocus(
             it.captureState is AudioCaptureState.Recording || it.captureState is AudioCaptureState.Stopping
         }?.let { return EditorFocus.Recording(it.id) }
     val selected = blocks.firstOrNull { it.id == selectedId } ?: return EditorFocus.Entry
+    if (selected is HandwritingBlockUiState) return EditorFocus.Drawing(selected.id)
     return if (selected is CameraBlockUiState && selected.uri == null) EditorFocus.Camera(selected.id) else EditorFocus.Editing(selected.id)
 }
 
@@ -62,12 +68,15 @@ internal fun editorFocusPresentation(
     hasJournalSelection: Boolean = true,
     entryLocked: Boolean = false,
 ): EditorFocusPresentation {
-    val capturing = focus is EditorFocus.Recording || focus is EditorFocus.Camera
+    val capturing = focus is EditorFocus.Recording || focus is EditorFocus.Camera || focus is EditorFocus.Drawing
     return EditorFocusPresentation(
         focus = focus,
         entryActionsEnabled = !capturing && !entryLocked,
         showJournalContext =
-            !keyboardVisible && focus !is EditorFocus.Camera && (!capturing || (paneWidth >= 600.dp && hasJournalSelection)),
+            !keyboardVisible &&
+                focus !is EditorFocus.Camera &&
+                focus !is EditorFocus.Drawing &&
+                (!capturing || (paneWidth >= 600.dp && hasJournalSelection)),
         showSecondaryContext = focus is EditorFocus.Recording && secondaryPaneAvailable,
         blockScrollEnabled = !capturing,
     )

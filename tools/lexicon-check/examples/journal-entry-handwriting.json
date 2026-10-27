@@ -1,0 +1,16 @@
+{
+  "collection": "app.logdate.journal.entry",
+  "rkey": "9f8e7d6c-5b4a-4398-8776-655443322110",
+  "record": {
+    "$type": "app.logdate.journal.entry",
+    "blocks": [
+      {
+        "$type": "app.logdate.journal.entry#handwritingBlock",
+        "id": "9f8e7d6c-5b4a-4398-8776-655443322110",
+        "document": "{\"version\":1,\"width\":720.0,\"height\":1700.0,\"strokes\":[{\"id\":\"11e3e90b-d60f-4d20-9c36-d4e48ef95845\",\"tool\":\"pen\",\"color\":\"#263044\",\"width\":3.5,\"points\":[{\"x\":12.25,\"y\":1400.5,\"pressure\":0.2},{\"x\":400.75,\"y\":1500.25,\"pressure\":0.9}]}]}"
+      }
+    ],
+    "timeZone": "Australia/Sydney",
+    "createdAt": "2026-10-12T07:41:09.512Z"
+  }
+}

@@ -1,0 +1,7 @@
+<resources>
+    <string name="entry_start_earlier_today">Earlier today</string>
+    <string name="entry_start_default_mode">Default capture mode</string>
+    <string name="entry_start_default_description">Open new entries directly in this mode.</string>
+    <string name="entry_start_handwriting_prompt">Write by hand…</string>
+    <string name="entry_start_preference_failed">Couldn’t save your default capture mode. Try again.</string>
+</resources>

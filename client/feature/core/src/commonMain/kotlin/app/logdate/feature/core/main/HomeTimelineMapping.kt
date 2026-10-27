@@ -122,6 +122,16 @@ private fun List<JournalNote>.toUiState(membershipMap: Map<Uuid, List<Journal>> 
                 .orEmpty()
                 .map { JournalBadgeUiState(journalId = it.id, title = it.title) }
         when (note) {
+            is JournalNote.Handwriting ->
+                app.logdate.ui.timeline.HandwritingNoteUiState(
+                    note.uid,
+                    note.document,
+                    note.creationTimestamp,
+                    noteJournals,
+                    note.isCapturedOnWatch,
+                    unreadable = note.unreadableContent != null,
+                    capturedDuring = note.capturedDuring,
+                )
             is JournalNote.Text ->
                 TextNoteUiState(
                     noteId = note.uid,

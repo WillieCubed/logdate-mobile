@@ -6,9 +6,12 @@ import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.AudioCaptureState
 import app.logdate.feature.editor.ui.editor.CameraBlockUiState
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
+import app.logdate.feature.editor.ui.editor.HandwritingBlockUiState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
+import app.logdate.feature.editor.ui.handwriting.toDocument
+import app.logdate.feature.editor.ui.handwriting.toPage
 import kotlin.time.Clock
 
 /**
@@ -18,6 +21,18 @@ import kotlin.time.Clock
  */
 fun JournalNote.toDomainBlock(): EntryBlockUiState =
     when (this) {
+        is JournalNote.Handwriting -> {
+            require(unreadableContent == null) { "Handwriting cannot be opened; the original ink is preserved." }
+            HandwritingBlockUiState(
+                id = uid,
+                timestamp = creationTimestamp,
+                page = document.toPage(),
+                timeZoneId = timeZoneId,
+                noteLocation = location,
+                capturedOn = capturedOn,
+                syncVersion = syncVersion,
+            )
+        }
         is JournalNote.Text ->
             TextBlockUiState(
                 id = uid,
@@ -68,6 +83,19 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
     val now = Clock.System.now()
 
     return when (this) {
+        is HandwritingBlockUiState -> {
+            if (!hasContent()) return null
+            JournalNote.Handwriting(
+                uid = id,
+                creationTimestamp = timestamp,
+                lastUpdated = now,
+                document = page.toDocument(),
+                timeZoneId = timeZoneId,
+                location = noteLocation,
+                capturedOn = capturedOn,
+                syncVersion = syncVersion,
+            )
+        }
         is TextBlockUiState -> {
             if (!hasContent()) return null
             JournalNote.Text(

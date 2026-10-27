@@ -30,6 +30,7 @@
     <string name="notification_channel_watch_sync_name">Watch sync</string>
     <string name="notification_channel_watch_sync_description">Alerts when entries arrive from your watch.</string>
     <string name="notification_watch_note_audio_title">Voice note from your watch</string>
+    <string name="notification_watch_note_handwriting_title">Handwriting from your watch</string>
     <string name="notification_watch_note_text_title">Note from your watch</string>
     <string name="notification_watch_note_photo_title">Photo from your watch</string>
     <string name="notification_watch_note_video_title">Video from your watch</string>

@@ -8,4 +8,5 @@
     <string name="event_note_headline_photo">Photo</string>
     <string name="event_note_headline_video">Video</string>
     <string name="event_note_headline_voice_memo">Voice memo</string>
+    <string name="event_note_headline_handwriting">Handwriting</string>
 </resources>

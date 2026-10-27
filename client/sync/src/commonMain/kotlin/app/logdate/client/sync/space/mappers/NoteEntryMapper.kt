@@ -32,12 +32,14 @@ import app.logdate.lexicon.app.logdate.DefsRecordRef
 import app.logdate.lexicon.app.logdate.journal.Entry
 import app.logdate.lexicon.app.logdate.journal.EntryAudioBlock
 import app.logdate.lexicon.app.logdate.journal.EntryBlocksItem
+import app.logdate.lexicon.app.logdate.journal.EntryHandwritingBlock
 import app.logdate.lexicon.app.logdate.journal.EntryImageBlock
 import app.logdate.lexicon.app.logdate.journal.EntryTextBlock
 import app.logdate.lexicon.app.logdate.journal.EntryVideoBlock
 import app.logdate.lexicon.app.logdate.journal.Transcript
 import app.logdate.lexicon.app.logdate.place.Place
 import app.logdate.lexicon.community.lexicon.location.Geo
+import app.logdate.shared.model.HandwritingDocument
 import app.logdate.shared.model.PhotoPresentation
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Instant
@@ -133,6 +135,10 @@ class NoteEntryMapper(
     ): EntryBlocksItem {
         val id = note.uid.toString()
         return when (note) {
+            is JournalNote.Handwriting ->
+                EntryBlocksItem.HandwritingBlock(
+                    EntryHandwritingBlock(id = id, document = note.unreadableContent ?: note.document.encode()),
+                )
             is JournalNote.Text -> EntryBlocksItem.TextBlock(EntryTextBlock(id = id, text = note.content))
             is JournalNote.Image ->
                 EntryBlocksItem.ImageBlock(
@@ -177,6 +183,7 @@ class NoteEntryMapper(
         owner: String,
     ): JournalNote =
         when (block) {
+            is EntryBlocksItem.HandwritingBlock -> handwritingNoteOf(block.value, context, owner)
             is EntryBlocksItem.TextBlock -> textNoteOf(block.value, context, owner)
             is EntryBlocksItem.ImageBlock -> imageNoteOf(block.value, context, owner)
             is EntryBlocksItem.VideoBlock -> videoNoteOf(block.value, context, owner)
@@ -184,6 +191,30 @@ class NoteEntryMapper(
             is EntryBlocksItem.Unknown ->
                 throw SpaceRecordMappingException("$owner: this version of LogDate can't show a ${block.type}")
         }
+
+    private fun handwritingNoteOf(
+        block: EntryHandwritingBlock,
+        context: NoteContext,
+        owner: String,
+    ): JournalNote.Handwriting {
+        requireBlockId(block.id, context.uid, owner)
+        val document =
+            try {
+                HandwritingDocument.decode(block.document)
+            } catch (failure: IllegalArgumentException) {
+                throw SpaceRecordMappingException("$owner: unreadable handwriting document", failure)
+            }
+        return JournalNote.Handwriting(
+            uid = context.uid,
+            creationTimestamp = context.created,
+            lastUpdated = context.updated,
+            document = document,
+            location = context.location,
+            timeZoneId = context.timeZoneId,
+            capturedOn = context.capturedOn,
+            capturedDuring = context.capturedDuring,
+        )
+    }
 
     private fun textNoteOf(
         block: EntryTextBlock,

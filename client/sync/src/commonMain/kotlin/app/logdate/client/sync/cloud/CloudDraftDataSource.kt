@@ -138,6 +138,7 @@ class DefaultCloudDraftDataSource(
                             val plaintext = requireNotNull(syncPayloadCipher).decryptString(blocksFieldId(id), encrypted)
                             json.decodeFromString<EditorDraft>(plaintext).also { require(it.id == id) }
                         } else {
+                            if (change.blockTypes.any { !it.equals("TEXT", ignoreCase = true) }) throw UnsupportedRemoteFormatException()
                             null
                         }
                     SyncedDraft(
@@ -198,6 +199,7 @@ class DefaultCloudDraftDataSource(
     private fun SerializableEntryBlock.syncBlockType(): String =
         when (this) {
             is SerializableTextBlock -> "TEXT"
+            is app.logdate.shared.model.SerializableHandwritingBlock -> "HANDWRITING"
             is SerializableImageBlock -> "IMAGE"
             is SerializableVideoBlock -> "VIDEO"
             is SerializableAudioBlock -> "AUDIO"

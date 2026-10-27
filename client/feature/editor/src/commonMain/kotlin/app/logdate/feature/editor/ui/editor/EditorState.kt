@@ -3,6 +3,7 @@ package app.logdate.feature.editor.ui.editor
 import androidx.compose.runtime.Stable
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryEditBase
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.text.UiText
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.location.VisitMemoryContext
@@ -61,6 +62,7 @@ class EditorState(
     val visitContext: VisitMemoryContext? = null,
     val markId: String? = null,
     val capturedOnWatch: Boolean = false,
+    val todayNotes: List<JournalNote> = emptyList(),
 ) {
     val isRecordingAudio: Boolean
         get() =
@@ -142,6 +144,7 @@ class EditorState(
         visitContext: VisitMemoryContext? = this.visitContext,
         markId: String? = this.markId,
         capturedOnWatch: Boolean = this.capturedOnWatch,
+        todayNotes: List<JournalNote> = this.todayNotes,
     ): EditorState =
         EditorState(
             blocks = blocks,
@@ -167,6 +170,7 @@ class EditorState(
             visitContext = visitContext,
             markId = markId,
             capturedOnWatch = capturedOnWatch,
+            todayNotes = todayNotes,
         )
 
     override fun equals(other: Any?): Boolean {
@@ -196,6 +200,7 @@ class EditorState(
         if (markId != other.markId) return false
         if (visitContext != other.visitContext) return false
         if (capturedOnWatch != other.capturedOnWatch) return false
+        if (todayNotes != other.todayNotes) return false
 
         return true
     }
@@ -224,6 +229,7 @@ class EditorState(
         result = 31 * result + isEditingLocked.hashCode()
         result = 31 * result + contentRevision.hashCode()
         result = 31 * result + capturedOnWatch.hashCode()
+        result = 31 * result + todayNotes.hashCode()
         return result
     }
 
@@ -236,6 +242,7 @@ class EditorState(
 
 private fun EntryBlockUiState.supportsPickerReturnTransition(): Boolean =
     when (this) {
+        is HandwritingBlockUiState,
         is TextBlockUiState,
         is ImageBlockUiState,
         is AudioBlockUiState,

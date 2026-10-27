@@ -68,11 +68,13 @@ kotlin {
             implementation(projects.client.awareness)
             implementation(projects.client.ui)
             implementation(projects.client.domain)
+            implementation(projects.client.logdateDatastore)
             implementation(projects.client.repository)
             implementation(projects.client.util)
             implementation(projects.client.media)
             implementation(projects.client.location)
             implementation(projects.client.permissions)
+            implementation(projects.client.feature.postcards)
             implementation(projects.shared.model)
             // Compose plugin dependencies
             implementation(libs.compose.runtime)
@@ -86,6 +88,7 @@ kotlin {
             // Core dependencies
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
+            implementation(libs.kotlinx.serialization.json)
             implementation(libs.nav3.runtime)
             implementation(libs.jetbrains.navigation3.ui)
             // External dependencies

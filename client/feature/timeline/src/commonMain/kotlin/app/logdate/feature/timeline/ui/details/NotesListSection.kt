@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -63,6 +64,12 @@ internal fun NotesListSection(
                     modifier = Modifier.clickable { onNoteClick(note.noteId) },
                 ) {
                     when (note) {
+                        is app.logdate.ui.timeline.HandwritingNoteUiState ->
+                            app.logdate.ui.handwriting.HandwritingPreview(
+                                note.document,
+                                Modifier.fillMaxWidth().height(240.dp),
+                                unreadable = note.unreadable,
+                            )
                         is TextNoteUiState -> TextNoteSnippet(note)
                         is ImageNoteUiState -> ImageNoteSnippet(note)
                         is AudioNoteUiState -> {

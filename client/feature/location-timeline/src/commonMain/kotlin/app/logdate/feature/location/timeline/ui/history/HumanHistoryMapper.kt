@@ -19,6 +19,7 @@ import logdate.client.feature.location.timeline.generated.resources.history_add_
 import logdate.client.feature.location.timeline.generated.resources.history_around_time
 import logdate.client.feature.location.timeline.generated.resources.history_journey_minutes
 import logdate.client.feature.location.timeline.generated.resources.history_location_recorded
+import logdate.client.feature.location.timeline.generated.resources.history_memory_handwriting
 import logdate.client.feature.location.timeline.generated.resources.history_memory_photo
 import logdate.client.feature.location.timeline.generated.resources.history_memory_recording
 import logdate.client.feature.location.timeline.generated.resources.history_memory_video
@@ -99,6 +100,13 @@ internal fun TravelMode.humanName(): StringResource =
 
 internal fun JournalNote.toHistoryMemory(): HistoryMemoryUi =
     when (this) {
+        is JournalNote.Handwriting ->
+            HistoryMemoryUi(
+                uid.toString(),
+                Res.string.history_memory_handwriting.toUiText(),
+                HistoryMemoryKind.Text,
+                creationTimestamp.toReadableDateShort(),
+            )
         is JournalNote.Text ->
             HistoryMemoryUi(uid.toString(), content.toUiText(), HistoryMemoryKind.Text, creationTimestamp.toReadableDateShort())
         is JournalNote.Image ->

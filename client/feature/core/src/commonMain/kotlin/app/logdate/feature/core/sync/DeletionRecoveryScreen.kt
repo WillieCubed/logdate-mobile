@@ -5,6 +5,7 @@ package app.logdate.feature.core.sync
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
@@ -38,6 +39,7 @@ import app.logdate.feature.journals.ui.detail.VideoNoteViewerContent
 import app.logdate.shared.model.textContent
 import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.common.SettingsScaffold
+import app.logdate.ui.handwriting.HandwritingPreview
 import app.logdate.ui.theme.Spacing
 import coil3.compose.AsyncImage
 import io.github.aakira.napier.Napier
@@ -203,6 +205,15 @@ fun DeletionRecoveryContent(
                 listOfNotNull(edit?.note) + edit?.notes.orEmpty() +
                     edit?.draft?.blocks.orEmpty().mapNotNull { block ->
                         when (block) {
+                            is app.logdate.shared.model.SerializableHandwritingBlock -> {
+                                JournalNote.Handwriting(
+                                    uid = block.id,
+                                    creationTimestamp = block.timestamp,
+                                    lastUpdated = block.timestamp,
+                                    document = block.document,
+                                )
+                            }
+
                             is app.logdate.shared.model.SerializableImageBlock -> {
                                 block.uri?.let {
                                     JournalNote.Image(block.id, block.timestamp, block.timestamp, it, block.caption)
@@ -295,6 +306,13 @@ private fun RecoveryAudio(note: JournalNote.Audio) {
 private fun RecoveryNotePreview(note: JournalNote) {
     Column(modifier = Modifier.padding(horizontal = Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         when (note) {
+            is JournalNote.Handwriting -> {
+                HandwritingPreview(
+                    document = note.document,
+                    modifier = Modifier.fillMaxWidth().height(240.dp),
+                    unreadable = note.unreadableContent != null,
+                )
+            }
             is JournalNote.Text -> {
                 Text(note.content, style = MaterialTheme.typography.bodyLarge)
             }

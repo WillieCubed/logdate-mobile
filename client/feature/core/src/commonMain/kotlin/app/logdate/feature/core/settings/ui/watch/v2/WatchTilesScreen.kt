@@ -31,6 +31,7 @@ import logdate.client.feature.core.generated.resources.watch_v2_campfire_provide
 import logdate.client.feature.core.generated.resources.watch_v2_complications
 import logdate.client.feature.core.generated.resources.watch_v2_complications_description
 import logdate.client.feature.core.generated.resources.watch_v2_fix_open
+import logdate.client.feature.core.generated.resources.watch_v2_handwriting
 import logdate.client.feature.core.generated.resources.watch_v2_mark
 import logdate.client.feature.core.generated.resources.watch_v2_mark_provider
 import logdate.client.feature.core.generated.resources.watch_v2_memory_preview_label
@@ -162,6 +163,8 @@ private fun WatchSurfaceGallery(
                     latest =
                         when (val note = it.latestMoment) {
                             is app.logdate.client.repository.journals.JournalNote.Text -> note.content.take(30)
+                            is app.logdate.client.repository.journals.JournalNote.Handwriting ->
+                                stringResource(Res.string.watch_v2_handwriting)
                             is app.logdate.client.repository.journals.JournalNote.Audio -> stringResource(Res.string.watch_v2_voice)
                             is app.logdate.client.repository.journals.JournalNote.Image -> stringResource(Res.string.watch_v2_photo)
                             is app.logdate.client.repository.journals.JournalNote.Video -> stringResource(Res.string.watch_v2_video)

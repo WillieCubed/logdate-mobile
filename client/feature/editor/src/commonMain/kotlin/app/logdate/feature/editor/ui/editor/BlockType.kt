@@ -5,6 +5,7 @@ package app.logdate.feature.editor.ui.editor
  */
 enum class BlockType {
     TEXT,
+    HANDWRITING,
     IMAGE,
     VIDEO,
     AUDIO,

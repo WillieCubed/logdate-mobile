@@ -30,6 +30,7 @@ internal fun EntryEditorViewModel.saveConflictingVersionSeparatelyImpl() {
 private fun EntryBlockUiState.withId(id: Uuid): EntryBlockUiState =
     when (this) {
         is TextBlockUiState -> copy(id = id)
+        is HandwritingBlockUiState -> copy(id = id)
         is ImageBlockUiState -> copy(id = id)
         is AudioBlockUiState -> copy(id = id)
         is VideoBlockUiState -> copy(id = id)

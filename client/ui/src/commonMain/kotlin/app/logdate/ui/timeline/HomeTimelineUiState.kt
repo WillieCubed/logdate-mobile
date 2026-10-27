@@ -203,6 +203,16 @@ sealed interface NoteUiState {
     val capturedDuring: CaptureActivity?
 }
 
+data class HandwritingNoteUiState(
+    override val noteId: Uuid,
+    val document: app.logdate.shared.model.HandwritingDocument,
+    val timestamp: Instant,
+    override val journals: List<JournalBadgeUiState> = emptyList(),
+    override val capturedOnWatch: Boolean = false,
+    val unreadable: Boolean = false,
+    override val capturedDuring: CaptureActivity? = null,
+) : NoteUiState
+
 data class TextNoteUiState(
     override val noteId: Uuid,
     val text: String,

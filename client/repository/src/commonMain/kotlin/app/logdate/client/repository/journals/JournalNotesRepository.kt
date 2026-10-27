@@ -3,6 +3,7 @@
 package app.logdate.client.repository.journals
 
 import app.logdate.client.repository.transcription.TranscriptDocument
+import app.logdate.shared.model.HandwritingDocument
 import app.logdate.shared.model.PhotoPresentation
 import app.logdate.util.UuidSerializer
 import kotlinx.coroutines.flow.Flow
@@ -225,6 +226,7 @@ enum class NoteType {
     IMAGE,
     VIDEO,
     LOCATION,
+    HANDWRITING,
 }
 
 /**
@@ -341,6 +343,25 @@ sealed class JournalNote(
     ) : JournalNote(NoteType.TEXT)
 
     @Serializable
+    data class Handwriting(
+        @Serializable(with = UuidSerializer::class)
+        override val uid: Uuid = Uuid.random(),
+        override val creationTimestamp: Instant,
+        override val lastUpdated: Instant,
+        val document: HandwritingDocument,
+        /** Original stored bytes when this client cannot read the document. Never replace them with an empty page. */
+        val unreadableContent: String? = null,
+        override val syncVersion: Long = 0,
+        override val location: NoteLocation? = null,
+        override val timeZoneId: String? = null,
+        @Serializable(with = LenientCaptureDeviceSerializer::class)
+        override val capturedOn: CaptureDevice? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER)
+        @Serializable(with = LenientCaptureActivitySerializer::class)
+        override val capturedDuring: CaptureActivity? = null,
+    ) : JournalNote(NoteType.HANDWRITING)
+
+    @Serializable
     data class Image(
         @Serializable(with = UuidSerializer::class)
         override val uid: Uuid = Uuid.random(),
@@ -411,13 +432,14 @@ fun JournalNote.mediaRefOrNull(): String? =
         is JournalNote.Audio -> mediaRef
         is JournalNote.Image -> mediaRef
         is JournalNote.Video -> mediaRef
-        is JournalNote.Text -> null
+        is JournalNote.Text, is JournalNote.Handwriting -> null
     }
 
 /** A copy of this note with [timeZoneId] as its capture time zone; everything else is unchanged. */
 fun JournalNote.withTimeZoneId(timeZoneId: String?): JournalNote =
     when (this) {
         is JournalNote.Text -> copy(timeZoneId = timeZoneId)
+        is JournalNote.Handwriting -> copy(timeZoneId = timeZoneId)
         is JournalNote.Image -> copy(timeZoneId = timeZoneId)
         is JournalNote.Video -> copy(timeZoneId = timeZoneId)
         is JournalNote.Audio -> copy(timeZoneId = timeZoneId)

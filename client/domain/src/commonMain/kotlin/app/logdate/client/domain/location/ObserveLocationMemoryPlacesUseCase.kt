@@ -94,6 +94,7 @@ class ObserveLocationMemoryPlacesUseCase(
 
     private fun JournalNote.previewText(): String =
         when (this) {
+            is JournalNote.Handwriting -> "Handwritten memory"
             is JournalNote.Text -> content
             is JournalNote.Image -> "Photo memory"
             is JournalNote.Audio -> "Audio memory"

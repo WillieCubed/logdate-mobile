@@ -43,6 +43,7 @@ import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.clear_all
 import logdate.client.feature.editor.generated.resources.draft_item_count
 import logdate.client.feature.editor.generated.resources.empty_draft
+import logdate.client.feature.editor.generated.resources.ink_add
 import logdate.client.feature.editor.generated.resources.loading_drafts
 import logdate.client.feature.editor.generated.resources.no_drafts_found
 import logdate.client.feature.editor.generated.resources.photo
@@ -267,6 +268,7 @@ private fun DraftListItemContent(
             draft.notes.firstOrNull()?.let { note ->
                 when (note) {
                     is JournalNote.Text -> note.content
+                    is JournalNote.Handwriting -> stringResource(Res.string.ink_add)
                     is JournalNote.Image -> stringResource(Res.string.photo)
                     is JournalNote.Video -> stringResource(Res.string.video)
                     is JournalNote.Audio -> stringResource(Res.string.record_audio)

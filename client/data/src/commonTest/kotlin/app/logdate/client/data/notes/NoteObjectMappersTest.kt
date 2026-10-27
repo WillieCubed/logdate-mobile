@@ -22,6 +22,7 @@ class NoteObjectMappersTest {
         val roundTripped =
             notes.map { note ->
                 when (note) {
+                    is JournalNote.Handwriting -> note.toEntity().toModel()
                     is JournalNote.Text -> note.toEntity().toModel()
                     is JournalNote.Image -> note.toEntity().toModel()
                     is JournalNote.Video -> note.toEntity().toModel()

@@ -41,6 +41,7 @@ import app.logdate.feature.editor.ui.LocalSharedTransitionScope
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.CameraBlockUiState
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
+import app.logdate.feature.editor.ui.editor.HandwritingBlockUiState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.ui.common.handwritingDelegator
@@ -67,6 +68,7 @@ internal data class EmptyEditorPickerTileIds(
     val audioId: Uuid? = null,
     val cameraId: Uuid? = null,
     val photoId: Uuid? = null,
+    val handwritingId: Uuid? = null,
 )
 
 internal fun matchingPickerTileIdsFor(block: EntryBlockUiState?): EmptyEditorPickerTileIds =
@@ -75,6 +77,7 @@ internal fun matchingPickerTileIdsFor(block: EntryBlockUiState?): EmptyEditorPic
         is AudioBlockUiState -> EmptyEditorPickerTileIds(audioId = block.id)
         is CameraBlockUiState -> EmptyEditorPickerTileIds(cameraId = block.id)
         is ImageBlockUiState -> EmptyEditorPickerTileIds(photoId = block.id)
+        is HandwritingBlockUiState -> EmptyEditorPickerTileIds(handwritingId = block.id)
         else -> EmptyEditorPickerTileIds()
     }
 
@@ -100,6 +103,7 @@ fun EmptyEditorStateContent(
     cameraTileId: Uuid? = null,
     modifier: Modifier = Modifier,
     retainConsumedTileIds: Boolean = false,
+    onStartHandwritingBlock: ((Uuid) -> Unit)? = null,
 ) {
     // Stable IDs pre-generated for each tile; used as the shared element key so
     // the tile morphs into the expanded block surface on tap. A generated id is
@@ -111,6 +115,14 @@ fun EmptyEditorStateContent(
     var audioId by remember(audioTileId) { mutableStateOf(audioTileId ?: Uuid.random()) }
     var cameraId by remember(cameraTileId) { mutableStateOf(cameraTileId ?: Uuid.random()) }
     var photoId by remember(photoTileId) { mutableStateOf(photoTileId ?: Uuid.random()) }
+    var inkId by remember { mutableStateOf(Uuid.random()) }
+    val startHandwritingBlock: (() -> Unit)? =
+        onStartHandwritingBlock?.let { start ->
+            {
+                start(inkId)
+                if (!retainConsumedTileIds) inkId = Uuid.random()
+            }
+        }
 
     val startTextBlock = {
         onStartTextBlock(textId)
@@ -137,64 +149,30 @@ fun EmptyEditorStateContent(
         val pickerWidth = maxWidth.coerceAtMost(800.dp)
         val minTileHeight = 152.dp * fontScale
         val useSingleRow = maxHeight < 360.dp && pickerWidth >= (144.dp * fontScale) * 4 + spacing * 3
-        val minHeight = if (useSingleRow) minTileHeight else minTileHeight * 2 + spacing
+        val minHeight = (if (useSingleRow) minTileHeight else minTileHeight * 2 + spacing)
         val contentHeight = maxHeight.coerceAtLeast(minHeight)
         Box(modifier = Modifier.widthIn(max = 800.dp).fillMaxWidth()) {
-            if (useSingleRow) {
-                // Landscape / height-constrained: all four tiles in one horizontal row.
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
-                            .height(contentHeight),
-                    horizontalArrangement = Arrangement.spacedBy(spacing),
-                ) {
-                    TextEntrySurface(
-                        onClick = startTextBlock,
-                        modifier = tileModifier(textId, sts, avs),
-                    )
-                    AudioRecordingSurface(
-                        onClick = startAudioBlock,
-                        modifier = tileModifier(audioId, sts, avs),
-                    )
-                    CameraCaptureSurface(
-                        onClick = startCameraBlock,
-                        modifier = tileModifier(cameraId, sts, avs),
-                    )
-                    PhotoSurface(
-                        onClick = startPhotoBlock,
-                        modifier = tileModifier(photoId, sts, avs),
-                    )
-                }
-            } else {
-                // Portrait / normal: 2×2 grid.
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
-                            .height(contentHeight),
-                    verticalArrangement = Arrangement.spacedBy(spacing),
-                ) {
+            Column {
+                if (useSingleRow) {
+                    // Landscape / height-constrained: all four tiles in one horizontal row.
                     Row(
-                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .height(contentHeight),
                         horizontalArrangement = Arrangement.spacedBy(spacing),
                     ) {
                         TextEntrySurface(
                             onClick = startTextBlock,
+                            onHandwrite = startHandwritingBlock,
+                            handwritingId = inkId,
                             modifier = tileModifier(textId, sts, avs),
                         )
                         AudioRecordingSurface(
                             onClick = startAudioBlock,
                             modifier = tileModifier(audioId, sts, avs),
                         )
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(spacing),
-                    ) {
                         CameraCaptureSurface(
                             onClick = startCameraBlock,
                             modifier = tileModifier(cameraId, sts, avs),
@@ -203,6 +181,46 @@ fun EmptyEditorStateContent(
                             onClick = startPhotoBlock,
                             modifier = tileModifier(photoId, sts, avs),
                         )
+                    }
+                } else {
+                    // Portrait / normal: 2×2 grid.
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .height(contentHeight),
+                        verticalArrangement = Arrangement.spacedBy(spacing),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(spacing),
+                        ) {
+                            TextEntrySurface(
+                                onClick = startTextBlock,
+                                onHandwrite = startHandwritingBlock,
+                                handwritingId = inkId,
+                                modifier = tileModifier(textId, sts, avs),
+                            )
+                            AudioRecordingSurface(
+                                onClick = startAudioBlock,
+                                modifier = tileModifier(audioId, sts, avs),
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth().weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(spacing),
+                        ) {
+                            CameraCaptureSurface(
+                                onClick = startCameraBlock,
+                                modifier = tileModifier(cameraId, sts, avs),
+                            )
+                            PhotoSurface(
+                                onClick = startPhotoBlock,
+                                modifier = tileModifier(photoId, sts, avs),
+                            )
+                        }
                     }
                 }
             }
@@ -238,8 +256,14 @@ private fun RowScope.tileModifier(
 @Composable
 private fun TextEntrySurface(
     onClick: () -> Unit,
+    onHandwrite: (() -> Unit)? = null,
+    handwritingId: Uuid,
     modifier: Modifier = Modifier,
 ) {
+    if (onHandwrite != null) {
+        WritingEntrySurface(onClick, onHandwrite, handwritingId, modifier)
+        return
+    }
     Surface(
         onClick = onClick,
         modifier = modifier.handwritingDelegator(onClick),

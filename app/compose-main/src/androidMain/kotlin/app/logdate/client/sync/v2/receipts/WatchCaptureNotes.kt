@@ -74,6 +74,7 @@ class WatchCaptureNotes(
     private fun JournalNote.withServerVersion(version: Long): JournalNote =
         when (this) {
             is JournalNote.Text -> copy(syncVersion = version)
+            is JournalNote.Handwriting -> copy(syncVersion = version)
             is JournalNote.Audio -> copy(syncVersion = version)
             is JournalNote.Image -> copy(syncVersion = version)
             is JournalNote.Video -> copy(syncVersion = version)

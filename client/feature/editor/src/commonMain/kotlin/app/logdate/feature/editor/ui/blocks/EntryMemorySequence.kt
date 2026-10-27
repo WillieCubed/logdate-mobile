@@ -54,11 +54,11 @@ import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
+import app.logdate.feature.editor.ui.layout.EditorBlockCornerRadius
 import app.logdate.feature.editor.ui.layout.EditorColumnMaxWidth
 import app.logdate.feature.editor.ui.layout.EditorSurfaceInset
 import app.logdate.feature.editor.ui.layout.FocusedEntryPanes
 import app.logdate.feature.editor.ui.layout.LocalEditorContextControlsVisible
-import app.logdate.feature.editor.ui.layout.LocalEditorCorners
 import app.logdate.feature.editor.ui.layout.LocalEditorFocusPresentation
 import app.logdate.feature.editor.ui.layout.LocalEditorKeyboardVisible
 import app.logdate.feature.editor.ui.state.BlocksUiState
@@ -75,6 +75,9 @@ internal fun EntryMemorySequence(
     listState: LazyListState,
     onAudioResolverReady: (Uuid, PendingAudioResolver) -> Unit,
     modifier: Modifier = Modifier,
+    entryContext: (@Composable () -> Unit)? = null,
+    autoFocusInitialText: Boolean = true,
+    showFocusActions: Boolean = false,
 ) {
     val sharedScope = LocalSharedTransitionScope.current
     val visibilityScope = LocalAnimatedVisibilityScope.current
@@ -95,7 +98,7 @@ internal fun EntryMemorySequence(
             uiState.blocks
         }
     val density = LocalDensity.current
-    val contextControlsVisible = LocalEditorContextControlsVisible.current && presentation.entryActionsEnabled
+    val contextControlsVisible = LocalEditorContextControlsVisible.current && presentation.entryActionsEnabled && uiState.allowBlockCreation
     val currentContextControlsVisible by rememberUpdatedState(contextControlsVisible)
     val aspectRatios = remember { mutableStateMapOf<Uuid, Float>() }
     var gesture by remember { mutableStateOf(EntryAddGestureState()) }
@@ -200,7 +203,7 @@ internal fun EntryMemorySequence(
         mutableStateOf(
             uiState.blocks
                 .singleOrNull()
-                ?.takeIf { it is TextBlockUiState && !it.hasContent() }
+                ?.takeIf { autoFocusInitialText && it is TextBlockUiState && !it.hasContent() }
                 ?.id,
         )
     }
@@ -296,6 +299,9 @@ internal fun EntryMemorySequence(
                     contentPadding = PaddingValues(start = EditorSurfaceInset, top = 8.dp, end = EditorSurfaceInset),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
+                    if (entryContext != null && !presentation.isRecording) {
+                        item(key = "earlier_entries") { entryContext() }
+                    }
                     items(visibleBlocks, key = { it.id }) { block ->
                         val itemVisibility =
                             remember(block.id) {
@@ -312,7 +318,10 @@ internal fun EntryMemorySequence(
                             val animatedWidth by animateDpAsState(blockWidth(block), label = "memoryBlockWidth")
                             Box(Modifier.fillMaxWidth().animateItem(placementSpec = null), contentAlignment = Alignment.TopCenter) {
                                 MemoryBlockSurface(
+                                    showFocusAction = showFocusActions,
                                     block = block,
+                                    customPresentation = block.id in uiState.blockPresentations,
+                                    focusTransitionProgress = uiState.blockPresentations[block.id]?.focusTransitionProgress ?: 0f,
                                     isSelected =
                                         (recordingId == block.id && presentation.isRecording) || uiState.expandedBlockId == block.id,
                                     onSelect = { uiState.onBlockFocused(block.id) },
@@ -326,22 +335,27 @@ internal fun EntryMemorySequence(
                                     modifier =
                                         Modifier.widthIn(max = animatedWidth).then(
                                             if (sharedScope != null && visibilityScope != null) {
+                                                val custom = uiState.blockPresentations[block.id]
                                                 with(sharedScope) {
-                                                    Modifier.sharedBounds(
-                                                        rememberSharedContentState("block_surface_${block.id}"),
-                                                        animatedVisibilityScope =
-                                                            if (visibilityScope.transition.targetState ==
-                                                                EnterExitState.PostExit
-                                                            ) {
-                                                                visibilityScope
-                                                            } else {
-                                                                blockVisibilityScope
-                                                            },
-                                                        clipInOverlayDuringTransition =
-                                                            OverlayClip(
-                                                                RoundedCornerShape(LocalEditorCorners.current.cardRadius),
-                                                            ),
-                                                    )
+                                                    if (custom != null) {
+                                                        Modifier
+                                                    } else {
+                                                        Modifier.sharedBounds(
+                                                            rememberSharedContentState("block_surface_${block.id}"),
+                                                            animatedVisibilityScope =
+                                                                if (visibilityScope.transition.targetState ==
+                                                                    EnterExitState.PostExit
+                                                                ) {
+                                                                    visibilityScope
+                                                                } else {
+                                                                    blockVisibilityScope
+                                                                },
+                                                            clipInOverlayDuringTransition =
+                                                                OverlayClip(
+                                                                    RoundedCornerShape(EditorBlockCornerRadius),
+                                                                ),
+                                                        )
+                                                    }
                                                 }
                                             } else {
                                                 Modifier
@@ -366,6 +380,7 @@ internal fun EntryMemorySequence(
                                         focusedTextHeight = focusedTextHeight,
                                         unfinishedRecordingHeight = recordingHeight,
                                         availableAudioHeight = availableAudioHeight,
+                                        presentation = uiState.blockPresentations[block.id],
                                     )
                                 }
                             }
@@ -379,6 +394,7 @@ internal fun EntryMemorySequence(
                             )
                             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
                                 EndOfEntryAddControl(
+                                    allowHandwriting = uiState.allowHandwritingCreation,
                                     progress = revealProgress,
                                     expanded = addExpanded,
                                     onExpand = {

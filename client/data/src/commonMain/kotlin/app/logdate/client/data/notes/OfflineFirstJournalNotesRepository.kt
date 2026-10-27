@@ -11,11 +11,9 @@ import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.entities.MediaCaptionEntity
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.media.MediaManager
-import app.logdate.client.media.MediaObject
 import app.logdate.client.media.storage.MediaReclamationJournal
 import app.logdate.client.media.storage.MediaReference
 import app.logdate.client.media.storage.StoredMediaReferences
-import app.logdate.client.media.storage.UnavailableMediaReferences
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.ExportableJournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
@@ -87,6 +85,8 @@ class OfflineFirstJournalNotesRepository(
             transcriptionRepository,
         )
 
+    private val mediaIndexer = JournalNoteMediaIndexer(mediaManager, indexedMediaRepository)
+
     override val allNotesObserved: Flow<List<JournalNote>> = queries.allNotesObserved
 
     override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> = queries.observeNotesInJournal(journalId)
@@ -145,7 +145,7 @@ class OfflineFirstJournalNotesRepository(
 
     override suspend fun create(note: JournalNote): Uuid {
         val storedNote = note.withStoredMediaRef(mediaReferences)
-        val pendingMediaIndex = buildPendingMediaIndex(storedNote)
+        val pendingMediaIndex = mediaIndexer.buildPendingMediaIndex(storedNote)
         val noteId =
             transactionManager.withTransaction {
                 // Keep note persistence, optional index creation, and sync metadata aligned so a
@@ -178,6 +178,10 @@ class OfflineFirstJournalNotesRepository(
                 ?.let { notePlaceResolver.get(it)?.id }
         val noteId =
             when (note) {
+                is JournalNote.Handwriting -> {
+                    textNoteDao.addNote(note.toEntity(linkedPlaceId))
+                    note.uid
+                }
                 is JournalNote.Text -> {
                     textNoteDao.addNote(note.toEntity(linkedPlaceId))
                     note.uid
@@ -207,7 +211,7 @@ class OfflineFirstJournalNotesRepository(
                 }
             }
 
-        indexPendingMediaIfNeeded(pendingMediaIndex)
+        mediaIndexer.indexPendingMediaIfNeeded(pendingMediaIndex)
         syncMetadataService.enqueuePending(
             entityId = note.uid.toString(),
             entityType = EntityType.NOTE,
@@ -215,68 +219,6 @@ class OfflineFirstJournalNotesRepository(
         )
 
         return noteId
-    }
-
-    private fun JournalNote.Video.withDurationFrom(pendingMediaIndex: PendingMediaIndex?): JournalNote.Video {
-        if (durationMs != null) return this
-        val duration = (pendingMediaIndex as? PendingMediaIndex.Video)?.duration ?: return this
-        return copy(durationMs = duration.inWholeMilliseconds)
-    }
-
-    private suspend fun buildPendingMediaIndex(note: JournalNote): PendingMediaIndex? {
-        if ((note is JournalNote.Image && UnavailableMediaReferences.isUnavailable(note.mediaRef)) ||
-            (note is JournalNote.Video && UnavailableMediaReferences.isUnavailable(note.mediaRef))
-        ) {
-            return null
-        }
-        val manager = mediaManager ?: return null
-        indexedMediaRepository ?: return null
-
-        return when (note) {
-            is JournalNote.Image -> {
-                manager
-                    .getMedia(note.mediaRef)
-                    .also { check(it is MediaObject.Image) { "Expected image media for ${note.mediaRef}" } }
-                PendingMediaIndex.Image(
-                    uri = note.mediaRef,
-                    timestamp = note.creationTimestamp,
-                )
-            }
-
-            is JournalNote.Video -> {
-                val media =
-                    manager
-                        .getMedia(note.mediaRef)
-                        .also { check(it is MediaObject.Video) { "Expected video media for ${note.mediaRef}" } } as MediaObject.Video
-                PendingMediaIndex.Video(
-                    uri = note.mediaRef,
-                    timestamp = note.creationTimestamp,
-                    duration = media.duration,
-                )
-            }
-
-            else -> null
-        }
-    }
-
-    private suspend fun indexPendingMediaIfNeeded(pendingMediaIndex: PendingMediaIndex?) {
-        val repository = indexedMediaRepository ?: return
-        val pending = pendingMediaIndex ?: return
-        if (repository.isIndexed(pending.uri)) return
-
-        when (pending) {
-            is PendingMediaIndex.Image ->
-                repository.indexImage(
-                    uri = pending.uri,
-                    timestamp = pending.timestamp,
-                )
-            is PendingMediaIndex.Video ->
-                repository.indexVideo(
-                    uri = pending.uri,
-                    timestamp = pending.timestamp,
-                    duration = pending.duration,
-                )
-        }
     }
 
     /** Deletes owned media only when notes, editor drafts, and journal covers no longer name it. */
@@ -368,7 +310,7 @@ class OfflineFirstJournalNotesRepository(
         journalId: Uuid,
     ) {
         val storedNote = note.withStoredMediaRef(mediaReferences)
-        val pendingMediaIndex = buildPendingMediaIndex(storedNote)
+        val pendingMediaIndex = mediaIndexer.buildPendingMediaIndex(storedNote)
         transactionManager.withTransaction {
             val scope = currentRecoveryScope()
             scope?.let {
@@ -441,7 +383,7 @@ class OfflineFirstJournalNotesRepository(
 
     private suspend fun indexAvailableRecoveryMedia(note: JournalNote) {
         val reference = note.mediaRefOrNull() ?: return
-        if (mediaManager?.exists(reference) == true) indexPendingMediaIfNeeded(buildPendingMediaIndex(note))
+        if (mediaManager?.exists(reference) == true) mediaIndexer.indexPendingMediaIfNeeded(mediaIndexer.buildPendingMediaIndex(note))
     }
 
     override suspend fun getNoteRecoveryScope() = currentRecoveryScope()

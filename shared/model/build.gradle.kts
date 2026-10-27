@@ -23,6 +23,9 @@ kotlin {
             languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
             compilerOptions.freeCompilerArgs.set(listOf("-Xexpect-actual-classes"))
         }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+        }
         commonMain.dependencies {
             api(libs.kotlinx.datetime)
             api(libs.kotlinx.coroutines.core)

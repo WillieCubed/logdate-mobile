@@ -90,6 +90,7 @@ internal fun EntryEditorViewModel.createNewBlockImpl(
 
     val newBlock =
         when (type) {
+            BlockType.HANDWRITING -> HandwritingBlockUiState(id = id, timestamp = timestamp, location = location)
             BlockType.TEXT ->
                 TextBlockUiState(
                     id = id,
@@ -188,6 +189,11 @@ internal fun EntryEditorViewModel.applyBlockChanges(
     base: EntryBlockUiState,
 ): EntryBlockUiState =
     when (updated) {
+        is HandwritingBlockUiState -> {
+            existing as HandwritingBlockUiState
+            base as HandwritingBlockUiState
+            existing.copy(page = changed(existing.page, updated.page, base.page))
+        }
         is TextBlockUiState -> applyTextChanges(existing as TextBlockUiState, updated, base as TextBlockUiState)
         is ImageBlockUiState -> {
             existing as ImageBlockUiState

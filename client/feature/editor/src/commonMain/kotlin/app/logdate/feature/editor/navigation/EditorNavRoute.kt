@@ -48,7 +48,7 @@ data class EntryEditorRoute(
     val journalIds: List<String> = emptyList(),
     val firstEntry: Boolean = false,
     val visitContext: VisitMemoryContext? = null,
-    val launchMode: EditorLaunchMode = EditorLaunchMode.Text,
+    val launchMode: EditorLaunchMode = EditorLaunchMode.Default,
     val promptPhotoUri: String? = null,
     val initialText: String? = null,
     val markId: String? = null,

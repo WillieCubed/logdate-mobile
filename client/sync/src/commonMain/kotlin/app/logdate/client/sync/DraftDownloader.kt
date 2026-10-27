@@ -1,6 +1,5 @@
 package app.logdate.client.sync
 
-import app.logdate.client.database.entities.sync.DownloadInboxEntity
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.SyncableDraftRepository
 import app.logdate.client.sync.cloud.CloudApiException
@@ -8,29 +7,18 @@ import app.logdate.client.sync.cloud.CloudDraftDataSource
 import app.logdate.client.sync.cloud.DraftSyncResult
 import app.logdate.client.sync.cloud.RemoteRecordFailure
 import app.logdate.client.sync.cloud.SyncedDraft
-import app.logdate.client.sync.diagnostics.DiagnosticSource
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
 import app.logdate.client.sync.space.SpaceKind
-import app.logdate.client.sync.space.SpaceMediaReference
-import app.logdate.client.sync.space.SpaceStagedRecords
 import app.logdate.client.sync.space.SpaceSync
 import app.logdate.client.sync.space.mappers.SpaceDraft
-import app.logdate.client.sync.space.spaceFetchError
 import app.logdate.shared.model.EditorDraft
-import app.logdate.shared.model.SerializableAudioBlock
-import app.logdate.shared.model.SerializableCameraBlock
-import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
-import app.logdate.shared.model.SerializableVideoBlock
-import app.logdate.shared.model.diagnostics.DiagnosticAction
 import app.logdate.shared.model.diagnostics.DiagnosticOutcome
-import app.logdate.shared.model.diagnostics.DiagnosticPhase
 import app.logdate.shared.model.diagnostics.DiagnosticReason
-import app.logdate.shared.model.diagnostics.SyncDiagnosticEvent
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlin.time.Instant
@@ -53,17 +41,20 @@ internal class DraftDownloader(
 ) {
     private val syncableDraftRepository = journalRepository as? SyncableDraftRepository
 
-    /** One fetched page, the inbox rows staged for it, and how each of its records was settled. */
-    private class DraftPage(
-        val result: DraftSyncResult,
-        val stagedRows: Map<String, DownloadInboxEntity>,
-        val capturedSource: DiagnosticSource?,
-        val applyAttempts: Map<String, String>,
-    ) {
-        val appliedIds = mutableListOf<Pair<String, Long>>()
-        val skippedIds = mutableListOf<Pair<String, Long>>()
-        val failedIds = mutableListOf<Pair<String, Long>>()
-    }
+    private val spaceDownloader =
+        SpaceDraftDownloader(
+            journalRepository,
+            syncMetadataService,
+            transactionManager,
+            downloadEngine,
+            downloadInbox,
+            ::saveDraft,
+            ::recordPendingConflict,
+            ::hasPendingLocal,
+            ::checkScope,
+            mapCloudApiError,
+            mapException,
+        )
 
     private class BatchTally {
         var downloadedCount = 0
@@ -76,7 +67,7 @@ internal class DraftDownloader(
         val kind = sync?.activeKind(EntityType.DRAFT)
         if (sync != null && kind != null) {
             @Suppress("UNCHECKED_CAST")
-            return downloadFromSpace(sync, kind as SpaceKind<SpaceDraft>)
+            return spaceDownloader.download(sync, kind as SpaceKind<SpaceDraft>)
         }
         return downloadFromServer(since)
     }
@@ -111,127 +102,6 @@ internal class DraftDownloader(
             mapException(e, "Download drafts")
         }
 
-    /**
-     * Applies the drafts the personal space changed, one at a time so one failure leaves the rest
-     * applied. A draft edited here since it was last uploaded keeps the edit and uploads it again;
-     * otherwise the newer of the two wins, as for drafts from the server.
-     */
-    private suspend fun downloadFromSpace(
-        sync: SpaceSync,
-        kind: SpaceKind<SpaceDraft>,
-    ): SyncResult =
-        try {
-            val selected = downloadInbox?.currentScope()
-            val tally = BatchTally()
-            val staged = sync.read(kind).getOrElse { failure -> throw failure }
-            downloadInbox.spaceFetchError()?.let { tally.errors += it }
-            do {
-                val page = staged.page()
-                page.changes.forEach { applySpaceDraft(staged, it, selected, tally) }
-                page.deletions.forEach { deleteSpaceDraft(staged, it, selected, tally) }
-            } while (page.hasMore)
-            SyncResult(
-                success = tally.errors.isEmpty(),
-                downloadedItems = tally.downloadedCount,
-                conflictsResolved = tally.conflictsResolved,
-                errors = tally.errors,
-            )
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: CloudApiException) {
-            mapCloudApiError(error)
-        } catch (error: Exception) {
-            mapException(error, "Download drafts")
-        }
-
-    private suspend fun applySpaceDraft(
-        staged: SpaceStagedRecords<SpaceDraft>,
-        remote: SpaceDraft,
-        selected: DownloadScope?,
-        tally: BatchTally,
-    ) {
-        val draft = remote.draft
-        val id = draft.id.toString()
-        try {
-            transactionManager.withTransaction {
-                checkScope(selected)
-                val existing = journalRepository.getDraft(draft.id)
-                val outcome =
-                    when {
-                        hasPendingLocal(draft.id) -> {
-                            recordPendingConflict(draft.id, existing, remote.syncVersion, draft.lastModifiedAt)
-                            tally.conflictsResolved++
-                            RemoteOutcome.DECLINED
-                        }
-                        existing != null && existing.lastModifiedAt > draft.lastModifiedAt -> {
-                            syncMetadataService.enqueuePending(id, EntityType.DRAFT, PendingOperation.UPDATE)
-                            tally.conflictsResolved++
-                            RemoteOutcome.KEPT_LOCAL
-                        }
-                        else -> {
-                            if (existing != draft) saveDraft(draft)
-                            downloadInbox?.takeIf { draft.hasSpaceMedia() }?.enqueueSpaceDraftMedia(id, remote.syncVersion)
-                            tally.downloadedCount++
-                            RemoteOutcome.STORED
-                        }
-                    }
-                staged.settle(id, outcome)
-                checkScope(selected)
-            }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            throwIfDeviceBlocked(error)
-            staged.settleFailed(id)
-            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to apply remote draft")
-            Napier.e("Failed to apply draft change")
-        }
-    }
-
-    private suspend fun deleteSpaceDraft(
-        staged: SpaceStagedRecords<SpaceDraft>,
-        id: String,
-        selected: DownloadScope?,
-        tally: BatchTally,
-    ) {
-        val draftId = Uuid.parse(id)
-        try {
-            transactionManager.withTransaction {
-                checkScope(selected)
-                val pending = syncMetadataService.getPendingUploads(EntityType.DRAFT).firstOrNull { it.entityId == id }
-                if (pending != null && pending.operation != PendingOperation.DELETE) {
-                    downloadEngine.preserveDeletionConflict(EntityType.DRAFT, id)
-                    tally.conflictsResolved++
-                } else if (pending != null) {
-                    check(
-                        syncMetadataService.settleIfCurrent(
-                            EntityType.DRAFT,
-                            pending,
-                            kotlin.time.Clock.System
-                                .now(),
-                            0L,
-                        ),
-                    )
-                }
-                if (syncableDraftRepository != null) {
-                    syncableDraftRepository.deleteDraftFromSync(draftId)
-                } else {
-                    journalRepository.deleteDraft(draftId)
-                }
-                staged.settle(id, RemoteOutcome.DELETED)
-                tally.downloadedCount++
-                checkScope(selected)
-            }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            throwIfDeviceBlocked(error)
-            staged.settleFailed(id)
-            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to delete remote draft")
-            Napier.e("Failed to delete draft")
-        }
-    }
-
     private suspend fun saveDraft(draft: EditorDraft) {
         if (syncableDraftRepository != null) syncableDraftRepository.saveDraftFromSync(draft) else journalRepository.saveDraft(draft)
     }
@@ -250,19 +120,6 @@ internal class DraftDownloader(
         localUpdatedAt = existing?.lastModifiedAt,
         remoteUpdatedAt = remoteUpdatedAt,
     )
-
-    private fun EditorDraft.hasSpaceMedia(): Boolean =
-        blocks.any { block ->
-            when (block) {
-                is SerializableTextBlock -> false
-                is SerializableImageBlock -> block.uri.isSpaceFile()
-                is SerializableVideoBlock -> block.uri.isSpaceFile() || block.thumbnailUri.isSpaceFile()
-                is SerializableAudioBlock -> block.uri.isSpaceFile()
-                is SerializableCameraBlock -> block.uri.isSpaceFile()
-            }
-        }
-
-    private fun String?.isSpaceFile(): Boolean = this != null && SpaceMediaReference.parse(this) != null
 
     private suspend fun downloadPage(
         cursor: Instant,
@@ -298,9 +155,9 @@ internal class DraftDownloader(
             errors += SyncError(SyncErrorType.SERVER_ERROR, "One or more drafts use an unsupported or damaged encrypted format")
         }
 
-        settleApplied(page, downloadScope)
-        settleSkipped(page, downloadScope)
-        settleFailed(page, downloadScope)
+        page.settleApplied(downloadScope)
+        page.settleSkipped(downloadScope)
+        page.settleFailed(downloadScope)
         recordRemoteFailures(result.failures, downloadScope, errors)
         return result to batchResult
     }
@@ -369,7 +226,7 @@ internal class DraftDownloader(
     private suspend fun startPage(
         result: DraftSyncResult,
         downloadScope: DownloadScope?,
-    ): DraftPage {
+    ): DraftDownloadPage {
         val stagedRows = downloadScope?.let { downloadInbox?.pending("DRAFT", it)?.associateBy { row -> row.entityId } }.orEmpty()
         val capturedSource = downloadScope?.let { downloadInbox?.captureDiagnosticSource(it) }
         val applyAttempts =
@@ -377,15 +234,15 @@ internal class DraftDownloader(
                 .distinct()
                 .mapNotNull { id -> stagedRows[id]?.let { id to Uuid.random().toString() } }
                 .toMap()
-        val page = DraftPage(result, stagedRows, capturedSource, applyAttempts)
+        val page = DraftDownloadPage(result, stagedRows, capturedSource, applyAttempts, downloadInbox, downloadEngine)
         for ((id, attemptId) in applyAttempts) {
-            recordApply(page, stagedRows.getValue(id), attemptId, DiagnosticOutcome.STARTED)
+            page.recordApply(stagedRows.getValue(id), attemptId, DiagnosticOutcome.STARTED)
         }
         return page
     }
 
     private suspend fun applyPage(
-        page: DraftPage,
+        page: DraftDownloadPage,
         downloadScope: DownloadScope?,
     ): BatchResult =
         try {
@@ -401,14 +258,14 @@ internal class DraftDownloader(
             }
         } catch (cancelled: CancellationException) {
             for ((id, attemptId) in page.applyAttempts) {
-                recordApply(page, page.stagedRows.getValue(id), attemptId, DiagnosticOutcome.INTERRUPTED)
+                page.recordApply(page.stagedRows.getValue(id), attemptId, DiagnosticOutcome.INTERRUPTED)
             }
             throw cancelled
         }
 
     private suspend fun applyChange(
         remoteDraft: SyncedDraft,
-        page: DraftPage,
+        page: DraftDownloadPage,
         downloadScope: DownloadScope?,
         tally: BatchTally,
     ) {
@@ -452,7 +309,7 @@ internal class DraftDownloader(
     private suspend fun skipForPendingLocalChange(
         remoteDraft: SyncedDraft,
         existingDraft: EditorDraft?,
-        page: DraftPage,
+        page: DraftDownloadPage,
         tally: BatchTally,
     ) {
         tally.conflictsResolved++
@@ -472,7 +329,7 @@ internal class DraftDownloader(
     private suspend fun saveRemoteDraft(
         remoteDraft: SyncedDraft,
         existingDraft: EditorDraft?,
-        page: DraftPage,
+        page: DraftDownloadPage,
         downloadScope: DownloadScope?,
         tally: BatchTally,
     ) {
@@ -491,7 +348,7 @@ internal class DraftDownloader(
 
     private suspend fun applyDeletion(
         draftId: Uuid,
-        page: DraftPage,
+        page: DraftDownloadPage,
         downloadScope: DownloadScope?,
         tally: BatchTally,
     ) {
@@ -532,67 +389,6 @@ internal class DraftDownloader(
         }
     }
 
-    private suspend fun settleApplied(
-        page: DraftPage,
-        downloadScope: DownloadScope?,
-    ) {
-        for ((id, version) in page.appliedIds) {
-            downloadEngine.markRecovered(EntityType.DRAFT, Uuid.parse(id))
-            if (downloadScope != null) downloadInbox?.applied("DRAFT", id, version, downloadScope)
-            val row = page.stagedRows[id]
-            val attemptId = page.applyAttempts[id]
-            if (row != null && attemptId != null) {
-                recordApply(page, row, attemptId, DiagnosticOutcome.SUCCEEDED)
-            }
-        }
-    }
-
-    private suspend fun settleSkipped(
-        page: DraftPage,
-        downloadScope: DownloadScope?,
-    ) {
-        for ((id, version) in page.skippedIds) {
-            if (downloadScope != null) downloadInbox?.skipped("DRAFT", id, version, downloadScope)
-            val row = page.stagedRows[id]
-            val attemptId = page.applyAttempts[id]
-            if (row != null && attemptId != null) {
-                recordApply(page, row, attemptId, DiagnosticOutcome.CONFLICT, DiagnosticReason.CONFLICT, DiagnosticAction.REVIEW_CONFLICT)
-            }
-        }
-    }
-
-    /** Schedules a retry for records that failed to apply, could not be decrypted, or used an unknown format. */
-    private suspend fun settleFailed(
-        page: DraftPage,
-        downloadScope: DownloadScope?,
-    ) {
-        for ((id, version) in page.failedIds) {
-            if (downloadScope != null) {
-                downloadInbox?.failed(
-                    "DRAFT",
-                    id,
-                    DiagnosticReason.LOCAL_STORAGE.name,
-                    version,
-                    downloadScope,
-                    attemptId = page.applyAttempts[id],
-                    source = page.capturedSource,
-                )
-            }
-        }
-        for (id in page.result.unreadable) {
-            val version = page.result.unreadableVersions[id] ?: continue
-            if (downloadScope != null) {
-                downloadInbox?.failed("DRAFT", id.toString(), DiagnosticReason.KEY_RECOVERY_REQUIRED.name, version, downloadScope)
-            }
-        }
-        for (id in page.result.incompatible) {
-            val version = page.stagedRows[id.toString()]?.version ?: continue
-            if (downloadScope != null) {
-                downloadInbox?.failed("DRAFT", id.toString(), DiagnosticReason.CORRUPT_PAYLOAD.name, version, downloadScope)
-            }
-        }
-    }
-
     private suspend fun recordRemoteFailures(
         failures: List<RemoteRecordFailure>,
         downloadScope: DownloadScope?,
@@ -624,27 +420,6 @@ internal class DraftDownloader(
 
     private fun checkScope(downloadScope: DownloadScope?) {
         if (isScopeChanged(downloadScope)) error("Download scope changed")
-    }
-
-    private fun recordApply(
-        page: DraftPage,
-        row: DownloadInboxEntity,
-        attemptId: String,
-        outcome: DiagnosticOutcome,
-        reason: DiagnosticReason = DiagnosticReason.NONE,
-        action: DiagnosticAction = DiagnosticAction.NONE,
-    ) {
-        downloadInbox?.recordDiagnostic(
-            SyncDiagnosticEvent(
-                DiagnosticPhase.APPLY,
-                outcome,
-                reason = reason,
-                action = action,
-                operationId = row.operationId,
-                attemptId = attemptId,
-            ),
-            page.capturedSource,
-        )
     }
 
     private fun SyncedDraft.toEditorDraft(): EditorDraft =

@@ -1,0 +1,4 @@
+<resources>
+    <string name="handwriting_unreadable">Handwriting unavailable. Original ink is preserved.</string>
+    <string name="original_handwriting">Original handwriting</string>
+</resources>

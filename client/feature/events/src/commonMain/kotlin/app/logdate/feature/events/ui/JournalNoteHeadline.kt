@@ -4,6 +4,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.text.UiText
 import app.logdate.client.text.toUiText
 import logdate.client.feature.events.generated.resources.Res
+import logdate.client.feature.events.generated.resources.event_note_headline_handwriting
 import logdate.client.feature.events.generated.resources.event_note_headline_photo
 import logdate.client.feature.events.generated.resources.event_note_headline_text
 import logdate.client.feature.events.generated.resources.event_note_headline_video
@@ -17,6 +18,7 @@ import logdate.client.feature.events.generated.resources.event_note_headline_voi
  */
 internal fun JournalNote.headline(): UiText =
     when (this) {
+        is JournalNote.Handwriting -> Res.string.event_note_headline_handwriting.toUiText()
         is JournalNote.Text -> {
             val firstLine =
                 content

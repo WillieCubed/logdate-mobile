@@ -30,6 +30,7 @@ import app.logdate.feature.editor.audio.AudioLabelResolver
 import app.logdate.feature.editor.audio.formatAudioLabel
 import app.logdate.ui.common.MarkdownPreviewText
 import app.logdate.ui.common.MarkdownText
+import app.logdate.ui.handwriting.HandwritingPreview
 import app.logdate.util.toReadableDateShort
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
@@ -111,6 +112,13 @@ private fun JournalNoteItem(
                 modifier = Modifier.padding(16.dp),
             ) {
                 when (note) {
+                    is JournalNote.Handwriting ->
+                        HandwritingPreview(
+                            note.document,
+                            Modifier.fillMaxWidth().height(240.dp),
+                            unreadable =
+                                note.unreadableContent != null,
+                        )
                     is JournalNote.Text -> {
                         AnimatedVisibility(
                             visible = !expanded,

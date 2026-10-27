@@ -33,6 +33,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -94,6 +95,8 @@ fun ImmersiveEditorLayout(
     focusState: EditorFocus? = null,
     hasJournalSelection: Boolean = true,
     entryLocked: Boolean = false,
+    animateContextControls: Boolean = true,
+    drawingBackdrop: Color = Color.White,
 ) {
     val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val (windowOrigin, trackWindowOrigin) = rememberWindowOrigin()
@@ -123,6 +126,7 @@ fun ImmersiveEditorLayout(
         val hasSeparatingHinge = foldableLayoutInfo.hinge?.isSeparating == true
         val maxEditorWidth =
             when {
+                focus is EditorFocus.Drawing -> containerWidth
                 hasSeparatingHinge -> containerWidth
                 else -> 1200.dp
             }
@@ -134,19 +138,25 @@ fun ImmersiveEditorLayout(
         val horizontalPadding = lerp(0.dp, Spacing.sm, immersiveExitProgress)
         val bottomPadding = lerp(0.dp, Spacing.lg, immersiveExitProgress)
         val bottomInsets = if (isImmersiveBlockActive) WindowInsets.ime else WindowInsets.ime.union(WindowInsets.navigationBars)
-        BlendedCaptionBar(background = MaterialTheme.colorScheme.surfaceDim)
+        val backdrop = if (focus is EditorFocus.Drawing) drawingBackdrop else MaterialTheme.colorScheme.surfaceDim
+        BlendedCaptionBar(background = backdrop)
         Box(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceDim),
+                    .background(backdrop),
         ) {
             BoxWithConstraints(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
-                        .padding(top = topOffset)
+                        .then(
+                            if (focus is EditorFocus.Drawing) {
+                                Modifier
+                            } else {
+                                Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
+                            },
+                        ).padding(top = topOffset)
                         .windowInsetsPadding(bottomInsets),
                 contentAlignment = Alignment.Center,
             ) {
@@ -182,11 +192,7 @@ fun ImmersiveEditorLayout(
                         }
 
                         if (!keyboardVisible) {
-                            AnimatedVisibility(
-                                visible = contextControlsVisible,
-                                enter = fadeIn(tween(200)) + expandVertically(tween(300, easing = FastOutSlowInEasing)),
-                                exit = fadeOut(tween(150)) + shrinkVertically(tween(300, easing = FastOutSlowInEasing)),
-                            ) {
+                            EditorContextVisibility(contextControlsVisible, animateContextControls) {
                                 Box(
                                     modifier =
                                         Modifier
@@ -242,5 +248,23 @@ fun ImmersiveEditorLayout(
                 topBarContent()
             }
         }
+    }
+}
+
+@Suppress("ktlint:standard:function-naming")
+@Composable
+private fun EditorContextVisibility(
+    visible: Boolean,
+    animate: Boolean,
+    content: @Composable () -> Unit,
+) {
+    if (animate) {
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(tween(200)) + expandVertically(tween(300, easing = FastOutSlowInEasing)),
+            exit = fadeOut(tween(150)) + shrinkVertically(tween(300, easing = FastOutSlowInEasing)),
+        ) { content() }
+    } else if (visible) {
+        content()
     }
 }

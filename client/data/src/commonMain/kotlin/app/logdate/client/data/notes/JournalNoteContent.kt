@@ -12,7 +12,7 @@ internal fun JournalNote.mediaRefOrNull(): String? =
         is JournalNote.Image -> mediaRef
         is JournalNote.Video -> mediaRef
         is JournalNote.Audio -> mediaRef
-        is JournalNote.Text -> null
+        is JournalNote.Text, is JournalNote.Handwriting -> null
     }
 
 internal fun JournalNote.withCaption(captionMap: Map<Uuid, String>): JournalNote =
@@ -33,6 +33,10 @@ internal fun JournalNote.hasSamePersistedContent(other: JournalNote): Boolean {
     }
     return when (this) {
         is JournalNote.Text -> other is JournalNote.Text && content == other.content
+        is JournalNote.Handwriting ->
+            other is JournalNote.Handwriting &&
+                document == other.document &&
+                unreadableContent == other.unreadableContent
         is JournalNote.Image ->
             other is JournalNote.Image && mediaRef == other.mediaRef && caption == other.caption && presentation == other.presentation
         is JournalNote.Audio ->

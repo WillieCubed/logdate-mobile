@@ -59,6 +59,7 @@ object LenientCaptureActivitySerializer : KSerializer<CaptureActivity?> {
 fun JournalNote.withCapturedDuring(capturedDuring: CaptureActivity?): JournalNote =
     when (this) {
         is JournalNote.Text -> copy(capturedDuring = capturedDuring)
+        is JournalNote.Handwriting -> copy(capturedDuring = capturedDuring)
         is JournalNote.Image -> copy(capturedDuring = capturedDuring)
         is JournalNote.Video -> copy(capturedDuring = capturedDuring)
         is JournalNote.Audio -> copy(capturedDuring = capturedDuring)

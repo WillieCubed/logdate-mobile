@@ -13,12 +13,12 @@ internal fun JournalNote.withRecoveredOriginal(reference: String): JournalNote =
         is JournalNote.Audio -> copy(mediaRef = reference)
         is JournalNote.Image -> copy(mediaRef = reference)
         is JournalNote.Video -> copy(mediaRef = reference)
-        is JournalNote.Text -> this
+        is JournalNote.Text, is JournalNote.Handwriting -> this
     }
 
 internal fun SerializableEntryBlock.archiveMediaReference(role: RecoveryMediaRole): String? =
     when (this) {
-        is SerializableTextBlock -> null
+        is app.logdate.shared.model.SerializableHandwritingBlock, is SerializableTextBlock -> null
         is SerializableImageBlock -> uri.takeIf { role == RecoveryMediaRole.ORIGINAL }
         is SerializableCameraBlock -> uri.takeIf { role == RecoveryMediaRole.ORIGINAL }
         is SerializableAudioBlock -> uri.takeIf { role == RecoveryMediaRole.ORIGINAL }
@@ -30,7 +30,7 @@ internal fun SerializableEntryBlock.withRecoveredAsset(
     reference: String,
 ): SerializableEntryBlock =
     when (this) {
-        is SerializableTextBlock -> this
+        is app.logdate.shared.model.SerializableHandwritingBlock, is SerializableTextBlock -> this
         is SerializableImageBlock -> copy(uri = reference)
         is SerializableCameraBlock -> copy(uri = reference)
         is SerializableAudioBlock -> copy(uri = reference)
@@ -39,7 +39,7 @@ internal fun SerializableEntryBlock.withRecoveredAsset(
 
 internal fun SerializableEntryBlock.archiveMediaKind(): String? =
     when (this) {
-        is SerializableTextBlock -> null
+        is app.logdate.shared.model.SerializableHandwritingBlock, is SerializableTextBlock -> null
         is SerializableImageBlock -> "image"
         is SerializableCameraBlock -> "camera"
         is SerializableAudioBlock -> "audio"

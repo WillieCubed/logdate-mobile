@@ -24,7 +24,7 @@ fun interface CaptureUsageReporter {
 fun captureModesOf(notes: List<JournalNote>): Set<EditorLaunchMode> =
     notes.mapTo(mutableSetOf()) { note ->
         when (note) {
-            is JournalNote.Text -> EditorLaunchMode.Text
+            is JournalNote.Text, is JournalNote.Handwriting -> EditorLaunchMode.Text
             is JournalNote.Image -> EditorLaunchMode.Camera
             is JournalNote.Video -> EditorLaunchMode.Video
             is JournalNote.Audio -> EditorLaunchMode.Voice

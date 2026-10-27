@@ -2,6 +2,8 @@ package app.logdate.feature.editor.ui.editor
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.datastore.EntryStartMode
+import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.domain.editor.ObserveEditorDataUseCase
 import app.logdate.client.domain.editor.SaveEntryUseCase
 import app.logdate.client.media.audio.AudioDurationResolver
@@ -14,11 +16,14 @@ import app.logdate.feature.editor.ui.editor.delegate.PendingAudioRecoverer
 import app.logdate.feature.editor.ui.mapper.toDomainBlock
 import app.logdate.shared.model.location.VisitMemoryContext
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -30,8 +35,8 @@ import kotlin.uuid.Uuid
 /**
  * ViewModel for the note editor screen.
  *
- * This attempts to load the entry for the current date. If entries exist, it will add them to the
- * state for editing. If no entries exist, it will create a new entry.
+ * Owns the current entry and its draft. Today's saved notes remain separate, read-only context;
+ * they are never appended to the entry being written.
  */
 class EntryEditorViewModel(
     observeEditorData: ObserveEditorDataUseCase,
@@ -60,7 +65,36 @@ class EntryEditorViewModel(
     internal val pendingAudioRecoverer: PendingAudioRecoverer? = null,
     internal val captureUsage: CaptureUsageReporter = CaptureUsageReporter.None,
     internal val audioDurationResolver: AudioDurationResolver? = null,
+    internal val preferences: LogdatePreferencesDataSource? = null,
 ) : ViewModel() {
+    private val entryModeWriteFailure = MutableStateFlow(false)
+    val defaultEntryModeWriteFailed: StateFlow<Boolean> = entryModeWriteFailure
+
+    val defaultEntryMode: StateFlow<EntryStartMode> =
+        (preferences?.observeEntryStartMode() ?: flowOf(EntryStartMode.TEXT))
+            .catch { error ->
+                Napier.e("Could not read default entry mode", error)
+                emit(EntryStartMode.TEXT)
+            }.stateIn(viewModelScope, SharingStarted.Eagerly, EntryStartMode.TEXT)
+
+    fun setDefaultEntryMode(mode: EntryStartMode) {
+        viewModelScope.launch {
+            entryModeWriteFailure.value = false
+            try {
+                checkNotNull(preferences).setEntryStartMode(mode)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Napier.e("Could not save default entry mode", error)
+                entryModeWriteFailure.value = true
+            }
+        }
+    }
+
+    internal var preferredEntryInitialized = false
+
+    fun initializePreferredEntryMode(mode: EntryStartMode? = null) = initializePreferredEntryModeImpl(mode)
+
     /**
      * Per-block finalizers bound by each block's own `AudioBlockEditor` composable, keyed by
      * block id.
@@ -184,6 +218,7 @@ class EntryEditorViewModel(
                 availableJournals = data.journals,
                 selectedJournalIds = selectedJournalIds,
                 availableDrafts = data.allDrafts,
+                todayNotes = data.todayNotes.filter { it.uid != currentState.entryEditBase?.targetId },
                 isLoadingDrafts = false,
                 isLoading = false,
             )
@@ -261,7 +296,7 @@ class EntryEditorViewModel(
 
     fun dismissExpandedBlockOrClearSingleEmpty(): Boolean = dismissExpandedBlockOrClearSingleEmptyImpl()
 
-    fun resumeFirstEntryDraft() = resumeFirstEntryDraftImpl()
+    fun resumeFirstEntryDraft(openPreferredIfEmpty: Boolean = false) = resumeFirstEntryDraftImpl(openPreferredIfEmpty)
 
     fun loadDraft(draftId: Uuid) = loadDraftImpl(draftId)
 

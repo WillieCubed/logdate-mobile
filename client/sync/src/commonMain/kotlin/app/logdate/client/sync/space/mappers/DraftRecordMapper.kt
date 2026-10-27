@@ -20,15 +20,18 @@ import app.logdate.lexicon.app.logdate.journal.Draft
 import app.logdate.lexicon.app.logdate.journal.DraftAudioBlock
 import app.logdate.lexicon.app.logdate.journal.DraftBlocksItem
 import app.logdate.lexicon.app.logdate.journal.DraftCameraBlock
+import app.logdate.lexicon.app.logdate.journal.DraftHandwritingBlock
 import app.logdate.lexicon.app.logdate.journal.DraftImageBlock
 import app.logdate.lexicon.app.logdate.journal.DraftTextBlock
 import app.logdate.lexicon.app.logdate.journal.DraftVideoBlock
 import app.logdate.lexicon.community.lexicon.location.Geo
 import app.logdate.shared.model.EditorDraft
+import app.logdate.shared.model.HandwritingDocument
 import app.logdate.shared.model.PhotoPresentation
 import app.logdate.shared.model.SerializableAudioBlock
 import app.logdate.shared.model.SerializableCameraBlock
 import app.logdate.shared.model.SerializableEntryBlock
+import app.logdate.shared.model.SerializableHandwritingBlock
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.SerializableVideoBlock
@@ -119,7 +122,7 @@ class DraftRecordMapper(
         return value.draft.blocks
             .flatMap { block ->
                 when (block) {
-                    is SerializableTextBlock -> emptyList()
+                    is SerializableHandwritingBlock, is SerializableTextBlock -> emptyList()
                     is SerializableImageBlock -> listOf(block.uri)
                     is SerializableVideoBlock -> listOf(block.uri, block.thumbnailUri)
                     is SerializableAudioBlock -> listOf(block.uri)
@@ -147,6 +150,10 @@ class DraftRecordMapper(
         val createdAt = block.timestamp.toDatetime("$owner timestamp")
         val location = locationOf(block, owner)
         return when (block) {
+            is SerializableHandwritingBlock ->
+                DraftBlocksItem.HandwritingBlock(
+                    DraftHandwritingBlock(id = id, createdAt = createdAt, location = location, document = block.document.encode()),
+                )
             is SerializableTextBlock ->
                 DraftBlocksItem.TextBlock(DraftTextBlock(id = id, createdAt = createdAt, location = location, text = block.content))
             is SerializableImageBlock ->
@@ -196,6 +203,7 @@ class DraftRecordMapper(
         draftOwner: String,
     ): SerializableEntryBlock =
         when (item) {
+            is DraftBlocksItem.HandwritingBlock -> handwritingBlock(item.value, draftOwner)
             is DraftBlocksItem.TextBlock -> textBlock(item.value, draftOwner)
             is DraftBlocksItem.ImageBlock -> imageBlock(item.value, draftOwner)
             is DraftBlocksItem.VideoBlock -> videoBlock(item.value, draftOwner)
@@ -204,6 +212,20 @@ class DraftRecordMapper(
             is DraftBlocksItem.Unknown ->
                 throw SpaceRecordMappingException("$draftOwner: this version of LogDate can't show a ${item.type} block")
         }
+
+    private fun handwritingBlock(
+        block: DraftHandwritingBlock,
+        draftOwner: String,
+    ): SerializableHandwritingBlock {
+        val at = capture(block.id, block.createdAt, block.location, draftOwner)
+        val document =
+            try {
+                HandwritingDocument.decode(block.document)
+            } catch (failure: IllegalArgumentException) {
+                throw SpaceRecordMappingException("$draftOwner: unreadable handwriting document", failure)
+            }
+        return SerializableHandwritingBlock(at.id, at.timestamp, at.latitude, at.longitude, at.altitude, document)
+    }
 
     private fun textBlock(
         block: DraftTextBlock,

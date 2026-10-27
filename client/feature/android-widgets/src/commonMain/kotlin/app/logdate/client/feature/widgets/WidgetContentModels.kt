@@ -20,6 +20,7 @@ data class ChosenEntryContent(
 fun JournalNote.toChosenEntryContent(transcript: String? = null): ChosenEntryContent {
     val (summary, imageUri, kind) =
         when (this) {
+            is JournalNote.Handwriting -> Triple("Handwriting", null, WidgetEntryKind.TEXT)
             is JournalNote.Text -> Triple(content, null, WidgetEntryKind.TEXT)
             is JournalNote.Image -> Triple(caption, mediaRef, WidgetEntryKind.IMAGE)
             is JournalNote.Video -> Triple(caption, null, WidgetEntryKind.VIDEO)

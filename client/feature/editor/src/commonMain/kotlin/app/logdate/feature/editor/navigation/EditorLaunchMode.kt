@@ -11,6 +11,9 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 enum class EditorLaunchMode {
+    /** A normal new entry, using the person's saved capture preference. */
+    Default,
+
     /** An empty text entry with the keyboard up. */
     Text,
 

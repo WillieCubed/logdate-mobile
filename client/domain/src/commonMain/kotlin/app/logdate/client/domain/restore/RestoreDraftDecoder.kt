@@ -71,7 +71,7 @@ internal class RestoreDraftDecoder(
         existing: SerializableEntryBlock?,
     ): SerializableEntryBlock =
         when (block) {
-            is SerializableTextBlock -> block
+            is app.logdate.shared.model.SerializableHandwritingBlock, is SerializableTextBlock -> block
             is SerializableImageBlock ->
                 block.copy(
                     uri = resolve(draftId, block.id, block.uri, fallback = (existing as? SerializableImageBlock)?.uri, kind = "image"),
