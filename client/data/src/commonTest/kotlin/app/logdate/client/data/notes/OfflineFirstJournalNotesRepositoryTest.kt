@@ -9,12 +9,14 @@ import app.logdate.client.data.fakes.FakeSyncManager
 import app.logdate.client.data.fakes.FakeSyncMetadataService
 import app.logdate.client.data.fakes.FakeTextNoteDao
 import app.logdate.client.data.fakes.FakeVideoNoteDao
+import app.logdate.client.data.fakes.RecordingMediaClaimFence
 import app.logdate.client.database.dao.ImageNoteDao
 import app.logdate.client.database.entities.JournalEntity
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.media.storage.MediaClaimFence
 import app.logdate.client.media.storage.MediaReclamationJournal
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.media.storage.UnavailableMediaReferences
@@ -72,6 +74,27 @@ class OfflineFirstJournalNotesRepositoryTest {
     private lateinit var repository: OfflineFirstJournalNotesRepository
     private var draftSnapshots = emptyList<EntryDraft>()
     private var coverUris = emptyList<String?>()
+
+    @Test
+    fun `media note creation and removal run inside the media claim fence`() =
+        runTest {
+            val fence = RecordingMediaClaimFence()
+            val local = createRepository(mediaClaimFence = fence)
+            val note = createTestImageNote()
+            mediaManager.mediaByUri[note.mediaRef] =
+                MediaObject.Image(
+                    uri = note.mediaRef,
+                    size = 128,
+                    name = "note.jpg",
+                    timestamp = note.creationTimestamp,
+                )
+
+            local.create(note)
+            assertEquals(1, fence.claims)
+
+            local.remove(note)
+            assertEquals(2, fence.claims)
+        }
 
     @BeforeTest
     fun setup() {
@@ -955,6 +978,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         transactionManager: SyncTransactionManager = PassthroughTransactionManager,
         mediaReferences: StoredMediaReferences = StoredMediaReferences.Unchanged,
         mediaReclamation: MediaReclamationJournal = MediaReclamationJournal.None,
+        mediaClaimFence: MediaClaimFence = MediaClaimFence.Disabled,
     ) = OfflineFirstJournalNotesRepository(
         textNoteDao = textNoteDao,
         imageNoteDao = imageNoteDao,
@@ -973,6 +997,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         journalCoverUris = { coverUris },
         mediaReferences = mediaReferences,
         mediaReclamation = mediaReclamation,
+        mediaClaimFence = mediaClaimFence,
     )
 
     private class FakeNotePlaceResolver(
