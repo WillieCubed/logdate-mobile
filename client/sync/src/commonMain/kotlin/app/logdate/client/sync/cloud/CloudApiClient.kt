@@ -269,6 +269,10 @@ interface CloudApiClient {
     ): Result<Unit>
 
     // Media Operations
+    suspend fun getMediaUploadReceipt(
+        accessToken: String,
+        uploadIntentId: String,
+    ): Result<MediaUploadResponse?> = Result.failure(UnsupportedOperationException("Media upload receipts are not supported"))
 
     /**
      * Uploads a media file to the cloud, streaming its body from [MediaUpload.openBody].

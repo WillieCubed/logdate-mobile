@@ -227,7 +227,7 @@
     <string name="recovery_phrase_entry_word_number">Word %1$d</string>
     <string name="backing_up_progress">Backing up %1$d of %2$d</string>
     <!-- First sync -->
-    <string name="first_sync_running">Backing up your journal…</string>
+    <string name="first_sync_running">Backing up your memories…</string>
     <string name="first_sync_progress">Backing up %1$d of %2$d</string>
     <string name="first_sync_success">Everything is backed up</string>
     <string name="first_sync_partial">Signed in. Some entries are still going up.</string>

@@ -27,6 +27,7 @@ internal suspend fun LogDateCloudApiClient.requestUploadMedia(
         val response =
             transport.post("$baseUrl/media") {
                 headers.append("Authorization", "Bearer $accessToken")
+                media.uploadIntentId?.let { headers.append("X-LogDate-Upload-Intent", it) }
                 setBody(
                     MultiPartFormDataContent(
                         formData {
@@ -316,4 +317,24 @@ internal suspend fun LogDateCloudApiClient.requestDeleteBackup(
         if (e is CancellationException) throw e
         Napier.e("Failed to delete backup")
         Result.failure(CloudApiException("NETWORK_ERROR", "Failed to delete backup"))
+    }
+
+internal suspend fun LogDateCloudApiClient.requestMediaUploadReceipt(
+    accessToken: String,
+    intent: String,
+): Result<MediaUploadResponse?> =
+    try {
+        val response =
+            transport.get("${getBaseUrl(accessToken)}/media/receipts/$intent") {
+                headers.append("Authorization", "Bearer $accessToken")
+                headers.append(HttpHeaders.CacheControl, "no-store")
+            }
+        when (response.status) {
+            HttpStatusCode.OK -> Result.success(response.body<app.logdate.shared.model.sync.MediaUploadReceiptResponse>().receipt)
+            HttpStatusCode.NotFound -> Result.failure(UnsupportedOperationException("Server does not support upload receipts"))
+            else -> handleApiError(response)
+        }
+    } catch (cause: Exception) {
+        if (cause is CancellationException) throw cause
+        Result.failure(cause)
     }

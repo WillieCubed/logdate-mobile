@@ -17,19 +17,15 @@ import kotlin.time.Instant
  * exceptions mapped through [SyncStatusPublisher.handleSyncException], and [SyncState.Idle]
  * always restored.
  *
- * @param beforeAccessToken Runs once the guard has passed and [syncStateFlow] is
- *   [SyncState.Syncing], but before the access token is fetched -- [uploadPendingChanges]
- *   needs to capture the pending count as the run's total *before* a possible auth failure,
- *   since once the queue starts draining, the original count is gone.
  */
 internal suspend fun DefaultSyncManager.runFullSyncPhase(
     operationName: String,
     exceptionLabel: String,
-    beforeAccessToken: suspend () -> Unit = {},
     body: suspend (accessToken: String) -> SyncResult,
 ): SyncResult =
     syncMutex.withLock {
         if (!tokenRefresher.isFullSyncScopeCurrent()) return SyncResult(success = false, hasMorePending = true)
+        statusPublisher.beginRun(null)
         if (!isEnabled) {
             return SyncResult(
                 success = false,
@@ -51,7 +47,6 @@ internal suspend fun DefaultSyncManager.runFullSyncPhase(
         syncStateFlow.value = SyncState.Syncing
 
         try {
-            beforeAccessToken()
             val accessToken = tokenRefresher.getAccessToken() ?: return authError()
             identityProvisioner.provision(accessToken)
             if (identityRecoveryNeededStore.isNeeded() || identityKeyManager?.hasIdentityKey() == false) {
@@ -85,12 +80,8 @@ internal suspend fun DefaultSyncManager.runPendingUploads(): SyncResult =
     runFullSyncPhase(
         operationName = "Upload",
         exceptionLabel = "Upload failed",
-        beforeAccessToken = {
-            // Captured here because this is the only moment the denominator exists: once the
-            // run starts draining the queue, the count that is left is all anyone can see.
-            statusPublisher.beginRun(runCatching { syncMetadataService.getPendingCount() }.getOrNull()?.takeIf { it > 0 })
-        },
     ) { accessToken ->
+        statusPublisher.beginRun(pendingUploadsForRun())
         // Deliberately sequential. Every one of these writes into the same AT Protocol
         // repo, and a repo write is read-whole-tree, rebuild, write-head. Two of them in
         // flight at once each build a tree missing the other's record, and the later head
@@ -147,6 +138,24 @@ internal suspend fun DefaultSyncManager.runPendingUploads(): SyncResult =
             hasMorePending = historyResult.hasMorePending,
         )
     }
+
+/** Count only due operations this upload pass can handle; held legacy rows stay queued. */
+private suspend fun DefaultSyncManager.pendingUploadsForRun(): Int? {
+    val types =
+        buildList {
+            addAll(listOf(EntityType.JOURNAL, EntityType.NOTE, EntityType.JOURNAL_MERGE, EntityType.ASSOCIATION))
+            if (profile.syncsDrafts) add(EntityType.DRAFT)
+            if (momentUploader != null) add(EntityType.MOMENT)
+        }
+    var count = 0
+    for (type in types) {
+        for (pending in syncMetadataService.getPendingUploads(type)) {
+            if (pending.operation == app.logdate.client.sync.metadata.PendingOperation.UPDATE && !profile.uploadsUpdates) continue
+            if (retryCoordinator.shouldAttempt(type, pending)) count++
+        }
+    }
+    return count.takeIf { it > 0 }
+}
 
 /** What one download pass brought, kind by kind. */
 private data class RemoteDownloads(
