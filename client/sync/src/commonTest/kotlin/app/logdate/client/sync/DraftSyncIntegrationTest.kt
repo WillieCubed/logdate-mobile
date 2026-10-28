@@ -44,6 +44,60 @@ import kotlin.uuid.Uuid
 
 class DraftSyncIntegrationTest {
     @Test
+    fun `a matching committed rich draft settles a lost acknowledgement without replaying payload`() =
+        runTest {
+            val api = fakeCloudApiClient()
+            val drafts = FakeJournalRepository()
+            val metadata = fakeSyncMetadataService()
+            val draft = testDraft(content = "synthetic committed draft")
+            drafts.saveDraftFromSync(draft)
+            metadata.enqueuePending(draft.id.toString(), EntityType.DRAFT, PendingOperation.CREATE)
+            val source = DefaultCloudDraftDataSource(api, cipher(), supportsRichDrafts = { true })
+
+            fun manager() =
+                testDefaultSyncManager(
+                    cloudDraftDataSource = source,
+                    journalRepository = drafts,
+                    syncMetadataService = metadata,
+                    supportsRichDrafts = { true },
+                    syncScope = backgroundScope,
+                )
+            api.uploadDraftResponse = Result.failure(IllegalStateException("response lost after server commit"))
+            assertFalse(manager().syncDrafts().success)
+            val sent = api.uploadDraftCalls.single().second
+            api.getDraftChangesResponse =
+                Result.success(
+                    DraftChangesResponse(
+                        drafts =
+                            listOf(
+                                DraftChange(
+                                    id = sent.id,
+                                    content = sent.content,
+                                    blockTypes = sent.blockTypes,
+                                    journalIds = sent.journalIds,
+                                    createdAt = sent.createdAt,
+                                    lastUpdated = sent.lastUpdated,
+                                    deviceId = sent.deviceId,
+                                    serverVersion = 1,
+                                    encryptedBlocksVersion = sent.encryptedBlocksVersion,
+                                    encryptedBlocks = sent.encryptedBlocks,
+                                ),
+                            ),
+                    ),
+                )
+            api.uploadDraftResponse = null
+            val retry = manager()
+            retry.releaseUploadBackoff()
+            assertTrue(retry.syncDrafts().success)
+            assertTrue(
+                metadata.getPendingUploads(EntityType.DRAFT).isEmpty(),
+                "Verified server acknowledgement must durably settle the captured operation",
+            )
+            assertEquals(1, api.uploadDraftCalls.size, "The already committed body must not be sent twice")
+            assertEquals(draft, drafts.getDraft(draft.id))
+        }
+
+    @Test
     fun `an acknowledged rich draft with submillisecond time is not uploaded again after download or restart`() =
         runTest {
             val api = fakeCloudApiClient()

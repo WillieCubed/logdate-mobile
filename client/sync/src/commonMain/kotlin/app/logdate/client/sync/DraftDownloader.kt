@@ -272,7 +272,17 @@ internal class DraftDownloader(
         try {
             checkScope(downloadScope)
             val existingDraft = journalRepository.getDraft(remoteDraft.id)
-            if (hasPendingLocal(remoteDraft.id)) {
+            val pending = syncMetadataService.getPendingUploads(EntityType.DRAFT).firstOrNull { it.entityId == remoteDraft.id.toString() }
+            if (pending != null) {
+                // A lost response is settled only by the complete authenticated plaintext, never by ID or time alone.
+                if (pending.operation != PendingOperation.DELETE &&
+                    remoteDraft.richDraft != null &&
+                    existingDraft == remoteDraft.richDraft &&
+                    syncMetadataService.settleIfCurrent(EntityType.DRAFT, pending, remoteDraft.lastUpdated, remoteDraft.serverVersion)
+                ) {
+                    page.appliedIds += remoteDraft.id.toString() to remoteDraft.serverVersion
+                    return
+                }
                 skipForPendingLocalChange(remoteDraft, existingDraft, page, tally)
                 return
             }
