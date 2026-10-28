@@ -135,6 +135,7 @@ fun Route.spaceXrpcRoutes(
         listRepoOps(records, gate)
         uploadBlob(blobs, gate, entitlementEnforcer, maxBlobBytes)
         getBlob(blobs, gate)
+        getBlobUploadReceipt(blobs, gate)
     }
 }
 

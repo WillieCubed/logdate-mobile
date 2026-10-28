@@ -25,6 +25,8 @@ import app.logdate.server.space.requireFreshCursor
 import app.logdate.server.space.requireRoom
 import app.logdate.server.space.requireSealedRecord
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.ResultRow
@@ -208,13 +210,53 @@ class PostgreSQLSpaceStore(
         reservation: SpaceUploadReservation?,
     ): SpaceBlob =
         withContext(Dispatchers.IO) {
-            repeat(PUT_BLOB_ATTEMPTS) {
-                transaction(transactionIsolation = Connection.TRANSACTION_READ_COMMITTED) {
-                    tryPutBlob(accountId, space, blob, quota, reservation)
-                }?.let { return@withContext it }
+            val intent = blob.uploadIntent
+            if (intent == null) return@withContext putBlobTransactions(accountId, space, blob, quota, reservation)
+            val identity = UUID.nameUUIDFromBytes("space-upload:$accountId:$space:$intent".encodeToByteArray())
+            val key = identity.mostSignificantBits xor identity.leastSignificantBits
+            // Bounded stripes cover in-process adapters; PostgreSQL also fences across instances.
+            receiptLocks[(key and Long.MAX_VALUE).rem(receiptLocks.size).toInt()].withLock {
+                putBlobTransactions(accountId, space, blob, quota, reservation, key)
             }
-            error("Blob ${blob.cid} was purged during every attempt to store it")
         }
+
+    private fun putBlobTransactions(
+        accountId: UUID,
+        space: String,
+        blob: SpaceBlob,
+        quota: SpaceQuota?,
+        reservation: SpaceUploadReservation?,
+        receiptLock: Long? = null,
+    ): SpaceBlob {
+        repeat(PUT_BLOB_ATTEMPTS) {
+            transaction(transactionIsolation = Connection.TRANSACTION_READ_COMMITTED) {
+                if (receiptLock != null && db.vendor == "postgresql") {
+                    // Derived signed integer only; no request text is interpolated into SQL.
+                    exec("SELECT pg_advisory_xact_lock($receiptLock)") { it.next() }
+                }
+                val previous = blob.uploadIntent?.let { receiptRow(space, it) }
+                if (previous != null) {
+                    reservation?.let { held -> SpaceUploadReservationsTable.deleteWhere { id eq held.id } }
+                    previous
+                } else {
+                    tryPutBlob(accountId, space, blob, quota, reservation)?.also { stored ->
+                        blob.uploadIntent?.let { intent ->
+                            SpaceBlobUploadReceiptsTable.insert {
+                                it[spaceUri] = space
+                                it[uploadIntent] = intent
+                                it[cid] = stored.cid
+                            }
+                        }
+                    }
+                }
+            }?.let { return it }
+        }
+        error("Blob ${blob.cid} was purged during every attempt to store it")
+    }
+
+    private companion object {
+        val receiptLocks = Array(64) { Mutex() }
+    }
 
     override suspend fun reserveUpload(
         accountId: UUID,
@@ -319,6 +361,39 @@ class PostgreSQLSpaceStore(
                     }
             }
         }
+
+    override suspend fun getBlobUploadReceipt(
+        space: String,
+        intent: String,
+    ): SpaceBlob? =
+        withContext(Dispatchers.IO) {
+            transaction { receiptRow(space, intent) }
+        }
+
+    private fun receiptRow(
+        space: String,
+        intent: String,
+    ): SpaceBlob? {
+        val cid =
+            SpaceBlobUploadReceiptsTable
+                .select(SpaceBlobUploadReceiptsTable.cid)
+                .where { (SpaceBlobUploadReceiptsTable.spaceUri eq space) and (SpaceBlobUploadReceiptsTable.uploadIntent eq intent) }
+                .singleOrNull()
+                ?.get(SpaceBlobUploadReceiptsTable.cid) ?: return null
+        return SpaceBlobsTable
+            .selectAll()
+            .where { (SpaceBlobsTable.spaceUri eq space) and (SpaceBlobsTable.cid eq cid) }
+            .singleOrNull()
+            ?.let {
+                SpaceBlob(
+                    it[SpaceBlobsTable.cid],
+                    it[SpaceBlobsTable.mimeType],
+                    it[SpaceBlobsTable.sizeBytes],
+                    it[SpaceBlobsTable.storagePath],
+                    intent,
+                )
+            }
+    }
 
     override suspend fun purge(
         tombstonesBefore: Instant,

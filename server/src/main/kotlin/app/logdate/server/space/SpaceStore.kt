@@ -142,6 +142,7 @@ data class SpaceBlob(
     val mimeType: String,
     val size: Long,
     val storagePath: String,
+    val uploadIntent: String? = null,
 )
 
 /**
@@ -245,6 +246,12 @@ interface SpaceStore {
     suspend fun getBlob(
         space: String,
         cid: String,
+    ): SpaceBlob?
+
+    /** Receipt for an opaque upload identity in exactly this space; no payload is read. */
+    suspend fun getBlobUploadReceipt(
+        space: String,
+        intent: String,
     ): SpaceBlob?
 
     /**
@@ -402,6 +409,7 @@ class InMemorySpaceStore(
     private val records = mutableMapOf<Triple<String, String, String>, Row>()
     private val recordBlobs = mutableMapOf<Triple<String, String, String>, Set<String>>()
     private val blobs = mutableMapOf<Pair<String, String>, BlobRow>()
+    private val uploadReceipts = mutableMapOf<Pair<String, String>, String>()
     private val stored = mutableMapOf<UUID, Long>()
     private val reservations = mutableMapOf<UUID, Held>()
 
@@ -488,6 +496,14 @@ class InMemorySpaceStore(
         reservation: SpaceUploadReservation?,
     ): SpaceBlob =
         mutex.withLock {
+            blob.uploadIntent?.let { intent ->
+                uploadReceipts[space to intent]?.let { cid ->
+                    blobs[space to cid]?.let { row ->
+                        reservation?.let { reservations.remove(it.id) }
+                        return@withLock row.blob.copy(uploadIntent = intent)
+                    }
+                }
+            }
             val existing = blobs[space to blob.cid]
             if (existing == null) {
                 requireRoom(quota, held(accountId, except = reservation?.id), blob.size)
@@ -496,6 +512,7 @@ class InMemorySpaceStore(
             reservation?.let { reservations.remove(it.id) }
             val stored = blob.copy(storagePath = existing?.blob?.storagePath ?: blob.storagePath)
             blobs[space to blob.cid] = BlobRow(existing?.accountId ?: accountId, stored, Clock.System.now())
+            blob.uploadIntent?.let { uploadReceipts[space to it] = stored.cid }
             stored
         }
 
@@ -521,6 +538,14 @@ class InMemorySpaceStore(
         space: String,
         cid: String,
     ): SpaceBlob? = mutex.withLock { blobs[space to cid]?.blob }
+
+    override suspend fun getBlobUploadReceipt(
+        space: String,
+        intent: String,
+    ): SpaceBlob? =
+        mutex.withLock {
+            uploadReceipts[space to intent]?.let { cid -> blobs[space to cid]?.blob?.copy(uploadIntent = intent) }
+        }
 
     override suspend fun purge(
         tombstonesBefore: Instant,
@@ -553,6 +578,7 @@ class InMemorySpaceStore(
                     return@withLock
                 }
                 blobs.remove(key)
+                uploadReceipts.entries.removeAll { it.key.first == key.first && it.value == key.second }
                 addStored(row.accountId, -row.blob.size)
                 deleted++
             }

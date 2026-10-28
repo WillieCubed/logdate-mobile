@@ -367,6 +367,33 @@ internal object XrpcSpaceDocs {
         }
     }
 
+    val getBlobUploadReceipt: RouteConfig.() -> Unit = {
+        bearerOperation(
+            "getSpaceBlobUploadReceipt",
+            ApiTags.XRPC,
+            "Check an encrypted file upload",
+            "Looks up an opaque upload identity in the owner's own space without downloading its payload. " +
+                "Returns supported=true and an optional committed CID and size; never cached.",
+        )
+        request {
+            spaceParameter()
+            queryParameter<String>("intent") {
+                required = true
+                description = "Canonical random UUID saved before uploading."
+            }
+        }
+        response {
+            ok(
+                "Committed blob metadata, or a null receipt when the identity has not committed.",
+                app.logdate.space.BlobUploadReceiptLookup(true),
+            )
+            pdsError(HttpStatusCode.BadRequest, invalidSpace, blobNotFound)
+            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired, deviceSessionRevoked)
+            pdsError(HttpStatusCode.TooManyRequests, rateLimited)
+            pdsError(HttpStatusCode.NotImplemented, notEnabled)
+        }
+    }
+
     val getBlob: RouteConfig.() -> Unit = {
         bearerOperation(
             "getSpaceBlob",

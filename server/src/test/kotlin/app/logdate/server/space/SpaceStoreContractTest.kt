@@ -3,6 +3,7 @@ package app.logdate.server.space
 import app.logdate.server.database.AccountStorageUsageTable
 import app.logdate.server.database.AccountsTable
 import app.logdate.server.database.PostgreSQLSpaceStore
+import app.logdate.server.database.SpaceBlobUploadReceiptsTable
 import app.logdate.server.database.SpaceBlobsTable
 import app.logdate.server.database.SpaceRecordBlobsTable
 import app.logdate.server.database.SpaceRecordsTable
@@ -68,6 +69,42 @@ abstract class SpaceStoreContractTest {
         blobs: List<String> = emptyList(),
         ciphertextBytes: Int = 528,
     ) = SpaceRecordWrite(account, space, author, rkey, sealed(fill, ciphertextBytes), blobs, swapCid, createOnly)
+
+    @Test
+    fun `concurrent ciphertexts for one upload identity retain one blob and one quota charge`() =
+        withStore { store, account ->
+            val intent = UUID.randomUUID().toString()
+            val results =
+                coroutineScope {
+                    (1..4)
+                        .map { index ->
+                            async(Dispatchers.IO) {
+                                store.putBlob(
+                                    account,
+                                    space,
+                                    SpaceBlob("bafy$index", "application/octet-stream", 41, "owned/$index", intent),
+                                )
+                            }
+                        }.awaitAll()
+                }
+            assertEquals(1, results.map { it.cid }.distinct().size)
+            assertEquals(results.first(), store.getBlobUploadReceipt(space, intent))
+            assertEquals(41L, store.storedBytes(account))
+        }
+
+    @Test
+    fun `blob upload identity commits once and is isolated by space`() =
+        withStore { store, account ->
+            val intent = UUID.randomUUID().toString()
+            val first = SpaceBlob("bafyfirst", "application/octet-stream", 41, "owned/first", intent)
+            val second = SpaceBlob("bafysecond", "application/octet-stream", 41, "owned/second", intent)
+            store.putBlob(account, space, first)
+            assertEquals(first, store.getBlobUploadReceipt(space, intent))
+            assertEquals(first, store.putBlob(account, space, second))
+            assertNull(store.getBlob(space, second.cid))
+            assertNull(store.getBlobUploadReceipt("another-space", intent))
+            assertEquals(41L, store.storedBytes(account))
+        }
 
     @Test
     fun `writes get increasing sequence numbers and read back`() =
@@ -446,6 +483,7 @@ class PostgreSQLSpaceStoreH2Test : SpaceStoreContractTest() {
         SpaceRecordsTable,
         SpaceRecordBlobsTable,
         SpaceBlobsTable,
+        SpaceBlobUploadReceiptsTable,
         AccountStorageUsageTable,
         SpaceUploadReservationsTable,
     ) {
