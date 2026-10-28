@@ -25,6 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -120,28 +122,31 @@ fun ImageNotePanel(
             )
         }
 
-        // Caption at bottom with enhanced styling
+        // Contrast belongs to the scene background; only the caption content has safe margins.
         if (!caption.isNullOrBlank()) {
             Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .fillMaxHeight(0.4f)
-                        .align(Alignment.BottomCenter)
-                        .windowInsetsPadding(
-                            LocalWorkspacePlaybackInsets.current.only(
-                                WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal,
-                            ),
-                        ).padding(horizontal = 16.dp, vertical = 24.dp),
+                        .align(Alignment.BottomCenter),
                 contentAlignment = Alignment.BottomCenter,
             ) {
                 Column(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
-                            .background(Color.Black.copy(alpha = 0.6f))
-                            .padding(16.dp),
+                            .drawBehind {
+                                drawRect(
+                                    Brush.verticalGradient(
+                                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.56f)),
+                                        endY = 48.dp.toPx().coerceAtMost(size.height),
+                                    ),
+                                )
+                            }.windowInsetsPadding(
+                                LocalWorkspacePlaybackInsets.current.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
+                            ).padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 24.dp)
+                            .verticalScroll(rememberScrollState()),
                 ) {
                     RewindRichMemoryText(
                         content = caption,

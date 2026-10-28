@@ -7,8 +7,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -79,7 +77,7 @@ import kotlin.math.abs
  *   button, or completion when [onComplete] is not provided)
  * @param modifier Modifier for customizing layout
  * @param isFirstView True when the user has never opened this rewind before. Enables
- *   a scale-up spring entrance and a single haptic pulse on mount.
+ *   a brief foreground reveal without shrinking the scene background.
  * @param onFirstViewConsumed Invoked after the entrance animation finishes so the
  *   host can clear its one-shot first-view flag. Without this, rotating the device
  *   mid-story would replay the celebration.
@@ -163,27 +161,17 @@ fun RewindStoryView(
         },
     )
 
-    // First-view entrance animation: scale up from 0.92 with a spring, then settle.
-    // Only plays once when the story first mounts, and only for unviewed rewinds.
-    val entranceScale = remember { Animatable(if (isFirstView && !reduceMotion) 0.92f else 1f) }
+    // Reveal foreground controls without scaling the scene or exposing its backing surface.
+    val entranceAlpha = remember { Animatable(if (isFirstView && !reduceMotion) 0f else 1f) }
 
     LaunchedEffect(isFirstView, reduceMotion) {
         if (isFirstView) {
             if (reduceMotion) {
-                entranceScale.snapTo(1f)
+                entranceAlpha.snapTo(1f)
                 onFirstViewConsumed?.invoke()
                 return@LaunchedEffect
             }
-            // Brief pause so the user registers the screen before the spring fires
-            delay(150)
-            entranceScale.animateTo(
-                targetValue = 1f,
-                animationSpec =
-                    spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow,
-                    ),
-            )
+            entranceAlpha.animateTo(1f, tween(200))
             onFirstViewConsumed?.invoke()
         }
     }
@@ -349,11 +337,7 @@ fun RewindStoryView(
             modifier
                 .onSizeChanged { storyContainerHeight = it.height.coerceAtLeast(1) }
                 .graphicsLayer {
-                    // Only the entrance animation scales this container. Dismiss never
-                    // translates or scales it — the backdrop stays fixed and just dims,
-                    // while the story panel above carries all of the dismiss motion.
-                    scaleX = entranceScale.value
-                    scaleY = entranceScale.value
+                    // Keep the scene backing fixed while its content carries dismiss motion.
                     alpha = 1f - easeDismiss(dismissProgress.value)
                 }.background(Color.Black)
                 // Swipe gesture with accumulated drag distance
@@ -422,7 +406,7 @@ fun RewindStoryView(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .graphicsLayer { alpha = 1f - easeDismiss(dismissProgress.value) }
+                            .graphicsLayer { alpha = entranceAlpha.value * (1f - easeDismiss(dismissProgress.value)) }
                             .windowInsetsPadding(LocalWorkspacePlaybackInsets.current)
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                 )
