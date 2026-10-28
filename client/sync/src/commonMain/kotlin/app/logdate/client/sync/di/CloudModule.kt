@@ -314,7 +314,7 @@ val cloudModule =
         single { MediaPayloadKeyProvider(get(), get(), get(), get()) }
         single<MediaPayloadCrypto> { StoredMediaPayloadCrypto(get()) }
         includes(spaceSyncModule)
-        single { SpaceMediaDataSource(get(), get(), spaceLocation(get(), get<SpaceSyncDependencies>().accountDid)) }
+        single { SpaceMediaDataSource(get(), get(), spaceLocation(get(), get<SpaceSyncDependencies>().accountDid), intents = get()) }
         single {
             val sessions = get<SessionStorage>()
             app.logdate.client.sync.metadata.MediaUploadIntentStore(get()) {

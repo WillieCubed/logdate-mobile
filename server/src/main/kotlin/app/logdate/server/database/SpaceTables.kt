@@ -78,6 +78,18 @@ object SpaceBlobsTable : Table("space_blobs") {
     }
 }
 
+/** Opaque write-once identities; content and encryption fingerprints remain on the device. */
+object SpaceBlobUploadReceiptsTable : Table("space_blob_upload_receipts") {
+    val spaceUri = text("space_uri")
+    val uploadIntent = varchar("upload_intent", 36)
+    val cid = varchar("cid", 255)
+    override val primaryKey = PrimaryKey(spaceUri, uploadIntent)
+
+    init {
+        foreignKey(spaceUri to SpaceBlobsTable.spaceUri, cid to SpaceBlobsTable.cid, onDelete = ReferenceOption.CASCADE)
+    }
+}
+
 /** Room held against an account's quota while an upload is in progress; it stops counting at [expiresAt]. */
 object SpaceUploadReservationsTable : Table("space_upload_reservations") {
     val id = javaUUID("id")

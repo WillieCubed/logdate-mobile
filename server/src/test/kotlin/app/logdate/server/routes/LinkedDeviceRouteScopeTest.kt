@@ -288,6 +288,7 @@ class LinkedDeviceRouteScopeTest {
                 "GET /xrpc/app.logdate.space.listRepoOps",
                 "POST /xrpc/app.logdate.space.uploadBlob",
                 "GET /xrpc/app.logdate.space.getBlob",
+                "GET /xrpc/app.logdate.space.getBlobUploadReceipt",
             )
 
         val LINKED_DEVICE_ROUTES = SYNC_DATA_ROUTES + ACCOUNT_DEVICE_ROUTES + PERSONAL_SPACE_ROUTES

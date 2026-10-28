@@ -76,6 +76,28 @@ class XrpcDataHomeTest {
     private fun HttpRequestData.bodyBytes(): ByteArray = (body as OutgoingContent.ByteArrayContent).bytes()
 
     @Test
+    fun `blob receipt lookup is authenticated metadata only and never treats server errors as absence`() =
+        runTest {
+            val intent = "bf155688-bcb4-49c4-a61e-3769eb0d31e8"
+            val result =
+                home(HttpStatusCode.OK, """{"supported":true,"receipt":{"cid":"bafycommitted","sizeBytes":4144}}""")
+                    .lookupBlobUpload(space, intent)
+            assertEquals(BlobUploadReceiptLookup(true, BlobUploadReceipt("bafycommitted", 4144)), result)
+            assertEquals(HttpMethod.Get, requests.single().method)
+            assertEquals("Bearer token", requests.single().headers[HttpHeaders.Authorization])
+            assertEquals(intent, requests.single().url.parameters["intent"])
+            assertFailsWith<XrpcProtocolException> {
+                home(HttpStatusCode.InternalServerError, """{"error":"InternalServerError","message":"unavailable"}""")
+                    .lookupBlobUpload(space, intent)
+            }
+            assertEquals(
+                BlobUploadReceiptLookup(false),
+                home(HttpStatusCode.NotImplemented, """{"error":"MethodNotImplemented","message":"unsupported"}""")
+                    .lookupBlobUpload(space, intent),
+            )
+        }
+
+    @Test
     fun `putRecord sends the space and key and envelope and swap signed in`() =
         runTest {
             val stored =

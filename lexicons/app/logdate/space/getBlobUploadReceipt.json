@@ -1,0 +1,73 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.space.getBlobUploadReceipt",
+  "description": "Recovers the receipt of an encrypted blob upload without transferring its payload.",
+  "defs": {
+    "main": {
+      "type": "query",
+      "parameters": {
+        "type": "params",
+        "required": [
+          "space",
+          "intent"
+        ],
+        "properties": {
+          "space": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "intent": {
+            "type": "string",
+            "maxLength": 36
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "supported"
+          ],
+          "properties": {
+            "supported": {
+              "type": "boolean"
+            },
+            "receipt": {
+              "type": "ref",
+              "ref": "#receipt"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "BlobNotFound"
+        },
+        {
+          "name": "RateLimitExceeded"
+        },
+        {
+          "name": "MethodNotImplemented"
+        }
+      ]
+    },
+    "receipt": {
+      "type": "object",
+      "required": [
+        "cid",
+        "sizeBytes"
+      ],
+      "properties": {
+        "cid": {
+          "type": "string",
+          "format": "cid"
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

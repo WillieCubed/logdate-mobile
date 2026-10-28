@@ -74,6 +74,22 @@ internal object SpaceSchemaDocs {
                         "value" to "The sealed envelope; absent for a deletion.",
                     ),
                 ),
+            "BlobUploadReceiptLookup" to
+                SchemaDoc(
+                    "Metadata-only acknowledgement lookup for an opaque upload identity in your own space.",
+                    mapOf(
+                        "supported" to "True when this server implements durable upload identities; never inferred from a missing blob.",
+                        "receipt" to "Committed blob metadata, absent when this identity has not committed. No payload is returned.",
+                    ),
+                ),
+            "BlobUploadReceipt" to
+                SchemaDoc(
+                    "The immutable encrypted blob already committed for this upload identity.",
+                    mapOf(
+                        "cid" to "Content identifier of the stored ciphertext; keep it in the sealed record.",
+                        "sizeBytes" to "Exact encrypted payload size, checked before adopting the acknowledgement.",
+                    ),
+                ),
             "UploadBlobOutput" to
                 SchemaDoc(
                     "What `app.logdate.space.uploadBlob` stored.",

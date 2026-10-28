@@ -76,6 +76,52 @@ import kotlin.uuid.Uuid
 
 class SpaceXrpcRoutesTest {
     @Test
+    fun `an upload receipt recovers committed bytes without downloading or replacing them`() =
+        testApplication {
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true)
+            val (did, token) = env.signedInAccount("receipt-owner")
+            val (_, stranger) = env.signedInAccount("receipt-stranger")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            val intent = "bf155688-bcb4-49c4-a61e-3769eb0d31e8"
+            val path = "/xrpc/app.logdate.space.getBlobUploadReceipt?space=$space&intent=$intent"
+            val absent = client.get(path) { bearer(token) }
+            assertEquals(HttpStatusCode.OK, absent.status)
+            assertTrue("true" in absent.bodyAsText())
+            val bytes = ByteArray(512) { 7 }
+            val first =
+                client.post("/xrpc/app.logdate.space.uploadBlob?space=$space") {
+                    bearer(token)
+                    header("X-LogDate-Upload-Intent", intent)
+                    contentType(ContentType.Application.OctetStream)
+                    setBody(bytes)
+                }
+            assertEquals(HttpStatusCode.OK, first.status)
+            val cid =
+                Json
+                    .parseToJsonElement(
+                        first.bodyAsText(),
+                    ).jsonObject["blob"]!!
+                    .jsonObject["ref"]!!
+                    .jsonObject["${'$'}link"]!!
+                    .jsonPrimitive.content
+            val receipt = client.get(path) { bearer(token) }
+            assertEquals(HttpStatusCode.OK, receipt.status)
+            assertTrue(cid in receipt.bodyAsText())
+            assertEquals("private, no-store", receipt.headers[HttpHeaders.CacheControl])
+            val replay =
+                client.post("/xrpc/app.logdate.space.uploadBlob?space=$space") {
+                    bearer(token)
+                    header("X-LogDate-Upload-Intent", intent)
+                    contentType(ContentType.Application.OctetStream)
+                    setBody(ByteArray(512) { 8 })
+                }
+            assertEquals(first.bodyAsText(), replay.bodyAsText())
+            assertContentEquals(bytes, client.get("/xrpc/app.logdate.space.getBlob?space=$space&cid=$cid") { bearer(token) }.bodyAsBytes())
+            assertEquals(HttpStatusCode.Unauthorized, client.get(path).status)
+            assertEquals(HttpStatusCode.BadRequest, client.get(path) { bearer(stranger) }.status)
+        }
+
+    @Test
     fun `the owner can write, read and list their personal space`() =
         testApplication {
             val env = configureAuthV1TestApp(personalSpaceEnabled = true)

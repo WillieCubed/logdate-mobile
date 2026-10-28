@@ -14,11 +14,15 @@ import app.logdate.client.sync.cloud.MediaIntegrityException
 import app.logdate.client.sync.cloud.MediaReadException
 import app.logdate.client.sync.cloud.MediaTooLargeException
 import app.logdate.client.sync.cloud.MediaUploadResult
+import app.logdate.client.sync.cloud.ReceiptVerifiedSource
 import app.logdate.client.sync.cloud.ReferencedMediaDataSource
 import app.logdate.client.sync.cloud.SizeCheckedSource
+import app.logdate.client.sync.cloud.mediaReceiptFingerprint
 import app.logdate.client.sync.crypto.MediaPayloadCrypto
 import app.logdate.client.sync.crypto.NoOpMediaPayloadCrypto
 import app.logdate.client.sync.crypto.isClientEncryptedMedia
+import app.logdate.client.sync.metadata.MediaUploadIntentStore
+import app.logdate.space.BlobUploadReceipts
 import app.logdate.space.SpaceRef
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.SHA256
@@ -53,6 +57,7 @@ class SpaceMediaDataSource(
     private val mediaPayloadCrypto: MediaPayloadCrypto,
     private val location: suspend () -> SpaceLocation?,
     private val workDirectory: Path = Path(SystemTemporaryDirectory, "logdate-space-media"),
+    private val intents: MediaUploadIntentStore? = null,
 ) : CloudMediaDataSource,
     ReferencedMediaDataSource,
     FileMediaDataSource {
@@ -76,7 +81,39 @@ class SpaceMediaDataSource(
         if (storedSize > MAX_BLOB_BYTES) return Result.failure(tooLarge(contentId, storedSize))
         val uploaded =
             spaceCall {
-                homes.open(target.origin, accessToken).uploadBlob(target.space, storedSize) { encryptor.encrypt(SizeCheckedSource(media)) }
+                val home = homes.open(target.origin, accessToken)
+                val receipts = home as? BlobUploadReceipts
+                val store = intents
+                if (store == null || receipts == null) {
+                    home.uploadBlob(target.space, storedSize) { encryptor.encrypt(SizeCheckedSource(media)) }
+                } else {
+                    val context = checkNotNull(encryptor.receiptContext) { "Encryption identity is unavailable for upload recovery" }
+                    val fingerprint = mediaReceiptFingerprint(media, "${target.space.uri}:$context")
+                    val intent = store.getOrCreate(contentId.toString(), fingerprint.value)
+                    store.withIntentLock(intent) {
+                        val lookup = receipts.lookupBlobUpload(target.space, intent)
+                        if (!lookup.supported) {
+                            check(!store.receiptRequired(intent)) { "The data home no longer supports this pending upload receipt" }
+                            home.uploadBlob(
+                                target.space,
+                                storedSize,
+                            ) { encryptor.encrypt(ReceiptVerifiedSource(media, fingerprint.contentDigest)) }
+                        } else {
+                            store.markReceiptSupported(intent)
+                            lookup.receipt?.let {
+                                check(mediaReceiptFingerprint(media, "${target.space.uri}:$context").value == fingerprint.value) {
+                                    "Media changed while its upload receipt was checked"
+                                }
+                                require(it.sizeBytes == storedSize) { "Upload receipt size mismatch" }
+                                Cid.require(it.cid)
+                                return@withIntentLock it.cid
+                            }
+                            receipts.uploadBlobWithIntent(target.space, intent, storedSize) {
+                                encryptor.encrypt(ReceiptVerifiedSource(media, fingerprint.contentDigest))
+                            }
+                        }
+                    }
+                }
             }
         val cid = uploaded.getOrElse { return Result.failure(uploadFailure(it, contentId, storedSize)) }
         val reference = SpaceMediaReference(cid, contentId, media.mimeType, storedSize, media.sizeBytes.takeUnless { alreadyEncrypted })

@@ -13,6 +13,8 @@ import app.logdate.server.space.SpaceQuotaExceededException
 import app.logdate.server.space.SpaceStore
 import app.logdate.server.space.SpaceUploadReservation
 import app.logdate.server.transfer.TransferSlots
+import app.logdate.space.BlobUploadReceipt
+import app.logdate.space.BlobUploadReceiptLookup
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.ktor.http.HttpHeaders
@@ -63,6 +65,15 @@ internal fun Route.uploadBlob(
                 ?.toLongOrNull()
                 ?.takeIf { it >= 0 }
                 ?: return@post call.respondLengthRequired()
+        val intent = call.request.headers["X-LogDate-Upload-Intent"]
+        if (intent != null && !isSpaceUploadIntent(intent)) return@post call.respondInvalid("Invalid upload identity")
+        if (intent != null) {
+            if (!gate.spend(call, account, SpaceBudget.READS)) return@post
+            objects.confirmedReceipt(space.uri, intent)?.let { stored ->
+                call.respond(stored.uploadOutput())
+                return@post
+            }
+        }
         if (declared > maxBlobBytes) return@post call.respondBlobTooLarge(maxBlobBytes)
         val slot = objects.transfers.tryStreamedUpload() ?: return@post call.respondServerBusy(objects.transfers.limits)
         try {
@@ -78,7 +89,7 @@ internal fun Route.uploadBlob(
                     }
                 }
             try {
-                call.receiveAndStoreBlob(objects, ownerId, space.uri, declared, limit, reservation)
+                call.receiveAndStoreBlob(objects, ownerId, space.uri, declared, limit, reservation, intent)
             } finally {
                 reservation?.let { withContext(NonCancellable) { objects.store.releaseUpload(it) } }
             }
@@ -101,6 +112,7 @@ private suspend fun ApplicationCall.receiveAndStoreBlob(
     declared: Long,
     quota: SpaceQuota?,
     reservation: SpaceUploadReservation?,
+    intent: String?,
 ) {
     val idleTimeout = objects.transfers.limits.idleTimeout
     val request = LogDateBlobStreamRequest(ownerId, LogDateBlobNamespace.SPACE, Uuid.random().toString(), SPACE_BLOB_MIME_TYPE)
@@ -120,7 +132,8 @@ private suspend fun ApplicationCall.receiveAndStoreBlob(
         return respondInvalid("The body must be exactly as long as its Content-Length")
     }
     val path = writer.storagePath
-    val blob = SpaceBlob(cid = received.cid, mimeType = SPACE_BLOB_MIME_TYPE, size = received.size, storagePath = path)
+    val blob =
+        SpaceBlob(cid = received.cid, mimeType = SPACE_BLOB_MIME_TYPE, size = received.size, storagePath = path, uploadIntent = intent)
     val stored =
         try {
             objects.store.putBlob(ownerId, space, blob, quota, reservation)
@@ -132,8 +145,42 @@ private suspend fun ApplicationCall.receiveAndStoreBlob(
             throw error
         }
     if (stored.storagePath != path) withContext(Dispatchers.IO) { objects.storage.deleteBlobIfExists(path) }
-    val ref = CidLink(cid = Cid.require(received.cid))
-    respond(UploadBlobOutput(blob = Blob(ref = ref, mimeType = stored.mimeType, size = stored.size)))
+    respond(stored.uploadOutput())
+}
+
+private fun SpaceBlob.uploadOutput() =
+    UploadBlobOutput(
+        blob = Blob(ref = CidLink(cid = Cid.require(cid)), mimeType = mimeType, size = size),
+    )
+
+private fun isSpaceUploadIntent(value: String): Boolean = runCatching { UUID.fromString(value).toString() == value }.getOrDefault(false)
+
+/** A missing or unreadable backing object is not permission to replay an acknowledged payload. */
+private suspend fun SpaceObjects.confirmedReceipt(
+    space: String,
+    intent: String,
+): SpaceBlob? {
+    val blob = store.getBlobUploadReceipt(space, intent) ?: return null
+    withContext(Dispatchers.IO) {
+        val stream = checkNotNull(storage.openBlob(blob.storagePath)) { "Stored receipt object is unavailable" }
+        stream.use { check(it.size == blob.size) { "Stored receipt object size mismatch" } }
+    }
+    return blob
+}
+
+internal fun Route.getBlobUploadReceipt(
+    blobs: SpaceObjects?,
+    gate: SpaceGate,
+) {
+    get("/app.logdate.space.getBlobUploadReceipt", XrpcSpaceDocs.getBlobUploadReceipt) {
+        val (account, objects) = gate.admit(call, blobs, SpaceBudget.READS) ?: return@get
+        val space = call.ownSpace(call.request.queryParameters["space"], account, BLOB_NOT_FOUND) ?: return@get
+        val intent = call.request.queryParameters["intent"].orEmpty()
+        if (!isSpaceUploadIntent(intent)) return@get call.respondInvalid("Invalid upload identity")
+        val receipt = objects.confirmedReceipt(space.uri, intent)?.let { BlobUploadReceipt(it.cid, it.size) }
+        call.response.header(HttpHeaders.CacheControl, "private, no-store")
+        call.respond(BlobUploadReceiptLookup(true, receipt))
+    }
 }
 
 /**
