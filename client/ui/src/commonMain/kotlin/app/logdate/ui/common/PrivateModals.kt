@@ -7,6 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.BottomSheetDefaults
@@ -115,7 +116,7 @@ fun ModalBottomSheet(
     tonalElevation: Dp = 0.dp,
     scrimColor: Color = BottomSheetDefaults.ScrimColor,
     dragHandle: @Composable (() -> Unit)? = { BottomSheetDefaults.DragHandle() },
-    contentWindowInsets: @Composable () -> WindowInsets = { BottomSheetDefaults.modalWindowInsets },
+    contentWindowInsets: @Composable () -> WindowInsets = { WindowInsets.safeDrawing },
     properties: ModalBottomSheetProperties = ModalBottomSheetProperties(),
     content: @Composable ColumnScope.() -> Unit,
 ) {

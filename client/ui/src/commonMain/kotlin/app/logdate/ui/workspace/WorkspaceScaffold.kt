@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.captionBar
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -222,7 +223,7 @@ fun WorkspaceScaffold(
             },
         ) { insets ->
             WorkspaceSearchHost {
-                Column(Modifier.fillMaxSize().padding(insets)) {
+                Column(Modifier.fillMaxSize().padding(insets).consumeWindowInsets(insets)) {
                     if (appBarInCaption != null && onSearch != null) {
                         WorkspaceCaptionAppBar(selected.title, appBarInCaption, onSearch, headerActions)
                     }

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
@@ -81,7 +81,6 @@ fun AdaptivePaneLayout(
                 widthClass = widthClass,
                 showSupportingPane = maxWidth >= effectiveSupportingPaneBreakpoint,
             )
-        val insetsPadding = contentWindowInsets.asPaddingValues()
         val foldableSplitLayout =
             calculateFoldableSplitLayout(
                 containerWidth = maxWidth,
@@ -99,7 +98,7 @@ fun AdaptivePaneLayout(
                             Modifier
                                 .width(splitLayout.leftPane.width)
                                 .fillMaxHeight()
-                                .padding(insetsPadding)
+                                .windowInsetsPadding(contentWindowInsets)
                                 .padding(contentPadding),
                         contentAlignment = Alignment.TopCenter,
                     ) {
@@ -123,7 +122,7 @@ fun AdaptivePaneLayout(
                             Modifier
                                 .width(splitLayout.rightPane.width)
                                 .fillMaxHeight()
-                                .padding(insetsPadding)
+                                .windowInsetsPadding(contentWindowInsets)
                                 .padding(contentPadding),
                     ) {
                         Box(
@@ -145,7 +144,7 @@ fun AdaptivePaneLayout(
                             Modifier
                                 .fillMaxWidth()
                                 .height(splitLayout.topPane.height)
-                                .padding(insetsPadding)
+                                .windowInsetsPadding(contentWindowInsets)
                                 .padding(contentPadding),
                         contentAlignment = Alignment.TopCenter,
                     ) {
@@ -169,7 +168,7 @@ fun AdaptivePaneLayout(
                             Modifier
                                 .fillMaxWidth()
                                 .height(splitLayout.bottomPane.height)
-                                .padding(insetsPadding)
+                                .windowInsetsPadding(contentWindowInsets)
                                 .padding(contentPadding),
                     ) {
                         Box(
@@ -189,7 +188,7 @@ fun AdaptivePaneLayout(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .padding(insetsPadding)
+                                .windowInsetsPadding(contentWindowInsets)
                                 .padding(contentPadding),
                         horizontalArrangement = Arrangement.spacedBy(paneSpacing),
                     ) {
@@ -224,7 +223,7 @@ fun AdaptivePaneLayout(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .padding(insetsPadding)
+                                .windowInsetsPadding(contentWindowInsets)
                                 .padding(contentPadding),
                         contentAlignment = Alignment.TopCenter,
                     ) {

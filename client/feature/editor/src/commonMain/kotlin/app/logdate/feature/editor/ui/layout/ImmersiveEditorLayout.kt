@@ -11,19 +11,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.captionBar
-import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -132,12 +130,19 @@ fun ImmersiveEditorLayout(
             }
 
         // In a desktop window the caption bar is transparent over the editor, so content starts below it.
-        val topBars = WindowInsets.statusBars.union(WindowInsets.captionBar)
+        val topBars = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
         val statusBarTop = topBars.asPaddingValues().calculateTopPadding()
         val topOffset = lerp(0.dp, statusBarTop + 64.dp, immersiveExitProgress)
         val horizontalPadding = lerp(0.dp, Spacing.sm, immersiveExitProgress)
         val bottomPadding = lerp(0.dp, Spacing.lg, immersiveExitProgress)
-        val bottomInsets = if (isImmersiveBlockActive) WindowInsets.ime else WindowInsets.ime.union(WindowInsets.navigationBars)
+        val bottomInsets =
+            if (isImmersiveBlockActive) {
+                WindowInsets.ime
+            } else {
+                WindowInsets.safeDrawing.only(
+                    WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal,
+                )
+            }
         val backdrop = if (focus is EditorFocus.Drawing) drawingBackdrop else MaterialTheme.colorScheme.surfaceDim
         BlendedCaptionBar(background = backdrop)
         Box(
@@ -154,9 +159,10 @@ fun ImmersiveEditorLayout(
                             if (focus is EditorFocus.Drawing) {
                                 Modifier
                             } else {
-                                Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
+                                Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                             },
                         ).padding(top = topOffset)
+                        .consumeWindowInsets(PaddingValues(top = topOffset))
                         .windowInsetsPadding(bottomInsets),
                 contentAlignment = Alignment.Center,
             ) {
@@ -182,7 +188,7 @@ fun ImmersiveEditorLayout(
                                 .padding(bottom = bottomPadding),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Box(
+                        EditorContentLayer(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
@@ -242,7 +248,7 @@ fun ImmersiveEditorLayout(
                     Modifier
                         .fillMaxWidth()
                         .align(Alignment.TopStart)
-                        .windowInsetsPadding(topBars),
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 topBarContent()

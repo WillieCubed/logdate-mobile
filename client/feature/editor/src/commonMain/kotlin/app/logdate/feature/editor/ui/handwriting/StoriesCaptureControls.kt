@@ -60,6 +60,7 @@ import app.logdate.feature.editor.ui.editor.HandwritingBlockUiState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
+import app.logdate.feature.editor.ui.layout.LocalEntryChromeHeight
 import app.logdate.shared.model.Journal
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.DropdownMenu
@@ -121,7 +122,7 @@ internal fun EntryFocusPrototypeHeader(
         Row(
             Modifier
                 .fillMaxWidth()
-                .height(64.dp)
+                .height(LocalEntryChromeHeight.current)
                 .padding(horizontal = 12.dp)
                 .then(if (recording || canvasOnly) Modifier else Modifier.captureModeSwipes(captureModeForBlock(block), onCaptureMode))
                 .testTag(if (focused) "entry_mode_focus" else "entry_mode_overview")
