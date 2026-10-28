@@ -127,31 +127,113 @@ data class MediaUploadResult(
 class DefaultCloudMediaDataSource(
     private val cloudApiClient: CloudApiClient,
     private val mediaPayloadCrypto: MediaPayloadCrypto = NoOpMediaPayloadCrypto,
+    private val uploadIntents: app.logdate.client.sync.metadata.MediaUploadIntentStore? = null,
 ) : CloudMediaDataSource {
     override suspend fun uploadMedia(
         accessToken: String,
         contentId: Uuid,
         media: MediaFileSource,
     ): Result<MediaUploadResult> {
-        // Encryption only ever adds bytes, so a file already over the limit is refused before
-        // anything is read from it.
         if (media.sizeBytes > MAX_MEDIA_UPLOAD_BYTES) return Result.failure(tooLarge(contentId, media.sizeBytes))
         val request =
             try {
                 prepareUpload(contentId, media)
-            } catch (error: Exception) {
-                return Result.failure(error)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (cause: Exception) {
+                return Result.failure(cause)
             }
         if (request.sizeBytes > MAX_MEDIA_UPLOAD_BYTES) return Result.failure(tooLarge(contentId, request.sizeBytes))
-
-        return cloudApiClient.uploadMedia(accessToken, request).map { response ->
-            MediaUploadResult(
-                mediaId = response.mediaId,
-                downloadUrl = response.downloadUrl,
-                uploadedAt = Instant.fromEpochMilliseconds(response.uploadedAt),
-            )
-        }
+        val fingerprint = request.receiptFingerprint
+        val store = uploadIntents
+        if (store == null || fingerprint == null) return uploadPrepared(accessToken, contentId, request, null)
+        val intent =
+            try {
+                store.getOrCreate(contentId.toString(), fingerprint)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (cause: Exception) {
+                return Result.failure(cause)
+            }
+        return store.withIntentLock(intent) { uploadPrepared(accessToken, contentId, request, intent) }
     }
+
+    private suspend fun uploadPrepared(
+        accessToken: String,
+        contentId: Uuid,
+        prepared: MediaUpload,
+        intent: String?,
+    ): Result<MediaUploadResult> {
+        var request = prepared
+        if (intent != null) {
+            val lookup = cloudApiClient.getMediaUploadReceipt(accessToken, intent)
+            val failure = lookup.exceptionOrNull()
+            // Explicitly unsupported older/custom servers keep their legacy behavior.
+            // Network/auth/storage errors never authorize blind payload replay.
+            if (failure != null && failure !is UnsupportedOperationException) return Result.failure(failure)
+            rememberReceiptSupport(intent, failure).exceptionOrNull()?.let { return Result.failure(it) }
+            if (failure == null) {
+                lookup.getOrThrow()?.let { receipt ->
+                    if (receipt.contentId != contentId.toString() || receipt.uploadIntentId != intent) {
+                        return Result.failure(MediaIntegrityException("Upload receipt does not match this content version"))
+                    }
+                    try {
+                        request.validateReceiptVersion()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (cause: Exception) {
+                        return Result.failure(cause)
+                    }
+                    return Result.success(
+                        MediaUploadResult(
+                            receipt.mediaId,
+                            receipt.downloadUrl,
+                            Instant.fromEpochMilliseconds(receipt.uploadedAt),
+                        ),
+                    )
+                }
+                request = request.withIntent(intent)
+            }
+        }
+        val uploaded =
+            try {
+                cloudApiClient.uploadMedia(accessToken, request)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (cause: Exception) {
+                return Result.failure(cause)
+            }
+        val response = uploaded.getOrElse { return Result.failure(it) }
+        if (request.uploadIntentId != null &&
+            (response.uploadIntentId != request.uploadIntentId || response.contentId != contentId.toString())
+        ) {
+            return Result.failure(MediaIntegrityException("Upload acknowledgement does not match this content version"))
+        }
+        return Result.success(
+            MediaUploadResult(
+                response.mediaId,
+                response.downloadUrl,
+                Instant.fromEpochMilliseconds(response.uploadedAt),
+            ),
+        )
+    }
+
+    private suspend fun rememberReceiptSupport(
+        intent: String,
+        failure: Throwable?,
+    ): Result<Unit> =
+        try {
+            if (failure is UnsupportedOperationException && uploadIntents?.receiptRequired(intent) == true) {
+                Result.failure(CloudApiException("UPLOAD_RECEIPT_UNAVAILABLE", "Could not confirm the previous upload"))
+            } else {
+                if (failure == null) uploadIntents?.markReceiptSupported(intent)
+                Result.success(Unit)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (cause: Exception) {
+            Result.failure(cause)
+        }
 
     /**
      * The hosting platform refuses a request this large before the server ever sees it, so
@@ -183,6 +265,7 @@ class DefaultCloudMediaDataSource(
             } else {
                 mediaPayloadCrypto.streamEncryptor()
             }
+        val fingerprint = if (uploadIntents != null) encryptor.receiptContext?.let { mediaReceiptFingerprint(media, it) } else null
         return MediaUpload(
             contentId = contentId.toString(),
             fileName = media.fileName,
@@ -191,7 +274,16 @@ class DefaultCloudMediaDataSource(
             // larger than the file on disk. The server checks this against the bytes it
             // actually receives and rejects a mismatch, so it has to describe the ciphertext.
             sizeBytes = encryptor.encryptedSizeBytes(media.sizeBytes),
-        ) { encryptor.encrypt(SizeCheckedSource(media)) }
+            receiptFingerprint = fingerprint?.value,
+            validateReceipt =
+                fingerprint?.let { expected ->
+                    {
+                        if (mediaReceiptFingerprint(media, checkNotNull(encryptor.receiptContext)).value != expected.value) {
+                            throw MediaReadException("Media changed while its upload receipt was being checked")
+                        }
+                    }
+                },
+        ) { encryptor.encrypt(fingerprint?.let { ReceiptVerifiedSource(media, it.contentDigest) } ?: SizeCheckedSource(media)) }
     }
 
     override suspend fun downloadMedia(

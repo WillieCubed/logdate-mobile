@@ -15,9 +15,29 @@ class MediaUpload(
     val mimeType: String,
     val sizeBytes: Long,
     val deviceId: DeviceId = DeviceId.UNKNOWN,
+    val uploadIntentId: String? = null,
+    internal val receiptFingerprint: String? = null,
+    private val validateReceipt: (() -> Unit)? = null,
     private val body: () -> RawSource,
 ) {
     fun openBody(): RawSource = body()
+
+    internal fun validateReceiptVersion() {
+        validateReceipt?.invoke()
+    }
+
+    internal fun withIntent(id: String): MediaUpload =
+        MediaUpload(
+            contentId,
+            fileName,
+            mimeType,
+            sizeBytes,
+            deviceId,
+            id,
+            receiptFingerprint,
+            validateReceipt,
+            body,
+        )
 }
 
 /**

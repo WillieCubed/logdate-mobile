@@ -430,6 +430,29 @@ private class MovingDeviceSecrets : SecureStorage {
 
 /** Key-value storage in memory, kept for the life of one device, as the app's own would be across runs. */
 internal class InMemoryKeyValues : KeyValueStorage {
+    override suspend fun compareAndSetStringsOrThrow(
+        expected: Map<String, String?>,
+        updates: Map<String, String?>,
+    ): Boolean {
+        while (true) {
+            val before = values.value
+            if (!expected.all { (key, value) -> before[key] == value }) return false
+            val after =
+                before.toMutableMap().apply {
+                    updates.forEach { (key, value) ->
+                        if (value ==
+                            null
+                        ) {
+                            remove(key)
+                        } else {
+                            put(key, value)
+                        }
+                    }
+                }
+            if (values.compareAndSet(before, after)) return true
+        }
+    }
+
     private val values = MutableStateFlow<Map<String, String>>(emptyMap())
 
     override suspend fun getString(key: String): String? = values.value[key]

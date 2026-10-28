@@ -8,6 +8,7 @@ import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.insertIgnore
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
@@ -22,18 +23,15 @@ internal class PostgreSQLLogDateMediaRepository : LogDateMediaRepository {
     ): LogDateMedia =
         transaction {
             val mediaId = media.mediaId.ifBlank { "media-${Random.nextLong().absoluteValue}" }
-            val existing =
-                LogDateMediaRecordsTable
-                    .selectAll()
-                    .where {
-                        (LogDateMediaRecordsTable.userId eq userId) and
-                            (LogDateMediaRecordsTable.mediaId eq mediaId)
-                    }.forUpdate()
-                    .singleOrNull()
+            val existing = mediaRowForUpdate(userId, mediaId)
             if (existing != null && existing[LogDateMediaRecordsTable.deleted]) {
                 throw StaleWriteException(mediaId, existing[LogDateMediaRecordsTable.deletedAt] ?: 0L)
             }
             val version = nextLogDateMediaVersion(existing?.get(LogDateMediaRecordsTable.version))
+            if (mediaId.startsWith("receipt-v1-")) {
+                if (existing != null) return@transaction existing.toLogDateMedia()
+                return@transaction insertReceiptIfAbsent(userId, mediaId, media, version)
+            }
             if (existing == null) {
                 LogDateMediaRecordsTable.insert {
                     it[LogDateMediaRecordsTable.userId] = userId
@@ -80,6 +78,57 @@ internal class PostgreSQLLogDateMediaRepository : LogDateMediaRepository {
                 version = version,
             )
         }
+
+    private fun mediaRowForUpdate(
+        userId: UUID,
+        mediaId: String,
+    ): ResultRow? =
+        LogDateMediaRecordsTable
+            .selectAll()
+            .where {
+                (LogDateMediaRecordsTable.userId eq userId) and (LogDateMediaRecordsTable.mediaId eq mediaId)
+            }.forUpdate()
+            .singleOrNull()
+
+    /** Called inside the caller's transaction; the unique key chooses one concurrent winner. */
+    private fun insertReceiptIfAbsent(
+        userId: UUID,
+        mediaId: String,
+        media: LogDateMedia,
+        version: Long,
+    ): LogDateMedia {
+        LogDateMediaRecordsTable.insertIgnore {
+            it[LogDateMediaRecordsTable.userId] = userId
+            it[LogDateMediaRecordsTable.mediaId] = mediaId
+            it[contentId] = media.contentId
+            it[fileName] = media.fileName
+            it[mimeType] = media.mimeType
+            it[sizeBytes] = media.sizeBytes
+            it[data] = media.data
+            it[storagePath] = media.storagePath
+            it[createdAt] = media.createdAt
+            it[LogDateMediaRecordsTable.version] = version
+            it[deviceId] = media.deviceId.value
+            it[deleted] = false
+            it[deletedAt] = null
+            it[encryptionVersion] = media.encryptionVersion
+            it[encryptionKeyId] = media.encryptionKeyId
+            it[encryptionMode] = media.encryptionMode
+        }
+        val committed =
+            LogDateMediaRecordsTable
+                .selectAll()
+                .where {
+                    (LogDateMediaRecordsTable.userId eq userId) and (LogDateMediaRecordsTable.mediaId eq mediaId)
+                }.single()
+        if (committed[LogDateMediaRecordsTable.deleted]) {
+            throw StaleWriteException(
+                mediaId,
+                committed[LogDateMediaRecordsTable.deletedAt] ?: 0L,
+            )
+        }
+        return committed.toLogDateMedia()
+    }
 
     override fun getMedia(
         userId: UUID,

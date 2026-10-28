@@ -115,6 +115,7 @@ class InMemoryLogDateMediaRepository : LogDateMediaRepository {
     ): LogDateMedia {
         val mediaId = media.mediaId.ifBlank { "media-${Random.nextLong().absoluteValue}" }
         rowsForUser(userId)[mediaId]?.deletedAt?.let { throw StaleWriteException(mediaId, it) }
+        if (mediaId.startsWith("receipt-v1-")) rowsForUser(userId)[mediaId]?.let { return it.media }
         val version = nextVersion(userId)
         val stored =
             media.copy(

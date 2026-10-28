@@ -46,6 +46,33 @@ import kotlin.test.assertEquals
 
 class SyncMediaRetrySafetyTest {
     @Test
+    fun `durable receipt lookup survives lost acknowledgement and is isolated by account`() =
+        testApplication {
+            val fixture = installMediaFixture()
+            val intent = "b88ce7fe-902c-4c01-862d-45238bf30928"
+            val missing = client.get("/api/v1/media/receipts/$intent") { header(HttpHeaders.Authorization, fixture.auth) }
+            assertEquals(HttpStatusCode.OK, missing.status)
+            assertEquals("{\"receipt\":null}", missing.readRawBytes().decodeToString())
+            val first = upload(fixture, byteArrayOf(1, 2, 3), intent)
+            assertEquals(HttpStatusCode.Created, first.status)
+            val accepted = Json.decodeFromString<MediaUploadResponse>(first.readRawBytes().decodeToString())
+            val receipt = client.get("/api/v1/media/receipts/$intent") { header(HttpHeaders.Authorization, fixture.auth) }
+            assertEquals(HttpStatusCode.OK, receipt.status)
+            kotlin.test.assertTrue(receipt.readRawBytes().decodeToString().contains(accepted.mediaId))
+            val other = fixture.tokenService.generateAccessToken("00000000-0000-0000-0000-000000000222")
+            val foreign = client.get("/api/v1/media/receipts/$intent") { header(HttpHeaders.Authorization, "Bearer $other") }
+            assertEquals(HttpStatusCode.OK, foreign.status)
+            assertEquals("{\"receipt\":null}", foreign.readRawBytes().decodeToString())
+            // Replayed intent never replaces the committed version, even with a different body.
+            assertEquals(HttpStatusCode.Created, upload(fixture, byteArrayOf(9, 9, 9), intent).status)
+            assertContentEquals(byteArrayOf(1, 2, 3), download(fixture, accepted.mediaId).readRawBytes())
+            val next = upload(fixture, byteArrayOf(4, 5, 6), "2b005707-657d-4bc8-a16c-ea0eca509cf0")
+            val newer = Json.decodeFromString<MediaUploadResponse>(next.readRawBytes().decodeToString())
+            kotlin.test.assertNotEquals(accepted.mediaId, newer.mediaId)
+            assertContentEquals(byteArrayOf(1, 2, 3), download(fixture, accepted.mediaId).readRawBytes())
+        }
+
+    @Test
     fun `failed retry preserves the previously committed attachment bytes`() =
         testApplication {
             val fixture = installMediaFixture()
@@ -166,9 +193,11 @@ class SyncMediaRetrySafetyTest {
     private suspend fun ApplicationTestBuilder.upload(
         fixture: MediaFixture,
         bytes: ByteArray,
+        intent: String? = null,
     ): HttpResponse =
         client.post("/api/v1/media") {
             header(HttpHeaders.Authorization, fixture.auth)
+            intent?.let { header("X-LogDate-Upload-Intent", it) }
             setBody(
                 mediaMultipartWithFields(
                     includeContentId = true,

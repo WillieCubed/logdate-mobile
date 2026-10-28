@@ -239,6 +239,11 @@ class LogDateCloudApiClient(
         draftId: String,
     ): Result<Unit> = requestDeleteDraft(accessToken, draftId)
 
+    override suspend fun getMediaUploadReceipt(
+        accessToken: String,
+        uploadIntentId: String,
+    ): Result<MediaUploadResponse?> = requestMediaUploadReceipt(accessToken, uploadIntentId)
+
     override suspend fun uploadMedia(
         accessToken: String,
         media: MediaUpload,

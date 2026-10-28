@@ -2,10 +2,13 @@ package app.logdate.server.database
 
 import app.logdate.server.database.support.withH2Database
 import app.logdate.server.logdate.LogDateMedia
+import app.logdate.server.sync.StaleWriteException
 import app.logdate.shared.model.sync.DeviceId
 import java.util.UUID
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -22,6 +25,35 @@ import kotlin.test.assertTrue
  * are correctly handled.
  */
 class PostgreSQLLogDateMediaRepositoryTest {
+    @Test
+    fun `receipt records choose one committed version and cannot resurrect a deletion`() {
+        withH2Database(LogDateMediaRecordsTable) {
+            val repository = PostgreSQLLogDateMediaRepository()
+            val owner = UUID.randomUUID()
+            val media =
+                LogDateMedia(
+                    "receipt-v1-test",
+                    "entry",
+                    owner,
+                    "photo.jpg",
+                    "image/jpeg",
+                    3,
+                    byteArrayOf(1, 2, 3),
+                    null,
+                    10,
+                    0,
+                    DeviceId("device"),
+                )
+            val first = repository.upsertMedia(owner, media)
+            val replay = repository.upsertMedia(owner, media.copy(data = byteArrayOf(4, 5, 6)))
+            assertContentEquals(first.data, replay.data)
+            assertEquals(first.version, replay.version)
+            assertNull(repository.getMedia(UUID.randomUUID(), media.mediaId))
+            repository.deleteMedia(owner, media.mediaId, 30)
+            assertFailsWith<StaleWriteException> { repository.upsertMedia(owner, media) }
+        }
+    }
+
     @Test
     fun `postgres media repository stores updates and tombstones media`() {
         withH2Database(LogDateMediaRecordsTable) {

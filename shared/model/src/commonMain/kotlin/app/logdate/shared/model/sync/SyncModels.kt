@@ -326,6 +326,13 @@ data class MediaUploadResponse(
     val mediaId: String,
     val downloadUrl: String,
     val uploadedAt: Long,
+    val uploadIntentId: String? = null,
+)
+
+/** A missing receipt is an explicit successful lookup, never a network error. */
+@Serializable
+data class MediaUploadReceiptResponse(
+    val receipt: MediaUploadResponse?,
 )
 
 @Serializable

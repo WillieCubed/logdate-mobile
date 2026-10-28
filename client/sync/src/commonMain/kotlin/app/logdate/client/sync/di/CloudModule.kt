@@ -315,11 +315,19 @@ val cloudModule =
         single<MediaPayloadCrypto> { StoredMediaPayloadCrypto(get()) }
         includes(spaceSyncModule)
         single { SpaceMediaDataSource(get(), get(), spaceLocation(get(), get<SpaceSyncDependencies>().accountDid)) }
+        single {
+            val sessions = get<SessionStorage>()
+            app.logdate.client.sync.metadata.MediaUploadIntentStore(get()) {
+                val bound = sessions.getOriginBoundSession()
+                app.logdate.client.sync.metadata
+                    .UploadScope(bound?.session?.accountId.orEmpty(), bound?.origin.orEmpty())
+            }
+        }
         single<CloudMediaDataSource> {
             val registry = get<SpaceRecordRegistry>()
             val gate = get<SpaceTransportGate>()
             SpaceRoutingMediaDataSource(
-                legacy = DefaultCloudMediaDataSource(get(), get()),
+                legacy = DefaultCloudMediaDataSource(get(), get(), get()),
                 space = get<SpaceMediaDataSource>(),
                 uploadsToSpace = { registry.forEntityType(EntityType.NOTE) != null && gate.route() == SpaceRoute.Space },
             )

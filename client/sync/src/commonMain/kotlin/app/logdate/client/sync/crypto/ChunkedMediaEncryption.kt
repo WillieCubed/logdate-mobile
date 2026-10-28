@@ -74,6 +74,14 @@ internal fun ByteArray.startsWith(prefix: ByteArray): Boolean {
 internal class ChunkedMediaStreamEncryptor(
     private val mediaKey: ByteArray,
 ) : MediaStreamEncryptor {
+    override val receiptContext: String =
+        "LDCE2:" +
+            CryptographyProvider.Default
+                .get(SHA256)
+                .hasher()
+                .hashBlocking(mediaKey)
+                .joinToString("") { it.toUByte().toString(16).padStart(2, '0') }
+
     init {
         // Each upload derives its own key while the request body is written, where a failure
         // could only surface as a failed request. Deriving one here reports a missing algorithm

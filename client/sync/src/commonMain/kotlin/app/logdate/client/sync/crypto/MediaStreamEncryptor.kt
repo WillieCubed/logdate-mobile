@@ -12,6 +12,9 @@ import kotlinx.io.readByteArray
  * [MediaPayloadCrypto.decrypt] reads back whatever this produces.
  */
 interface MediaStreamEncryptor {
+    /** Local receipt scope for this exact captured encryption key and format; never transmitted. */
+    val receiptContext: String? get() = null
+
     /** Length of the stream [encrypt] produces for a payload of [plainSizeBytes] bytes. */
     fun encryptedSizeBytes(plainSizeBytes: Long): Long
 
@@ -81,6 +84,8 @@ internal class ClientMediaStreamDecryptor(
 }
 
 internal object PassthroughMediaStreamEncryptor : MediaStreamEncryptor {
+    override val receiptContext: String = "passthrough-v1"
+
     override fun encryptedSizeBytes(plainSizeBytes: Long): Long = plainSizeBytes
 
     override fun encrypt(source: RawSource): RawSource = source
