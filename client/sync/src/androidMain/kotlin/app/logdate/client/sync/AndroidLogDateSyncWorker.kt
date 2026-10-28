@@ -8,15 +8,9 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.AppInfoProvider
 import app.logdate.client.sync.metadata.UploadScope
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.takeWhile
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.plus
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.time.Duration.Companion.seconds
 
 class AndroidLogDateSyncWorker(
     context: Context,
@@ -39,14 +33,6 @@ class AndroidLogDateSyncWorker(
             Napier.i("Starting Android background sync worker")
             val appInfo = appInfoProvider.getAppInfo()
             syncManager.resumeAfterUpgrade("${appInfo.versionCode}:${appInfo.versionName}", upgradeResumption)
-            // Without this the sync is ordinary background work and dies when the app leaves the
-            // screen - part way through, with the queue half drained. Failing to promote is not
-            // fatal (the permission may be denied); the sync just goes back to being cancellable.
-            val promoted =
-                runCatching { setForeground(getForegroundInfo()) }
-                    .onFailure { Napier.w("Backup running without a foreground notification") }
-                    .isSuccess
-
             val syncType = inputData.getString(KEY_SYNC_TYPE) ?: SYNC_TYPE_FULL
             val consent = mobileDataSyncScope(inputData, sessionStorage.getOriginBoundSession())
             val run: suspend () -> SyncResult = {
@@ -56,7 +42,23 @@ class AndroidLogDateSyncWorker(
                     runSyncBatches { runSync(syncType) }
                 }
             }
-            val result = if (promoted) withProgressNotification(run) else run()
+            val result =
+                withSyncForegroundRun(
+                    statuses = syncManager.syncStatusFlow,
+                    showStarting = {
+                        try {
+                            setForeground(getForegroundInfo())
+                            true
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            Napier.w("Backup running without a foreground notification")
+                            false
+                        }
+                    },
+                    showProgress = ::showProgress,
+                    run = run,
+                )
 
             when (SyncWorkerRetryPolicy.decide(result, runAttemptCount)) {
                 SyncWorkerRetryPolicy.Outcome.SUCCESS -> {
@@ -99,29 +101,6 @@ class AndroidLogDateSyncWorker(
         }
 
     /**
-     * Runs [sync] while the notification follows the run's progress, and stops following it as
-     * soon as [sync] returns. A backup of several hundred entries takes minutes, and a notification
-     * that says "Starting…" for all of them reads as a backup that has stopped.
-     */
-    private suspend fun <T> withProgressNotification(sync: suspend () -> T): T =
-        coroutineScope {
-            val statuses = syncManager.syncStatusFlow
-            val since = statuses.value
-            val updates =
-                launch {
-                    statuses
-                        .runProgressUpdates(since = since, period = PROGRESS_UPDATE_PERIOD)
-                        .takeWhile { progress -> showProgress(progress) }
-                        .collect()
-                }
-            try {
-                sync()
-            } finally {
-                updates.cancel()
-            }
-        }
-
-    /**
      * Shows [progress] in the foreground notification. Returns false once the notification can no
      * longer be updated; the backup carries on regardless, under the notification it already has.
      */
@@ -145,8 +124,5 @@ class AndroidLogDateSyncWorker(
 
         const val WORK_NAME_PERIODIC_SYNC = "periodic_sync"
         const val WORK_NAME_IMMEDIATE_SYNC = "immediate_sync"
-
-        /** Often enough to watch a backup move, rarely enough not to redraw on every entry. */
-        private val PROGRESS_UPDATE_PERIOD = 1.seconds
     }
 }

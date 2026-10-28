@@ -11,6 +11,7 @@ import app.logdate.client.sync.metadata.UploadScope
 internal fun immediateSyncRequest(
     syncType: String,
     consent: UploadScope?,
+    expedited: Boolean = false,
 ): OneTimeWorkRequest {
     val constraints =
         Constraints
@@ -30,12 +31,11 @@ internal fun immediateSyncRequest(
             .setConstraints(constraints)
             .setInputData(inputData)
             .apply { if (consent != null) addTag(MOBILE_DATA_SYNC_TAG) }
-            // Out of expedited quota, run it as ordinary work rather than drop it. This is what
-            // "Back up now" schedules, and dropping it threw the request away with nothing on
-            // screen changing: the backup waited for the next periodic run, hours later, while
-            // the app showed items waiting and a button that seemed to do nothing.
-            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-            .build()
+            .apply {
+                // Only an explicit backup is expedited. On older Android an expedited request
+                // can require a notification before the worker can discover that nothing changed.
+                if (expedited) setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            }.build()
 
     return request
 }
