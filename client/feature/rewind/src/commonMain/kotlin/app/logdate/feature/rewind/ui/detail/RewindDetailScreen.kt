@@ -2,12 +2,8 @@
 
 package app.logdate.feature.rewind.ui.detail
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -17,10 +13,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.feature.rewind.ui.AudioPanelPlaybackUiState
 import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
@@ -291,14 +285,7 @@ fun RewindDetailScreenContent(
  */
 @Composable
 fun RewindLoadingScreen(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.background(Color.Black),
-        contentAlignment = Alignment.Center,
-    ) {
-        CircularProgressIndicator(
-            color = Color.White,
-        )
-    }
+    RewindMemoryFrame("rewind-story", RewindMemoryLoadState.Loading, modifier.fillMaxSize()) { }
 }
 
 /**
@@ -317,19 +304,10 @@ fun RewindErrorScreen(
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier = modifier.background(Color.Black),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyLarge,
-            color = Color.White,
-            textAlign = TextAlign.Center,
-            modifier =
-                Modifier
-                    .background(Color.Black)
-                    .clickable { onExit() },
-        )
-    }
+    RewindMemoryFrame(
+        "rewind-story",
+        RewindMemoryLoadState.Unavailable,
+        modifier.fillMaxSize().clickable { onExit() },
+        errorMessage = message,
+    ) { }
 }
