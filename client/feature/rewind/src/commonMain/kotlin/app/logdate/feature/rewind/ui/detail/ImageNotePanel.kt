@@ -5,12 +5,12 @@ package app.logdate.feature.rewind.ui.detail
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,7 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.logdate.ui.content.ImageScrimOverlay
+import app.logdate.ui.workspace.LocalWorkspacePlaybackInsets
 import coil3.compose.AsyncImage
 import logdate.client.feature.rewind.generated.resources.Res
 import logdate.client.feature.rewind.generated.resources.cd_rewind_journal_photo
@@ -81,9 +81,6 @@ fun ImageNotePanel(
             onSuccess = { loadState = RewindMemoryLoadState.Ready },
         )
 
-        // Top and bottom gradient overlays for more polished look
-        ImageScrimOverlay(alphaStops = listOf(0.3f, 0f, 0f, 0.7f))
-
         // Date indicator at top
         if (isVideoFrame) {
             Text(
@@ -93,8 +90,9 @@ fun ImageNotePanel(
                 modifier =
                     Modifier
                         .align(Alignment.TopEnd)
-                        .windowInsetsPadding(WindowInsets.safeDrawing)
-                        .padding(top = 80.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)
+                        .windowInsetsPadding(
+                            LocalWorkspacePlaybackInsets.current.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+                        ).padding(top = 80.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)
                         .clip(RoundedCornerShape(20.dp))
                         .background(Color.Black.copy(alpha = 0.6f))
                         .padding(horizontal = 12.dp, vertical = 6.dp),
@@ -104,8 +102,10 @@ fun ImageNotePanel(
         Box(
             modifier =
                 Modifier
+                    .align(Alignment.TopStart)
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .windowInsetsPadding(LocalWorkspacePlaybackInsets.current.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                    .padding(start = 24.dp, end = 24.dp, top = 88.dp),
             contentAlignment = Alignment.TopStart,
         ) {
             Text(
@@ -115,7 +115,7 @@ fun ImageNotePanel(
                 modifier =
                     Modifier
                         .clip(RoundedCornerShape(20.dp))
-                        .background(Color.Black.copy(alpha = 0.4f))
+                        .background(Color.Black.copy(alpha = 0.6f))
                         .padding(horizontal = 12.dp, vertical = 6.dp),
             )
         }
@@ -128,7 +128,11 @@ fun ImageNotePanel(
                         .fillMaxWidth()
                         .fillMaxHeight(0.4f)
                         .align(Alignment.BottomCenter)
-                        .padding(horizontal = 16.dp, vertical = 24.dp),
+                        .windowInsetsPadding(
+                            LocalWorkspacePlaybackInsets.current.only(
+                                WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal,
+                            ),
+                        ).padding(horizontal = 16.dp, vertical = 24.dp),
                 contentAlignment = Alignment.BottomCenter,
             ) {
                 Column(
@@ -136,8 +140,7 @@ fun ImageNotePanel(
                         Modifier
                             .fillMaxWidth()
                             .verticalScroll(rememberScrollState())
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color.Black.copy(alpha = 0.5f))
+                            .background(Color.Black.copy(alpha = 0.6f))
                             .padding(16.dp),
                 ) {
                     RewindRichMemoryText(

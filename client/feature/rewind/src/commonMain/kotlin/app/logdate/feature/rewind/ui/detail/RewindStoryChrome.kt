@@ -2,6 +2,7 @@
 
 package app.logdate.feature.rewind.ui.detail
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -29,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindPanelUiState
@@ -123,7 +126,10 @@ internal fun RewindStoryChrome(
             ) {
                 if (useOverflow) {
                     Box {
-                        IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(48.dp)) {
+                        IconButton(
+                            onClick = { menuExpanded = true },
+                            modifier = Modifier.size(48.dp).background(Color.Black.copy(alpha = 0.48f), CircleShape),
+                        ) {
                             Icon(PlatformIcons.more(), stringResource(Res.string.rewind_more_actions), tint = Color.White)
                         }
                         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
@@ -141,12 +147,15 @@ internal fun RewindStoryChrome(
                     }
                 } else {
                     actions.forEach { action ->
-                        IconButton(onClick = action.onClick, modifier = Modifier.size(48.dp)) {
+                        IconButton(
+                            onClick = action.onClick,
+                            modifier = Modifier.size(48.dp).background(Color.Black.copy(alpha = 0.48f), CircleShape),
+                        ) {
                             Icon(action.icon(), action.label, tint = Color.White)
                         }
                     }
                 }
-                IconButton(onClick = onExit, modifier = Modifier.size(48.dp)) {
+                IconButton(onClick = onExit, modifier = Modifier.size(48.dp).background(Color.Black.copy(alpha = 0.48f), CircleShape)) {
                     Icon(PlatformIcons.close(), stringResource(Res.string.close_rewind), tint = Color.White)
                 }
             }
@@ -187,7 +196,7 @@ private fun StoryProgressIndicators(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier,
+        modifier = modifier.testTag("rewind-story-progress"),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         repeat(totalPanels) { index ->
@@ -206,7 +215,7 @@ private fun StoryProgressIndicators(
                         .height(3.dp)
                         .clip(RoundedCornerShape(1.5.dp)),
                 color = color,
-                trackColor = color.copy(alpha = 0.3f),
+                trackColor = Color(0xFF626B70),
             )
         }
     }

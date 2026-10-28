@@ -13,21 +13,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.logdate.ui.content.ImageScrimOverlay
 import coil3.compose.AsyncImage
 
 /**
@@ -66,30 +62,8 @@ fun TextNotePanel(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-
-            // Gradient overlay for text readability
-            ImageScrimOverlay(topAlpha = 0.4f, bottomAlpha = 0.7f)
         } else {
-            // Apply a gradient to the solid color background for visual interest
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors =
-                                    listOf(
-                                        backgroundColor,
-                                        backgroundColor.copy(
-                                            red = backgroundColor.red * 0.8f,
-                                            green = backgroundColor.green * 0.8f,
-                                            blue =
-                                                backgroundColor.blue * 0.8f,
-                                        ),
-                                    ),
-                            ),
-                        ),
-            )
+            Box(Modifier.fillMaxSize().background(backgroundColor))
         }
 
         // Content container
@@ -99,8 +73,7 @@ fun TextNotePanel(
                     .fillMaxWidth(0.85f)
                     .fillMaxHeight(0.7f)
                     .verticalScroll(rememberScrollState())
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color.Black.copy(alpha = 0.3f))
+                    .background(if (backgroundImageUri != null) Color.Black.copy(alpha = 0.6f) else Color.Transparent)
                     .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,

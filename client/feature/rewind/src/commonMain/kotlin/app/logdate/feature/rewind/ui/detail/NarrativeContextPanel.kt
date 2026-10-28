@@ -6,20 +6,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import app.logdate.ui.content.ImageScrimOverlay
 import coil3.compose.AsyncImage
 
 /**
@@ -32,7 +28,7 @@ import coil3.compose.AsyncImage
  *
  * ## Visual Design:
  * - **Typography**: Large, bold text for narrative impact
- * - **Background**: Optional image with gradient overlay for readability
+ * - **Background**: Optional image with localized text contrast
  * - **Styling**: Subtle container with semi-transparent background
  * - **Alignment**: Centered for visual focus
  *
@@ -63,25 +59,8 @@ fun NarrativeContextPanel(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-
-            // Gradient overlay for text readability
-            ImageScrimOverlay(topAlpha = 0.5f, bottomAlpha = 0.7f)
         } else {
-            // Subtle gradient background when no image
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors =
-                                    listOf(
-                                        MaterialTheme.colorScheme.primaryContainer,
-                                        MaterialTheme.colorScheme.primary,
-                                    ),
-                            ),
-                        ),
-            )
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primary))
         }
 
         // Content container with subtle backdrop
@@ -89,14 +68,13 @@ fun NarrativeContextPanel(
             modifier =
                 Modifier
                     .padding(horizontal = 32.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color.Black.copy(alpha = 0.2f))
+                    .background(if (backgroundImageUri != null) Color.Black.copy(alpha = 0.6f) else Color.Transparent)
                     .padding(32.dp),
         ) {
             Text(
                 text = contextText,
                 style = MaterialTheme.typography.headlineLarge,
-                color = Color.White,
+                color = if (backgroundImageUri == null) MaterialTheme.colorScheme.onPrimary else Color.White,
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Bold,
                 lineHeight = MaterialTheme.typography.headlineLarge.lineHeight * 1.3f,

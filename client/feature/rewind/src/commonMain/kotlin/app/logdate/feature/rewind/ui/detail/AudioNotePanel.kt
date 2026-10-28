@@ -8,12 +8,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -31,7 +29,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.Role
@@ -40,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.audio.AudioWaveformComponent
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.timeline.newstuff.TimelineTranscriptPreview
+import app.logdate.ui.workspace.LocalWorkspacePlaybackInsets
 import logdate.client.feature.rewind.generated.resources.Res
 import logdate.client.feature.rewind.generated.resources.rewind_pause_audio
 import logdate.client.feature.rewind.generated.resources.rewind_play_audio
@@ -51,7 +49,7 @@ private val AUDIO_PANEL_BACKGROUND = Color(0xFF1A1A1A)
 /**
  * A panel displaying an audio journal entry in story format.
  *
- * Mirrors [TextNotePanel]'s visual language (dark gradient, centered translucent card)
+ * Mirrors [TextNotePanel]'s flat reading surface
  * but swaps the quote body for a waveform, a play/pause control, and — when available —
  * the transcript. [transcriptionText] is frequently null: transcription is eventual, not
  * guaranteed by the time a rewind is generated, so the panel must read fine either way.
@@ -84,17 +82,13 @@ fun AudioNotePanel(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(AUDIO_PANEL_BACKGROUND, Color.Black),
-                    ),
-                ),
+                .background(AUDIO_PANEL_BACKGROUND),
         contentAlignment = Alignment.Center,
     ) {
         Box(
             Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .windowInsetsPadding(LocalWorkspacePlaybackInsets.current)
                 .padding(top = 80.dp, bottom = 24.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -103,8 +97,6 @@ fun AudioNotePanel(
                     Modifier
                         .fillMaxWidth(0.85f)
                         .verticalScroll(rememberScrollState())
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.Black.copy(alpha = 0.3f))
                         .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,

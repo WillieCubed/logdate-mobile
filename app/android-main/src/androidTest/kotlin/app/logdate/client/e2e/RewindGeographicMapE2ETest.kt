@@ -4,8 +4,12 @@ package app.logdate.client.e2e
 
 import android.graphics.BitmapFactory
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
@@ -16,9 +20,11 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import app.logdate.client.text.toUiText
@@ -31,6 +37,8 @@ import app.logdate.ui.maps.LocalGoogleMapsAvailabilityOverride
 import app.logdate.ui.platform.LocalReduceMotionOverride
 import app.logdate.ui.theme.LogDateTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
@@ -38,6 +46,10 @@ import java.io.File
 /** Synthetic coordinates only. Run on an emulator or Gradle Managed Device. */
 class RewindGeographicMapE2ETest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
+    @Before fun configureSystemBars() {
+        compose.runOnUiThread { compose.activity.enableEdgeToEdge() }
+    }
 
     @Test fun geographyLoadsBehindMarkersAndMapTapsStillAdvanceTheStory() {
         showMap(listOf(MapPanelPoint(36.1699, -115.1398), MapPanelPoint(36.1716, -115.1460), MapPanelPoint(36.1740, -115.1320)))
@@ -47,9 +59,32 @@ class RewindGeographicMapE2ETest {
             compose.onNodeWithTag("rewind-story-focus").fetchSemanticsNode().boundsInRoot,
             compose.onNodeWithTag("rewind-map-surface").fetchSemanticsNode().boundsInRoot,
         )
+        val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        assertEquals(
+            "Phone map fills its edge-to-edge scene",
+            root,
+            compose.onNodeWithTag("rewind-map-surface").fetchSemanticsNode().boundsInRoot,
+        )
         capture("rewind-geographic-map")
         compose.onNodeWithTag("rewind-native-map").performTouchInput { click(Offset(width * 0.75f, height * 0.5f)) }
         compose.onNodeWithText("Next moment").assertIsDisplayed()
+    }
+
+    @Test fun boundedSceneFillsItsOwnBoundsWithoutAdoptingWindowInsets() {
+        showMap(listOf(MapPanelPoint(36.1699, -115.1398)), bounded = true)
+        awaitMap()
+        val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        val scene = compose.onNodeWithTag("rewind-story-focus").fetchSemanticsNode().boundsInRoot
+        assertTrue("Responsive parent can bound the scene", scene.height < root.height && scene.width < root.width)
+        assertEquals(scene, compose.onNodeWithTag("rewind-native-map").fetchSemanticsNode().boundsInRoot)
+        val heading = compose.onNodeWithText("Where your week was").fetchSemanticsNode().boundsInRoot
+        assertEquals(
+            "A contained scene must not inherit the window's top inset",
+            with(compose.density) { 96.dp.toPx() },
+            heading.top - scene.top,
+            1f,
+        )
+        capture("rewind-bounded-scene-map")
     }
 
     @Test fun singleLocationRendersOneRealNeighborhood() {
@@ -106,6 +141,7 @@ class RewindGeographicMapE2ETest {
         mapsEnabled: Boolean? = null,
         reduceMotion: Boolean? = null,
         fontScale: Float? = null,
+        bounded: Boolean = false,
     ) {
         compose.setContent {
             val density = LocalDensity.current
@@ -115,20 +151,22 @@ class RewindGeographicMapE2ETest {
                 LocalDensity provides Density(density.density, fontScale ?: density.fontScale),
             ) {
                 LogDateTheme {
-                    RewindStoryView(
-                        panels =
-                            listOf(
-                                LocationMapRewindPanelUiState(
-                                    points,
-                                    "Where your week was".toUiText(),
-                                    "Your recorded locations".toUiText(),
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        RewindStoryView(
+                            panels =
+                                listOf(
+                                    LocationMapRewindPanelUiState(
+                                        points,
+                                        "Where your week was".toUiText(),
+                                        "Your recorded locations".toUiText(),
+                                    ),
+                                    SubtitledRewindPanelUiState("Next moment", "Tuesday".toUiText(), null),
                                 ),
-                                SubtitledRewindPanelUiState("Next moment", "Tuesday".toUiText(), null),
-                            ),
-                        onExit = {},
-                        externalPause = true,
-                        modifier = Modifier.fillMaxSize(),
-                    ) { RewindStoryContent(it) }
+                            onExit = {},
+                            externalPause = true,
+                            modifier = if (bounded) Modifier.size(320.dp, 500.dp) else Modifier.fillMaxSize(),
+                        ) { RewindStoryContent(it) }
+                    }
                 }
             }
         }
@@ -173,7 +211,9 @@ class RewindGeographicMapE2ETest {
             val visible =
                 samples.count { (x, y) ->
                     val pixel = image.getPixel((bounds.left + bounds.width * x).toInt(), (bounds.top + bounds.height * y).toInt())
-                    android.graphics.Color.red(pixel) > 100 && android.graphics.Color.green(pixel) > 100
+                    android.graphics.Color.red(pixel) > 25 &&
+                        android.graphics.Color.green(pixel) > 30 &&
+                        android.graphics.Color.blue(pixel) > 35
                 }
             image.recycle()
             visible >= 2

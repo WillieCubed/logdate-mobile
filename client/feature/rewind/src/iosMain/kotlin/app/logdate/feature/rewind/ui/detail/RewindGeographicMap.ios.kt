@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.viewinterop.UIKitInteropProperties
 import androidx.compose.ui.viewinterop.UIKitView
 import app.logdate.ui.platform.rememberSystemReduceMotion
@@ -37,6 +38,7 @@ import platform.MapKit.MKMapView
 import platform.MapKit.MKMapViewDelegateProtocol
 import platform.MapKit.MKPointAnnotation
 import platform.UIKit.UIEdgeInsetsMake
+import platform.UIKit.UIUserInterfaceStyle
 import platform.UIKit.accessibilityLabel
 import platform.darwin.NSObject
 
@@ -77,6 +79,7 @@ internal actual fun RewindGeographicMap(
             failed = true
         }
     }
+    val direction = LocalLayoutDirection.current
     val description = stringResource(Res.string.rewind_map_accessibility)
     val reveal by animateFloatAsState(
         targetValue = if (loaded) 1f else 0.01f,
@@ -124,15 +127,16 @@ internal actual fun RewindGeographicMap(
                                     edgePadding =
                                         UIEdgeInsetsMake(
                                             contentInsets.calculateTopPadding().value.toDouble(),
-                                            24.0,
+                                            contentInsets.calculateLeftPadding(direction).value.toDouble(),
                                             contentInsets.calculateBottomPadding().value.toDouble(),
-                                            24.0,
+                                            contentInsets.calculateRightPadding(direction).value.toDouble(),
                                         ),
                                     animated = false,
                                 )
                             }
                         }
                     }.apply {
+                        overrideUserInterfaceStyle = UIUserInterfaceStyle.UIUserInterfaceStyleDark
                         this.delegate = delegate
                         showsUserLocation = false
                         showsCompass = false

@@ -22,6 +22,21 @@ class WorkspacePlaybackLayoutTest {
     @Test
     fun controlsOverlayTheStoryInRtl() = verifyOverlay(LayoutDirection.Rtl)
 
+    @Test fun phoneSceneKeepsEveryAvailablePixel() =
+        runDesktopComposeUiTest(width = 411, height = 891) {
+            setContent {
+                WorkspacePlaybackLayout(
+                    focus = { Box(Modifier.fillMaxSize().testTag("story")) },
+                    controls = {},
+                )
+            }
+            val scene = onNodeWithTag("story").fetchSemanticsNode().boundsInRoot
+            assertEquals(0f, scene.left)
+            assertEquals(0f, scene.top)
+            assertEquals(411f, scene.width)
+            assertEquals(891f, scene.height)
+        }
+
     private fun verifyOverlay(direction: LayoutDirection) =
         runDesktopComposeUiTest(width = 1280, height = 800) {
             setContent {
@@ -39,5 +54,7 @@ class WorkspacePlaybackLayoutTest {
             assertEquals(story, controls, "Playback controls must stay over the story")
             assertEquals(0f, story.top, "Home gutters must not reduce playback height")
             assertEquals(800f, story.height)
+            assertEquals(40f, story.left)
+            assertEquals(1200f, story.width)
         }
 }
