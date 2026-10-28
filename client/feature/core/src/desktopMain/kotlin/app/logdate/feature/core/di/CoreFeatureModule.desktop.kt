@@ -59,6 +59,7 @@ import app.logdate.feature.core.settings.ui.LocalDiagnosticsViewModel
 import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.MemoriesSettingsViewModel
 import app.logdate.feature.core.settings.ui.MemoriesWidgetInstallController
+import app.logdate.feature.core.settings.ui.PlacesBetaSettingsViewModel
 import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
 import app.logdate.feature.core.settings.ui.RecoveryPhraseEntryViewModel
 import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
@@ -176,6 +177,7 @@ actual val coreFeatureModule: Module =
             )
         }
         viewModel { SettingsOverviewViewModel(get(), get(), get()) }
+        viewModel { PlacesBetaSettingsViewModel(get()) }
         viewModel { LibrarySettingsViewModel(get()) }
         viewModel {
             PrivacySettingsViewModel(

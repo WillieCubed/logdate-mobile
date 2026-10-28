@@ -28,6 +28,9 @@ enum class FeatureFlag(
      */
     LIBRARY(key = "library_enabled", defaultEnabled = true),
 
+    /** Opt-in Places browsing presentation; independent of location collection and Rewind maps. */
+    PLACES_BETA(key = "places_beta_enabled", defaultEnabled = false),
+
     /** Immersive entry overview and block focus, with a legacy presentation rollback. */
     IMMERSIVE_ENTRY_EDITOR(key = "immersive_entry_editor_enabled", defaultEnabled = true),
 

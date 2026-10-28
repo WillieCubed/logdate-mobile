@@ -26,17 +26,12 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaul
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -122,24 +117,17 @@ fun HomeScreen(
     val syncPresentation = syncPresentationViewModel.presentation.collectAsStateWithLifecycle()
     val accountSyncStatus = syncPresentationViewModel.accountStatus.collectAsStateWithLifecycle()
     val campfire = campfireViewModel.presentation.collectAsStateWithLifecycle()
+    val flags: FeatureFlagStore = koinInject()
     val isLibraryEnabled by viewModel.isLibraryEnabled.collectAsStateWithLifecycle()
-    val visibleDestinations = HomeRouteDestination.visibleEntries(isLibraryEnabled)
-    var currentDestination: HomeRouteDestination by rememberSaveable {
-        mutableStateOf(HomeRouteDestination.Timeline)
-    }
-    // Disabling Library while it's the open tab would otherwise leave the shell on a tab that's no
-    // longer in the bar; fall back to Timeline whenever the current tab drops out of the list.
-    LaunchedEffect(visibleDestinations) {
-        if (currentDestination !in visibleDestinations) {
-            currentDestination = HomeRouteDestination.Timeline
-        }
-    }
+    val navigation = rememberHomeNavigation(isLibraryEnabled, flags)
+    val visibleDestinations = navigation.destinations
+    val currentDestination = navigation.selected
     // Ctrl+1 to Ctrl+5 open the Home tabs in the order the navigation shows them.
     val homeKeys =
         modifier.onPreviewKeyEvent { event ->
             val index = AppKeyboardShortcut.match(event, AppShortcutScope.Home)?.homeTabIndex
             val destination = index?.let(visibleDestinations::getOrNull) ?: return@onPreviewKeyEvent false
-            currentDestination = destination
+            navigation.select(destination)
             true
         }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -171,7 +159,6 @@ fun HomeScreen(
             )
         }
     }
-    val flags: FeatureFlagStore = koinInject()
     val mergeJournals: MergeJournalsUseCase = koinInject()
     val mergeIssues = remember(mergeJournals) { mergeJournals.observeIssues() }.collectAsStateWithLifecycle(initialValue = emptyList())
     val workspaceEnabled by remember(flags) { flags.observe(FeatureFlag.HOME_WORKSPACE_V2) }
@@ -188,7 +175,7 @@ fun HomeScreen(
                             WorkspaceRailJournal(it.data.id.toString(), it.data.title)
                         },
                     onOpen = { onOpenJournal(Uuid.parse(it)) },
-                    onSeeAll = { currentDestination = HomeRouteDestination.Journals },
+                    onSeeAll = { navigation.select(HomeRouteDestination.Journals) },
                 )
             }
         HomeWorkspaceComposition(
@@ -198,7 +185,7 @@ fun HomeScreen(
                 },
             selectedKey = currentDestination.name,
             onSelect = {
-                currentDestination = HomeRouteDestination.valueOf(it)
+                navigation.select(HomeRouteDestination.valueOf(it))
             },
             onCreate =
                 if (currentDestination == HomeRouteDestination.LocationHistory) {
@@ -349,7 +336,7 @@ fun HomeScreen(
                         item(
                             selected = destination == currentDestination,
                             onClick = {
-                                currentDestination = destination
+                                navigation.select(destination)
                             },
                             icon = {
                                 if (currentPlatform.isApple) {
@@ -498,18 +485,3 @@ fun HomeScreen(
         }
     }
 }
-
-/**
- * Resolves the SF Symbol painter shown for a home tab on Apple platforms. iOS tab bars
- * conventionally use a single glyph per tab with the system tint indicating selection, so
- * we don't switch between filled/outlined variants here — the tint color handles it.
- */
-@Composable
-private fun HomeRouteDestination.iosTabBarIcon(): Painter =
-    when (this) {
-        HomeRouteDestination.Timeline -> PlatformIcons.timeline()
-        HomeRouteDestination.LocationHistory -> PlatformIcons.location()
-        HomeRouteDestination.Journals -> PlatformIcons.journal()
-        HomeRouteDestination.Library -> PlatformIcons.library()
-        HomeRouteDestination.Rewind -> PlatformIcons.rewind()
-    }

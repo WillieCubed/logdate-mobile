@@ -83,6 +83,7 @@ internal fun SettingsPersonalSection(
     onNavigateToEventsSettings: () -> Unit,
     onNavigateToPeopleSettings: () -> Unit,
     onNavigateToLibrarySettings: () -> Unit,
+    placesBetaSettings: @Composable () -> Unit = {},
 ) {
     SettingsSection(
         title = stringResource(Res.string.settings_group_personal),
@@ -136,6 +137,7 @@ internal fun SettingsPersonalSection(
             icon = { Icon(Icons.Default.Person, contentDescription = null) },
             onClick = onNavigateToPeopleSettings,
         )
+        placesBetaSettings()
         SettingsNavigationItem(
             title = stringResource(Res.string.library_settings),
             description = stringResource(Res.string.library_settings_description),
