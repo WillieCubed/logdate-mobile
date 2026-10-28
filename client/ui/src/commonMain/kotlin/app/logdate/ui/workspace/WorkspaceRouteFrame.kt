@@ -5,6 +5,7 @@ package app.logdate.ui.workspace
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -39,7 +40,7 @@ fun WorkspaceRouteFrame(
     ) { insets ->
         CompositionLocalProvider(LocalWorkspaceHosted provides true) {
             WorkspaceSearchHost {
-                Column(Modifier.fillMaxSize().padding(insets)) {
+                Column(Modifier.fillMaxSize().padding(insets).consumeWindowInsets(insets)) {
                     LocalWorkspaceSearchAction.current?.let { onSearch ->
                         if (focusConstraints.maximumWidth != null) {
                             BoxWithConstraints {

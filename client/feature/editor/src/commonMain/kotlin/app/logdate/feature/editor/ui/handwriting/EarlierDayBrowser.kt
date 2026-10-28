@@ -9,13 +9,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -130,7 +127,7 @@ private fun BrowserEntries(
     heading: @Composable () -> Unit,
 ) {
     Column(
-        modifier.padding(top = 104.dp + WindowInsets.statusBars.asPaddingValues().calculateTopPadding(), bottom = 96.dp),
+        modifier.padding(top = 104.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         heading()

@@ -17,12 +17,14 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -67,6 +69,7 @@ import app.logdate.feature.editor.ui.image.ImageBlockPreview
 import app.logdate.feature.editor.ui.layout.EditorBlockCornerRadius
 import app.logdate.feature.editor.ui.layout.EditorFocus
 import app.logdate.feature.editor.ui.layout.FocusedBlockLayout
+import app.logdate.feature.editor.ui.layout.LocalEntryChromeHeight
 import app.logdate.feature.editor.ui.layout.editorFocus
 import app.logdate.feature.editor.ui.state.BlocksUiState
 import app.logdate.feature.editor.ui.text.TextBlockContent
@@ -343,11 +346,12 @@ fun MainEditorContent(
                                                         if (floatingChrome &&
                                                             liveBlock is TextBlockUiState
                                                         ) {
-                                                            Modifier.padding(
-                                                                top =
-                                                                    80.dp + WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-                                                                bottom = 80.dp,
-                                                            )
+                                                            Modifier
+                                                                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                                                                .padding(
+                                                                    top = LocalEntryChromeHeight.current,
+                                                                    bottom = LocalEntryChromeHeight.current,
+                                                                )
                                                         } else {
                                                             Modifier
                                                         },

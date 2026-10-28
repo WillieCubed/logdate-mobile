@@ -3,6 +3,7 @@ package app.logdate.feature.editor.ui.text
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -79,7 +80,7 @@ fun TextBlockContent(
     val markdownTransformation = rememberInlineMarkdownVisualTransformation()
 
     // The container for the text field
-    Box(
+    BoxWithConstraints(
         modifier =
             modifier
                 .then(if (isExpanded) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
@@ -94,6 +95,7 @@ fun TextBlockContent(
                 },
         contentAlignment = Alignment.TopCenter,
     ) {
+        val verticalPadding = if (isExpanded && maxHeight < 96.dp) Spacing.xs else Spacing.lg
         // The actual text field - use local state with callback
         BasicTextField(
             value = fieldValue,
@@ -125,7 +127,7 @@ fun TextBlockContent(
                 ),
             readOnly = readOnly,
             decorationBox = { innerTextField ->
-                Box(modifier = Modifier.padding(Spacing.lg)) {
+                Box(modifier = Modifier.padding(horizontal = Spacing.lg, vertical = verticalPadding)) {
                     if (fieldValue.text.isEmpty()) {
                         Text(
                             text = stringResource(Res.string.whats_on_your_mind),
