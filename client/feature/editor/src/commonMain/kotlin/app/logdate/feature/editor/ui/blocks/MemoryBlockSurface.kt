@@ -46,6 +46,7 @@ import app.logdate.shared.model.PhotoPresentation
 import app.logdate.ui.common.DropdownMenu
 import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.entry_page_focus_block
 import logdate.client.feature.editor.generated.resources.ink_add
 import logdate.client.feature.editor.generated.resources.memory_audio
 import logdate.client.feature.editor.generated.resources.memory_camera
@@ -143,7 +144,7 @@ internal fun MemoryBlockSurface(
                         IconButton(
                             onClick = onSelect,
                             modifier = Modifier.testTag("focus_block_${block.id}"),
-                        ) { Icon(Icons.Outlined.Fullscreen, "Focus ${memoryBlockLabel(block)}") }
+                        ) { Icon(Icons.Outlined.Fullscreen, stringResource(Res.string.entry_page_focus_block, memoryBlockLabel(block))) }
                     }
                     Box {
                         val overMedia = block is ImageBlockUiState || block is VideoBlockUiState || block is CameraBlockUiState

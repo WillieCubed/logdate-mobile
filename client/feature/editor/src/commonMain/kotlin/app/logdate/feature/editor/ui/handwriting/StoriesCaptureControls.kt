@@ -64,7 +64,17 @@ import app.logdate.shared.model.Journal
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.DropdownMenu
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.close
+import logdate.client.feature.editor.generated.resources.entry_page_block_focus
+import logdate.client.feature.editor.generated.resources.entry_page_choose_journal
+import logdate.client.feature.editor.generated.resources.entry_page_drafts_count
+import logdate.client.feature.editor.generated.resources.entry_page_entry
+import logdate.client.feature.editor.generated.resources.entry_page_focus
+import logdate.client.feature.editor.generated.resources.entry_page_options
+import logdate.client.feature.editor.generated.resources.entry_page_return_to_entry
+import logdate.client.feature.editor.generated.resources.entry_page_save
 import logdate.client.feature.editor.generated.resources.entry_start_default_mode
+import logdate.client.feature.editor.generated.resources.save_entry
 import logdate.client.feature.editor.generated.resources.saving
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
@@ -103,6 +113,9 @@ internal fun EntryFocusPrototypeHeader(
     var optionsOpen by remember { mutableStateOf(false) }
     val focused = block != null
     val savingDescription = stringResource(Res.string.saving)
+    val paneDescription = stringResource(if (focused) Res.string.entry_page_block_focus else Res.string.entry_page_entry)
+    val returnToEntryDescription = stringResource(Res.string.entry_page_return_to_entry)
+    val saveDescription = stringResource(Res.string.save_entry)
     val largeText = LocalDensity.current.fontScale >= 1.5f
     val header: @Composable () -> Unit = {
         Row(
@@ -112,7 +125,7 @@ internal fun EntryFocusPrototypeHeader(
                 .padding(horizontal = 12.dp)
                 .then(if (recording || canvasOnly) Modifier else Modifier.captureModeSwipes(captureModeForBlock(block), onCaptureMode))
                 .testTag(if (focused) "entry_mode_focus" else "entry_mode_overview")
-                .semantics { paneTitle = if (focused) "Block focus" else "Entry" },
+                .semantics { paneTitle = paneDescription },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -125,7 +138,7 @@ internal fun EntryFocusPrototypeHeader(
                             containerColor = StoryChrome,
                             contentColor = MaterialTheme.colorScheme.onSurface,
                         ),
-                    modifier = Modifier.semantics { contentDescription = "Return to entry" },
+                    modifier = Modifier.semantics { contentDescription = returnToEntryDescription },
                 ) {
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack, null, Modifier.size(20.dp))
                 }
@@ -138,7 +151,13 @@ internal fun EntryFocusPrototypeHeader(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        if (!largeText) Text("Focus", style = MaterialTheme.typography.labelSmall, color = StoryMuted)
+                        if (!largeText) {
+                            Text(
+                                stringResource(Res.string.entry_page_focus),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = StoryMuted,
+                            )
+                        }
                     }
                 }
             } else {
@@ -149,7 +168,7 @@ internal fun EntryFocusPrototypeHeader(
                             containerColor = StoryChrome,
                             contentColor = MaterialTheme.colorScheme.onSurface,
                         ),
-                ) { Icon(Icons.Outlined.Close, "Close") }
+                ) { Icon(Icons.Outlined.Close, stringResource(Res.string.close)) }
                 Box(Modifier.weight(1f).height(48.dp)) {
                     Column(
                         (
@@ -168,14 +187,14 @@ internal fun EntryFocusPrototypeHeader(
                     ) {
                         if (!largeText && !floating) {
                             Text(
-                                "Entry",
+                                stringResource(Res.string.entry_page_entry),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                if (journalSelected) journal?.title.orEmpty() else "Choose journal",
+                                if (journalSelected) journal?.title.orEmpty() else stringResource(Res.string.entry_page_choose_journal),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = StoryMuted,
                             )
@@ -200,7 +219,7 @@ internal fun EntryFocusPrototypeHeader(
                     enabled = saveEnabled && !saveInProgress,
                     modifier =
                         Modifier.height(40.dp).semantics {
-                            contentDescription = "Save entry"
+                            contentDescription = saveDescription
                             if (saveInProgress) stateDescription = savingDescription
                             liveRegion = LiveRegionMode.Polite
                         },
@@ -211,7 +230,7 @@ internal fun EntryFocusPrototypeHeader(
                     } else if (largeText) {
                         Icon(Icons.Outlined.Check, null, Modifier.size(20.dp))
                     } else {
-                        Text("Save", maxLines = 1)
+                        Text(stringResource(Res.string.entry_page_save), maxLines = 1)
                     }
                 }
                 if (onShowDrafts != null) {
@@ -219,7 +238,7 @@ internal fun EntryFocusPrototypeHeader(
                         FilledTonalIconButton(
                             onClick = { optionsOpen = true },
                             modifier = Modifier.size(40.dp),
-                        ) { Icon(Icons.Outlined.MoreVert, "Entry options") }
+                        ) { Icon(Icons.Outlined.MoreVert, stringResource(Res.string.entry_page_options)) }
                         DropdownMenu(optionsOpen, { optionsOpen = false }) {
                             onChooseDefaultMode?.let { chooseDefault ->
                                 DropdownMenuItem(
@@ -231,7 +250,7 @@ internal fun EntryFocusPrototypeHeader(
                                 )
                             }
                             DropdownMenuItem(
-                                text = { Text("Drafts ($draftCount)") },
+                                text = { Text(stringResource(Res.string.entry_page_drafts_count, draftCount)) },
                                 enabled = draftCount > 0,
                                 modifier = Modifier.testTag("entry_open_drafts"),
                                 onClick = {

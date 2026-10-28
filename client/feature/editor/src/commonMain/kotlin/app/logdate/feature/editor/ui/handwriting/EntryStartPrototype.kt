@@ -45,6 +45,9 @@ import app.logdate.feature.editor.ui.state.BlocksUiState
 import app.logdate.feature.editor.ui.state.EditorBlockPresentation
 import app.logdate.feature.editor.ui.state.rememberBlocksUiState
 import app.logdate.shared.model.Journal
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.entry_page_sample_journal
+import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
 
 /** Local preview state in the original editor components; saving belongs to the real editor host. */
@@ -67,7 +70,8 @@ fun EntryStartPrototype(
     overviewStudyState: EntryPageOverviewState? = null,
     studyDefaultMode: EntryStartMode = EntryStartMode.TEXT,
 ) {
-    val journal = remember { Journal(title = "Everyday") }
+    val journalTitle = stringResource(Res.string.entry_page_sample_journal)
+    val journal = remember(journalTitle) { Journal(title = journalTitle) }
     var blocks by remember {
         mutableStateOf(
             initialBlocks ?: buildList<EntryBlockUiState> {

@@ -87,6 +87,11 @@ import app.logdate.ui.foldable.rememberFoldableLayoutInfo
 import app.logdate.ui.foldable.rememberWindowOrigin
 import app.logdate.ui.platform.rememberLogDateHaptics
 import kotlinx.coroutines.launch
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.entry_page_browse_earlier_today
+import logdate.client.feature.editor.generated.resources.entry_page_earlier_today
+import logdate.client.feature.editor.generated.resources.entry_page_now
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 import kotlin.uuid.Uuid
 
@@ -226,9 +231,13 @@ internal fun EntryPageOverview(
             if (notes.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Earlier today", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            stringResource(Res.string.entry_page_earlier_today),
+                            Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
                         FilledTonalIconButton(onClick = { state.earlierExpanded = true }) {
-                            Icon(Icons.Outlined.History, "Browse earlier today")
+                            Icon(Icons.Outlined.History, stringResource(Res.string.entry_page_browse_earlier_today))
                         }
                     }
                     EarlierEntryContext(notes, showHeading = false)
@@ -238,7 +247,7 @@ internal fun EntryPageOverview(
         val writing: @Composable () -> Unit = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    "Now",
+                    stringResource(Res.string.entry_page_now),
                     Modifier.padding(horizontal = 16.dp),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

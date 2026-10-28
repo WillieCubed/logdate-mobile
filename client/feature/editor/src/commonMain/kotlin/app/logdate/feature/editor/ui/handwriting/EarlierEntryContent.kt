@@ -14,6 +14,10 @@ import app.logdate.feature.editor.ui.audio.AudioPlaybackComponent
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.image.ImageBlockPreview
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.entry_page_handwriting_newer_version
+import logdate.client.feature.editor.generated.resources.entry_page_handwritten_entry
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun EarlierEntryContent(note: JournalNote) {
@@ -21,12 +25,12 @@ internal fun EarlierEntryContent(note: JournalNote) {
         is JournalNote.Text -> Text(note.content, style = MaterialTheme.typography.bodyLarge)
         is JournalNote.Handwriting -> {
             if (note.unreadableContent != null) {
-                Text("This handwriting needs a newer version of LogDate.")
+                Text(stringResource(Res.string.entry_page_handwriting_newer_version))
             } else {
                 HandwritingCanvas(
                     note.document.toPage(),
                     Modifier.fillMaxWidth().heightIn(min = 208.dp, max = 320.dp),
-                    description = "Handwritten entry",
+                    description = stringResource(Res.string.entry_page_handwritten_entry),
                     fitPreviewToWidth = false,
                     adaptInkToPaper = true,
                     paperColor = MaterialTheme.colorScheme.surfaceContainerLow,
