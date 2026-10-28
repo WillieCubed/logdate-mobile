@@ -21,11 +21,35 @@ internal class AudioPlaybackController(
     private val scope: CoroutineScope,
     private val stopRecordingBeforePlayback: suspend () -> Unit,
 ) {
+    init {
+        statusProvider?.let { provider ->
+            scope.launch {
+                provider.playbackStatus.collect { status ->
+                    state.update { current ->
+                        if (current.currentUri == null) {
+                            current
+                        } else if (current.currentUri != status.currentUri) {
+                            current.copy(isPlaying = false)
+                        } else {
+                            current.copy(isPlaying = status.isPlaying, playbackProgress = status.progress)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun ownsPlayback(expectedUri: String? = null): Boolean {
+        val uri = state.value.currentUri
+        if (expectedUri != null && uri != expectedUri) return false
+        return statusProvider == null || statusProvider.playbackStatus.value.currentUri == uri
+    }
+
     fun toggle(
         uri: String,
         metadata: AudioPlaybackMetadata?,
     ) {
-        if (state.value.isPlaying) pause() else start(uri, metadata)
+        if (state.value.isPlaying && state.value.currentUri == uri && ownsPlayback(uri)) pause(uri) else start(uri, metadata)
     }
 
     fun start(
@@ -36,12 +60,14 @@ internal class AudioPlaybackController(
             Napier.d("AudioViewModel: Starting playback of $uri")
             try {
                 stopRecordingBeforePlayback()
-                state.update { it.copy(isPlaying = true, currentUri = uri, isRecording = false, isPaused = false) }
+                state.update { it.copy(isPlaying = true, currentUri = uri, isRecording = false, isPaused = false, error = null) }
                 manager.startPlayback(
                     uri = uri,
                     metadata = metadata,
-                    onProgressUpdated = { progress -> state.update { it.copy(playbackProgress = progress) } },
-                    onPlaybackCompleted = { completePlayback() },
+                    onProgressUpdated = { progress ->
+                        if (ownsPlayback(uri)) state.update { it.copy(playbackProgress = progress) }
+                    },
+                    onPlaybackCompleted = { completePlayback(uri) },
                 )
             } catch (cancellation: CancellationException) {
                 throw cancellation
@@ -52,8 +78,14 @@ internal class AudioPlaybackController(
         }
     }
 
-    private fun completePlayback() {
-        val failure = statusProvider?.playbackStatus?.value?.errorMessage
+    private fun completePlayback(uri: String) {
+        if (state.value.currentUri != uri) return
+        val failure =
+            statusProvider
+                ?.playbackStatus
+                ?.value
+                ?.takeIf { it.currentUri == uri }
+                ?.errorMessage
         state.update {
             it.copy(
                 isPlaying = false,
@@ -63,8 +95,9 @@ internal class AudioPlaybackController(
         }
     }
 
-    fun pause() {
+    fun pause(expectedUri: String? = null) {
         scope.launch {
+            if (!ownsPlayback(expectedUri)) return@launch
             Napier.d("AudioViewModel: Pausing playback")
             try {
                 manager.pausePlayback()
@@ -75,8 +108,12 @@ internal class AudioPlaybackController(
         }
     }
 
-    fun seek(position: Float) {
+    fun seek(
+        position: Float,
+        expectedUri: String? = null,
+    ) {
         scope.launch {
+            if (!ownsPlayback(expectedUri)) return@launch
             Napier.d("AudioViewModel: Seeking to $position")
             try {
                 manager.seekTo(position)
@@ -92,6 +129,7 @@ internal class AudioPlaybackController(
         durationMs: Long,
     ) {
         scope.launch {
+            if (!ownsPlayback()) return@launch
             Napier.d("AudioViewModel: Seeking to ${positionMs}ms")
             try {
                 manager.seekTo(positionMs, durationMs)
@@ -107,6 +145,6 @@ internal class AudioPlaybackController(
     }
 
     fun stopIfPlaying() {
-        if (state.value.isPlaying) manager.stopPlayback()
+        if (state.value.isPlaying && ownsPlayback()) manager.stopPlayback()
     }
 }

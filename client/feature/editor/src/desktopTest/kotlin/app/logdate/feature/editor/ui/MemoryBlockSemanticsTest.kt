@@ -22,10 +22,13 @@ import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.blocks.MemoryBlockSurface
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
+import app.logdate.feature.editor.ui.editor.AudioCaptureState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
 import app.logdate.feature.editor.ui.state.BlocksUiState
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.editor_error_recording_not_recovered
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -33,6 +36,38 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class MemoryBlockSemanticsTest {
+    @Test
+    fun `recording finalization ready and recovery preserve the selected memory surface identity`() =
+        runSkikoComposeUiTest(size = Size(500f, 700f)) {
+            val audio = mutableStateOf(AudioBlockUiState(captureState = AudioCaptureState.Recording("retained.m4a")))
+            setContent {
+                MaterialTheme {
+                    MemoryBlockSurface(audio.value, true, {}, {}, {}) {
+                        Text(audio.value.captureState::class.simpleName.orEmpty())
+                    }
+                }
+            }
+            val tag = "memory_block_${audio.value.id}"
+            val original = onNodeWithTag(tag).fetchSemanticsNode()
+            val top = onNodeWithTag(tag).getUnclippedBoundsInRoot().top
+            val states =
+                listOf(
+                    AudioCaptureState.Stopping("retained.m4a"),
+                    AudioCaptureState.Ready("retained.m4a", 8_000),
+                    AudioCaptureState.Failed(
+                        Res.string.editor_error_recording_not_recovered,
+                        "retained.m4a",
+                    ),
+                )
+            states.forEach { capture ->
+                runOnIdle { audio.value = audio.value.copy(captureState = capture) }
+                val updated = onNodeWithTag(tag).fetchSemanticsNode()
+                assertEquals(original.id, updated.id)
+                assertTrue(updated.config[SemanticsProperties.Selected])
+                assertEquals(top, onNodeWithTag(tag).getUnclippedBoundsInRoot().top)
+            }
+        }
+
     @Test
     fun `every memory type offers the same edit and remove actions`() {
         listOf(TextBlockUiState(), ImageBlockUiState(), AudioBlockUiState(), VideoBlockUiState()).forEach { block ->

@@ -1,7 +1,6 @@
 package app.logdate.feature.editor.ui.audio
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -28,8 +28,10 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.feature.editor.ui.formatMediaDuration
@@ -37,11 +39,14 @@ import app.logdate.ui.audio.AudioContextProcessor
 import app.logdate.ui.audio.AudioWaveformComponent
 import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.capture_state_playback_failed
+import logdate.client.feature.editor.generated.resources.capture_state_playback_start_failed
 import logdate.client.feature.editor.generated.resources.generating_transcription
 import logdate.client.feature.editor.generated.resources.pause
 import logdate.client.feature.editor.generated.resources.play
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -62,16 +67,47 @@ fun AudioPlaybackComponent(
     waveformEnabled: Boolean = true,
     showTranscription: Boolean = false,
     transcriptionText: String? = null,
-    viewModel: AudioViewModel = koinInject(),
+    viewModel: AudioViewModel = koinViewModel(key = "entry-audio-playback"),
+    knownDurationMs: Long = 0,
+    contentPadding: Dp = 16.dp,
+) {
+    val durationResolver: AudioDurationResolver = koinInject()
+    ValidatedAudioContent(audioUri, knownDurationMs, durationResolver::resolveDurationMs, modifier.padding(contentPadding)) { duration ->
+        ResolvedAudioPlaybackComponent(
+            audioUri,
+            Modifier,
+            initiallyPlaying,
+            waveformEnabled,
+            showTranscription,
+            transcriptionText,
+            viewModel,
+            duration,
+        )
+    }
+}
+
+@Suppress("ktlint:standard:function-naming")
+@Composable
+private fun ResolvedAudioPlaybackComponent(
+    audioUri: String,
+    modifier: Modifier = Modifier,
+    initiallyPlaying: Boolean = false,
+    waveformEnabled: Boolean = true,
+    showTranscription: Boolean = false,
+    transcriptionText: String? = null,
+    viewModel: AudioViewModel,
+    resolvedDurationMs: Long,
 ) {
     val audioContextProcessor: AudioContextProcessor = koinInject()
-    val durationResolver: AudioDurationResolver = koinInject()
     // Get the current UI state from the view model
     val uiState by viewModel.uiState.collectAsState()
 
-    val resolvedDuration by produceState(initialValue = Duration.ZERO, key1 = audioUri) {
-        val durationMs = durationResolver.resolveDurationMs(audioUri)
-        value = durationMs?.milliseconds ?: Duration.ZERO
+    val resolvedDuration = resolvedDurationMs.milliseconds
+    if (uiState.currentUri == audioUri &&
+        (uiState.error == Res.string.capture_state_playback_failed || uiState.error == Res.string.capture_state_playback_start_failed)
+    ) {
+        AudioUnavailableContent(resolvedDurationMs, onRetry = { viewModel.startPlayback(audioUri) }, playbackFailure = true)
+        return
     }
 
     val waveformAmplitudes by produceState(
@@ -95,14 +131,14 @@ fun AudioPlaybackComponent(
 
     // Create playback state that manages playback
     val playbackState =
-        remember {
+        remember(audioUri) {
             // Create the state with a non-circular reference to the seek operation
             AudioPlaybackState(
                 audioUri = audioUri,
                 initialIsPlaying = initiallyPlaying,
-                initialTotalDuration = Duration.ZERO,
+                initialTotalDuration = resolvedDuration,
                 onStartPlayback = { viewModel.startPlayback(audioUri) },
-                onStopPlayback = { viewModel.pausePlayback() },
+                onStopPlayback = { viewModel.pausePlaybackFor(audioUri) },
                 onSeek = { duration, totalDuration ->
                     val ratio =
                         if (totalDuration > Duration.ZERO) {
@@ -113,7 +149,7 @@ fun AudioPlaybackComponent(
                         } else {
                             0f
                         }
-                    viewModel.seekTo(ratio)
+                    viewModel.seekPlaybackFor(audioUri, ratio)
                 },
             )
         }
@@ -146,6 +182,8 @@ fun AudioPlaybackComponent(
                 val newDuration = Duration.parse(progressDuration.toString() + "ms")
                 playbackState.updateProgress(newDuration)
             }
+        } else {
+            playbackState.updatePlaybackState(false)
         }
     }
 
@@ -157,19 +195,17 @@ fun AudioPlaybackComponent(
     }
 
     // Clean up on disposal
-    DisposableEffect(Unit) {
+    DisposableEffect(audioUri) {
         onDispose {
-            if (playbackState.isPlaying) {
-                playbackState.stopPlayback()
+            if (viewModel.uiState.value.currentUri == audioUri && viewModel.uiState.value.isPlaying) {
+                viewModel.pausePlaybackFor(audioUri)
             }
         }
     }
 
     Column(
         modifier =
-            modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier.fillMaxWidth(),
     ) {
         // Optional transcription display
         if (showTranscription) {
@@ -259,17 +295,13 @@ fun AudioPlaybackComponent(
         ) {
             // Play/pause button
             Surface(
+                onClick = { playbackState.togglePlayback() },
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primaryContainer,
                 modifier =
                     Modifier
                         .size(48.dp)
-                        .clip(CircleShape)
-                        .pointerInput(playbackState) {
-                            detectTapGestures {
-                                playbackState.togglePlayback()
-                            }
-                        },
+                        .semantics { role = Role.Button },
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     if (playbackState.isLoading || (uiState.currentUri == audioUri && uiState.isPlaying != playbackState.isPlaying)) {
@@ -305,7 +337,9 @@ fun AudioPlaybackComponent(
                 text = formatMediaDuration(playbackState.progress.inWholeMilliseconds, true),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.width(40.dp),
+                modifier = Modifier.widthIn(min = 48.dp),
+                maxLines = 1,
+                softWrap = false,
             )
 
             if (!waveformEnabled) {
@@ -324,7 +358,9 @@ fun AudioPlaybackComponent(
                 text = formatMediaDuration(playbackState.totalDuration.inWholeMilliseconds, true),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.width(40.dp),
+                modifier = Modifier.widthIn(min = 48.dp),
+                maxLines = 1,
+                softWrap = false,
             )
         }
     }

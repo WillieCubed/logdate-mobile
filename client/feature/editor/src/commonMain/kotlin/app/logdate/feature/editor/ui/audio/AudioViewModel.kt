@@ -370,6 +370,13 @@ class AudioViewModel(
      */
     fun pausePlayback() = playbackController.pause()
 
+    fun pausePlaybackFor(uri: String) = playbackController.pause(uri)
+
+    fun seekPlaybackFor(
+        uri: String,
+        position: Float,
+    ) = playbackController.seek(position, uri)
+
     /**
      * Seeks to a specific position in the audio.
      */

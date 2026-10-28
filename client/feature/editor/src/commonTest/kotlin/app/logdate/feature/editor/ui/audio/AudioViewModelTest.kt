@@ -890,14 +890,32 @@ class AudioViewModelTest {
     private fun buildViewModel(
         recordingManager: FakeAudioRecordingManager,
         durationResolver: AudioDurationResolver = FakeAudioDurationResolver(),
+        playbackManager: AudioPlaybackManager = FakeAudioPlaybackManager(),
     ): AudioViewModel =
         AudioViewModel(
             audioRecordingManager = recordingManager,
-            audioPlaybackManager = FakeAudioPlaybackManager(),
+            audioPlaybackManager = playbackManager,
             audioDurationResolver = durationResolver,
             transcriptionService = FakeTranscriptionService(),
             audioTaggingService = NoopAudioTaggingService,
         )
+
+    @Test
+    fun `retry playback clears the previous failure without starting capture`() =
+        runTest(dispatcher) {
+            val recorder = FakeAudioRecordingManager("retained.m4a", 1.seconds, 0f)
+            val player = FakeAudioPlaybackManager().apply { startFailure = IllegalStateException("unavailable") }
+            val model = buildViewModel(recorder, playbackManager = player)
+            model.startPlayback("retained.m4a")
+            advanceUntilIdle()
+            assertNotNull(model.uiState.value.error)
+            player.startFailure = null
+            model.startPlayback("retained.m4a")
+            advanceUntilIdle()
+            assertNull(model.uiState.value.error)
+            assertTrue(model.uiState.value.isPlaying)
+            assertEquals(0, recorder.startCalls)
+        }
 
     @Test
     fun `tapping record twice starts a single recording`() =
@@ -1236,6 +1254,7 @@ private class FakeAudioRecordingManager(
 }
 
 private class FakeAudioPlaybackManager : AudioPlaybackManager {
+    var startFailure: Exception? = null
     var lastSeekRatio: Float? = null
     var lastSeekPositionMs: Long? = null
     var lastSeekDurationMs: Long? = null
@@ -1246,6 +1265,7 @@ private class FakeAudioPlaybackManager : AudioPlaybackManager {
         onProgressUpdated: (Float) -> Unit,
         onPlaybackCompleted: () -> Unit,
     ) {
+        startFailure?.let { throw it }
         onProgressUpdated(0f)
     }
 

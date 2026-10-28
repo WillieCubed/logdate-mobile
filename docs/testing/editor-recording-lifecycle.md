@@ -31,3 +31,18 @@ an empty or unplayable recording as a successful save.
 The lifecycle tests inject Android touch input. The notification test also opens
 the system shade and taps the notification with UiAutomator. Screenshots and XML
 results remain in the supplied output directory for inspection.
+
+Saved audio shown in earlier-entry context must also expose its actual recording
+UI rather than a generic media-type label. Native acceptance waits for validated
+playback, checks Play is reachable, and rejects the bare Audio fallback before
+capturing the retained second editor. Loading and unavailable-file states retain
+known duration, offer a non-destructive retry, and keep the outer container stable.
+Focused regressions cover recording/finalizing/ready/recovery surface identity,
+duration updates without reloading media, and one preview being unable to pause,
+seek, or dispose another preview's current playback.
+
+An explicit blank new window versus recording recovery remains a named UX gap.
+Context-free editor requests currently resume an active local recording, while
+populated or contextual requests retain their independent input. A future intent
+distinction and persistent global recording controller are design work; these
+regressions do not claim that behavior is implemented.

@@ -46,7 +46,7 @@ internal fun EarlierEntryContent(note: JournalNote) {
             if (note.caption.isNotBlank()) Text(note.caption)
         }
         is JournalNote.Audio -> {
-            AudioPlaybackComponent(note.mediaRef, Modifier.fillMaxWidth())
+            AudioPlaybackComponent(note.mediaRef, Modifier.fillMaxWidth(), knownDurationMs = note.durationMs)
             if (note.caption.isNotBlank()) Text(note.caption)
         }
         is JournalNote.Video -> {
