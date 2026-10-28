@@ -52,9 +52,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -74,7 +71,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -121,12 +117,10 @@ import logdate.client.feature.editor.generated.resources.captured_photo
 import logdate.client.feature.editor.generated.resources.captured_video
 import logdate.client.feature.editor.generated.resources.editor_action_record_video
 import logdate.client.feature.editor.generated.resources.microphone
-import logdate.client.feature.editor.generated.resources.photo
 import logdate.client.feature.editor.generated.resources.stop_recording
 import logdate.client.feature.editor.generated.resources.switch_camera
 import logdate.client.feature.editor.generated.resources.take_photo
 import logdate.client.feature.editor.generated.resources.tap_to_enable_camera
-import logdate.client.feature.editor.generated.resources.video
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -1001,50 +995,6 @@ private fun RecordingIndicator(
                 )
             }
         }
-    }
-}
-
-/**
- * Toggle between photo and video capture modes.
- */
-@Suppress("ktlint:standard:function-naming")
-@Composable
-private fun PhotoVideoToggle(
-    currentMode: CaptureMode,
-    onModeChanged: (CaptureMode) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    SingleChoiceSegmentedButtonRow(modifier = modifier) {
-        SegmentedButton(
-            selected = currentMode == CaptureMode.PHOTO,
-            onClick = { onModeChanged(CaptureMode.PHOTO) },
-            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-            icon = { SegmentedButtonDefaults.Icon(active = currentMode == CaptureMode.PHOTO) },
-            label = { CameraToggleOption(Icons.Default.CameraAlt, stringResource(Res.string.photo)) },
-        )
-
-        SegmentedButton(
-            selected = currentMode == CaptureMode.VIDEO,
-            onClick = { onModeChanged(CaptureMode.VIDEO) },
-            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-            icon = { SegmentedButtonDefaults.Icon(active = currentMode == CaptureMode.VIDEO) },
-            label = { CameraToggleOption(Icons.Default.Videocam, stringResource(Res.string.video)) },
-        )
-    }
-}
-
-@Suppress("ktlint:standard:function-naming")
-@Composable
-private fun CameraToggleOption(
-    icon: ImageVector,
-    label: String,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(24.dp))
-        Text(label)
     }
 }
 
