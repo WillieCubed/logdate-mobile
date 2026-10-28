@@ -1,11 +1,17 @@
 package app.logdate.feature.editor.ui.content
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
+import androidx.compose.ui.unit.Density
 import app.logdate.client.datastore.EntryStartMode
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.feature.editor.ui.editor.BlockType
@@ -28,33 +34,47 @@ class EntryStartContentTest {
                 EntryStartMode.GALLERY to BlockType.IMAGE,
             )
         for ((mode, expected) in modes) {
-            runDesktopComposeUiTest(width = 360, height = 800) {
-                var created: BlockType? = null
-                setContent {
-                    LogDateTheme(dynamicColor = false) {
-                        EntryStartContent(emptyList(), { type, _ -> created = type }, {}, defaultMode = mode)
+            for (fontScale in listOf(1f, 2f)) {
+                runDesktopComposeUiTest(width = 360, height = 800) {
+                    var created: BlockType? = null
+                    setContent {
+                        CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
+                            LogDateTheme(dynamicColor = false) {
+                                EntryStartContent(emptyList(), { type, _ -> created = type }, {}, defaultMode = mode)
+                            }
+                        }
                     }
+                    assertNull(created)
+                    // The tile center can be inside its nested alternative-mode button.
+                    onNodeWithTag("entry_start_primary").assertIsDisplayed().performTouchInput {
+                        click(Offset(width * 0.15f, height * 0.15f))
+                    }
+                    assertEquals(expected, created)
                 }
-                assertNull(created)
-                onNodeWithTag("entry_start_primary").assertIsDisplayed().performClick()
-                assertEquals(expected, created)
             }
         }
     }
 
     @Test
-    fun `writing is ready without choosing a mode or creating content`() =
-        runDesktopComposeUiTest(width = 360, height = 800) {
-            var created: BlockType? = null
-            setContent {
-                LogDateTheme(dynamicColor = false) {
-                    EntryStartContent(emptyList(), { type, _ -> created = type }, {})
+    fun `writing is ready without choosing a mode or creating content`() {
+        for (fontScale in listOf(1f, 2f)) {
+            runDesktopComposeUiTest(width = 360, height = 800) {
+                var created: BlockType? = null
+                setContent {
+                    CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
+                        LogDateTheme(dynamicColor = false) {
+                            EntryStartContent(emptyList(), { type, _ -> created = type }, {})
+                        }
+                    }
                 }
+                assertNull(created)
+                onNodeWithTag("entry_start_writing").assertIsDisplayed().performTouchInput {
+                    click(Offset(width * 0.15f, height * 0.15f))
+                }
+                assertEquals(BlockType.TEXT, created)
             }
-            assertNull(created)
-            onNodeWithTag("entry_start_writing").assertIsDisplayed().performClick()
-            assertEquals(BlockType.TEXT, created)
         }
+    }
 
     @Test
     fun `handwriting remains a secondary capture action`() =
