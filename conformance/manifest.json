@@ -16,7 +16,7 @@
   ],
   "inputs": {
     "description": "The lexicon and example files these fixtures were generated from. A client copies lexicons/ at this revision and checks each file's sha256. digest is the SHA-256 of the lines '<sha256>  <path>' for all files, sorted by path.",
-    "digest": "ada37bf45a034262a0c45eeba418ee9ab05f9b8492e4cc1b539c4d0c40bf3f92",
+    "digest": "05954c3ad589860cbecd8b28dfabfadf6cc15d03b20fa69d4986a97993688d6c",
     "files": {
       "lexicons/app/logdate/actor/profile.json": "f4c7b4672319cf885e5cb1c40e25eef5d2989557adbc882172f463ba3a85ddfc",
       "lexicons/app/logdate/actor/settings.json": "c607132ea5d1fb1e75411ef26b952b5fc386174d5f26ab3425703e29a17e5ccd",
@@ -60,6 +60,7 @@
       "lexicons/app/logdate/space/circle.json": "463b54d6521b7f937aa2c3f30de7eeb7d5b0e915bd30288d69b4724242dca92e",
       "lexicons/app/logdate/space/deleteRecord.json": "5d25ee15e3a52822d7aa4c88cdae4ebf80dfc3d7402481213d9059a3af7c0d38",
       "lexicons/app/logdate/space/getBlob.json": "11bc118160a39240ffc558d6bc20fcd6ed1a3891ece033d662832c41b6d4aa93",
+      "lexicons/app/logdate/space/getBlobUploadReceipt.json": "977bce134dc37143434690730f0be8166c0d97d7ed25e3a95b8e38997a471db4",
       "lexicons/app/logdate/space/getRecord.json": "1c4fce3c423c311816f004e64ea8725f60e3184c74ec704df67d8bfbd78559bb",
       "lexicons/app/logdate/space/group.json": "aa9531b490346a875754a37ac9758986621017ff5ce183db37ff45d240f0443b",
       "lexicons/app/logdate/space/groupProfile.json": "53e86bf3f3b5c0f5aa495f749696068dbd1ac2dcbf32e4442702183b4735fe5a",
