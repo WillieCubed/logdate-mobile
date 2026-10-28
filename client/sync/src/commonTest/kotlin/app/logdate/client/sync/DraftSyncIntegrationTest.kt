@@ -44,6 +44,78 @@ import kotlin.uuid.Uuid
 
 class DraftSyncIntegrationTest {
     @Test
+    fun `an acknowledged rich draft with submillisecond time is not uploaded again after download or restart`() =
+        runTest {
+            val api = fakeCloudApiClient()
+            val drafts = FakeJournalRepository()
+            val metadata = fakeSyncMetadataService()
+            val draft =
+                testDraft(content = "unchanged synthetic draft").copy(
+                    lastModifiedAt = Instant.parse("2026-10-28T05:00:00.123456789Z"),
+                )
+            drafts.saveDraftFromSync(draft)
+            metadata.enqueuePending(draft.id.toString(), EntityType.DRAFT, PendingOperation.CREATE)
+            val source = DefaultCloudDraftDataSource(api, cipher(), supportsRichDrafts = { true })
+
+            fun manager() =
+                testDefaultSyncManager(
+                    cloudDraftDataSource = source,
+                    journalRepository = drafts,
+                    syncMetadataService = metadata,
+                    supportsRichDrafts = { true },
+                    syncScope = backgroundScope,
+                )
+            assertTrue(manager().syncDrafts().success)
+            val sent = api.uploadDraftCalls.single().second
+            val payloadBytes =
+                sent.encryptedBlocks
+                    .orEmpty()
+                    .encodeToByteArray()
+                    .size
+            api.getDraftChangesResponse =
+                Result.success(
+                    DraftChangesResponse(
+                        drafts =
+                            listOf(
+                                DraftChange(
+                                    id = sent.id,
+                                    content = sent.content,
+                                    blockTypes = sent.blockTypes,
+                                    journalIds = sent.journalIds,
+                                    createdAt = sent.createdAt,
+                                    lastUpdated = sent.lastUpdated,
+                                    deviceId = sent.deviceId,
+                                    serverVersion = 1,
+                                    encryptedBlocksVersion = sent.encryptedBlocksVersion,
+                                    encryptedBlocks = sent.encryptedBlocks,
+                                ),
+                            ),
+                    ),
+                )
+            repeat(3) { assertTrue(manager().syncDrafts().success) }
+            assertEquals(1, api.uploadDraftCalls.size, "An own upload echo is not a new local edit")
+            assertEquals(
+                payloadBytes,
+                api.uploadDraftCalls.sumOf {
+                    it.second.encryptedBlocks
+                        .orEmpty()
+                        .encodeToByteArray()
+                        .size
+                },
+            )
+            assertEquals(draft, drafts.getDraft(draft.id))
+            val edited =
+                draft.copy(
+                    lastModifiedAt = Instant.parse("2026-10-28T05:00:00.123456790Z"),
+                    blocks = listOf(SerializableTextBlock(Uuid.random(), draft.createdAt, content = "real new edit")),
+                )
+            drafts.saveDraftFromSync(edited)
+            assertTrue(manager().syncDrafts().success)
+            assertEquals(2, api.uploadDraftCalls.size, "A real edit one nanosecond later must still upload")
+            assertEquals(edited, drafts.getDraft(draft.id))
+        }
+
+    @Test
     fun `same server version keeps already hydrated draft media local`() =
         runTest {
             val database = DownloadInboxTest.Database()
