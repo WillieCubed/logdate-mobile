@@ -4,7 +4,7 @@ Run the focused acceptance tests on a repository-declared Gradle Managed Device:
 
 ```sh
 ./gradlew :app:android-main:phoneApi34DebugAndroidTest \
-  -Plogdate.androidTestClass=app.logdate.client.e2e.EditorSafeAreaAcceptanceTest,app.logdate.client.e2e.SurfaceSafeAreaAcceptanceTest,app.logdate.client.e2e.EditorGeometryAcceptanceTest \
+  -Plogdate.androidTestClass=app.logdate.client.e2e.EditorSafeAreaAcceptanceTest,app.logdate.client.e2e.SurfaceSafeAreaAcceptanceTest,app.logdate.client.e2e.EditorGeometryAcceptanceTest,app.logdate.client.e2e.EditorLongPageAcceptanceTest \
   -Plogdate.androidTestCoverage=false \
   -Plogdate.androidTestOrchestrator=false
 ```
@@ -70,3 +70,13 @@ It exercises the real IME and captures six bounded images in `editor-geometry/`,
 including the two large-text keyboard states. Inspect their pixels separately
 from the measurements. Native runs do not cover a 280dp window or RTL; those are
 headless layout regressions.
+
+The overview selector follows its document anchor until it reaches the safe bottom
+of the viewport, including the IME boundary. Long documents cannot push it into
+system navigation. The creation slot and bottom spacing still let the last block
+scroll fully above the selector. `EntryCapturePositionTest` checks short, long and
+returning anchors with pointer input. `EditorLongPageAcceptanceTest` measures the
+actual Android safe bounds at the start and end of a long document in both
+navigation modes and orientations, and captures eight bounded images in
+`editor-long-page/`. Its end-state assertion checks that content clears the bar;
+presence of the selector alone is insufficient.
