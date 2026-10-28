@@ -94,6 +94,8 @@ class EditorGeometryAcceptanceTest {
                             }
                             ime
                         }
+                        device.waitForIdle(2_000)
+                        compose.waitForIdle()
                         // A short keyboard viewport may be smaller than the inline block minimum;
                         // its writing area must remain readable rather than enforcing an impossible fixed height.
                         val writing = compose.onNodeWithTag("editor_text_input").getUnclippedBoundsInRoot()

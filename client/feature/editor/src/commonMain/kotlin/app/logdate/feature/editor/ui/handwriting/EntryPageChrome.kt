@@ -126,7 +126,8 @@ internal fun EntryPageChrome(
         val progress = focusProgress ?: if (focused) 1f else 0f
         val overviewLeft = with(density) { (anchor?.left?.toDp() ?: origin.x) - origin.x }
         val overviewWidth = with(density) { (anchor?.width ?: constraints.maxWidth.toFloat()).toDp() }
-        val overviewTop = with(density) { anchor?.top?.toDp()?.minus(origin.y) ?: maxHeight }
+        // Long document content can put the creation anchor below the viewport.
+        val overviewTop = with(density) { anchor?.top?.toDp()?.minus(origin.y) ?: maxHeight }.coerceAtMost(focusTop)
         val barLeft = lerp(overviewLeft, focusLeft, progress)
         val barWidth = lerp(overviewWidth, focusWidth, progress)
         val writingTop = lerp(overviewTop, focusTop, progress)
