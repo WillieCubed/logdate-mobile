@@ -36,6 +36,7 @@ import com.google.android.gms.maps.model.MarkerOptions
 import kotlinx.coroutines.delay
 import logdate.client.feature.rewind.generated.resources.Res
 import logdate.client.feature.rewind.generated.resources.rewind_map_accessibility
+import logdate.client.feature.rewind.generated.resources.rewind_map_loaded
 import logdate.client.feature.rewind.generated.resources.rewind_map_loading
 import logdate.client.feature.rewind.generated.resources.rewind_map_not_configured
 import logdate.client.feature.rewind.generated.resources.rewind_map_unavailable
@@ -118,10 +119,11 @@ internal actual fun RewindGeographicMap(
         }
         val bitmap = image
         if (bitmap != null) {
+            val loadedDescription = stringResource(Res.string.rewind_map_loaded)
             Image(
                 bitmap,
                 stringResource(Res.string.rewind_map_accessibility),
-                Modifier.fillMaxSize().testTag("rewind-native-map").semantics { stateDescription = "Map loaded" },
+                Modifier.fillMaxSize().testTag("rewind-native-map").semantics { stateDescription = loadedDescription },
                 contentScale = ContentScale.FillBounds,
             )
         } else {
