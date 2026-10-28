@@ -5,6 +5,14 @@ commands that build and test them. Every command goes through `./run`, which wra
 Docker, and the helper scripts; `./run help` lists all of them. Deeper references are linked from
 each section.
 
+## Developer mode
+
+In About LogDate, tap the app version seven times to reveal Developer Tools and Labs.
+This choice is saved on this installation and survives app restarts. Choose **Hide developer mode**
+on the same screen to hide both entries again, including after a restart. You can repeat the
+seven-tap unlock later. Developer mode starts hidden on installations that have never enabled it.
+Hiding the entries does not change diagnostic, location, or feature-preview preferences.
+
 ## Toolchain
 
 LogDate is a Kotlin Multiplatform project built with Gradle. Install these before setting up:
@@ -125,20 +133,20 @@ every automated device run uses a Gradle Managed Device declared in the root `bu
 Gradle downloads the system image, creates the emulator, runs the tests, and removes it, so every
 machine and CI lane tests the same devices. Never create an emulator by hand.
 
-| Device | Role | Hardware profile | API level |
-| --- | --- | --- | --- |
-| `oldestSupportedPhoneApi30` | Oldest supported phone (`minSdk`) | Pixel 2 | 30 |
-| `phoneApi31` | Behavior boundary: Android 12 | Pixel 9 Pro | 31 |
-| `phoneApi33` | Behavior boundary: Android 13 | Pixel 9 Pro | 33 |
-| `phoneApi34` | Behavior boundary: Android 14 | Pixel 9 Pro | 34 |
-| `flagshipPhoneApi37` | Target phone (`targetSdk`) | Pixel 9 Pro | 37 |
-| `foldableApi37` | Foldable | Pixel 9 Pro Fold | 37 |
-| `largeScreenTabletApi37` | Tablet | Pixel Tablet | 37 |
-| `desktopApi34` | Desktop windowing | Medium Desktop | 34 |
-| `wearSmallRoundApi34` (`:app:wear`) | Watch | Wear OS Small Round | 34 |
-| `restorePairApi34` (`:tools:native-restore-driver`) | Native backup/restore source and destination shards | Pixel 9 Pro | 34 |
-| `d2dPairApi34` (`:tools:native-restore-driver`) | Google Play D2D transport source and destination shards | Pixel 9 Pro | 34 |
-| `restoreCallbackApi36_1` (`:tools:native-restore-driver`) | Modern full-restore callback contract | Pixel 9 Pro | 36.1 |
+| Device                                                    | Role                                                    | Hardware profile    | API level |
+| --------------------------------------------------------- | ------------------------------------------------------- | ------------------- | --------- |
+| `oldestSupportedPhoneApi30`                               | Oldest supported phone (`minSdk`)                       | Pixel 2             | 30        |
+| `phoneApi31`                                              | Behavior boundary: Android 12                           | Pixel 9 Pro         | 31        |
+| `phoneApi33`                                              | Behavior boundary: Android 13                           | Pixel 9 Pro         | 33        |
+| `phoneApi34`                                              | Behavior boundary: Android 14                           | Pixel 9 Pro         | 34        |
+| `flagshipPhoneApi37`                                      | Target phone (`targetSdk`)                              | Pixel 9 Pro         | 37        |
+| `foldableApi37`                                           | Foldable                                                | Pixel 9 Pro Fold    | 37        |
+| `largeScreenTabletApi37`                                  | Tablet                                                  | Pixel Tablet        | 37        |
+| `desktopApi34`                                            | Desktop windowing                                       | Medium Desktop      | 34        |
+| `wearSmallRoundApi34` (`:app:wear`)                       | Watch                                                   | Wear OS Small Round | 34        |
+| `restorePairApi34` (`:tools:native-restore-driver`)       | Native backup/restore source and destination shards     | Pixel 9 Pro         | 34        |
+| `d2dPairApi34` (`:tools:native-restore-driver`)           | Google Play D2D transport source and destination shards | Pixel 9 Pro         | 34        |
+| `restoreCallbackApi36_1` (`:tools:native-restore-driver`) | Modern full-restore callback contract                   | Pixel 9 Pro         | 36.1      |
 
 Native transfer acceptance runs through
 [`managed-native-restore-acceptance.py`](../tests/e2e/managed-native-restore-acceptance.py).
@@ -151,13 +159,13 @@ entrypoint and checks the full SDK version, including the minor version.
 The phone behavior-boundary devices exist because LogDate's code branches on Android 12, 13, and
 14 behavior. When a minimum-SDK raise or a code change removes such a branch, remove its device too.
 
-| Group | Devices | Run it when |
-| --- | --- | --- |
-| `smokeDevices` | Target phone, tablet | Any change to Android UI |
-| `deviceMatrix` | Oldest phone, target phone, foldable, tablet, desktop | Before a release, and when adaptive behavior changes |
-| `apiMatrix` | Oldest phone, the three behavior-boundary phones, target phone | When platform-version branches change |
-| `phoneDevices`, `tabletDevices` | Phones only, tablet only | Focused runs |
-| `wearDevices` (`:app:wear`) | Watch | Any change to the Wear app |
+| Group                           | Devices                                                        | Run it when                                          |
+| ------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------- |
+| `smokeDevices`                  | Target phone, tablet                                           | Any change to Android UI                             |
+| `deviceMatrix`                  | Oldest phone, target phone, foldable, tablet, desktop          | Before a release, and when adaptive behavior changes |
+| `apiMatrix`                     | Oldest phone, the three behavior-boundary phones, target phone | When platform-version branches change                |
+| `phoneDevices`, `tabletDevices` | Phones only, tablet only                                       | Focused runs                                         |
+| `wearDevices` (`:app:wear`)     | Watch                                                          | Any change to the Wear app                           |
 
 ```bash
 ./gradlew :app:android-main:smokeDevicesGroupDebugAndroidTest          # a group

@@ -1,6 +1,7 @@
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
@@ -45,6 +46,7 @@ class DeveloperSettingsVisibilityTest {
     fun developerToolsRequireDeliberateUnlock() =
         runDesktopComposeUiTest(width = 411, height = 891) {
             var opens = 0
+            val enabled = mutableStateOf(false)
             setContent {
                 LogDateTheme(darkTheme = false) {
                     AdvancedSettingsContent(
@@ -53,6 +55,8 @@ class DeveloperSettingsVisibilityTest {
                         onCheckForAppUpdates = {},
                         onCompleteAppUpdate = {},
                         onNavigateToDeveloperTools = { opens++ },
+                        developerModeEnabled = enabled.value,
+                        onSetDeveloperModeEnabled = { enabled.value = it },
                     )
                 }
             }
@@ -63,6 +67,42 @@ class DeveloperSettingsVisibilityTest {
             onNodeWithText("Developer Tools").assertExists().performClick()
             assertEquals(1, opens)
             saveScreenshot("about-unlocked-phone", onRoot().captureToImage())
+            onNodeWithText("Hide developer mode").performClick()
+            onNodeWithText("Developer Tools").assertDoesNotExist()
+            onNodeWithText("Hide developer mode").assertDoesNotExist()
+            onNodeWithText("Labs").assertDoesNotExist()
+            repeat(6) { onNodeWithText("App version: 1.2.3").performClick() }
+            onNodeWithText("Developer Tools").assertDoesNotExist()
+            onNodeWithText("App version: 1.2.3").performClick()
+            onNodeWithText("Developer Tools").assertExists()
+        }
+
+    @Test
+    fun savedDeveloperModeIsVisibleWithoutVersionTapsAtLargeText() =
+        runDesktopComposeUiTest(width = 411, height = 891) {
+            var hidden = false
+            setContent {
+                CompositionLocalProvider(LocalDensity provides Density(1f, 2f)) {
+                    LogDateTheme(darkTheme = true) {
+                        AdvancedSettingsContent(
+                            onBack = {},
+                            appUpdateUiState = AppUpdateUiState(currentVersionName = "1.2.3"),
+                            onCheckForAppUpdates = {},
+                            onCompleteAppUpdate = {},
+                            developerModeEnabled = true,
+                            onSetDeveloperModeEnabled = { hidden = !it },
+                            developerModeSaveFailed = true,
+                        )
+                    }
+                }
+            }
+            onNodeWithText("Developer Tools").assertExists()
+            onNode(hasScrollAction()).performScrollToNode(hasText("Hide developer mode"))
+            onNodeWithText("Hide developer mode").performClick()
+            assertEquals(true, hidden)
+            onNode(hasScrollAction()).performScrollToNode(hasText("Couldn’t save developer mode. Please try again."))
+            onNodeWithText("Couldn’t save developer mode. Please try again.").assertExists()
+            saveScreenshot("about-developer-large-dark", onRoot().captureToImage())
         }
 
     @Test

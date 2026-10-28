@@ -242,7 +242,7 @@ actual val coreFeatureModule: Module =
         }
         viewModel { UserDataExportViewModel(get(), get()) }
         viewModel { UserDataRestoreViewModel(get(), get()) }
-        viewModel { AdvancedSettingsViewModel(appUpdateController = get()) }
+        viewModel { AdvancedSettingsViewModel(appUpdateController = get(), preferences = get()) }
         factory { DeviceEraser(get(), get(), get(), get(), get()) }
         viewModel { DangerZoneSettingsViewModel(get()) }
         viewModel {
