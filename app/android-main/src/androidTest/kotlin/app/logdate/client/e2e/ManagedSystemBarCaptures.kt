@@ -51,7 +51,8 @@ internal class ManagedSystemBarCaptures(
                         bottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
                         top = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
                     }
-                    val resources = if (navigation == "threebutton") listOf("back", "home", "recent_apps") else listOf("home_handle")
+                    // This API34 fixture does not expose the non-clickable gesture handle in its accessibility windows.
+                    val resources = if (navigation == "threebutton") listOf("back", "home", "recent_apps") else emptyList()
                     val controls = resources.mapNotNull { device.findObject(By.res("com.android.systemui", it))?.visibleBounds }
                     val correctInsets = if (navigation == "threebutton") bottom > gestureBottom else bottom > 0
                     if (!correctInsets || controls.size != resources.size || controls.any { it.isEmpty }) return@waitUntil false
@@ -59,7 +60,11 @@ internal class ManagedSystemBarCaptures(
                     val bitmap = checkNotNull(BitmapFactory.decodeFile(screenshot.absolutePath))
                     try {
                         val background = bitmap.getPixel(bitmap.width / 8, bitmap.height - bottom / 2)
-                        controls.all { containsVisibleIcon(bitmap, it, background) }
+                        if (navigation == "threebutton") {
+                            controls.all { containsVisibleIcon(bitmap, it, background) }
+                        } else {
+                            containsGestureHandle(bitmap, bottom, background)
+                        }
                     } finally {
                         bitmap.recycle()
                     }
@@ -87,6 +92,54 @@ internal class ManagedSystemBarCaptures(
         }
     }
 
+    private fun containsGestureHandle(
+        bitmap: Bitmap,
+        bottomInset: Int,
+        background: Int,
+    ): Boolean {
+        val regionLeft = bitmap.width / 4
+        val regionWidth = bitmap.width * 3 / 4 - regionLeft
+        val ink =
+            BooleanArray(regionWidth * bottomInset) { index ->
+                colorDifference(
+                    bitmap.getPixel(regionLeft + index % regionWidth, bitmap.height - bottomInset + index / regionWidth),
+                    background,
+                ) > 48
+            }
+        val queue = ArrayDeque<Int>()
+
+        fun enqueue(index: Int) {
+            if (ink[index]) {
+                ink[index] = false
+                queue.addLast(index)
+            }
+        }
+        for (seed in ink.indices) {
+            if (!ink[seed]) continue
+            var left = regionWidth
+            var right = 0
+            var top = bottomInset
+            var bottom = 0
+            enqueue(seed)
+            while (queue.isNotEmpty()) {
+                val index = queue.removeFirst()
+                val x = index % regionWidth
+                val y = index / regionWidth
+                left = min(left, x)
+                right = max(right, x)
+                top = min(top, y)
+                bottom = max(bottom, y)
+                if (x > 0) enqueue(index - 1)
+                if (x + 1 < regionWidth) enqueue(index + 1)
+                if (y > 0) enqueue(index - regionWidth)
+                if (y + 1 < bottomInset) enqueue(index + regionWidth)
+            }
+            val centered = abs(regionLeft + (left + right) / 2f - bitmap.width / 2f) <= bitmap.width * 0.025f
+            if (centered && right - left >= bitmap.width / 10 && bottom - top in 1..max(1, bottomInset / 4)) return true
+        }
+        return false
+    }
+
     private fun containsVisibleIcon(
         bitmap: Bitmap,
         bounds: Rect,
@@ -96,12 +149,16 @@ internal class ManagedSystemBarCaptures(
         for (y in max(0, bounds.top) until min(bitmap.height, bounds.bottom) step 2) {
             for (x in max(0, bounds.left) until min(bitmap.width, bounds.right) step 2) {
                 val pixel = bitmap.getPixel(x, y)
-                val difference =
-                    abs(Color.red(pixel) - Color.red(background)) +
-                        abs(Color.green(pixel) - Color.green(background)) + abs(Color.blue(pixel) - Color.blue(background))
-                if (difference > 48) ink++
+                if (colorDifference(pixel, background) > 48) ink++
             }
         }
         return ink >= 8
     }
+
+    private fun colorDifference(
+        pixel: Int,
+        background: Int,
+    ): Int =
+        abs(Color.red(pixel) - Color.red(background)) +
+            abs(Color.green(pixel) - Color.green(background)) + abs(Color.blue(pixel) - Color.blue(background))
 }
