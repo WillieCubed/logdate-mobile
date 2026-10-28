@@ -17,13 +17,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.History
@@ -77,6 +81,8 @@ import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
 import app.logdate.feature.editor.ui.editorBlockFocusElement
 import app.logdate.feature.editor.ui.layout.EditorBlockCornerRadius
 import app.logdate.feature.editor.ui.layout.EntryPageRailMaxWidth
+import app.logdate.feature.editor.ui.layout.LocalEntryChromeHeight
+import app.logdate.feature.editor.ui.layout.LocalEntryContentInsets
 import app.logdate.feature.editor.ui.state.BlocksUiState
 import app.logdate.feature.editor.ui.text.TextBlockContent
 import app.logdate.ui.foldable.FoldableSplitLayout
@@ -129,7 +135,8 @@ internal fun EntryPageOverview(
     defaultMode: EntryStartMode = EntryStartMode.TEXT,
     onAudioResolverReady: (Uuid, PendingAudioResolver) -> Unit = { _, _ -> },
 ) {
-    val contentTop = 88.dp
+    val safeInsets = LocalEntryContentInsets.current.asPaddingValues()
+    val contentTop = 88.dp + safeInsets.calculateTopPadding()
     val scroll = state.scroll
     val earlierExpanded = state.earlierExpanded
     val browsing = rememberEarlierDayTransition(state)
@@ -212,6 +219,7 @@ internal fun EntryPageOverview(
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
+            .windowInsetsPadding(LocalEntryContentInsets.current.only(WindowInsetsSides.Horizontal))
             .then(trackOrigin)
             .onGloballyPositioned { state.viewportTop = it.positionInWindow().y }
             .clipToBounds()
@@ -258,9 +266,14 @@ internal fun EntryPageOverview(
                     EntryBlocks(uiState, state, viewportWidthPx, viewportHeightPx, onAudioResolverReady)
                 }
                 Box(
-                    Modifier.fillMaxWidth().height(80.dp).testTag("entry_page_creation").onGloballyPositioned {
-                        state.captureBounds = Rect(it.positionInWindow(), Size(it.size.width.toFloat(), it.size.height.toFloat()))
-                    },
+                    Modifier
+                        .fillMaxWidth()
+                        .height(
+                            LocalEntryChromeHeight.current + Spacing.lg + safeInsets.calculateBottomPadding(),
+                        ).testTag("entry_page_creation")
+                        .onGloballyPositioned {
+                            state.captureBounds = Rect(it.positionInWindow(), Size(it.size.width.toFloat(), it.size.height.toFloat()))
+                        },
                 )
             }
         }
@@ -288,14 +301,19 @@ internal fun EntryPageOverview(
                     contentAlignment = Alignment.TopCenter,
                 ) {
                     if (book != null) {
-                        Row(Modifier.fillMaxWidth().padding(top = contentTop, bottom = 16.dp)) {
-                            Box(Modifier.width(book.leftPane.width).padding(end = 16.dp)) { reading() }
+                        Row(Modifier.fillMaxWidth().padding(top = contentTop)) {
+                            Box(
+                                Modifier.width(book.leftPane.width).padding(
+                                    end = Spacing.lg,
+                                    bottom = Spacing.lg + safeInsets.calculateBottomPadding(),
+                                ),
+                            ) { reading() }
                             Box(Modifier.width(book.hingeBounds.width))
                             Box(Modifier.width(book.rightPane.width).padding(start = 16.dp)) { writing() }
                         }
                     } else {
                         Column(
-                            Modifier.widthIn(max = EntryPageRailMaxWidth).fillMaxWidth().padding(top = contentTop, bottom = 16.dp),
+                            Modifier.widthIn(max = EntryPageRailMaxWidth).fillMaxWidth().padding(top = contentTop),
                             verticalArrangement = Arrangement.spacedBy(24.dp),
                         ) {
                             reading()

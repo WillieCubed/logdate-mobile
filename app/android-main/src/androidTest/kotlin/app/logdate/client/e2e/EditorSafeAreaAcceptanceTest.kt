@@ -4,6 +4,9 @@ import android.app.Application
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.os.Build
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -31,6 +34,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.koin.core.context.GlobalContext
 import java.io.File
+import kotlin.math.abs
 import kotlin.test.assertTrue
 
 /** Real production editor and IME. Only run through a repository-declared Managed Device. */
@@ -185,6 +189,22 @@ class EditorSafeAreaAcceptanceTest {
             right = (view.width - insets.right) / density
             bottom = (view.height - insets.bottom) / density
         }
+        val focused =
+            compose
+                .onAllNodes(
+                    SemanticsMatcher("focused memory surface") {
+                        it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("focused_block_") == true
+                    },
+                )[0]
+                .getUnclippedBoundsInRoot()
+        val root = compose.onNodeWithTag("stories_editor").getUnclippedBoundsInRoot()
+        assertTrue(
+            abs(focused.left.value - root.left.value) < 1f &&
+                abs(focused.top.value - root.top.value) < 1f &&
+                abs(focused.right.value - root.right.value) < 1f &&
+                abs(focused.bottom.value - root.bottom.value) < 1f,
+            "$label: painted focus surface was inset or clipped: $focused vs $root",
+        )
         val field = compose.onNodeWithTag("editor_text_input").getUnclippedBoundsInRoot()
         assertTrue(
             field.bottom - field.top >=

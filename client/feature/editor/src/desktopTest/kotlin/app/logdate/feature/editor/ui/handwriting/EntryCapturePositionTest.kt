@@ -37,7 +37,7 @@ class EntryCapturePositionTest {
                     ) {}
                 }
             }
-            for ((anchor, expected) in listOf(280f to 280f, 1000f to 736f, 700f to 700f)) {
+            for ((anchor, expected) in listOf(280f to 280f, 1000f to 720f, 700f to 700f)) {
                 runOnIdle { overview.captureBounds = Rect(0f, anchor, 400f, anchor + 80f) }
                 val bounds = onNodeWithTag("entry_capture_tools").getUnclippedBoundsInRoot()
                 assertEquals(expected, bounds.top.value, 1f, "Capture must follow the page until its safe bottom limit")

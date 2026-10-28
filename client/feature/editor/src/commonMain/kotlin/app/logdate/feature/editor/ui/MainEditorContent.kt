@@ -16,15 +16,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -71,6 +66,7 @@ import app.logdate.feature.editor.ui.layout.EditorFocus
 import app.logdate.feature.editor.ui.layout.FocusedBlockLayout
 import app.logdate.feature.editor.ui.layout.LocalEntryChromeHeight
 import app.logdate.feature.editor.ui.layout.editorFocus
+import app.logdate.feature.editor.ui.layout.entryContentPadding
 import app.logdate.feature.editor.ui.state.BlocksUiState
 import app.logdate.feature.editor.ui.text.TextBlockContent
 import app.logdate.feature.editor.ui.video.VideoBlockEditor
@@ -344,13 +340,25 @@ fun MainEditorContent(
                                                 modifier =
                                                     Modifier.fillMaxSize().then(
                                                         if (floatingChrome &&
-                                                            liveBlock is TextBlockUiState
+                                                            !(liveBlock is CameraBlockUiState && liveBlock.uri == null)
                                                         ) {
                                                             Modifier
-                                                                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-                                                                .padding(
-                                                                    top = LocalEntryChromeHeight.current,
-                                                                    bottom = LocalEntryChromeHeight.current,
+                                                                .entryContentPadding(
+                                                                    top =
+                                                                        if (liveBlock is TextBlockUiState ||
+                                                                            liveBlock is AudioBlockUiState
+                                                                        ) {
+                                                                            LocalEntryChromeHeight.current
+                                                                        } else {
+                                                                            0.dp
+                                                                        },
+                                                                    bottom =
+                                                                        if (liveBlock is TextBlockUiState) {
+                                                                            LocalEntryChromeHeight.current +
+                                                                                Spacing.lg
+                                                                        } else {
+                                                                            0.dp
+                                                                        },
                                                                 )
                                                         } else {
                                                             Modifier

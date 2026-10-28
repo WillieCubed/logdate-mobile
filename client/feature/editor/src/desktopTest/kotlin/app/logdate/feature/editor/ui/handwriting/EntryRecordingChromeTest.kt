@@ -16,6 +16,8 @@ import app.logdate.feature.editor.ui.audio.ActiveRecordingDisplay
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.AudioCaptureState
 import app.logdate.feature.editor.ui.editor.EditorState
+import app.logdate.feature.editor.ui.layout.LocalEntryChromeHeight
+import app.logdate.feature.editor.ui.layout.entryContentPadding
 import app.logdate.ui.theme.LogDateTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -46,7 +48,7 @@ class EntryRecordingChromeTest {
                             {},
                             {},
                             { finishes++ },
-                            Modifier.fillMaxSize().testTag("recording_content"),
+                            Modifier.fillMaxSize().entryContentPadding(top = LocalEntryChromeHeight.current).testTag("recording_content"),
                             transcriptionText = "A thought to keep.",
                         )
                     }

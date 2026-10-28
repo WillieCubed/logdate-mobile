@@ -156,7 +156,7 @@ fun ImmersiveEditorLayout(
                     Modifier
                         .fillMaxSize()
                         .then(
-                            if (focus is EditorFocus.Drawing) {
+                            if (isImmersiveBlockActive) {
                                 Modifier
                             } else {
                                 Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))

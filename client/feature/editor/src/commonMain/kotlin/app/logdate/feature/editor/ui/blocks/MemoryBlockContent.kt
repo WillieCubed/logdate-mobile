@@ -42,6 +42,7 @@ import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
 import app.logdate.feature.editor.ui.handwriting.HandwritingCanvas
 import app.logdate.feature.editor.ui.image.ImageBlockPreview
 import app.logdate.feature.editor.ui.image.ImagePickerContent
+import app.logdate.feature.editor.ui.layout.clipEntryContentToSafeWindow
 import app.logdate.feature.editor.ui.state.EditorBlockPresentation
 import app.logdate.feature.editor.ui.text.TextBlockContent
 import app.logdate.feature.editor.ui.text.rememberInlineMarkdownVisualTransformation
@@ -199,7 +200,7 @@ internal fun MemoryCaptionField(
             MarkdownText(
                 content = block.caption,
                 textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
-                modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                modifier = modifier.clipEntryContentToSafeWindow().padding(horizontal = 16.dp, vertical = 12.dp),
             )
         }
         return
@@ -231,6 +232,7 @@ internal fun MemoryCaptionField(
         },
         modifier =
             modifier
+                .clipEntryContentToSafeWindow()
                 .fillMaxWidth()
                 .testTag("memory_caption_${block.id}")
                 .focusRequester(focusRequester)

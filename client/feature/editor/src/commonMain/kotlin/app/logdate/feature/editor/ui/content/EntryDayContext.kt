@@ -21,6 +21,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.feature.editor.ui.audio.AudioPlaybackComponent
 import app.logdate.feature.editor.ui.editor.EditorState
 import app.logdate.feature.editor.ui.layout.EditorBlockMinHeight
+import app.logdate.feature.editor.ui.layout.clipEntryContentToSafeWindow
 import app.logdate.util.localTime
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.entry_start_earlier_today
@@ -50,7 +51,10 @@ internal fun EarlierEntryContext(
                     shape = RoundedCornerShape(12.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
                 ) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(16.dp).clipEntryContentToSafeWindow(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
                         Text(
                             note.creationTimestamp.localTime,
                             style = MaterialTheme.typography.labelMedium,

@@ -39,7 +39,9 @@ and recording transport ownership. Run the affected suites with:
 ./gradlew :client:ui:desktopTest :client:feature:editor:desktopTest
 ```
 
-The frame owns system insets and persistent chrome. Shared transition overlays belong
+The frame owns persistent chrome and provides safe insets to the inner document
+and control layout. Full-window surfaces and imagery paint behind the system bars;
+do not pad or clip the whole transition layer to the safe rectangle. Shared transition overlays belong
 to `EditorContentLayer`, below that chrome. A recording or stopping take owns its
 transport area; the capture selector returns when that ownership ends. In short
 keyboard viewports both chrome rows use 48dp targets to preserve space for writing.
@@ -53,7 +55,10 @@ can grow. Focused content adapts to the available keyboard viewport instead of
 forcing the inline minimum into a shorter writing area.
 
 Overview memory surfaces and mode-selector ends share a centered rail capped at
-640dp with 16dp framing inside the safe area. The journal chooser centers on the
+640dp with 16dp framing inside the safe area. The final scroll target reserves the selector
+height, one 16dp bottom design margin, and the necessary OS inset together. There
+is no second footer padding; scrolling that target into view clears the last line.
+The journal chooser centers on the
 safe header using equal reservations for the measured leading and trailing
 actions. Below 360dp, Save uses an accessible icon button so the chooser retains
 at least a 48dp target; long titles ellipsize without overlapping controls.
@@ -80,3 +85,23 @@ actual Android safe bounds at the start and end of a long document in both
 navigation modes and orientations, and captures eight bounded images in
 `editor-long-page/`. Its end-state assertion checks that content clears the bar;
 presence of the selector alone is insufficient.
+
+`EntryEdgeToEdgeTest` asserts actual focused-surface pixels behind all four
+synthetic system-bar boundaries, independently from the inner writing bounds.
+It also measures equal 16dp horizontal and bottom design margins at 400/700/900dp,
+retaining the 640dp rail on larger windows. Native focus assertions separately
+require the painted surface to fill the window while writing and controls remain
+inside the system/IME safe bounds. Inspect device captures for continuous paint;
+three-button navigation may add an Android contrast scrim independently of app
+painting, so a platform scrim is not evidence of app padding.
+
+Scrolling text, audio controls, media captions and block menus use an inner
+window-safe clipping layer. The owning Surface and imagery remain uncut.
+The clip blocks pointer input as well as ink; fully clipped content is hidden
+from accessibility without replacing its semantics identity. Reported layout
+rectangles remain layout geometry, so tests check actual pointer delivery,
+accessibility hiding and pixel output rather than assuming the rectangles shrink.
+The native long-page end capture checks that the center status strip contains
+only continuous surface color, excluding Android's clock and status icons.
+Native TalkBack operation, camera capture and foldable posture are not covered
+by these two text-focused journeys.
