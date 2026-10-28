@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -70,12 +72,14 @@ fun TextNotePanel(
         Column(
             modifier =
                 Modifier
-                    .fillMaxWidth(0.85f)
+                    .widthIn(max = RewindReadingMaxWidth)
+                    .fillMaxWidth()
                     .fillMaxHeight(0.7f)
                     .verticalScroll(rememberScrollState())
                     .background(if (backgroundImageUri != null) Color.Black.copy(alpha = 0.6f) else Color.Transparent)
-                    .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                    .padding(RewindMemoryContentPadding)
+                    .testTag("rewind-reading-content"),
+            horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.Center,
         ) {
             // Quote marks for styling
@@ -92,7 +96,7 @@ fun TextNotePanel(
             RewindRichMemoryText(
                 content = content,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.2f),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxWidth(),
             )
 
             Spacer(modifier = Modifier.height(16.dp))

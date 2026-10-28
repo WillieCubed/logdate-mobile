@@ -2,18 +2,19 @@
 
 package app.logdate.feature.rewind.ui.detail
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,12 +25,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.workspace.LocalWorkspacePlaybackInsets
 import coil3.compose.AsyncImage
@@ -46,8 +45,8 @@ import org.jetbrains.compose.resources.stringResource
  * optional caption and date context. Designed for visual memories and moments.
  *
  * ## Visual Design:
- * - **Image Focus**: Maximizes visual impact of the image
- * - **Caption**: Optional text overlay for context
+ * - **Image Focus**: Bounded media preserves its proportions inside the full scene
+ * - **Caption**: Leading text beneath the media shares its width
  * - **Date Context**: Clear indication of when the image was captured
  *
  * @param imageUri URI of the image to display
@@ -65,97 +64,65 @@ fun ImageNotePanel(
     memoryId: String = "image-memory",
 ) {
     var loadState by remember(imageUri) { mutableStateOf<RewindMemoryLoadState>(RewindMemoryLoadState.Loading) }
+    val insets = LocalWorkspacePlaybackInsets.current
+    val safeTop = with(LocalDensity.current) { insets.getTop(this).toDp() }
+    val headerClearance = (LocalRewindChromeHeight.current - safeTop).coerceAtLeast(0.dp) + 12.dp
     RewindMemoryFrame(memoryId, loadState, modifier.fillMaxSize()) {
-        // Image as full background
-        AsyncImage(
-            model = imageUri,
-            contentDescription =
-                if (isVideoFrame) {
-                    stringResource(Res.string.cd_rewind_video_frame, dateFormatted)
-                } else {
-                    caption?.takeIf { it.isNotBlank() }
-                        ?: stringResource(Res.string.cd_rewind_journal_photo, dateFormatted)
-                },
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
-            onLoading = { loadState = RewindMemoryLoadState.Loading },
-            onError = { loadState = RewindMemoryLoadState.Unavailable },
-            onSuccess = { loadState = RewindMemoryLoadState.Ready },
-        )
-
-        // Date indicator at top
-        if (isVideoFrame) {
-            Text(
-                text = stringResource(Res.string.rewind_video_frame_label),
-                style = MaterialTheme.typography.labelLarge,
-                color = Color.White,
-                modifier =
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .windowInsetsPadding(
-                            LocalWorkspacePlaybackInsets.current.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-                        ).padding(top = 80.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color.Black.copy(alpha = 0.6f))
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-            )
-        }
-
-        Box(
-            modifier =
-                Modifier
-                    .align(Alignment.TopStart)
-                    .fillMaxWidth()
-                    .windowInsetsPadding(LocalWorkspacePlaybackInsets.current.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
-                    .padding(start = 24.dp, end = 24.dp, top = 88.dp),
-            contentAlignment = Alignment.TopStart,
+        BoxWithConstraints(
+            Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(insets)
+                .padding(horizontal = RewindMemoryContentPadding)
+                .padding(top = headerClearance, bottom = RewindMemoryContentPadding),
+            contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = dateFormatted,
-                style = MaterialTheme.typography.labelLarge,
-                color = Color.White,
-                modifier =
-                    Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color.Black.copy(alpha = 0.6f))
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-            )
-        }
-
-        // Contrast belongs to the scene background; only the caption content has safe margins.
-        if (!caption.isNullOrBlank()) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight(0.4f)
-                        .align(Alignment.BottomCenter),
-                contentAlignment = Alignment.BottomCenter,
+            val captionLimit = maxHeight * 0.32f
+            Column(
+                Modifier
+                    .widthIn(max = RewindMediaMaxWidth)
+                    .fillMaxWidth()
+                    .heightIn(max = maxHeight)
+                    .testTag("rewind-media-content"),
+                horizontalAlignment = Alignment.Start,
             ) {
-                Column(
-                    modifier =
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(dateFormatted, style = MaterialTheme.typography.labelLarge, color = Color.White)
+                    if (isVideoFrame) {
+                        Text(
+                            stringResource(Res.string.rewind_video_frame_label),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                AsyncImage(
+                    model = imageUri,
+                    contentDescription =
+                        if (isVideoFrame) {
+                            stringResource(Res.string.cd_rewind_video_frame, dateFormatted)
+                        } else {
+                            caption?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.cd_rewind_journal_photo, dateFormatted)
+                        },
+                    modifier = Modifier.weight(1f, fill = false).fillMaxWidth(),
+                    contentScale = ContentScale.Fit,
+                    onLoading = { loadState = RewindMemoryLoadState.Loading },
+                    onError = { loadState = RewindMemoryLoadState.Unavailable },
+                    onSuccess = {
+                        loadState = RewindMemoryLoadState.Ready
+                    },
+                )
+                if (!caption.isNullOrBlank()) {
+                    Spacer(Modifier.height(12.dp))
+                    Column(
                         Modifier
                             .fillMaxWidth()
-                            .drawBehind {
-                                drawRect(
-                                    Brush.verticalGradient(
-                                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.68f)),
-                                        endY = 48.dp.toPx().coerceAtMost(size.height),
-                                    ),
-                                )
-                            }.windowInsetsPadding(
-                                LocalWorkspacePlaybackInsets.current.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
-                            ).padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 24.dp)
-                            .verticalScroll(rememberScrollState()),
-                ) {
-                    RewindRichMemoryText(
-                        content = caption,
-                        textStyle =
-                            MaterialTheme.typography.bodyLarge.copy(
-                                fontWeight = FontWeight.Medium,
-                                lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.2f,
-                            ),
-                    )
+                            .heightIn(max = captionLimit)
+                            .verticalScroll(rememberScrollState())
+                            .padding(RewindMemoryContentPadding),
+                    ) {
+                        RewindRichMemoryText(content = caption)
+                    }
                 }
             }
         }
