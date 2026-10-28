@@ -5,11 +5,13 @@ package app.logdate.feature.editor.ui.handwriting
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
@@ -59,8 +61,10 @@ class EntryChromeLayeringTest {
                                             .fillMaxWidth()
                                             .height(64.dp)
                                             .background(Color.Magenta)
-                                            .clickable { selected.value = null }
-                                            .testTag("chrome"),
+                                            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                                                selected.value =
+                                                    null
+                                            }.testTag("chrome"),
                                     )
                                 },
                             ) {
@@ -90,7 +94,7 @@ class EntryChromeLayeringTest {
 
             fun assertChrome() {
                 val pixel = onRoot().captureToImage().toPixelMap()[200, 32]
-                assertTrue(pixel.red > 0.9f && pixel.blue > 0.9f && pixel.green < 0.3f, "Content painted over chrome: $pixel")
+                assertTrue(pixel.red > 0.95f && pixel.blue > 0.95f && pixel.green < 0.05f, "Content painted over chrome: $pixel")
             }
             runOnIdle { selected.value = block.id }
             mainClock.advanceTimeBy(96)
