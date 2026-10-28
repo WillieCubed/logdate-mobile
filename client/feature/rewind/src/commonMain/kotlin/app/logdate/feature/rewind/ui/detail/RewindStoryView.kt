@@ -17,12 +17,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -132,6 +135,7 @@ fun RewindStoryView(
     var navigatingForward by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
+    var chromeHeight by remember { mutableStateOf(0.dp) }
     val reduceMotion by rememberSystemReduceMotion()
 
     // Predictive back drives this screen's dismissal: [dismissProgress] tracks the live
@@ -385,8 +389,10 @@ fun RewindStoryView(
         WorkspacePlaybackLayout(
             focus = {
                 RewindSystemBars()
-                TapNavigationLayer(Modifier.fillMaxSize().testTag("rewind-story-focus")) {
-                    StoryPanel(Modifier.fillMaxSize())
+                CompositionLocalProvider(LocalRewindChromeHeight provides chromeHeight) {
+                    TapNavigationLayer(Modifier.fillMaxSize().testTag("rewind-story-focus")) {
+                        StoryPanel(Modifier.fillMaxSize())
+                    }
                 }
             },
             controls = {
@@ -407,8 +413,12 @@ fun RewindStoryView(
                         Modifier
                             .fillMaxWidth()
                             .graphicsLayer { alpha = entranceAlpha.value * (1f - easeDismiss(dismissProgress.value)) }
-                            .windowInsetsPadding(LocalWorkspacePlaybackInsets.current)
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                            .onSizeChanged { chromeHeight = with(density) { it.height.toDp() } }
+                            .windowInsetsPadding(
+                                LocalWorkspacePlaybackInsets.current.only(
+                                    WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
+                                ),
+                            ).padding(horizontal = 16.dp, vertical = 12.dp),
                 )
             },
         )

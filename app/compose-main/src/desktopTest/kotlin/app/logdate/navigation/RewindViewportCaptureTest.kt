@@ -19,6 +19,8 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -26,7 +28,9 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
 import app.logdate.client.text.toUiText
+import app.logdate.feature.rewind.ui.AudioNoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.ImageRewindPanelUiState
+import app.logdate.feature.rewind.ui.TextNoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.detail.RewindStoryContent
 import app.logdate.feature.rewind.ui.detail.RewindStoryView
 import app.logdate.ui.theme.LogDateTheme
@@ -51,7 +55,24 @@ class RewindViewportCaptureTest {
 
     @Test fun landscapeTabletViewport() = capture("tablet-landscape-fixture", 1280, 800)
 
+    @Test fun normalMobileReadingWidth() = capture("normal-mobile-reading", 411, 891, reading = true)
+
+    @Test fun foldableSizedReadingWidth() = capture("foldable-sized-reading", 674, 900, reading = true)
+
+    @Test fun landscapeTabletReadingWidth() = capture("tablet-landscape-reading", 1280, 800, reading = true)
+
     @Test fun shortWindowLongCaptionKeepsContrastAtSceneEdges() = capture("short-window-long-caption", 411, 480, scrollToEnd = true)
+
+    @Test fun normalMobileAudioWidth() = capture("normal-mobile-audio", 411, 891, reading = true, audio = true)
+
+    @Test fun foldableSizedAudioWidth() = capture("foldable-sized-audio", 674, 900, reading = true, audio = true)
+
+    @Test fun landscapeTabletAudioWidth() = capture("tablet-landscape-audio", 1280, 800, reading = true, audio = true)
+
+    @Test fun tallVideoMemoryFitsBelowChrome() = capture("portrait-video-memory", 411, 891, scrollToEnd = true, portraitVideo = true)
+
+    @Test fun tabletTallVideoMemoryFitsBelowChrome() =
+        capture("tablet-portrait-video-memory", 1280, 800, scrollToEnd = true, portraitVideo = true)
 
     @Test fun firstEntryKeepsBackgroundAtSceneEdges() =
         runDesktopComposeUiTest(width = 411, height = 891) {
@@ -90,10 +111,28 @@ class RewindViewportCaptureTest {
         width: Int,
         height: Int,
         scrollToEnd: Boolean = false,
+        reading: Boolean = false,
+        audio: Boolean = false,
+        portraitVideo: Boolean = false,
     ) = runDesktopComposeUiTest(width = width, height = height) {
         val id = Uuid.parse("00000000-0000-0000-0000-000000000038")
         setContent {
-            val image = remember { ColorImage((if (width == 411) Color.White else Color(0xFFD8EBF7)).toArgb()) }
+            val image =
+                remember {
+                    ColorImage(
+                        (
+                            if (width ==
+                                411
+                            ) {
+                                Color.White
+                            } else {
+                                Color(0xFFD8EBF7)
+                            }
+                        ).toArgb(),
+                        600,
+                        if (portraitVideo) 1200 else 400,
+                    )
+                }
             val handler = remember(image) { AsyncImagePreviewHandler { image } }
             CompositionLocalProvider(
                 LocalDensity provides Density(1f, 1f),
@@ -104,20 +143,40 @@ class RewindViewportCaptureTest {
                     RewindStoryView(
                         panels =
                             listOf(
-                                ImageRewindPanelUiState(
-                                    id,
-                                    Instant.parse("2026-10-20T12:00:00Z"),
-                                    "fixture://rewind-photo",
-                                    "## A quiet walk\n\nRoom to **remember** the afternoon." +
-                                        if (scrollToEnd) {
-                                            "\n\n" +
-                                                (1..20).joinToString("\n\n") { "Remembering moment $it on the walk home." } +
-                                                "\n\nLast detail"
-                                        } else {
-                                            ""
-                                        },
-                                    "Tuesday".toUiText(),
-                                ),
+                                if (audio) {
+                                    AudioNoteRewindPanelUiState(
+                                        id,
+                                        Instant.parse("2026-10-20T12:00:00Z"),
+                                        "fixture://audio",
+                                        42000,
+                                        "A quiet walk. Room to remember the afternoon.",
+                                        "Tuesday".toUiText(),
+                                        listOf(0.2f, 0.8f),
+                                    )
+                                } else if (reading) {
+                                    TextNoteRewindPanelUiState(
+                                        id,
+                                        Instant.parse("2026-10-20T12:00:00Z"),
+                                        "## A quiet walk\n\nRoom to **remember** the afternoon. A memory should remain readable on a wide display, with a calm leading edge and room around the words.",
+                                        "Tuesday".toUiText(),
+                                    )
+                                } else {
+                                    ImageRewindPanelUiState(
+                                        id,
+                                        Instant.parse("2026-10-20T12:00:00Z"),
+                                        "fixture://rewind-photo",
+                                        "## A quiet walk\n\nRoom to **remember** the afternoon." +
+                                            if (scrollToEnd) {
+                                                "\n\n" +
+                                                    (1..20).joinToString("\n\n") { "Remembering moment $it on the walk home." } +
+                                                    "\n\nLast detail"
+                                            } else {
+                                                ""
+                                            },
+                                        "Tuesday".toUiText(),
+                                        isVideoFrame = portraitVideo,
+                                    )
+                                },
                             ),
                         onExit = {},
                         externalPause = true,
@@ -127,10 +186,29 @@ class RewindViewportCaptureTest {
         }
         onNodeWithText("A quiet walk", substring = true).assertIsDisplayed()
         val scene = onNodeWithTag("rewind-story-focus").fetchSemanticsNode().boundsInRoot
-        val memory = onNodeWithTag("rewind_memory_$id").fetchSemanticsNode().boundsInRoot
-        assertEquals(scene, memory)
+        if (!audio) {
+            val memory = onNodeWithTag("rewind_memory_$id").fetchSemanticsNode().boundsInRoot
+            assertEquals(scene, memory)
+        }
         assertEquals(minOf(width, 1200).toFloat(), scene.width)
         assertEquals(height.toFloat(), scene.height)
+        val readable = onAllNodes(hasScrollAction()).fetchSemanticsNodes().maxBy { it.boundsInRoot.width }.boundsInRoot
+        assertTrue(readable.width <= if (reading) 600f else 760f, "Memory content needs its own Apple-aligned maximum: $readable")
+        assertTrue(kotlin.math.abs(readable.center.x - scene.center.x) <= 1f, "Memory content must be centered inside its scene")
+        if (!reading) {
+            val media =
+                onNode(
+                    hasContentDescription(if (portraitVideo) "Tuesday" else "A quiet walk", substring = true),
+                ).fetchSemanticsNode().boundsInRoot
+            assertTrue(media.width <= 760f, "Media memory must keep its own maximum, independently from the scene: $media")
+            val date = onNodeWithText("Tuesday").fetchSemanticsNode().boundsInRoot
+            assertTrue(date.bottom <= media.top, "Media must fit below metadata without overdraw: date=$date media=$media")
+            if (portraitVideo) {
+                val videoLabel = onNodeWithText("Video still").fetchSemanticsNode().boundsInRoot
+                val close = onNode(hasContentDescription("Close rewind")).fetchSemanticsNode().boundsInRoot
+                assertTrue(videoLabel.top >= close.bottom, "Video metadata must clear the measured playback header")
+            }
+        }
         mainClock.advanceTimeBy(500)
         waitForIdle()
         if (scrollToEnd) onNodeWithText("Last detail").performScrollTo().assertIsDisplayed()
