@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -26,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.feature.editor.ui.layout.LocalEntryContentInsets
+import app.logdate.feature.editor.ui.layout.clipEntryContentToSafeWindow
 import app.logdate.ui.foldable.FoldableSplitLayout
 import app.logdate.ui.foldable.calculateFoldableSplitLayout
 import app.logdate.ui.foldable.relativeTo
@@ -127,7 +130,11 @@ private fun BrowserEntries(
     heading: @Composable () -> Unit,
 ) {
     Column(
-        modifier.padding(top = 104.dp, bottom = 96.dp),
+        modifier.padding(
+            top = 104.dp + LocalEntryContentInsets.current.asPaddingValues().calculateTopPadding(),
+            bottom =
+                16.dp + LocalEntryContentInsets.current.asPaddingValues().calculateBottomPadding(),
+        ),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         heading()
@@ -150,7 +157,10 @@ private fun BrowserEntries(
                             bottomEnd = if (index == notes.lastIndex) 16.dp else 4.dp,
                         ),
                 ) {
-                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(20.dp).clipEntryContentToSafeWindow(),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
                         Text(
                             note.creationTimestamp.localTime,
                             style = MaterialTheme.typography.titleSmall,

@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,10 +32,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -378,6 +383,7 @@ private fun PreviewInlineCameraCapture(
                     modifier =
                         Modifier
                             .align(Alignment.TopEnd)
+                            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                             .statusBarsPadding()
                             .padding(16.dp),
                     shape = RoundedCornerShape(16.dp),
@@ -408,6 +414,7 @@ private fun PreviewInlineCameraCapture(
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                         .navigationBarsPadding()
                         .padding(bottom = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -544,6 +551,7 @@ private fun MediaReviewContent(
                     Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                         .navigationBarsPadding()
                         .background(
                             MaterialTheme.colorScheme.surfaceContainer,
@@ -784,6 +792,7 @@ private fun InlineCameraCapture(
                 modifier =
                     Modifier
                         .align(Alignment.TopEnd)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                         .statusBarsPadding()
                         .padding(16.dp),
             )
@@ -937,6 +946,7 @@ private fun InlineCameraCapture(
                     modifier =
                         Modifier
                             .fillMaxSize()
+                            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                             .navigationBarsPadding()
                             .padding(horizontal = 16.dp, vertical = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -954,6 +964,7 @@ private fun InlineCameraCapture(
                     modifier =
                         Modifier
                             .align(Alignment.TopStart)
+                            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                             .statusBarsPadding()
                             .padding(16.dp),
                 )
@@ -961,6 +972,7 @@ private fun InlineCameraCapture(
                     modifier =
                         Modifier
                             .align(Alignment.BottomCenter)
+                            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                             .navigationBarsPadding()
                             .padding(bottom = 24.dp),
                 )
@@ -968,6 +980,7 @@ private fun InlineCameraCapture(
                     modifier =
                         Modifier
                             .align(Alignment.TopCenter)
+                            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                             .statusBarsPadding()
                             .padding(top = 16.dp),
                 )

@@ -3,6 +3,8 @@ package app.logdate.client.e2e
 import android.app.Application
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.os.Build
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -29,6 +31,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.koin.core.context.GlobalContext
 import java.io.File
+import kotlin.math.abs
 import kotlin.test.assertTrue
 
 /** The creation anchor may be below the viewport; its interactive selector must remain safe. */
@@ -99,14 +102,16 @@ class EditorLongPageAcceptanceTest {
                         check(device.takeScreenshot(File(output, "$mode-$name-initial.png")))
                         compose.onNodeWithTag("entry_page_creation").performScrollTo()
                         compose.waitForIdle()
-                        assertSafeCapture(scenario, "$mode-$name-end")
+                        assertSafeCapture(scenario, "$mode-$name-end", expectBalancedMargin = true)
                         val textBounds = compose.onNodeWithTag("editor_text_input").getUnclippedBoundsInRoot()
                         val capture = compose.onNodeWithTag("entry_capture_tools").getUnclippedBoundsInRoot()
                         assertTrue(
                             textBounds.bottom.value <= capture.top.value + 1f,
                             "Last content line cannot scroll clear of the selector: $textBounds, $capture",
                         )
-                        check(device.takeScreenshot(File(output, "$mode-$name-end.png")))
+                        val screenshot = File(output, "$mode-$name-end.png")
+                        check(device.takeScreenshot(screenshot))
+                        assertCleanStatusStrip(scenario, screenshot, "$mode-$name-end")
                     }
                 }
             }
@@ -116,9 +121,42 @@ class EditorLongPageAcceptanceTest {
         }
     }
 
+    private fun assertCleanStatusStrip(
+        scenario: ActivityScenario<EditorActivity>,
+        screenshot: File,
+        label: String,
+    ) {
+        var statusTop = 0
+        scenario.onActivity {
+            statusTop =
+                checkNotNull(ViewCompat.getRootWindowInsets(it.window.decorView)).getInsets(WindowInsetsCompat.Type.statusBars()).top
+        }
+        check(statusTop > 4) { "The fixture must expose a status strip" }
+        val bitmap = checkNotNull(BitmapFactory.decodeFile(screenshot.path))
+        try {
+            // The synthetic long text card crosses this strip. Avoid Android's left clock
+            // and right icons: its center must contain continuous surface paint, never ink.
+            val reference = bitmap.getPixel(bitmap.width / 2, 2)
+            for (y in 2 until statusTop - 2) {
+                for (x in bitmap.width * 35 / 100 until bitmap.width * 65 / 100) {
+                    val pixel = bitmap.getPixel(x, y)
+                    assertTrue(
+                        abs(Color.red(pixel) - Color.red(reference)) <= 3 &&
+                            abs(Color.green(pixel) - Color.green(reference)) <= 3 &&
+                            abs(Color.blue(pixel) - Color.blue(reference)) <= 3,
+                        "$label: inner text/control ink in the status strip at $x,$y",
+                    )
+                }
+            }
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
     private fun assertSafeCapture(
         scenario: ActivityScenario<EditorActivity>,
         label: String,
+        expectBalancedMargin: Boolean = false,
     ) {
         var left = 0f
         var top = 0f
@@ -137,6 +175,21 @@ class EditorLongPageAcceptanceTest {
             bottom = (view.height - insets.bottom) / scale
         }
         val capture = compose.onNodeWithTag("entry_capture_tools").getUnclippedBoundsInRoot()
+        if (expectBalancedMargin) {
+            val railWidth = minOf(right - left, 640f)
+            val railLeft = left + (right - left - railWidth) / 2f
+            val startMargin = capture.left.value - railLeft
+            val endMargin = railLeft + railWidth - capture.right.value
+            val bottomMargin = bottom - capture.bottom.value
+            assertTrue(
+                abs(startMargin - 16f) <= 1f && abs(endMargin - 16f) <= 1f,
+                "$label: wrong inner rail margins $startMargin/$endMargin",
+            )
+            assertTrue(
+                abs(bottomMargin - startMargin) <= 1f,
+                "$label: bottom design margin $bottomMargin differs from side margin $startMargin",
+            )
+        }
         assertTrue(
             capture.top.value >= top - 1 && capture.bottom.value <= bottom + 1,
             "$label selector overlaps system UI: $capture vs $top..$bottom",

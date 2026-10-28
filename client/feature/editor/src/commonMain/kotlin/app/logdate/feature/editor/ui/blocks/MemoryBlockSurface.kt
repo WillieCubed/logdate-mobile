@@ -44,6 +44,7 @@ import app.logdate.feature.editor.ui.handwriting.handwritingSharedElement
 import app.logdate.feature.editor.ui.layout.EditorBlockCornerRadius
 import app.logdate.feature.editor.ui.layout.EditorBlockMinHeight
 import app.logdate.feature.editor.ui.layout.LocalEditorRecordingActive
+import app.logdate.feature.editor.ui.layout.clipEntryContentToSafeWindow
 import app.logdate.shared.model.PhotoPresentation
 import app.logdate.ui.common.DropdownMenu
 import app.logdate.ui.platform.PlatformIcons
@@ -134,7 +135,11 @@ internal fun MemoryBlockSurface(
                         else -> Modifier
                     }
                 }
-            Column(contentInsets) { content() }
+            Column(
+                contentInsets.then(
+                    if (block is TextBlockUiState || block is AudioBlockUiState) Modifier.clipEntryContentToSafeWindow() else Modifier,
+                ),
+            ) { content() }
             if (!recordingActive) {
                 val menuTopInset =
                     if (block is AudioBlockUiState && block.uri != null) {
@@ -142,7 +147,7 @@ internal fun MemoryBlockSurface(
                     } else {
                         4.dp
                     }
-                Row(Modifier.align(Alignment.TopEnd).padding(top = menuTopInset, end = 4.dp)) {
+                Row(Modifier.align(Alignment.TopEnd).padding(top = menuTopInset, end = 4.dp).clipEntryContentToSafeWindow()) {
                     if (showFocusAction) {
                         IconButton(
                             onClick = onSelect,

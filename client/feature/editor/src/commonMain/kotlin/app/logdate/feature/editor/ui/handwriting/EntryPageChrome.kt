@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
@@ -51,6 +52,7 @@ import app.logdate.feature.editor.ui.layout.LocalEditorContextControlsVisible
 import app.logdate.feature.editor.ui.layout.LocalEditorFocusPresentation
 import app.logdate.feature.editor.ui.layout.LocalEditorRecordingActive
 import app.logdate.feature.editor.ui.layout.LocalEntryChromeHeight
+import app.logdate.feature.editor.ui.layout.LocalEntryContentInsets
 import app.logdate.feature.editor.ui.layout.editorFocus
 import app.logdate.feature.editor.ui.layout.editorFocusPresentation
 import app.logdate.ui.foldable.FoldableSplitLayout
@@ -78,12 +80,14 @@ internal fun EntryPageChrome(
     modifier: Modifier = Modifier,
     header: (@Composable () -> Unit)? = null,
     focusProgress: Float? = null,
+    safeInsets: WindowInsets = WindowInsets.safeDrawing,
     content: @Composable () -> Unit,
 ) {
     val returnToWriting = stringResource(Res.string.entry_page_return_to_writing)
     val density = LocalDensity.current
+    val direction = LocalLayoutDirection.current
     val keyboardBottom = WindowInsets.ime.getBottom(density)
-    val safeBottom = WindowInsets.safeDrawing.getBottom(density)
+    val safeBottom = safeInsets.getBottom(density)
     val focused = editor.expandedBlockId != null
     val block = editor.blocks.firstOrNull { it.id == editor.expandedBlockId }
     val journal = editor.availableJournals.firstOrNull()
@@ -100,32 +104,39 @@ internal fun EntryPageChrome(
         modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surfaceDim)
-            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
             .then(trackOrigin)
             .testTag("stories_editor")
             .semantics { isTraversalGroup = true },
     ) {
         val split =
             calculateFoldableSplitLayout(maxWidth, maxHeight, rememberFoldableLayoutInfo().relativeTo(origin), minPaneWidth = 280.dp)
-        val safeTop = WindowInsets.safeDrawing.getTop(density)
+        val safeTop = safeInsets.getTop(density)
+        val safeLeft = with(density) { safeInsets.getLeft(density, direction).toDp() }
+        val safeRight = with(density) { safeInsets.getRight(density, direction).toDp() }
+        val safeWidth = (maxWidth - safeLeft - safeRight).coerceAtLeast(0.dp)
         val safeHeight = maxHeight - with(density) { (safeBottom + safeTop).toDp() }
         val chromeHeight = if (safeHeight < 240.dp) 48.dp else 64.dp
         val anchor = overview.captureBounds
         val focusLeft =
             if (split is FoldableSplitLayout.Vertical) {
-                split.rightPane.left
+                split.rightPane.left.coerceAtLeast(safeLeft)
             } else {
                 (
-                    maxWidth -
-                        minOf(maxWidth, EntryPageRailMaxWidth)
+                    safeWidth -
+                        minOf(safeWidth, EntryPageRailMaxWidth)
                 ) /
-                    2
+                    2 + safeLeft
             }
-        val focusWidth = if (split is FoldableSplitLayout.Vertical) split.rightPane.width else minOf(maxWidth, EntryPageRailMaxWidth)
-        val focusTop = maxHeight - chromeHeight - with(density) { maxOf(keyboardBottom, safeBottom).toDp() }
+        val focusWidth =
+            if (split is FoldableSplitLayout.Vertical) {
+                (split.rightPane.right.coerceAtMost(maxWidth - safeRight) - focusLeft).coerceAtLeast(0.dp)
+            } else {
+                minOf(safeWidth, EntryPageRailMaxWidth)
+            }
+        val focusTop = maxHeight - chromeHeight - with(density) { maxOf(keyboardBottom, safeBottom).toDp() } - Spacing.lg
         val progress = focusProgress ?: if (focused) 1f else 0f
-        val overviewLeft = with(density) { (anchor?.left?.toDp() ?: origin.x) - origin.x }
-        val overviewWidth = with(density) { (anchor?.width ?: constraints.maxWidth.toFloat()).toDp() }
+        val overviewLeft = anchor?.let { with(density) { it.left.toDp() - origin.x } } ?: safeLeft
+        val overviewWidth = anchor?.let { with(density) { it.width.toDp() } } ?: safeWidth
         // Long document content can put the creation anchor below the viewport.
         val overviewTop = with(density) { anchor?.top?.toDp()?.minus(origin.y) ?: maxHeight }.coerceAtMost(focusTop)
         val barLeft = lerp(overviewLeft, focusLeft, progress)
@@ -134,7 +145,7 @@ internal fun EntryPageChrome(
         val barTop = lerp(writingTop, maxHeight + 80.dp, overview.browsingProgress)
         val barAlpha = 1f - overview.browsingProgress
         val pullProgress = (-overview.pull / with(density) { 112.dp.toPx() }).coerceIn(0f, 1f)
-        CompositionLocalProvider(LocalEntryChromeHeight provides chromeHeight) {
+        CompositionLocalProvider(LocalEntryChromeHeight provides chromeHeight, LocalEntryContentInsets provides safeInsets) {
             CompositionLocalProvider(
                 LocalEditorFocusPresentation provides
                     editorFocusPresentation(editor.editorFocus(), maxWidth, split != FoldableSplitLayout.None, keyboardBottom > 0),
@@ -145,28 +156,22 @@ internal fun EntryPageChrome(
                 EditorContentLayer(
                     Modifier
                         .fillMaxSize()
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical))
                         .clipToBounds()
-                        .then(
-                            if (editor.isRecordingAudio) {
-                                Modifier
-                                    .windowInsetsPadding(
-                                        WindowInsets.safeDrawing.only(WindowInsetsSides.Top),
-                                    ).padding(top = chromeHeight)
-                            } else {
-                                Modifier
-                            },
-                        ).semantics {
+                        .semantics {
                             isTraversalGroup = true
                             traversalIndex = 1f
                         },
                 ) { content() }
             }
             Box(
-                Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)).semantics {
-                    isTraversalGroup = true
-                    traversalIndex = 0f
-                },
+                Modifier
+                    .align(
+                        Alignment.TopStart,
+                    ).windowInsetsPadding(safeInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                    .semantics {
+                        isTraversalGroup = true
+                        traversalIndex = 0f
+                    },
             ) {
                 if (!overview.earlierExpanded) {
                     Box(Modifier.graphicsLayer { alpha = 1f - overview.browsingProgress }) {
