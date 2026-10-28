@@ -367,6 +367,10 @@
   >Could not change local diagnostic history.</string>
     <string name="about_logdate">About LogDate</string>
     <string name="about_logdate_description">Version and app updates</string>
+    <string name="hide_developer_mode">Hide developer mode</string>
+    <string
+    name="developer_mode_save_failed"
+  >Couldn’t save developer mode. Please try again.</string>
     <string name="developer_tools">Developer Tools</string>
     <string
     name="developer_tools_description"

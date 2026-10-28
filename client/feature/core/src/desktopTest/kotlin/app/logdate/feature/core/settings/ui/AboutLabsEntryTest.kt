@@ -3,6 +3,8 @@
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -52,6 +54,7 @@ private fun About(
     appUpdateUiState: AppUpdateUiState,
     onOpenLabs: () -> Unit,
 ) {
+    val developerModeEnabled = remember { mutableStateOf(false) }
     LogDateTheme(dynamicColor = false, darkTheme = false) {
         AdvancedSettingsContent(
             onBack = {},
@@ -59,6 +62,8 @@ private fun About(
             onCheckForAppUpdates = {},
             onCompleteAppUpdate = {},
             onNavigateToLabs = onOpenLabs,
+            developerModeEnabled = developerModeEnabled.value,
+            onSetDeveloperModeEnabled = { developerModeEnabled.value = it },
         )
     }
 }

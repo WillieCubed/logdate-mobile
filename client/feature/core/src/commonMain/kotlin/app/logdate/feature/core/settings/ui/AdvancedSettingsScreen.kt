@@ -8,7 +8,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material.icons.outlined.SystemUpdate
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -44,8 +46,10 @@ import logdate.client.feature.core.generated.resources.app_updates_description
 import logdate.client.feature.core.generated.resources.app_version_label
 import logdate.client.feature.core.generated.resources.app_version_with_build_label
 import logdate.client.feature.core.generated.resources.check_for_updates
+import logdate.client.feature.core.generated.resources.developer_mode_save_failed
 import logdate.client.feature.core.generated.resources.developer_tools
 import logdate.client.feature.core.generated.resources.developer_tools_description
+import logdate.client.feature.core.generated.resources.hide_developer_mode
 import logdate.client.feature.core.generated.resources.labs_settings_description
 import logdate.client.feature.core.generated.resources.labs_settings_title
 import org.jetbrains.compose.resources.stringResource
@@ -60,6 +64,8 @@ fun AdvancedSettingsScreen(
     viewModel: AdvancedSettingsViewModel = koinViewModel(),
 ) {
     val appUpdateUiState by viewModel.appUpdateUiState.collectAsState()
+    val developerModeEnabled by viewModel.developerModeEnabled.collectAsState()
+    val developerModeSaveFailed by viewModel.developerModeSaveFailed.collectAsState()
 
     AdvancedSettingsContent(
         onBack = onBack,
@@ -68,6 +74,9 @@ fun AdvancedSettingsScreen(
         appUpdateUiState = appUpdateUiState,
         onCheckForAppUpdates = viewModel::checkForAppUpdates,
         onCompleteAppUpdate = viewModel::completeAppUpdate,
+        developerModeEnabled = developerModeEnabled,
+        onSetDeveloperModeEnabled = viewModel::setDeveloperModeEnabled,
+        developerModeSaveFailed = developerModeSaveFailed,
     )
 }
 
@@ -79,6 +88,9 @@ fun AdvancedSettingsContent(
     onCompleteAppUpdate: () -> Unit,
     onNavigateToDeveloperTools: () -> Unit = {},
     onNavigateToLabs: () -> Unit = {},
+    developerModeEnabled: Boolean = false,
+    onSetDeveloperModeEnabled: (Boolean) -> Unit = {},
+    developerModeSaveFailed: Boolean = false,
 ) {
     var versionTaps by rememberSaveable { mutableIntStateOf(0) }
     SettingsScaffold(title = stringResource(Res.string.about_logdate), onBack = onBack) {
@@ -86,9 +98,18 @@ fun AdvancedSettingsContent(
             MaterialContainer(modifier = Modifier.padding(horizontal = Spacing.lg)) {
                 SettingsRow(
                     headlineContent = { Text(installedVersionLabel(appUpdateUiState)) },
-                    modifier = Modifier.clickable { versionTaps = (versionTaps + 1).coerceAtMost(7) },
+                    modifier =
+                        Modifier.clickable {
+                            if (!developerModeEnabled) {
+                                versionTaps++
+                                if (versionTaps >= 7) {
+                                    versionTaps = 0
+                                    onSetDeveloperModeEnabled(true)
+                                }
+                            }
+                        },
                 )
-                if (versionTaps >= 7) {
+                if (developerModeEnabled) {
                     SettingsNavigationItem(
                         title = stringResource(Res.string.developer_tools),
                         description = stringResource(Res.string.developer_tools_description),
@@ -100,6 +121,23 @@ fun AdvancedSettingsContent(
                         description = stringResource(Res.string.labs_settings_description),
                         icon = { Icon(Icons.Outlined.Science, contentDescription = null) },
                         onClick = onNavigateToLabs,
+                    )
+                    SettingsRow(
+                        headlineContent = { Text(stringResource(Res.string.hide_developer_mode)) },
+                        leadingContent = { Icon(Icons.Outlined.VisibilityOff, contentDescription = null) },
+                        modifier =
+                            Modifier.clickable {
+                                versionTaps = 0
+                                onSetDeveloperModeEnabled(false)
+                            },
+                    )
+                }
+                if (developerModeSaveFailed) {
+                    Text(
+                        stringResource(Res.string.developer_mode_save_failed),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(Spacing.lg),
                     )
                 }
             }
