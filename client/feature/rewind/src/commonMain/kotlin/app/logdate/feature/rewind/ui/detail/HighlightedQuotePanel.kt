@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,15 +47,15 @@ fun HighlightedQuotePanel(
         Column(
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(28.dp),
-            modifier = Modifier.padding(horizontal = 40.dp, vertical = 80.dp),
+            modifier = Modifier.padding(horizontal = 40.dp, vertical = 80.dp).verticalScroll(rememberScrollState()),
         ) {
-            Text(
-                text = "\u201C${text}\u201D",
-                style = MaterialTheme.typography.headlineLarge,
-                color = Color.White,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.Start,
-                lineHeight = MaterialTheme.typography.headlineLarge.lineHeight,
+            RewindRichMemoryText(
+                content = text,
+                textStyle =
+                    MaterialTheme.typography.headlineLarge.copy(
+                        fontWeight = FontWeight.Medium,
+                        lineHeight = MaterialTheme.typography.headlineLarge.lineHeight,
+                    ),
             )
             Text(
                 text = whyItHits,

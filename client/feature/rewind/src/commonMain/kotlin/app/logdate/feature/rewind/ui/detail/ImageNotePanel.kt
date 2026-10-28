@@ -6,12 +6,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,7 +34,6 @@ import coil3.compose.AsyncImage
 import logdate.client.feature.rewind.generated.resources.Res
 import logdate.client.feature.rewind.generated.resources.cd_rewind_journal_photo
 import logdate.client.feature.rewind.generated.resources.cd_rewind_video_frame
-import logdate.client.feature.rewind.generated.resources.rewind_media_unavailable
 import logdate.client.feature.rewind.generated.resources.rewind_video_frame_label
 import org.jetbrains.compose.resources.stringResource
 
@@ -58,12 +60,10 @@ fun ImageNotePanel(
     dateFormatted: String,
     isVideoFrame: Boolean = false,
     modifier: Modifier = Modifier,
+    memoryId: String = "image-memory",
 ) {
-    var imageFailed by remember(imageUri) { mutableStateOf(false) }
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
+    var loadState by remember(imageUri) { mutableStateOf<RewindMemoryLoadState>(RewindMemoryLoadState.Loading) }
+    RewindMemoryFrame(memoryId, loadState, modifier.fillMaxSize()) {
         // Image as full background
         AsyncImage(
             model = imageUri,
@@ -76,21 +76,13 @@ fun ImageNotePanel(
                 },
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
-            onError = { imageFailed = true },
-            onSuccess = { imageFailed = false },
+            onLoading = { loadState = RewindMemoryLoadState.Loading },
+            onError = { loadState = RewindMemoryLoadState.Unavailable },
+            onSuccess = { loadState = RewindMemoryLoadState.Ready },
         )
 
         // Top and bottom gradient overlays for more polished look
         ImageScrimOverlay(alphaStops = listOf(0.3f, 0f, 0f, 0.7f))
-
-        if (imageFailed) {
-            Text(
-                text = stringResource(Res.string.rewind_media_unavailable),
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color.White,
-                modifier = Modifier.padding(24.dp),
-            )
-        }
 
         // Date indicator at top
         if (isVideoFrame) {
@@ -134,23 +126,27 @@ fun ImageNotePanel(
                 modifier =
                     Modifier
                         .fillMaxWidth()
+                        .fillMaxHeight(0.4f)
                         .align(Alignment.BottomCenter)
                         .padding(horizontal = 16.dp, vertical = 24.dp),
+                contentAlignment = Alignment.BottomCenter,
             ) {
                 Column(
                     modifier =
                         Modifier
                             .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
                             .clip(RoundedCornerShape(16.dp))
                             .background(Color.Black.copy(alpha = 0.5f))
                             .padding(16.dp),
                 ) {
-                    Text(
-                        text = caption,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White,
-                        fontWeight = FontWeight.Medium,
-                        lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.2f,
+                    RewindRichMemoryText(
+                        content = caption,
+                        textStyle =
+                            MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = FontWeight.Medium,
+                                lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.2f,
+                            ),
                     )
                 }
             }

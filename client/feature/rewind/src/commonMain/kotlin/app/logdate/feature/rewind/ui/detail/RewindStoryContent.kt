@@ -111,6 +111,7 @@ fun RewindStoryContent(
                 backgroundColor = panel.background.color?.let { Color(it) } ?: Color(0xFF1A1A1A),
                 backgroundImageUri = panel.background.uri,
                 modifier = modifier,
+                memoryId = panel.sourceId.toString(),
             )
         }
 
@@ -121,6 +122,7 @@ fun RewindStoryContent(
                 dateFormatted = panel.dateFormatted.asString(),
                 isVideoFrame = panel.isVideoFrame,
                 modifier = modifier,
+                memoryId = panel.sourceId.toString(),
             )
         }
 

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <resources>
+    <string name="rewind_media_loading">Loading memory…</string>
+    <string name="rewind_media_ready">Memory loaded</string>
     <string name="rewind_map_loading">Loading map…</string>
     <string name="rewind_map_unavailable">Map unavailable. Check your connection and reopen this Rewind.</string>
     <string name="rewind_map_not_configured">Map unavailable on this device.</string>
