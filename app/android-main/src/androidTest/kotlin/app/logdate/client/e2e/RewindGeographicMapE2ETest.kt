@@ -42,6 +42,11 @@ class RewindGeographicMapE2ETest {
     @Test fun geographyLoadsBehindMarkersAndMapTapsStillAdvanceTheStory() {
         showMap(listOf(MapPanelPoint(36.1699, -115.1398), MapPanelPoint(36.1716, -115.1460), MapPanelPoint(36.1740, -115.1320)))
         awaitMap()
+        assertEquals(
+            "Rewind details must fill their playback area without a decorative frame",
+            compose.onNodeWithTag("rewind-story-focus").fetchSemanticsNode().boundsInRoot,
+            compose.onNodeWithTag("rewind-map-surface").fetchSemanticsNode().boundsInRoot,
+        )
         capture("rewind-geographic-map")
         compose.onNodeWithTag("rewind-native-map").performTouchInput { click(Offset(width * 0.75f, height * 0.5f)) }
         compose.onNodeWithText("Next moment").assertIsDisplayed()

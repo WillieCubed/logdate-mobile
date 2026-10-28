@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,17 +36,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindPanelUiState
 import app.logdate.ui.platform.PlatformPredictiveBackHandler
-import app.logdate.ui.platform.rememberScreenCornerRadius
 import app.logdate.ui.platform.rememberSystemReduceMotion
 import app.logdate.ui.workspace.WorkspacePlaybackLayout
 import kotlinx.coroutines.delay
@@ -165,15 +163,6 @@ fun RewindStoryView(
             }
         },
     )
-
-    // Panel corners are concentric with the physical display: the same center point as the
-    // screen's own rounded corners, so the small inset reads as reveal rather than an
-    // arbitrarily-chosen radius sitting inside a squared-off screen.
-    val screenCornerRadius = rememberScreenCornerRadius()
-    val storyPanelShape =
-        remember(screenCornerRadius) {
-            RoundedCornerShape((screenCornerRadius - rewindStoryPanelInset).coerceAtLeast(0.dp))
-        }
 
     // First-view entrance animation: scale up from 0.92 with a spring, then settle.
     // Only plays once when the story first mounts, and only for unviewed rewinds.
@@ -320,8 +309,7 @@ fun RewindStoryView(
                         scaleX = scale
                         scaleY = scale
                         alpha = 1f - eased * DISMISS_CARD_MAX_FADE
-                    }.padding(rewindStoryPanelInset)
-                    .clip(storyPanelShape),
+                    },
         ) { panelIndex ->
             content(panels[panelIndex])
         }
@@ -413,7 +401,7 @@ fun RewindStoryView(
     ) {
         WorkspacePlaybackLayout(
             focus = {
-                TapNavigationLayer(Modifier.fillMaxSize()) {
+                TapNavigationLayer(Modifier.fillMaxSize().testTag("rewind-story-focus")) {
                     StoryPanel(Modifier.fillMaxSize())
                 }
             },
@@ -442,10 +430,6 @@ fun RewindStoryView(
         )
     }
 }
-
-// Small enough to keep the story feeling edge-to-edge and immersive; just enough for the
-// concentric-corner reveal at the panel's edges to register.
-private val rewindStoryPanelInset = 4.dp
 
 // A mild ease-in: the gesture reads as slightly softened rather than raw 1:1 finger
 // tracking, without the long dead zone a stronger curve gives at the very start.
