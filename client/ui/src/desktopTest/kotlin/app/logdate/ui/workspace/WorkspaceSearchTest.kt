@@ -32,6 +32,35 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class WorkspaceSearchTest {
+    @Test fun phoneDestinationsKeepSearchAtTheSameLeadingPosition() =
+        runDesktopComposeUiTest(width = 411, height = 891) {
+            val names = listOf("Timeline", "Places", "Journals", "Library", "Rewind")
+            var selected by mutableStateOf("Timeline")
+            setContent {
+                LogDateTheme {
+                    WorkspaceScaffold(
+                        names.map { WorkspaceDestination(it, it, Icons.Default.Place) },
+                        selected,
+                        { selected = it },
+                        onSearch = {},
+                        actions = { Box(Modifier.size(48.dp).testTag("account_action")) },
+                    ) {
+                        if (selected == "Places") WorkspaceSearchScope("", "Search your places", {})
+                        Box(Modifier.fillMaxSize().testTag("working_panel"))
+                    }
+                }
+            }
+            val original = onNodeWithTag("workspace_search").fetchSemanticsNode().boundsInRoot
+            for (name in names) {
+                onNodeWithText(name).performClick()
+                onAllNodesWithTag("workspace_search").assertCountEquals(1)
+                val bounds = onNodeWithTag("workspace_search").fetchSemanticsNode().boundsInRoot
+                assertEquals(original.left, bounds.left, "Search must keep its leading edge in $name")
+                assertEquals(original.top, bounds.top, "Search must keep its vertical position in $name")
+                assertEquals(original.width, bounds.width, "Search must keep its available width in $name")
+            }
+        }
+
     @Test fun compactLargeTextKeepsGlobalSearchAndAccountOnOneRow() = verifyCompactAppBar(false)
 
     @Test fun compactLargeTextKeepsPlaceSearchAndAccountOnOneRow() = verifyCompactAppBar(true)

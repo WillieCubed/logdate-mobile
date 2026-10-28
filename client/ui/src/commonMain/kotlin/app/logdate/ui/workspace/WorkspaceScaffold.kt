@@ -343,7 +343,7 @@ private fun WorkspaceNavigationRail(
         }
     }
     val items: @Composable () -> Unit = {
-        Column(Modifier.verticalScroll(rememberScrollState())) {
+        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             destinations.forEach { destination ->
                 val isSelected = selectedKey == destination.key
                 WideNavigationRailItem(

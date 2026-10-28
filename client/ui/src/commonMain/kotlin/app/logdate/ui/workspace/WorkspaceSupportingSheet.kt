@@ -2,7 +2,8 @@
 
 package app.logdate.ui.workspace
 
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -23,7 +24,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -31,7 +31,7 @@ import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.collapse
@@ -58,6 +58,9 @@ val LocalSupportingOverlap = staticCompositionLocalOf { 0.dp }
 
 /** Keeps the visual focus mounted while the same supporting panel changes extent or placement. */
 @Composable
+// Foundation 1.11's untargeted fling is not reported by isAnimationRunning. Keep explicit takeover
+// until the default covers it; WorkspaceSheetGestureTest verifies a content touch interrupts a fling.
+@Suppress("DEPRECATION")
 fun WorkspaceSupportingSheet(
     summary: String,
     modifier: Modifier = Modifier,
@@ -100,18 +103,13 @@ fun WorkspaceSupportingSheet(
         val anchors = supportingSheetAnchors(mapBounds.height, 160.dp * density.fontScale.coerceAtMost(2f))
         val side = composition.browse
         val focused = extent == SupportingExtent.Focused || (side == null && !anchors.canOverlay && extent != SupportingExtent.Peek)
-        val sheetHeight =
-            if (side != null) {
-                side.height
-            } else {
-                when {
-                    focused -> mapBounds.height
-                    !anchors.canOverlay -> 64.dp.coerceAtMost(mapBounds.height)
-                    extent == SupportingExtent.Peek -> anchors.peek
-                    extent == SupportingExtent.Browsing -> anchors.browsing
-                    else -> anchors.expanded
-                }
-            }
+        val motion =
+            rememberSupportingSheetMotion(
+                extent,
+                anchors.dragAnchors(with(density) { mapBounds.height.toPx() }, density.density),
+                onSettled = { extent = it },
+            )
+        val sheetHeight = side?.height ?: with(density) { (-motion.state.requireOffset()).toDp() }
         val mapPlacement =
             if (mapBounds.x > 0.dp ||
                 parentPlacement == PanelPlacement.Floating
@@ -145,9 +143,21 @@ fun WorkspaceSupportingSheet(
                 containment = if (side == null) PanelContainment.Working else supportingContainment,
                 placement = if (side == null && mapPlacement != PanelPlacement.Floating) PanelPlacement.Lower else PanelPlacement.Floating,
             ) {
-                Column(Modifier.fillMaxSize()) {
+                Column(
+                    Modifier.fillMaxSize().then(
+                        if (side == null) {
+                            Modifier.nestedScroll(motion.nestedScroll).anchoredDraggable(
+                                state = motion.state,
+                                orientation = Orientation.Vertical,
+                                flingBehavior = motion.flingBehavior,
+                                startDragImmediately = motion.isSettling || motion.state.isAnimationRunning,
+                            )
+                        } else {
+                            Modifier
+                        },
+                    ),
+                ) {
                     if (side == null || header != null) {
-                        var drag by remember { mutableStateOf(0f) }
                         FlowRow(
                             Modifier
                                 .fillMaxWidth()
@@ -162,28 +172,6 @@ fun WorkspaceSupportingSheet(
                                             extent = SupportingExtent.Peek
                                             true
                                         }
-                                    }
-                                }.pointerInput(extent, anchors, side) {
-                                    if (side != null) return@pointerInput
-                                    detectVerticalDragGestures(onDragStart = { drag = 0f }, onDragEnd = {
-                                        if (drag < -24.dp.toPx()) {
-                                            extent =
-                                                when (extent) {
-                                                    SupportingExtent.Peek ->
-                                                        if (anchors.canOverlay) SupportingExtent.Browsing else SupportingExtent.Focused
-                                                    else -> SupportingExtent.Expanded
-                                                }
-                                        }
-                                        if (drag > 24.dp.toPx()) {
-                                            extent =
-                                                when (extent) {
-                                                    SupportingExtent.Focused, SupportingExtent.Expanded -> SupportingExtent.Browsing
-                                                    else -> SupportingExtent.Peek
-                                                }
-                                        }
-                                    }) { change, amount ->
-                                        change.consume()
-                                        drag += amount
                                     }
                                 }.padding(horizontal = Spacing.lg),
                         ) {
@@ -287,10 +275,24 @@ fun WorkspaceSupportingSheet(
                             }
                         }
                     }
-                    if (side == null && extent == SupportingExtent.Peek) {
+                    if (side == null && extent == SupportingExtent.Peek && sheetHeight <= anchors.peek) {
                         if (anchors.canOverlay) PanelHeader(summary, subtitle = summaryDetail)
                     } else {
-                        Box(Modifier.weight(1f)) { supporting(if (side != null) SupportingExtent.Expanded else extent) }
+                        Box(Modifier.weight(1f)) {
+                            supporting(
+                                if (side !=
+                                    null
+                                ) {
+                                    SupportingExtent.Expanded
+                                } else if (extent ==
+                                    SupportingExtent.Peek
+                                ) {
+                                    SupportingExtent.Browsing
+                                } else {
+                                    extent
+                                },
+                            )
+                        }
                     }
                 }
             }
