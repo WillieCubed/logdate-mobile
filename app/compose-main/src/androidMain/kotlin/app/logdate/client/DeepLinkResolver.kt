@@ -30,7 +30,9 @@ import app.logdate.client.feature.widgets.NAV_SOURCE_ON_THIS_DAY_WIDGET
 import app.logdate.client.location.tracking.NAV_SOURCE_LOCATION_HISTORY
 import app.logdate.client.media.audio.EXTRA_NAV_SOURCE
 import app.logdate.client.media.audio.EXTRA_NOTE_ID
+import app.logdate.client.media.audio.EXTRA_RECORDING_DRAFT_ID
 import app.logdate.client.media.audio.NAV_SOURCE_AUDIO_PLAYBACK
+import app.logdate.client.media.audio.NAV_SOURCE_AUDIO_RECORDING
 import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_ID
 import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_TARGET
 import app.logdate.client.rewind.REWIND_NOTIFICATION_TARGET_DETAIL
@@ -261,6 +263,7 @@ fun resolveMainActivityNavKey(intent: Intent?): NavKey? {
 private val WIDGET_AND_PLAYBACK_SOURCES =
     setOf(
         NAV_SOURCE_AUDIO_PLAYBACK,
+        NAV_SOURCE_AUDIO_RECORDING,
         NAV_SOURCE_ON_THIS_DAY_WIDGET,
         NAV_SOURCE_FIXED_MEMORY_WIDGET,
         NAV_SOURCE_NEW_ENTRY_WIDGET,
@@ -280,6 +283,10 @@ private fun resolveNavSourceRoute(
     navSource: String?,
 ): NavKey? =
     when (navSource) {
+        NAV_SOURCE_AUDIO_RECORDING ->
+            intent.getStringExtra(EXTRA_RECORDING_DRAFT_ID)?.parseUuidTo {
+                EntryEditorRoute(draftId = it.toString(), resumeRecording = true)
+            }
         NAV_SOURCE_AUDIO_PLAYBACK -> intent.getStringExtra(EXTRA_NOTE_ID)?.parseUuidTo(::NoteDetailRoute)
         NAV_SOURCE_ON_THIS_DAY_WIDGET -> intent.getStringExtra(EXTRA_WIDGET_TARGET_DATE)?.parseDateString(::TimelineDetailRoute)
         NAV_SOURCE_FIXED_MEMORY_WIDGET -> intent.getStringExtra(EXTRA_WIDGET_NOTE_ID)?.parseUuidTo(::NoteDetailRoute)

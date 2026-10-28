@@ -1,5 +1,6 @@
 package app.logdate.feature.editor.ui.editor
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.datastore.EntryStartMode
@@ -66,7 +67,11 @@ class EntryEditorViewModel(
     internal val captureUsage: CaptureUsageReporter = CaptureUsageReporter.None,
     internal val audioDurationResolver: AudioDurationResolver? = null,
     internal val preferences: LogdatePreferencesDataSource? = null,
+    internal val savedStateHandle: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
+    /** Draft identity restored before launch-mode effects, so process recreation cannot start another take. */
+    val recoverableDraftId: Uuid? get() = savedStateHandle.get<String>("editor.draftId")?.let { runCatching { Uuid.parse(it) }.getOrNull() }
+
     private val entryModeWriteFailure = MutableStateFlow(false)
     val defaultEntryModeWriteFailed: StateFlow<Boolean> = entryModeWriteFailure
 

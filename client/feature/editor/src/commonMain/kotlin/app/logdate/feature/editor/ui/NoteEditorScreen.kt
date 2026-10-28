@@ -11,10 +11,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import app.logdate.client.datastore.EntryStartMode
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.client.repository.moments.MarkedMomentRepository
 import app.logdate.feature.editor.navigation.EditorLaunchMode
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
@@ -74,10 +78,39 @@ fun NoteEditorScreen(
     markId: Uuid? = null,
     blockFocusEnabled: Boolean? = null,
 ) {
+    val recorder: AudioRecordingManager = koinInject()
+    // Capture once per visit. A later stop must not turn a resumed draft into a new entry.
+    val resolvedDraftId =
+        remember(viewModel, entryId, draftId) {
+            draftId ?: viewModel.recoverableDraftId ?: if (
+                entryId == null &&
+                initialTextContent.isNullOrBlank() &&
+                attachments.isEmpty() &&
+                promptPhotoUri == null &&
+                markId == null &&
+                visitContext == null &&
+                journalId == null &&
+                journalIds.isEmpty() &&
+                (recorder.isRecording || recorder.isStartingRecording)
+            ) {
+                recorder.currentRecordingDraftId
+            } else {
+                null
+            }
+        }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        val activeBlock = recorder.currentRecordingTargetNoteId
+        if (recorder.isRecording &&
+            viewModel.editorState.value.blocks
+                .any { it.id == activeBlock }
+        ) {
+            viewModel.setExpandedBlockId(activeBlock)
+        }
+    }
     val marks: MarkedMomentRepository = koinInject()
-    LaunchedEffect(markId, entryId, draftId) {
+    LaunchedEffect(markId, entryId, resolvedDraftId) {
         viewModel.initializeMarkContext(markId?.toString())
-        if (markId != null && entryId == null && draftId == null && initialTextContent.isNullOrBlank()) {
+        if (markId != null && entryId == null && resolvedDraftId == null && initialTextContent.isNullOrBlank()) {
             try {
                 viewModel.openMarkedMoment(markId.toString(), marks.getMark(markId)?.caption.orEmpty())
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
@@ -93,13 +126,18 @@ fun NoteEditorScreen(
     val focusEnabled = blockFocusEnabled ?: pageEnabled
     val handwritingEnabled by flags.observe(FeatureFlag.HANDWRITING_ENTRIES).collectAsState(false)
     // Load an existing draft or journal entry when provided
-    LaunchedEffect(entryId, draftId, firstEntry, visitContext) {
-        if (draftId != null) {
+    LaunchedEffect(entryId, resolvedDraftId, firstEntry, visitContext) {
+        if (resolvedDraftId != null) {
             try {
-                Napier.d("NoteEditorScreen: Loading draft: $draftId")
-                viewModel.loadDraft(draftId)
+                Napier.d("NoteEditorScreen: Loading draft: $resolvedDraftId")
+                val retained = viewModel.editorState.value
+                if ((retained.draftState as? app.logdate.feature.editor.ui.editor.DraftState.Active)?.id != resolvedDraftId ||
+                    retained.blocks.isEmpty()
+                ) {
+                    viewModel.loadDraft(resolvedDraftId)
+                }
             } catch (e: Exception) {
-                Napier.e("Failed to load draft: $draftId", e)
+                Napier.e("Failed to load draft: $resolvedDraftId", e)
             }
         } else if (entryId != null) {
             try {
@@ -119,7 +157,7 @@ fun NoteEditorScreen(
     // Set initial content ONLY when creating a new entry (entryId is null)
     LaunchedEffect(initialTextContent, attachments, entryId) {
         // Only process initial content for new entries
-        if (entryId == null) {
+        if (entryId == null && resolvedDraftId == null) {
             try {
                 // Handle initial text content if explicitly provided
                 if (!initialTextContent.isNullOrBlank()) {
@@ -142,8 +180,18 @@ fun NoteEditorScreen(
         }
     }
 
-    LaunchedEffect(launchMode, promptPhotoUri, entryId, draftId, focusEnabled, firstEntry, initialTextContent, attachments, markId) {
-        if (entryId != null || draftId != null) return@LaunchedEffect
+    LaunchedEffect(
+        launchMode,
+        promptPhotoUri,
+        entryId,
+        resolvedDraftId,
+        focusEnabled,
+        firstEntry,
+        initialTextContent,
+        attachments,
+        markId,
+    ) {
+        if (entryId != null || resolvedDraftId != null) return@LaunchedEffect
         if (promptPhotoUri != null) {
             viewModel.initializePhotoPrompt(promptPhotoUri, record = launchMode == EditorLaunchMode.Voice)
         } else if (focusEnabled &&

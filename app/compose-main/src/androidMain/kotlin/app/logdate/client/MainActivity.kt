@@ -40,6 +40,9 @@ import app.logdate.client.launch.LaunchStageTracker
 import app.logdate.client.launch.whenApplicationReady
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.location.tracking.LocationTrackingManager
+import app.logdate.client.media.audio.AudioRecordingManager
+import app.logdate.client.media.audio.EXTRA_NAV_SOURCE
+import app.logdate.client.media.audio.NAV_SOURCE_AUDIO_RECORDING
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.testing.onboarding.DEBUG_SKIP_ONBOARDING_EXTRA
@@ -64,6 +67,7 @@ import app.logdate.feature.core.isAppUnlocked
 import app.logdate.feature.core.restore.AndroidRestoreLauncher
 import app.logdate.feature.core.settings.navigation.DataSettingsRoute
 import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
+import app.logdate.feature.editor.navigation.EntryEditorRoute
 import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
 import app.logdate.navigation.LogDateNavDisplay
 import app.logdate.ui.common.HomeScreenPins
@@ -97,6 +101,7 @@ class MainActivity : FragmentActivity() {
     private val androidRestoreLauncher: AndroidRestoreLauncher by inject()
     private val databaseStartupMonitor: DatabaseStartupMonitor by inject()
     private val homeScreenPins: HomeScreenPins by inject()
+    private val recorder: AudioRecordingManager by inject()
     private val recordingWindows: RecordingWindowTracker by inject()
     private val databaseRecoveryController: DatabaseRecoveryController by inject()
     private val postRestoreDetector: PostRestoreDetector by inject()
@@ -196,13 +201,18 @@ class MainActivity : FragmentActivity() {
         // A recreated activity receives the launch intent again; resolving it a second time
         // would overwrite the Navigation 3 back stack restored across rotation.
         if (savedInstanceState == null) {
+            val recordingWindowForwarded = showRecordingWindowIfAsked(intent)
             pendingNavKey =
-                if (retainedJournalWorkspace(this).current() != null &&
-                    postRestoreDetector.pendingContentRecoveryId() != null
-                ) {
-                    DataSettingsRoute
+                if (recordingWindowForwarded) {
+                    null
                 } else {
-                    resolveMainActivityNavKey(intent)
+                    if (retainedJournalWorkspace(this).current() != null &&
+                        postRestoreDetector.pendingContentRecoveryId() != null
+                    ) {
+                        DataSettingsRoute
+                    } else {
+                        resolveMainActivityNavKey(intent) ?: activeRecordingDestination()
+                    }
                 }
         }
 
@@ -234,7 +244,6 @@ class MainActivity : FragmentActivity() {
         if (savedInstanceState == null && intent?.let { handleMultiWindowIntent(it) } == true) {
             return
         }
-        if (savedInstanceState == null) showRecordingWindowIfAsked(intent)
     }
 
     private fun attachPlatformLaunchers() {
@@ -330,7 +339,16 @@ class MainActivity : FragmentActivity() {
             return
         }
         if (showRecordingWindowIfAsked(intent)) return
-        resolveMainActivityNavKey(intent)?.let { pendingNavKey = it }
+        val recordingReturn = intent.action == Intent.ACTION_MAIN || intent.getBooleanExtra(EXTRA_SHOW_RECORDING, false)
+        val destination =
+            if (recordingReturn) {
+                activeRecordingDestination() ?: resolveMainActivityNavKey(
+                    intent,
+                )
+            } else {
+                resolveMainActivityNavKey(intent)
+            }
+        destination?.let { pendingNavKey = it }
     }
 
     /**
@@ -338,9 +356,18 @@ class MainActivity : FragmentActivity() {
      * A recording in this window needs nothing more, since this window is already in front.
      */
     private fun showRecordingWindowIfAsked(intent: Intent?): Boolean {
-        if (intent?.getBooleanExtra(EXTRA_SHOW_RECORDING, false) != true) return false
+        val recordingTap = intent?.getStringExtra(EXTRA_NAV_SOURCE) == NAV_SOURCE_AUDIO_RECORDING
+        val launcherReturn = intent?.action == Intent.ACTION_MAIN && activeRecordingDestination() != null
+        if (intent?.getBooleanExtra(EXTRA_SHOW_RECORDING, false) != true && !recordingTap && !launcherReturn) return false
         return recordingWindows.bringRecordingWindowForward(this)
     }
+
+    private fun activeRecordingDestination(): EntryEditorRoute? =
+        if (recorder.isRecording || recorder.isStartingRecording) {
+            recorder.currentRecordingDraftId?.let { EntryEditorRoute(draftId = it.toString(), resumeRecording = true) }
+        } else {
+            null
+        }
 
     @SuppressLint("NewApi")
     override fun onHandoffActivityDataRequested(info: HandoffActivityDataRequestInfo): HandoffActivityData? {

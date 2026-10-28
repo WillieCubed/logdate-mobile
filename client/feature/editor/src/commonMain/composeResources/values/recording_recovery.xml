@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<resources>
+    <string
+    name="recording_recovery_kept"
+  >Recovery details have been kept. Any available audio has been left in place.</string>
+    <string name="recording_recovery_retry">Try recovery again</string>
+</resources>

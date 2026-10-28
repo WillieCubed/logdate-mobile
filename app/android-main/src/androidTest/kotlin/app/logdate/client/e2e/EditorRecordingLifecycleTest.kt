@@ -1,0 +1,196 @@
+package app.logdate.client.e2e
+
+import android.Manifest
+import android.app.NotificationManager
+import android.content.Context
+import android.content.Intent
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDisplayed
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.lifecycle.Lifecycle
+import androidx.test.core.app.ActivityScenario
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.rule.GrantPermissionRule
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
+import app.logdate.client.MainActivity
+import app.logdate.client.media.audio.AndroidAudioNotificationHandler
+import app.logdate.client.media.audio.AudioRecordingManager
+import app.logdate.client.repository.journals.EntryDraftRepository
+import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.testing.onboarding.DEBUG_SKIP_ONBOARDING_EXTRA
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.koin.mp.KoinPlatform
+import java.io.File
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+
+/** Runs only through Gradle Managed Devices; never targets an operator device or clears app data. */
+@RunWith(AndroidJUnit4::class)
+class EditorRecordingLifecycleTest {
+    private val createEntry = hasText("Create Entry") or hasContentDescription("Create new entry") or hasContentDescription("Add a memory")
+
+    @get:Rule val compose = createEmptyComposeRule()
+
+    @get:Rule val microphone = GrantPermissionRule.grant(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS)
+
+    @Test
+    fun recordingSurvivesBackgroundRecreationAndNotificationReturnWithOneReachableTake() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val launch =
+            Intent(context, MainActivity::class.java).apply {
+                action = "app.logdate.action.CAPTURE"
+                putExtra(app.logdate.client.capture.EXTRA_CAPTURE_MODE, "voice")
+                putExtra(DEBUG_SKIP_ONBOARDING_EXTRA, true)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        ActivityScenario.launch<MainActivity>(launch).use { scenario ->
+            val manager = KoinPlatform.getKoin().get<AudioRecordingManager>()
+            compose.waitUntil(30_000) { manager.isRecording }
+            val block = assertNotNull(manager.currentRecordingTargetNoteId)
+            val draft = assertNotNull(manager.currentRecordingDraftId)
+            val path = assertNotNull(manager.currentRecordingPath)
+            compose.onNodeWithText("Finish").assertIsDisplayed()
+            capture(context, "recording-started")
+
+            scenario.moveToState(Lifecycle.State.CREATED)
+            assertTrue(manager.isRecording, "Backgrounding must keep the same foreground-service session")
+            scenario.moveToState(Lifecycle.State.RESUMED)
+            scenario.recreate()
+            compose.waitForIdle()
+            assertEquals(block, manager.currentRecordingTargetNoteId)
+            assertEquals(path, manager.currentRecordingPath)
+            compose.onNodeWithText("Finish").assertIsDisplayed()
+            capture(context, "recording-recreated")
+            scenario.onActivity { activity ->
+                activity.startActivity(
+                    Intent(context, MainActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        action = app.logdate.client.capture.ACTION_CAPTURE
+                        putExtra(app.logdate.client.capture.EXTRA_CAPTURE_MODE, "text")
+                        putExtra(app.logdate.client.capture.EXTRA_CAPTURE_TEXT, "Retained scratch entry")
+                    },
+                )
+            }
+            compose.waitUntil(15_000) { compose.onNodeWithTag("editor_text_input").isDisplayed() }
+            compose.onNodeWithText("Retained scratch entry").assertIsDisplayed()
+            assertTrue(manager.isRecording)
+            assertEquals(block, manager.currentRecordingTargetNoteId)
+            capture(context, "second-editor-retained-during-recording")
+
+            scenario.moveToState(Lifecycle.State.CREATED)
+            val notifications = context.getSystemService(NotificationManager::class.java)
+            val notification = notifications.activeNotifications.single { it.id == AndroidAudioNotificationHandler.NOTIFICATION_ID }
+            assertNotNull(notification.notification.contentIntent)
+            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            device.openNotification()
+            val notificationTitle = device.wait(Until.findObject(By.text("Recording audio")), 10_000)
+            assertNotNull(notificationTitle, "The system shade must expose the recording notification")
+            capture(context, "recording-notification-shade")
+            notificationTitle.click()
+            compose.waitUntil(15_000) { scenario.state == Lifecycle.State.RESUMED }
+            compose.waitUntil(15_000) {
+                manager.currentRecordingTargetNoteId == block && manager.isRecording
+            }
+            assertEquals(draft, manager.currentRecordingDraftId)
+            compose.onNodeWithText("Finish").assertIsDisplayed().performClick()
+            compose.waitUntil(30_000) { !manager.isRecording && !manager.isStartingRecording }
+            compose.waitUntil(15_000) { compose.onNodeWithTag("audio_block_duration").isDisplayed() }
+            if (compose.onNodeWithContentDescription("Return to entry").isDisplayed()) {
+                compose.onNodeWithContentDescription("Return to entry").performClick()
+            }
+            compose.waitUntil(15_000) { compose.onNodeWithContentDescription("Save entry").isDisplayed() }
+            capture(context, "recording-finished")
+            assertTrue(File(path.removePrefix("file://")).length() > 0, "The captured audio must be retained")
+            compose.onNodeWithContentDescription("Save entry").assertIsDisplayed().performClick()
+            compose.waitForIdle()
+            compose.waitUntil(15_000) { compose.onNodeWithText("Retained scratch entry").isDisplayed() }
+            capture(context, "second-editor-restored-after-recording")
+            if (compose.onNodeWithContentDescription("Return to entry").isDisplayed()) {
+                compose.onNodeWithContentDescription("Return to entry").performClick()
+            }
+            compose.waitUntil(15_000) { compose.onNodeWithContentDescription("Save entry").isDisplayed() }
+            compose.onNodeWithContentDescription("Save entry").assertIsDisplayed().performClick()
+            compose.waitForIdle()
+            capture(context, "recording-saved")
+            repeat(3) {
+                compose.onNode(createEntry).assertIsDisplayed().performClick()
+                compose.onNodeWithTag("editor_text_input").assertIsDisplayed()
+                capture(context, "reopened-editor-$it")
+                repeat(4) {
+                    if (!compose.onNode(createEntry).isDisplayed()) {
+                        device.pressBack()
+                        compose.waitForIdle()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun exitingRecordingToDraftStopsCaptureAndAddEntryCanOpenAgain() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val launch =
+            Intent(context, MainActivity::class.java).apply {
+                action = app.logdate.client.capture.ACTION_CAPTURE
+                putExtra(app.logdate.client.capture.EXTRA_CAPTURE_MODE, "voice")
+                putExtra(DEBUG_SKIP_ONBOARDING_EXTRA, true)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        ActivityScenario.launch<MainActivity>(launch).use {
+            val manager = KoinPlatform.getKoin().get<AudioRecordingManager>()
+            compose.waitUntil(30_000) { manager.isRecording }
+            val block = assertNotNull(manager.currentRecordingTargetNoteId)
+            val path = assertNotNull(manager.currentRecordingPath)
+            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            compose.onNodeWithText("Finish").assertIsDisplayed()
+            compose.waitForIdle()
+            repeat(3) {
+                if (!compose.onNodeWithText("Save Draft").isDisplayed()) {
+                    device.pressBack()
+                    compose.waitForIdle()
+                }
+            }
+            compose.waitUntil(15_000) { compose.onNodeWithText("Save Draft").isDisplayed() }
+            compose.onNodeWithText("Save Draft").assertIsDisplayed().performClick()
+            compose.waitUntil(30_000) { !manager.isRecording && !manager.isStartingRecording }
+            val drafts = KoinPlatform.getKoin().get<EntryDraftRepository>()
+            compose.waitUntil(15_000) {
+                runBlocking { drafts.getDrafts().first().any { draft -> draft.notes.any { it.uid == block && it is JournalNote.Audio } } }
+            }
+            assertTrue(File(path.removePrefix("file://")).length() > 0)
+            capture(context, "recording-exit-retained")
+            compose.onNode(createEntry).assertIsDisplayed().performClick()
+            compose.onNodeWithTag("editor_text_input").assertIsDisplayed()
+            assertTrue(!manager.isRecording, "Reopening Add entry must not start another recording")
+            capture(context, "recording-exit-reopened")
+        }
+    }
+
+    private fun capture(
+        context: Context,
+        name: String,
+    ) {
+        val directory =
+            checkNotNull(InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")) {
+                "Recording lifecycle acceptance requires a Gradle Managed Device"
+            }
+        val destination = File(directory, "$name.png")
+        destination.parentFile?.mkdirs()
+        assertTrue(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(destination))
+    }
+}

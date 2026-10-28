@@ -11,6 +11,9 @@ import kotlin.uuid.Uuid
  * Interface for audio recording functionality across platforms
  */
 interface AudioRecordingManager {
+    /** Durable editor destination for this session; reading it never starts capture. */
+    val currentRecordingDraftId: Uuid? get() = null
+
     /**
      * Starts audio recording.
      *

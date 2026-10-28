@@ -8,17 +8,24 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import app.logdate.feature.editor.ui.NoteEditorScreen
+import app.logdate.feature.editor.ui.editor.DraftState
+import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.shared.model.location.VisitMemoryContext
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.common.transitions.TransitionKeys
+import app.logdate.ui.navigation.ViewModelsPerVisit
 import app.logdate.ui.navigation.taggedEntry
 import kotlinx.serialization.Serializable
+import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 import app.logdate.feature.editor.ui.LocalAnimatedVisibilityScope as EditorLocalAnimatedVisibilityScope
 import app.logdate.feature.editor.ui.LocalSharedTransitionScope as EditorLocalSharedTransitionScope
@@ -52,6 +59,7 @@ data class EntryEditorRoute(
     val promptPhotoUri: String? = null,
     val initialText: String? = null,
     val markId: String? = null,
+    val resumeRecording: Boolean = false,
 ) : NavKey
 
 /** Pushes the editor onto the back stack with optional entry / draft / journal context. */
@@ -77,10 +85,18 @@ fun NavBackStack<NavKey>.navigateToEditor(
  */
 fun EntryProviderScope<NavKey>.editorEntry(
     onNavigateBack: () -> Unit,
-    onEntrySaved: () -> Unit,
+    onEntrySaved: (EntryEditorRoute) -> Unit,
     metadata: Map<String, Any> = emptyMap(),
 ) {
-    taggedEntry<EntryEditorRoute>(metadata = metadata) { route ->
+    taggedEntry<EntryEditorRoute>(metadata = metadata + ViewModelsPerVisit) { route ->
+        val editorViewModel: EntryEditorViewModel = koinViewModel()
+        val state by editorViewModel.editorState.collectAsState()
+        LaunchedEffect(route, state.draftState, state.isRecordingAudio) {
+            val draft = state.draftState as? DraftState.Active
+            if (state.isRecordingAudio && draft != null) {
+                RecordingEditorDestination.bind(draft.id.toString(), route)
+            }
+        }
         val navigationScope = LocalSharedTransitionScope.current
         val animatedContentScope = LocalNavAnimatedContentScope.current
         val sharedBoundsModifier =
@@ -102,8 +118,9 @@ fun EntryProviderScope<NavKey>.editorEntry(
             EditorLocalAnimatedVisibilityScope provides animatedContentScope,
         ) {
             NoteEditorScreen(
+                viewModel = editorViewModel,
                 onNavigateBack = onNavigateBack,
-                onEntrySaved = onEntrySaved,
+                onEntrySaved = { onEntrySaved(route) },
                 entryId = route.entryId?.let(Uuid::parse),
                 draftId = route.draftId?.let(Uuid::parse),
                 firstEntry = route.firstEntry,

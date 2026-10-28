@@ -10,6 +10,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -30,6 +32,7 @@ import app.logdate.util.formatDateLocalized
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.compose.resources.stringResource
@@ -216,8 +219,32 @@ fun AudioBlockEditor(
         previousBlockId.value = block.id
     }
 
+    val scope = rememberCoroutineScope()
+    var recovering by remember(block.id) { mutableStateOf(false) }
     Box(modifier = modifier) {
-        if (existingAudioUri != null) {
+        val failure = block.captureState as? AudioCaptureState.Failed
+        if (failure != null) {
+            RecordingRecoveryContent(
+                failure,
+                recovering = recovering,
+                onRetry = {
+                    if (!recovering) {
+                        scope.launch {
+                            recovering = true
+                            try {
+                                val recovered =
+                                    audioViewModel.pendingAudioRecoverer.recover(
+                                        AudioCaptureState.Stopping(failure.filePath, failure.fallbackFilePath),
+                                    )
+                                onBlockUpdated(block.copy(captureState = recovered))
+                            } finally {
+                                recovering = false
+                            }
+                        }
+                    }
+                },
+            )
+        } else if (existingAudioUri != null) {
             val audioContextProcessor: AudioContextProcessor = koinInject()
             val waveformAmplitudes by produceState(
                 initialValue = emptyList<Float>(),

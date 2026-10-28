@@ -60,6 +60,8 @@ import app.logdate.feature.core.sync.navigation.syncIssuesEntry
 import app.logdate.feature.core.watch.continuity.watchHandoffEntries
 import app.logdate.feature.editor.navigation.EditorLaunchMode
 import app.logdate.feature.editor.navigation.EntryEditorRoute
+import app.logdate.feature.editor.navigation.RecordingEditorDestination
+import app.logdate.feature.editor.navigation.completeEditorVisit
 import app.logdate.feature.editor.navigation.editorEntry
 import app.logdate.feature.events.navigation.EventDetailRoute
 import app.logdate.feature.events.navigation.eventDetailEntry
@@ -178,7 +180,11 @@ fun LogDateNavDisplay(
     LaunchedEffect(pendingNavKey, appUiState.isOnboarded, appUiState.requiresUnlock) {
         val target = pendingNavKey ?: return@LaunchedEffect
         if (!appUiState.isOnboarded || appUiState.requiresUnlock) return@LaunchedEffect
-        backStack.add(target)
+        if (target is EntryEditorRoute && target.resumeRecording) {
+            RecordingEditorDestination.open(backStack, target)
+        } else {
+            backStack.add(target)
+        }
         onPendingNavKeyConsumed()
     }
 
@@ -341,9 +347,9 @@ fun LogDateNavDisplay(
                                     )
                                     editorEntry(
                                         onNavigateBack = { backStack.removeLastOrNull() },
-                                        onEntrySaved = {
-                                            backStack.clear()
-                                            backStack.add(
+                                        onEntrySaved = { saved ->
+                                            backStack.completeEditorVisit(
+                                                saved,
                                                 if (appUiState.isOnboarded) HomeRoute else OnboardingComplete,
                                             )
                                         },
