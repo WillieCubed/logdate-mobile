@@ -4,6 +4,7 @@ import android.graphics.Color
 import android.os.Build
 import android.os.SystemClock
 import android.view.WindowInsets
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -69,6 +70,8 @@ class PlacesSheetGestureE2ETest {
                 device.executeShellCommand("wm size ${size.first}x${size.second}")
                 ActivityScenario.launch(ComponentActivity::class.java).use { scenario ->
                     scenario.onActivity { activity ->
+                        // Match MainActivity: unspecified input mode can pan this tooling Activity.
+                        activity.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
                         activity.enableEdgeToEdge(
                             SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
                             SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
@@ -121,7 +124,8 @@ class PlacesSheetGestureE2ETest {
                             val beforeIme = headerTop()
                             check(device.click(device.displayWidth / 2, 68))
                             awaitIme(scenario, true)
-                            checkNotNull(device.wait(Until.findObject(By.desc("Show map")), 5_000))
+                            device.waitForIdle(1_000)
+                            assertTrue(headerTop() < beforeIme - 100, "IME must resize the sheet above the keyboard")
                             device.pressBack()
                             awaitIme(scenario, false)
                             device.waitForIdle(1_000)
