@@ -107,24 +107,34 @@ internal fun rememberSupportingSheetMotion(
     anchors: androidx.compose.foundation.gestures.DraggableAnchors<SupportingExtent>,
     onSettled: (SupportingExtent) -> Unit,
 ): SupportingSheetMotion {
-    val fallback = if (anchors.positionOf(SupportingExtent.Focused).isNaN()) SupportingExtent.Peek else SupportingExtent.Focused
-    val target = if (anchors.positionOf(extent).isNaN()) fallback else extent
+    val target = anchors.availableExtent(extent)
     val state = remember { AnchoredDraggableState(target, anchors) }
     // Anchor updates preserve the current destination, including when available height changes for IME/resize.
     SideEffect {
-        state.updateAnchors(anchors, if (anchors.positionOf(state.targetValue).isNaN()) fallback else state.targetValue)
+        state.updateAnchors(anchors, anchors.availableExtent(state.targetValue))
     }
     val reduceMotion by rememberSystemReduceMotion()
     val fling = AnchoredDraggableDefaults.flingBehavior(state, animationSpec = if (reduceMotion) snap() else tween(240))
     val scope = rememberCoroutineScope()
     val motion = remember(state, fling, scope, reduceMotion) { SupportingSheetMotion(state, fling, scope, reduceMotion) }
     val settled = rememberUpdatedState(onSettled)
-    LaunchedEffect(state) { snapshotFlow { state.settledValue }.collect { settled.value(it) } }
-    LaunchedEffect(target, extent, motion) {
-        if (target != extent) settled.value(target) else motion.moveTo(target)
+    // Borrow a fitting presentation without replacing a choice saved before a temporary resize.
+    val temporaryFallback = rememberUpdatedState(target.takeIf { it != extent })
+    LaunchedEffect(state) {
+        snapshotFlow { state.settledValue }.collect {
+            if (it != temporaryFallback.value) settled.value(it)
+        }
     }
+    LaunchedEffect(target, motion) { motion.moveTo(target) }
     return motion
 }
+
+internal fun DraggableAnchors<SupportingExtent>.availableExtent(requested: SupportingExtent): SupportingExtent =
+    when {
+        !positionOf(requested).isNaN() -> requested
+        !positionOf(SupportingExtent.Focused).isNaN() -> SupportingExtent.Focused
+        else -> SupportingExtent.Peek
+    }
 
 internal fun SupportingSheetAnchors.dragAnchors(
     height: Float,
