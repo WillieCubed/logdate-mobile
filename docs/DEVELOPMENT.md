@@ -13,6 +13,13 @@ on the same screen to hide both entries again, including after a restart. You ca
 seven-tap unlock later. Developer mode starts hidden on installations that have never enabled it.
 Hiding the entries does not change diagnostic, location, or feature-preview preferences.
 
+## Places beta
+
+Enable **Places (beta)** in Settings to show Places in Home. The opt-in is saved across
+app restarts and starts off. Turning it off returns an open Places view to Home and
+removes Places links from the main navigation. Location recording, permission choices,
+saved places and Rewind maps are unchanged. Developer mode is not required.
+
 ## Toolchain
 
 LogDate is a Kotlin Multiplatform project built with Gradle. Install these before setting up:

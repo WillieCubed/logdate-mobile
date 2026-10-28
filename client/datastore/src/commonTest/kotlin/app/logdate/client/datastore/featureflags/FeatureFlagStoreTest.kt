@@ -25,6 +25,20 @@ class FeatureFlagStoreTest {
     private val store = DataStoreFeatureFlagStore(preferences)
 
     @Test
+    fun `Places beta defaults off and does not change collection or developer settings`() =
+        runTest {
+            assertFalse(store.isEnabled(FeatureFlag.PLACES_BETA))
+            val settings = LogdatePreferencesDataSource(preferences)
+            store.setEnabled(FeatureFlag.HUMAN_LOCATION_HISTORY, true)
+            store.setEnabled(FeatureFlag.PLACES_BETA, true)
+            assertTrue(store.isEnabled(FeatureFlag.PLACES_BETA))
+            assertFalse(settings.observeDeveloperModeEnabled().first())
+            store.setEnabled(FeatureFlag.PLACES_BETA, false)
+            assertFalse(store.isEnabled(FeatureFlag.PLACES_BETA))
+            assertTrue(store.isEnabled(FeatureFlag.HUMAN_LOCATION_HISTORY))
+        }
+
+    @Test
     fun `internal build enables Quiet Save without changing the user preference`() =
         runTest {
             val app =

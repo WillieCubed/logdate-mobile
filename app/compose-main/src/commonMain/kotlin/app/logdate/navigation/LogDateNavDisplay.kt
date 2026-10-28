@@ -117,16 +117,9 @@ import kotlinx.datetime.LocalDate
 import org.koin.compose.koinInject
 
 /**
- * Multiplatform Navigation 3 root for the LogDate app.
- *
- * Each feature module exposes its own `xEntry()` extensions on `EntryProviderScope<NavKey>`
- * so this root never imports a screen composable directly — the modular navigation contract
- * lives in the feature modules themselves. Routes that don't yet have a per-module helper
- * are registered inline via [taggedEntry]. Registrations declare presentation and related content
- * context for [RelatedContentSceneStrategy] in `NavEntry.metadata`.
- *
- * Every concrete `NavKey` subtype must be registered in [appNavSavedStateConfiguration] for
- * save-state to round-trip on iOS / web.
+ * Multiplatform Navigation 3 root. Feature entry helpers and inline [taggedEntry]
+ * registrations declare presentation and related-content metadata for [RelatedContentSceneStrategy].
+ * Every concrete NavKey must be registered in [appNavSavedStateConfiguration] for restoration.
  */
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -149,6 +142,7 @@ fun LogDateNavDisplay(
     val activityAwarenessEnabled by remember(workspaceFlags) { workspaceFlags.observe(FeatureFlag.ACTIVITY_AWARENESS) }
         .collectAsState(initial = FeatureFlag.ACTIVITY_AWARENESS.defaultEnabled)
     val backStack = rememberNavBackStack(appNavSavedStateConfiguration, BaseRoute)
+    val placesEnabled by rememberPlacesBetaNavigation(workspaceFlags, backStack, appUiState.isOnboarded, appUiState.requiresUnlock)
     var hasRequestedUnlock by remember { mutableStateOf(false) }
 
     LaunchedEffect(appUiState.isOnboarded, appUiState.requiresUnlock) {
@@ -177,13 +171,13 @@ fun LogDateNavDisplay(
         hasRequestedUnlock = false
     }
 
-    LaunchedEffect(pendingNavKey, appUiState.isOnboarded, appUiState.requiresUnlock) {
-        val target = pendingNavKey ?: return@LaunchedEffect
+    LaunchedEffect(pendingNavKey, placesEnabled, appUiState.isOnboarded, appUiState.requiresUnlock) {
+        val target = pendingNavKey?.let { placesNavigationTarget(it, placesEnabled) } ?: return@LaunchedEffect
         if (!appUiState.isOnboarded || appUiState.requiresUnlock) return@LaunchedEffect
         if (target is EntryEditorRoute && target.resumeRecording) {
             RecordingEditorDestination.open(backStack, target)
         } else {
-            backStack.add(target)
+            addPlacesSafeTarget(backStack, target)
         }
         onPendingNavKeyConsumed()
     }
@@ -199,7 +193,7 @@ fun LogDateNavDisplay(
                 is DeepLinkAction.OpenJournal -> backStack.add(JournalDetailsRoute(action.id))
                 is DeepLinkAction.OpenNote -> backStack.add(NoteDetailRoute(action.id))
                 is DeepLinkAction.OpenRewind -> backStack.add(RewindDetailRoute(action.id))
-                DeepLinkAction.OpenLocationTimeline -> backStack.add(LocationTimelineRoute)
+                DeepLinkAction.OpenLocationTimeline -> openPlacesDeepLink(workspaceFlags, backStack)
             }
         }
     }
@@ -459,10 +453,12 @@ fun LogDateNavDisplay(
                                     }
                                     // Location timeline (top-level)
                                     taggedEntry<LocationTimelineRoute> {
-                                        LocationTimelineScreen(
-                                            onAddMemory = { backStack.add(EntryEditorRoute(visitContext = it)) },
-                                            onOpenNote = { backStack.add(NoteDetailRoute(it)) },
-                                        )
+                                        if (placesEnabled == true) {
+                                            LocationTimelineScreen(
+                                                onAddMemory = { backStack.add(EntryEditorRoute(visitContext = it)) },
+                                                onOpenNote = { backStack.add(NoteDetailRoute(it)) },
+                                            )
+                                        }
                                     }
                                     // Timeline per-day detail
                                     taggedEntry<TimelineDetailRoute>(
@@ -472,7 +468,7 @@ fun LogDateNavDisplay(
                                             date = LocalDate.parse(route.dateIso),
                                             scrollToEntryId = route.entryId,
                                             onClose = { backStack.removeLastOrNull() },
-                                            onOpenLocations = { backStack.add(LocationTimelineRoute) },
+                                            onOpenLocations = placesLocationAction(placesEnabled, backStack),
                                             onOpenEvent = { backStack.add(EventDetailRoute(it)) },
                                             onOpenNote = { backStack.add(NoteDetailRoute(it)) },
                                         )

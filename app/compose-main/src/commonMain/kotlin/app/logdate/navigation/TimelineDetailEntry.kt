@@ -19,7 +19,7 @@ internal fun TimelineDetailEntry(
     date: LocalDate,
     scrollToEntryId: String?,
     onClose: () -> Unit,
-    onOpenLocations: () -> Unit,
+    onOpenLocations: (() -> Unit)?,
     onOpenEvent: (eventId: String) -> Unit,
     onOpenNote: (Uuid) -> Unit,
 ) {
