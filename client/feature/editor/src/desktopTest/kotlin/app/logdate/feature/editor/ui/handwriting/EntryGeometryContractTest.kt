@@ -192,8 +192,8 @@ class EntryGeometryContractTest {
                 val block = TextBlockUiState(content = "A quiet walk by the water")
                 setContent { EntryPageStudy(initialBlocks = listOf(block)) }
                 val surface = onNodeWithTag("memory_block_${block.id}").getUnclippedBoundsInRoot()
-                val first = onNodeWithContentDescription("Write").getUnclippedBoundsInRoot()
-                val last = onNodeWithContentDescription("Photos").getUnclippedBoundsInRoot()
+                val first = onNodeWithTag("entry_creation_actions").getUnclippedBoundsInRoot()
+                val last = first
                 assertTrue(abs((surface.left - first.left).value) <= 1f, "Leading edges differ: $surface, $first")
                 assertTrue(abs((surface.right - last.right).value) <= 1f, "Trailing edges differ: $surface, $last")
                 assertTrue(surface.bottom - surface.top >= 120.dp, "Production text block must retain the shared minimum")

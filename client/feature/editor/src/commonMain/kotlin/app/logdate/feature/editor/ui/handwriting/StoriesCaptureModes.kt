@@ -4,6 +4,7 @@
 package app.logdate.feature.editor.ui.handwriting
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -35,6 +36,14 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.platform.PlatformIcons
+import app.logdate.ui.platform.rememberSystemReduceMotion
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.camera
+import logdate.client.feature.editor.generated.resources.entry_creation_handwrite
+import logdate.client.feature.editor.generated.resources.entry_creation_photos
+import logdate.client.feature.editor.generated.resources.entry_creation_voice
+import logdate.client.feature.editor.generated.resources.memory_write
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun StoriesCaptureModes(
@@ -45,6 +54,8 @@ internal fun StoriesCaptureModes(
     enabled: Boolean = true,
 ) {
     val density = LocalDensity.current
+    val reduceMotion = rememberSystemReduceMotion().value
+    val activeLabel = mode?.let { captureChoiceLabel(it) }.orEmpty()
     val textMeasurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelMedium
     MaterialTheme(motionScheme = MotionScheme.expressive()) {
@@ -52,7 +63,7 @@ internal fun StoriesCaptureModes(
             val activeLabelWidth =
                 with(density) {
                     textMeasurer
-                        .measure(mode?.name.orEmpty(), labelStyle)
+                        .measure(activeLabel, labelStyle)
                         .size.width
                         .toDp()
                 }
@@ -61,9 +72,10 @@ internal fun StoriesCaptureModes(
             Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 StoryCaptureMode.entries.forEachIndexed { index, item ->
                     val active = mode == item
+                    val itemLabel = captureChoiceLabel(item)
                     val widthShare by animateFloatAsState(
                         if (active && showLabel) 2.25f else 1f,
-                        spring(dampingRatio = 0.8f, stiffness = 450f),
+                        if (reduceMotion) snap() else spring(dampingRatio = 0.8f, stiffness = 450f),
                         label = "captureModeWidth",
                     )
                     val outline =
@@ -79,7 +91,7 @@ internal fun StoriesCaptureModes(
                         onCheckedChange = { onMode(item) },
                         modifier =
                             Modifier.weight(widthShare).height(if (compact) 48.dp else 56.dp).semantics {
-                                contentDescription = item.name
+                                contentDescription = itemLabel
                                 selected = active
                                 role = Role.RadioButton
                             },
@@ -102,7 +114,7 @@ internal fun StoriesCaptureModes(
                             val labelWidth =
                                 with(density) {
                                     textMeasurer
-                                        .measure(item.name, labelStyle)
+                                        .measure(itemLabel, labelStyle)
                                         .size.width
                                         .toDp()
                                 }
@@ -124,7 +136,7 @@ internal fun StoriesCaptureModes(
                                     Modifier.size(20.dp),
                                 )
                                 if (active && showLabel && labelFits) {
-                                    Text(item.name, style = labelStyle, maxLines = 1, softWrap = false)
+                                    Text(itemLabel, style = labelStyle, maxLines = 1, softWrap = false)
                                 }
                             }
                         }
@@ -134,3 +146,15 @@ internal fun StoriesCaptureModes(
         }
     }
 }
+
+@Composable
+private fun captureChoiceLabel(mode: StoryCaptureMode): String =
+    stringResource(
+        when (mode) {
+            StoryCaptureMode.Write -> Res.string.memory_write
+            StoryCaptureMode.Handwrite -> Res.string.entry_creation_handwrite
+            StoryCaptureMode.Camera -> Res.string.camera
+            StoryCaptureMode.Voice -> Res.string.entry_creation_voice
+            StoryCaptureMode.Photos -> Res.string.entry_creation_photos
+        },
+    )

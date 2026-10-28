@@ -190,6 +190,44 @@ class EntryEditorViewModelAudioSaveTest {
     }
 
     @Test
+    fun `save admission cannot overtake a capture start reservation`() =
+        testScope.runTest {
+            val viewModel = buildViewModel()
+            viewModel.editorState.first()
+            val audio = viewModel.seedAudioBlock(AudioCaptureState.Empty)
+            advanceUntilIdle()
+            val token = assertNotNull(viewModel.claimAudioCaptureStart(audio.id))
+            assertNull(viewModel.tryBeginEntrySave(viewModel.editorState.value))
+            assertFalse(viewModel.mutableEditorState.value.isSaving)
+            viewModel.releaseAudioCaptureStart(audio.id, token)
+            assertNotNull(viewModel.tryBeginEntrySave(viewModel.editorState.value))
+        }
+
+    @Test
+    fun `pending capture owner survives Return clearing and explicit removal`() =
+        testScope.runTest {
+            val viewModel = buildViewModel()
+            viewModel.editorState.first()
+            val audio = viewModel.seedAudioBlock(AudioCaptureState.Empty)
+            viewModel.setExpandedBlockId(audio.id)
+            advanceUntilIdle()
+            val token = assertNotNull(viewModel.claimAudioCaptureStart(audio.id))
+            assertFalse(viewModel.mutableEditorState.value.shouldReturnToPickerOnBack())
+            assertFalse(viewModel.clearSingleEmptyBlock())
+            assertFalse(viewModel.dismissExpandedBlockOrClearSingleEmpty())
+            viewModel.setExpandedBlockId(null)
+            viewModel.removeBlock(audio.id)
+            assertEquals(
+                listOf(audio.id),
+                viewModel.mutableEditorState.value.blocks
+                    .map { it.id },
+            )
+            assertEquals(audio.id, viewModel.mutableEditorState.value.expandedBlockId)
+            viewModel.releaseAudioCaptureStart(audio.id, token)
+            assertTrue(viewModel.clearSingleEmptyBlock())
+        }
+
+    @Test
     fun `discard stops its live recording before deleting the durable owner`() =
         testScope.runTest {
             var stopped = false

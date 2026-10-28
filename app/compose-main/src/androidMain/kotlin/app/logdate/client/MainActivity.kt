@@ -11,7 +11,6 @@ import android.os.Bundle
 import android.view.KeyboardShortcutGroup
 import android.view.Menu
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -75,6 +74,7 @@ import app.logdate.ui.common.LocalEditorWindows
 import app.logdate.ui.common.LocalHomeScreenPins
 import app.logdate.ui.keyboard.AppShortcutScope
 import app.logdate.ui.keyboard.appKeyboardShortcutGroups
+import app.logdate.ui.platform.enableTransparentSystemBars
 import io.github.aakira.napier.Napier
 import io.github.vinceglb.filekit.core.FileKit
 import kotlinx.coroutines.delay
@@ -165,7 +165,7 @@ class MainActivity : FragmentActivity() {
         markLaunchStage(LaunchStage.ActivityCreated)
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableTransparentSystemBars()
         startLaunchWatchdog()
         splashScreen.setKeepOnScreenCondition {
             launchTracker.bootstrapState is LaunchBootstrapState.BlockingSplash

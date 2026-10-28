@@ -201,7 +201,7 @@ class EntryEdgeToEdgeTest {
                     }
                 }
                 onNodeWithTag("entry_page_creation").performScrollTo()
-                val capture = onNodeWithTag("entry_capture_tools").getUnclippedBoundsInRoot()
+                val capture = onNodeWithTag("entry_creation_actions").getUnclippedBoundsInRoot()
                 val pixels = onRoot().captureToImage().toPixelMap()
                 assertEquals(Color.Blue, pixels[width / 2, 2], "Scrolling surfaces must paint behind the status bar")
                 val railWidth = minOf(width - 56, 640)
@@ -280,6 +280,6 @@ class EntryEdgeToEdgeTest {
             assertEquals(20.dp, field.left)
             assertEquals(364.dp, field.right)
             assertEquals(88.dp, field.top)
-            assertEquals(672.dp, field.bottom)
+            assertEquals(752.dp, field.bottom)
         }
 }

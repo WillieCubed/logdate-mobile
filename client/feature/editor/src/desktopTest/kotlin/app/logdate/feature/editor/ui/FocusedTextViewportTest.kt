@@ -40,6 +40,6 @@ class FocusedTextViewportTest {
             }
             val field = onNodeWithTag("editor_text_input").getUnclippedBoundsInRoot()
             assertTrue(field.bottom - field.top >= 48.dp, "Writing is squeezed out of the keyboard viewport: $field")
-            assertTrue(field.top >= 64.dp && field.bottom <= 128.dp, "Writing overlaps persistent chrome: $field")
+            assertTrue(field.top >= 64.dp && field.bottom <= 192.dp, "Meaningful writing must reclaim the hidden creation area: $field")
         }
 }

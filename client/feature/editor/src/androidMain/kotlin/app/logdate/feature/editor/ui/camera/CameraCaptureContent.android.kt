@@ -52,7 +52,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -86,6 +85,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -97,8 +99,8 @@ import app.logdate.client.media.device.asSystemControlledSelection
 import app.logdate.client.text.asString
 import app.logdate.client.text.resolve
 import app.logdate.client.text.toUiText
+import app.logdate.feature.editor.ui.audio.expansion.ImmersiveSystemBarEffect
 import app.logdate.ui.adaptive.FoldableTabletopLayout
-import app.logdate.ui.media.MediaDeviceSelector
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
@@ -117,13 +119,13 @@ import logdate.client.feature.editor.generated.resources.camera
 import logdate.client.feature.editor.generated.resources.camera_microphone_route_message
 import logdate.client.feature.editor.generated.resources.captured_photo
 import logdate.client.feature.editor.generated.resources.captured_video
+import logdate.client.feature.editor.generated.resources.editor_action_record_video
 import logdate.client.feature.editor.generated.resources.microphone
 import logdate.client.feature.editor.generated.resources.photo
-import logdate.client.feature.editor.generated.resources.retake
+import logdate.client.feature.editor.generated.resources.stop_recording
 import logdate.client.feature.editor.generated.resources.switch_camera
+import logdate.client.feature.editor.generated.resources.take_photo
 import logdate.client.feature.editor.generated.resources.tap_to_enable_camera
-import logdate.client.feature.editor.generated.resources.use_photo
-import logdate.client.feature.editor.generated.resources.use_video
 import logdate.client.feature.editor.generated.resources.video
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
@@ -208,6 +210,7 @@ actual fun CameraCaptureContent(
         )
 
     val hasPermissions = cameraPermissions.allPermissionsGranted
+    if (hasPermissions) ImmersiveSystemBarEffect()
 
     LaunchedEffect(uiState.capturedMediaUri) {
         uiState.capturedMediaUri?.let { uri ->
@@ -385,6 +388,7 @@ private fun PreviewInlineCameraCapture(
                             .align(Alignment.TopEnd)
                             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                             .statusBarsPadding()
+                            .cameraHeaderClearance()
                             .padding(16.dp),
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.errorContainer,
@@ -416,6 +420,7 @@ private fun PreviewInlineCameraCapture(
                         .align(Alignment.BottomCenter)
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                         .navigationBarsPadding()
+                        .cameraCreationClearance()
                         .padding(bottom = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -545,44 +550,12 @@ private fun MediaReviewContent(
                 }
             }
 
-            // Bottom action bar
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
-                        .navigationBarsPadding()
-                        .background(
-                            MaterialTheme.colorScheme.surfaceContainer,
-                            RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-                        ).padding(horizontal = 24.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                OutlinedButton(
-                    onClick = onRetake,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(Res.string.retake))
-                }
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Button(
-                    onClick = onUse,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(
-                        stringResource(
-                            when (mediaType) {
-                                CapturedMediaType.PHOTO -> Res.string.use_photo
-                                CapturedMediaType.VIDEO -> Res.string.use_video
-                            },
-                        ),
-                    )
-                }
-            }
+            CameraReviewActions(
+                mediaType,
+                onRetake,
+                onUse,
+                Modifier.align(Alignment.BottomCenter),
+            )
         }
     }
 }
@@ -794,6 +767,7 @@ private fun InlineCameraCapture(
                         .align(Alignment.TopEnd)
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                         .statusBarsPadding()
+                        .cameraHeaderClearance()
                         .padding(16.dp),
             )
         }
@@ -805,7 +779,7 @@ private fun InlineCameraCapture(
             modifier = modifier,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            MediaDeviceSelector(
+            CameraRouteSelector(
                 selection = uiState.cameraSelection,
                 onDeviceSelected = { deviceId ->
                     if (!uiState.isRecording) {
@@ -817,7 +791,7 @@ private fun InlineCameraCapture(
             )
 
             if (uiState.captureMode == CaptureMode.VIDEO) {
-                MediaDeviceSelector(
+                CameraRouteSelector(
                     selection =
                         inputSelection.asSystemControlledSelection(
                             routeControlMessage = Res.string.camera_microphone_route_message.toUiText(),
@@ -948,6 +922,7 @@ private fun InlineCameraCapture(
                             .fillMaxSize()
                             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                             .navigationBarsPadding()
+                            .cameraCreationClearance()
                             .padding(horizontal = 16.dp, vertical = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
@@ -966,6 +941,7 @@ private fun InlineCameraCapture(
                             .align(Alignment.TopStart)
                             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                             .statusBarsPadding()
+                            .cameraHeaderClearance()
                             .padding(16.dp),
                 )
                 CaptureControls(
@@ -974,6 +950,7 @@ private fun InlineCameraCapture(
                             .align(Alignment.BottomCenter)
                             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                             .navigationBarsPadding()
+                            .cameraCreationClearance()
                             .padding(bottom = 24.dp),
                 )
                 ErrorMessage(
@@ -982,6 +959,7 @@ private fun InlineCameraCapture(
                             .align(Alignment.TopCenter)
                             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                             .statusBarsPadding()
+                            .cameraHeaderClearance()
                             .padding(top = 16.dp),
                 )
             },
@@ -1082,6 +1060,14 @@ private fun ShutterButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val label =
+        stringResource(
+            when {
+                isRecording -> Res.string.stop_recording
+                captureMode == CaptureMode.PHOTO -> Res.string.take_photo
+                else -> Res.string.editor_action_record_video
+            },
+        )
     val buttonSize = 72.dp
     val innerSize = if (isRecording) 24.dp else 56.dp
 
@@ -1089,7 +1075,8 @@ private fun ShutterButton(
         modifier =
             modifier
                 .size(buttonSize)
-                .clickable(enabled = !isCapturing) { onClick() },
+                .semantics { contentDescription = label }
+                .clickable(enabled = !isCapturing, role = Role.Button) { onClick() },
         shape = CircleShape,
         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
     ) {

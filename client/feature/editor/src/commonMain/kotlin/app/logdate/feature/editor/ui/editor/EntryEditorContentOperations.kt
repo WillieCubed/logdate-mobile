@@ -334,7 +334,16 @@ internal fun EntryEditorViewModel.removeBlockImpl(blockId: Uuid) {
     }
     val removed =
         mutateEditorContent { currentState ->
-            if (currentState.blocks.none { it.id == blockId }) return@mutateEditorContent currentState
+            val currentBlock = currentState.blocks.firstOrNull { it.id == blockId } ?: return@mutateEditorContent currentState
+            val captureActive =
+                currentBlock is AudioBlockUiState &&
+                    (currentBlock.captureState is AudioCaptureState.Recording || currentBlock.captureState is AudioCaptureState.Stopping)
+            if (currentState.audioCaptureStartReservations.containsKey(blockId) ||
+                currentState.isReadOnly(blockId) ||
+                captureActive
+            ) {
+                return@mutateEditorContent currentState
+            }
             val shouldClearExpanded = currentState.expandedBlockId == blockId
             val filteredBlocks = currentState.blocks.filterNot { it.id == blockId }
 

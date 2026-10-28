@@ -6,9 +6,11 @@ import androidx.compose.ui.graphics.asSkiaBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
@@ -58,6 +60,10 @@ class EntryPageAccessibilityScenesTest(
                 }
             }
             waitForIdle()
+            onNodeWithTag("entry_capture_tools").assertIsNotDisplayed()
+            onNodeWithContentDescription("Return to entry").performClick()
+            onNodeWithTag("entry_mode_overview").assertExists()
+            onNodeWithText("Add to entry").performClick()
             StoryCaptureMode.entries.forEach { mode ->
                 val bounds = onNodeWithContentDescription(mode.name).fetchSemanticsNode().boundsInRoot
                 assertTrue(bounds.width >= 48f && bounds.height >= 48f, "$name $mode needs a 48dp target: $bounds")

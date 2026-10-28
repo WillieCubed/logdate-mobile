@@ -131,9 +131,7 @@ class AudioViewModel(
     fun startRecording(
         targetNoteId: Uuid? = null,
         onTargetReady: suspend (String, String?) -> Boolean = { _, _ -> true },
-    ) {
-        viewModelScope.launch { startRecordingInternal(targetNoteId, onTargetReady = onTargetReady) }
-    }
+    ) = viewModelScope.launch { startRecordingInternal(targetNoteId, onTargetReady = onTargetReady) }
 
     private suspend fun startRecordingInternal(
         targetNoteId: Uuid?,

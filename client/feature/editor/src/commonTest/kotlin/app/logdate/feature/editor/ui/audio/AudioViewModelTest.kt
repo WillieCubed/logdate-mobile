@@ -13,7 +13,11 @@ import app.logdate.client.media.audio.transcription.TranscriptionFailure
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import app.logdate.client.media.audio.transcription.TranscriptionStartResult
+import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.AudioCaptureState
+import app.logdate.feature.editor.ui.editor.EditorAudioCaptureStartGate
+import app.logdate.feature.editor.ui.editor.EditorState
+import app.logdate.feature.editor.ui.editor.startReservedAudioCapture
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -121,6 +125,109 @@ class AudioViewModelTest {
             assertEquals(0, startCallsAtPersistence)
             assertEquals(1, manager.startCalls)
             assertTrue(model.uiState.value.isRecording)
+        }
+
+    @Test
+    fun `a gated manager keeps synchronous start reservation until refusal completes`() =
+        runTest(dispatcher) {
+            val block = AudioBlockUiState()
+            val state = MutableStateFlow(EditorState(blocks = listOf(block)))
+            val gate = EditorAudioCaptureStartGate(state)
+            val ready = CompletableDeferred<Unit>()
+            val manager = FakeAudioRecordingManager(null, Duration.ZERO, 0f, startSucceeds = false).apply { targetGate = ready }
+            val model = buildViewModel(manager)
+            val job = assertNotNull(startReservedAudioCapture(gate, block.id) { model.startRecording(block.id) })
+            assertNotNull(state.value.audioCaptureStartReservations[block.id])
+            assertFalse(model.uiState.value.isStartingRecording, "Reservation must precede the scheduled AudioVM admission")
+            dispatcher.scheduler.runCurrent()
+            assertTrue(model.uiState.value.isStartingRecording)
+            assertEquals(0, manager.startCalls)
+            assertNull(startReservedAudioCapture(gate, block.id) { model.startRecording(block.id) })
+            assertEquals(AudioCaptureState.Empty, (state.value.blocks.single() as AudioBlockUiState).captureState)
+            ready.complete(Unit)
+            advanceUntilIdle()
+            assertTrue(job.isCompleted)
+            assertEquals(1, manager.startCalls)
+            assertTrue(state.value.audioCaptureStartReservations.isEmpty())
+            assertFalse(manager.isRecording)
+            assertEquals(block.id, model.uiState.value.failedRecordingTargetNoteId)
+        }
+
+    @Test
+    fun `cancelling a start before its target releases reservation without a phantom take`() =
+        runTest(dispatcher) {
+            val block = AudioBlockUiState()
+            val state = MutableStateFlow(EditorState(blocks = listOf(block)))
+            val gate = EditorAudioCaptureStartGate(state)
+            val ready = CompletableDeferred<Unit>()
+            val manager = FakeAudioRecordingManager(null, Duration.ZERO, 0f).apply { targetGate = ready }
+            val model = buildViewModel(manager)
+            val job = assertNotNull(startReservedAudioCapture(gate, block.id) { model.startRecording(block.id) })
+            dispatcher.scheduler.runCurrent()
+            job.cancel()
+            advanceUntilIdle()
+            assertTrue(state.value.audioCaptureStartReservations.isEmpty())
+            assertEquals(AudioCaptureState.Empty, (state.value.blocks.single() as AudioBlockUiState).captureState)
+            assertFalse(model.uiState.value.isStartingRecording)
+            assertNull(model.uiState.value.failedRecordingTargetNoteId, "Cleanup cannot depend on failed-target emission")
+            assertEquals(0, manager.startCalls)
+            assertNotNull(gate.claim(block.id), "The same empty block must allow a deliberate retry")
+        }
+
+    @Test
+    fun `a successful start transfers reservation to durable target before completion`() =
+        runTest(dispatcher) {
+            val block = AudioBlockUiState()
+            val state = MutableStateFlow(EditorState(blocks = listOf(block)))
+            val gate = EditorAudioCaptureStartGate(state)
+            val ready = CompletableDeferred<Unit>()
+            val manager = FakeAudioRecordingManager("file:///test/audio.m4a", Duration.ZERO, 0f).apply { startGate = ready }
+            val model = buildViewModel(manager)
+            val job =
+                assertNotNull(
+                    startReservedAudioCapture(gate, block.id) {
+                        model.startRecording(block.id) { path, fallback ->
+                            val target = block.copy(captureState = AudioCaptureState.Recording(path, fallback))
+                            state.value = state.value.copy(blocks = listOf(target))
+                            true
+                        }
+                    },
+                )
+            dispatcher.scheduler.runCurrent()
+            assertNotNull(state.value.audioCaptureStartReservations[block.id])
+            val target = assertIs<AudioCaptureState.Recording>((state.value.blocks.single() as AudioBlockUiState).captureState)
+            assertEquals("/test/audio.m4a", target.filePath)
+            assertFalse(manager.isRecording)
+            ready.complete(Unit)
+            advanceUntilIdle()
+            assertTrue(job.isCompleted)
+            assertTrue(manager.isRecording)
+            assertTrue(state.value.audioCaptureStartReservations.isEmpty())
+            assertIs<AudioCaptureState.Recording>((state.value.blocks.single() as AudioBlockUiState).captureState)
+            model.stopRecording()
+            advanceUntilIdle()
+        }
+
+    @Test
+    fun `rejected AudioVM admission releases reservation without replacing earlier recovery`() =
+        runTest(dispatcher) {
+            val manager = FakeAudioRecordingManager(null, Duration.ZERO, 0f)
+            val model = buildViewModel(manager)
+            model.startRecording(Uuid.random())
+            advanceUntilIdle()
+            model.stopRecording()
+            advanceUntilIdle()
+            val recovery = assertNotNull(model.uiState.value.pendingRecoveryFilePath)
+            val block = AudioBlockUiState()
+            val state = MutableStateFlow(EditorState(blocks = listOf(block)))
+            val gate = EditorAudioCaptureStartGate(state)
+            val job = assertNotNull(startReservedAudioCapture(gate, block.id) { model.startRecording(block.id) })
+            advanceUntilIdle()
+            assertTrue(job.isCompleted)
+            assertTrue(state.value.audioCaptureStartReservations.isEmpty())
+            assertEquals(1, manager.startCalls)
+            assertEquals(recovery, model.uiState.value.pendingRecoveryFilePath)
+            assertEquals(AudioCaptureState.Empty, (state.value.blocks.single() as AudioBlockUiState).captureState)
         }
 
     @Test
@@ -1113,6 +1220,7 @@ private class FakeAudioRecordingManager(
 
     /** When set, [startRecording] suspends until it completes so tests can observe the in-flight state. */
     var startGate: CompletableDeferred<Unit>? = null
+    var targetGate: CompletableDeferred<Unit>? = null
     var startCalls: Int = 0
         private set
     var stopCalls: Int = 0
@@ -1153,6 +1261,7 @@ private class FakeAudioRecordingManager(
         targetNoteId: Uuid?,
         onTargetReady: suspend (String) -> Boolean,
     ): Boolean {
+        targetGate?.await()
         if (!onTargetReady(nextRecordingPath)) return false
         return startRecording(targetNoteId)
     }

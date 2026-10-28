@@ -8,6 +8,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
@@ -172,7 +173,8 @@ class EditorSafeAreaAcceptanceTest {
         label: String,
     ) {
         compose.waitForIdle()
-        val nodes = listOf(compose.onNodeWithContentDescription("Return to entry"), compose.onNodeWithTag("entry_capture_tools"))
+        val nodes = listOf(compose.onNodeWithContentDescription("Return to entry"))
+        compose.onNodeWithTag("entry_capture_tools").assertIsNotDisplayed()
         var left = 0f
         var top = 0f
         var right = 0f

@@ -3,7 +3,10 @@ package app.logdate.feature.editor.ui.handwriting
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
@@ -18,6 +21,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 
 @OptIn(ExperimentalTestApi::class)
 @RunWith(Parameterized::class)
@@ -25,7 +29,7 @@ class EntryPageCaptureModesTest(
     private val direction: LayoutDirection,
 ) {
     @Test
-    fun barSwipesReuseTheSameTextAndInkBlocks() =
+    fun barSwipesChangeOnlyANewEmptyTargetAndRetainExistingTextAndInk() =
         runDesktopComposeUiTest(width = 360, height = 800) {
             val text = TextBlockUiState(content = "Keep this thought intact.")
             val ink = HandwritingBlockUiState(page = entryPageStudyInk())
@@ -37,18 +41,23 @@ class EntryPageCaptureModesTest(
             }
             onNodeWithTag("memory_block_${text.id}").performScrollTo().performClick()
             waitForIdle()
+            onNodeWithTag("entry_capture_tools").assertIsNotDisplayed()
+            onNodeWithContentDescription("Return to entry").performClick()
+            onNodeWithText("Add to entry").performClick()
+            waitForIdle()
             onNodeWithTag("entry_capture_tools").performTouchInput {
                 if (direction == LayoutDirection.Ltr) swipeLeft() else swipeRight()
             }
             waitForIdle()
-            onNodeWithTag("handwriting_canvas").assertExists()
+            assertIs<HandwritingBlockUiState>(blocks.last())
             onNodeWithTag("entry_capture_tools").performTouchInput {
                 if (direction == LayoutDirection.Ltr) swipeRight() else swipeLeft()
             }
             waitForIdle()
             onNodeWithTag("editor_text_input").assertExists()
-            assertEquals(listOf(text.id, ink.id), blocks.map { it.id })
-            assertEquals(text.content, blocks.filterIsInstance<TextBlockUiState>().single().content)
+            assertEquals(3, blocks.size)
+            assertEquals(listOf(text.id, ink.id), blocks.take(2).map { it.id })
+            assertEquals(text.content, blocks.filterIsInstance<TextBlockUiState>().first().content)
             assertEquals(ink.page, blocks.filterIsInstance<HandwritingBlockUiState>().single().page)
         }
 

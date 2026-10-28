@@ -65,6 +65,7 @@ import app.logdate.feature.editor.ui.layout.EditorBlockCornerRadius
 import app.logdate.feature.editor.ui.layout.EditorFocus
 import app.logdate.feature.editor.ui.layout.FocusedBlockLayout
 import app.logdate.feature.editor.ui.layout.LocalEntryChromeHeight
+import app.logdate.feature.editor.ui.layout.LocalEntryCreationReserve
 import app.logdate.feature.editor.ui.layout.editorFocus
 import app.logdate.feature.editor.ui.layout.entryContentPadding
 import app.logdate.feature.editor.ui.state.BlocksUiState
@@ -354,8 +355,7 @@ fun MainEditorContent(
                                                                         },
                                                                     bottom =
                                                                         if (liveBlock is TextBlockUiState) {
-                                                                            LocalEntryChromeHeight.current +
-                                                                                Spacing.lg
+                                                                            LocalEntryCreationReserve.current
                                                                         } else {
                                                                             0.dp
                                                                         },

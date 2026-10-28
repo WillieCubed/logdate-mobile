@@ -5,7 +5,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
@@ -21,6 +20,7 @@ import app.logdate.client.sync.datalayer.RemoteCameraCaptureResult
 import app.logdate.feature.editor.ui.camera.CameraCaptureContent
 import app.logdate.feature.editor.ui.camera.CameraRemoteControl
 import app.logdate.feature.editor.ui.camera.CapturedMediaType
+import app.logdate.ui.platform.enableTransparentSystemBars
 import app.logdate.ui.theme.LogDateTheme
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
@@ -30,7 +30,7 @@ import kotlin.time.Clock
 class RemoteCameraActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableTransparentSystemBars()
 
         whenApplicationReady { showCamera() }
     }

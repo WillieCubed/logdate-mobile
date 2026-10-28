@@ -4,8 +4,8 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import app.logdate.client.datastore.EntryStartMode
@@ -39,11 +39,11 @@ class EntryCapturePositionTest {
             }
             for ((anchor, expected) in listOf(280f to 280f, 1000f to 720f, 700f to 700f)) {
                 runOnIdle { overview.captureBounds = Rect(0f, anchor, 400f, anchor + 80f) }
-                val bounds = onNodeWithTag("entry_capture_tools").getUnclippedBoundsInRoot()
+                val bounds = onNodeWithTag("entry_creation_actions").getUnclippedBoundsInRoot()
                 assertEquals(expected, bounds.top.value, 1f, "Capture must follow the page until its safe bottom limit")
                 assertTrue(bounds.bottom.value <= 800f, "Long page moved capture outside the viewport: $bounds")
             }
-            onNodeWithContentDescription("Write").performTouchInput { click() }
+            onNodeWithText("Add to entry").performTouchInput { click() }
             assertEquals(1, captures, "Bounded capture controls must still receive physical pointer input")
         }
 }

@@ -71,7 +71,7 @@ class StoriesEntryPrototypeTest {
         }
 
     @Test
-    fun `swiping the focus header switches tools without replacing existing strokes`() =
+    fun `swiping the focus header cannot convert a memory with content`() =
         runDesktopComposeUiTest(width = 360, height = 800) {
             val text = TextBlockUiState(content = "Keep this thought.")
             val ink = HandwritingBlockUiState(page = sampleInk())
@@ -87,8 +87,8 @@ class StoriesEntryPrototypeTest {
                 }
             }
             onNodeWithTag("entry_mode_focus").performTouchInput { swipeLeft() }
-            onNodeWithTag("focused_block_${ink.id}").assertExists()
-            onNodeWithTag("handwriting_canvas").assertExists()
+            onNodeWithTag("focused_block_${text.id}").assertExists()
+            onNodeWithTag("editor_text_input").assertTextEquals(text.content)
             assertEquals(listOf(text, ink), latest)
         }
 }
