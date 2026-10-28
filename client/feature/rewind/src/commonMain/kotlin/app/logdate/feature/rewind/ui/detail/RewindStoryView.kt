@@ -403,7 +403,6 @@ fun RewindStoryView(
                 RewindSystemBars()
                 TapNavigationLayer(Modifier.fillMaxSize().testTag("rewind-story-focus")) {
                     StoryPanel(Modifier.fillMaxSize())
-                    RewindSystemBarScrims()
                 }
             },
             controls = {
