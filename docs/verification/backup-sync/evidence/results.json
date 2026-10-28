@@ -1,0 +1,66 @@
+{
+  "checkedAtUtc": "2026-10-28T13:15:16.566125+00:00",
+  "specSha256": "fa61e9b1cf3fd628d52fda70a76dec2956f7f71c99082523ecfa09a63e3c827b",
+  "toolJarSha256": "d15655eeaff4b3f7b3d65c46b838bc0f35d131b2ef4b1e473689b62c98d4726f",
+  "bounds": {
+    "contentItems": 1,
+    "contentGenerations": 2,
+    "workerIdentities": 2,
+    "networkStates": [
+      "offline",
+      "cellular",
+      "wifi"
+    ],
+    "chargingStates": 2,
+    "authenticationKeyServerFlags": 3,
+    "snapshotProgressTotal": 1
+  },
+  "cases": [
+    {
+      "case": "BackupSync",
+      "passed": true,
+      "returnCode": 0,
+      "expectedCounterexample": null,
+      "configSha256": "471f3c0b2acaa6b2059c31df69309ff8cdaca2f6f7ad45ae8f1adc9a044dbb6c",
+      "generatedStates": 381745,
+      "distinctStates": 7488
+    },
+    {
+      "case": "Cellular",
+      "passed": true,
+      "returnCode": 0,
+      "expectedCounterexample": null,
+      "configSha256": "745c9eaae08e1e720eda1dbcaff5744bf58fb697bd8cf66f63488197a82b2441",
+      "generatedStates": 381889,
+      "distinctStates": 7488
+    },
+    {
+      "case": "BuggyEcho",
+      "passed": true,
+      "returnCode": 12,
+      "expectedCounterexample": "NoAcknowledgedPayload",
+      "configSha256": "b6c9280aac54505d75792ff34bb972ee5834d5d829b7fa22afabdd4886f59064",
+      "generatedStates": 175872,
+      "distinctStates": 4605
+    },
+    {
+      "case": "BuggyNotice",
+      "passed": true,
+      "returnCode": 12,
+      "expectedCounterexample": "TruthfulNotification",
+      "configSha256": "2bbc6a8451586b9c025690dfe7b9c12b672a4e51515cef525e7f13143d02bbdb",
+      "generatedStates": 7135,
+      "distinctStates": 262
+    },
+    {
+      "case": "BuggyLostAck",
+      "passed": true,
+      "returnCode": 12,
+      "expectedCounterexample": "NoCommittedPayloadReplay",
+      "configSha256": "69f14620689a1092f53136ec3f6c396edc8bc07f7198ccaa4cab410ac1e55cf6",
+      "generatedStates": 143847,
+      "distinctStates": 3535
+    }
+  ],
+  "passed": true
+}
