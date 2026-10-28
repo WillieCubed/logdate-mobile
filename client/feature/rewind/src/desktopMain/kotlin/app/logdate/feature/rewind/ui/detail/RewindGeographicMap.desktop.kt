@@ -3,6 +3,7 @@
 package app.logdate.feature.rewind.ui.detail
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -13,6 +14,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 internal actual fun RewindGeographicMap(
     geometry: RewindMapGeometry,
+    contentInsets: PaddingValues,
     modifier: Modifier,
 ) {
     Box(modifier) {

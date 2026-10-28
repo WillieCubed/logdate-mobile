@@ -3,7 +3,10 @@
 
 package app.logdate.feature.rewind.ui.detail
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,32 +19,39 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.UIKitInteropProperties
 import androidx.compose.ui.viewinterop.UIKitView
+import app.logdate.ui.platform.rememberSystemReduceMotion
+import kotlinx.cinterop.useContents
 import kotlinx.coroutines.delay
 import logdate.client.feature.rewind.generated.resources.Res
 import logdate.client.feature.rewind.generated.resources.rewind_map_accessibility
 import logdate.client.feature.rewind.generated.resources.rewind_map_loading
 import logdate.client.feature.rewind.generated.resources.rewind_map_unavailable
 import org.jetbrains.compose.resources.stringResource
+import platform.CoreGraphics.CGRectMake
 import platform.CoreLocation.CLLocationCoordinate2DMake
 import platform.Foundation.NSError
-import platform.MapKit.MKCoordinateRegionMake
-import platform.MapKit.MKCoordinateSpanMake
+import platform.MapKit.MKMapPointForCoordinate
+import platform.MapKit.MKMapRectMake
+import platform.MapKit.MKMapRectWorld
 import platform.MapKit.MKMapView
 import platform.MapKit.MKMapViewDelegateProtocol
 import platform.MapKit.MKPointAnnotation
+import platform.UIKit.UIEdgeInsetsMake
 import platform.UIKit.accessibilityLabel
 import platform.darwin.NSObject
 
 @Composable
 internal actual fun RewindGeographicMap(
     geometry: RewindMapGeometry,
+    contentInsets: PaddingValues,
     modifier: Modifier,
 ) {
     val center = geometry.center ?: return
-    var loaded by remember(geometry) { mutableStateOf(false) }
-    var failed by remember(geometry) { mutableStateOf(false) }
+    val reduceMotion by rememberSystemReduceMotion()
+    var loaded by remember(geometry, contentInsets) { mutableStateOf(false) }
+    var failed by remember(geometry, contentInsets) { mutableStateOf(false) }
     val delegate =
-        remember(geometry) {
+        remember(geometry, contentInsets) {
             object : NSObject(), MKMapViewDelegateProtocol {
                 override fun mapViewDidFinishRenderingMap(
                     mapView: MKMapView,
@@ -61,19 +71,68 @@ internal actual fun RewindGeographicMap(
                 }
             }
         }
-    LaunchedEffect(geometry, loaded) {
+    LaunchedEffect(geometry, contentInsets, loaded) {
         if (!loaded) {
             delay(15_000)
             failed = true
         }
     }
     val description = stringResource(Res.string.rewind_map_accessibility)
+    val reveal by animateFloatAsState(
+        targetValue = if (loaded) 1f else 0.01f,
+        animationSpec = tween(if (reduceMotion) 0 else 280),
+        label = "RewindMapReveal",
+    )
+
+    fun longitude(value: Double) = ((value + 540.0) % 360.0) - 180.0
+    val northwest =
+        MKMapPointForCoordinate(
+            CLLocationCoordinate2DMake(
+                (center.latitude + geometry.latitudeSpan / 2).coerceAtMost(85.0),
+                longitude(
+                    center.longitude - geometry.longitudeSpan / 2,
+                ),
+            ),
+        )
+    val southeast =
+        MKMapPointForCoordinate(
+            CLLocationCoordinate2DMake(
+                (center.latitude - geometry.latitudeSpan / 2).coerceAtLeast(-85.0),
+                longitude(
+                    center.longitude + geometry.longitudeSpan / 2,
+                ),
+            ),
+        )
+    val left = northwest.useContents { x }
+    val right = southeast.useContents { x }.let { if (it < left) it + MKMapRectWorld.size.width else it }
+    val top = northwest.useContents { y }
+    val rectangle = MKMapRectMake(left, top, right - left, southeast.useContents { y } - top)
     Box(modifier) {
-        key(geometry) {
+        key(geometry, contentInsets) {
             UIKitView(
                 modifier = Modifier.fillMaxSize(),
                 factory = {
-                    MKMapView().apply {
+                    object : MKMapView(frame = CGRectMake(0.0, 0.0, 0.0, 0.0)) {
+                        private var framed = false
+
+                        override fun layoutSubviews() {
+                            super.layoutSubviews()
+                            if (!framed && bounds.useContents { size.width > 0 && size.height > 0 }) {
+                                framed = true
+                                setVisibleMapRect(
+                                    rectangle,
+                                    edgePadding =
+                                        UIEdgeInsetsMake(
+                                            contentInsets.calculateTopPadding().value.toDouble(),
+                                            24.0,
+                                            contentInsets.calculateBottomPadding().value.toDouble(),
+                                            24.0,
+                                        ),
+                                    animated = false,
+                                )
+                            }
+                        }
+                    }.apply {
                         this.delegate = delegate
                         showsUserLocation = false
                         showsCompass = false
@@ -91,15 +150,9 @@ internal actual fun RewindGeographicMap(
                                 }
                             },
                         )
-                        setRegion(
-                            MKCoordinateRegionMake(
-                                CLLocationCoordinate2DMake(center.latitude, center.longitude),
-                                MKCoordinateSpanMake(geometry.latitudeSpan, geometry.longitudeSpan),
-                            ),
-                            animated = false,
-                        )
                     }
                 },
+                update = { it.alpha = reveal.toDouble() },
                 properties = UIKitInteropProperties(interactionMode = null, isNativeAccessibilityEnabled = true),
                 onRelease = { it.delegate = null },
             )
@@ -107,7 +160,7 @@ internal actual fun RewindGeographicMap(
         if (!loaded) {
             RewindMapMessage(
                 stringResource(if (failed) Res.string.rewind_map_unavailable else Res.string.rewind_map_loading),
-                Modifier.align(Alignment.TopCenter),
+                Modifier.align(Alignment.Center),
             )
         }
     }
