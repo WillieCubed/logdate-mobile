@@ -6,6 +6,8 @@ import kotlinx.coroutines.withTimeout
 import kotlin.uuid.Uuid
 
 interface RecordingDraftLifecycle {
+    val draftId: Uuid? get() = null
+
     suspend fun prepare(
         blockId: Uuid,
         path: String,
@@ -24,6 +26,9 @@ class RecordingDraftSession(
     private val drafts: EntryDraftRepository,
     private val currentOwner: suspend () -> String,
 ) : RecordingDraftLifecycle {
+    override var draftId: Uuid? = null
+        private set
+
     private var recordingBlock: Uuid? = null
     private var recordingOwner: String? = null
 
@@ -36,7 +41,8 @@ class RecordingDraftSession(
             drafts.getDrafts().first { entries -> entries.any { draft -> draft.pendingMedia.any { it.blockId == blockId } } }
         }
         check(currentOwner() == owner) { "Recording account changed" }
-        check(drafts.checkpointRecording(blockId, path, owner) != null) { "Recording has no durable draft" }
+        val preparedDraft = checkNotNull(drafts.checkpointRecording(blockId, path, owner)) { "Recording has no durable draft" }
+        draftId = preparedDraft
         recordingBlock = blockId
         recordingOwner = owner
     }

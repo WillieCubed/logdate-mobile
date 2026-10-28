@@ -51,6 +51,7 @@ val editorFeatureModule: Module =
 
         viewModel {
             EntryEditorViewModel(
+                savedStateHandle = get(),
                 observeEditorData = get(),
                 saveEntryUseCase = get(),
                 draftManager = get(),

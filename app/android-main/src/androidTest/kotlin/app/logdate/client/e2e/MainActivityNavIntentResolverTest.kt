@@ -48,6 +48,23 @@ import app.logdate.feature.core.notifications.EXTRA_NAV_SOURCE as EXTRA_DATA_TRA
 @RunWith(AndroidJUnit4::class)
 class MainActivityNavIntentResolverTest {
     @Test
+    fun `recording notification returns to its exact draft without starting another take`() {
+        val draft = Uuid.random()
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val intent =
+            app.logdate.client.media.audio
+                .recordingReturnIntent(context, draft)
+        assertNull(intent.data, "Recording return must reuse the main document, not open a second task")
+        assertEquals(
+            app.logdate.feature.editor.navigation
+                .EntryEditorRoute(draftId = draft.toString(), resumeRecording = true),
+            resolveMainActivityNavKey(intent),
+        )
+        intent.putExtra(app.logdate.client.media.audio.EXTRA_RECORDING_DRAFT_ID, "invalid")
+        assertNull(resolveMainActivityNavKey(intent))
+    }
+
+    @Test
     fun `fixed memory widget opens the exact selected entry`() {
         val noteId = Uuid.random()
         assertEquals(
@@ -66,7 +83,7 @@ class MainActivityNavIntentResolverTest {
         val photoUri = "content://media/external/images/media/42"
         assertEquals(
             app.logdate.feature.editor.navigation
-                .EntryEditorRoute(promptPhotoUri = photoUri),
+                .EntryEditorRoute(launchMode = app.logdate.feature.editor.navigation.EditorLaunchMode.Text, promptPhotoUri = photoUri),
             resolveMainActivityNavKey(
                 Intent().apply {
                     putExtra(EXTRA_WIDGET_NAV_SOURCE, NAV_SOURCE_NEW_ENTRY_WIDGET)

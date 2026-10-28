@@ -80,6 +80,9 @@ class AndroidAudioRecordingManager(
     @Volatile
     internal var sessionTargetNoteId: Uuid? = null
 
+    @Volatile
+    internal var sessionDraftId: Uuid? = null
+
     /**
      * File the service reported when it ended the session on its own (notification action,
      * recorder failure). Handed back by the next [stopRecording] so the editor still gets
@@ -135,6 +138,9 @@ class AndroidAudioRecordingManager(
 
     internal var quietSaveForSession = false
 
+    override val currentRecordingDraftId: Uuid?
+        get() = recordingTarget?.let { sessionDraftId }
+
     override val continuesWithoutEditor: Boolean
         get() = quietSaveForSession && isRecording
 
@@ -189,6 +195,7 @@ class AndroidAudioRecordingManager(
             return false
         }
         sessionGeneration++
+        sessionDraftId = null
         val target = prepareRecordingTarget(audioStorage, onTargetReady) ?: return false
         recordingTarget = target
         recordingDraftSaved = false
@@ -202,7 +209,10 @@ class AndroidAudioRecordingManager(
 
         var confirmed = false
         try {
-            if (targetNoteId != null) draftSession?.prepare(targetNoteId, target.path)
+            if (targetNoteId != null) {
+                draftSession?.prepare(targetNoteId, target.path)
+                sessionDraftId = draftSession?.draftId
+            }
             quietSaveTriggered = false
             serviceEnded = false
             lastCheckpointSeconds = 0

@@ -260,6 +260,7 @@ internal suspend fun EntryEditorViewModel.persistLatestDraftUntilStable(initialS
 
 internal suspend fun EntryEditorViewModel.persistDraftSnapshot(state: EditorState): Uuid? =
     draftManager.autoSave(state)?.also { draftId ->
+        savedStateHandle["editor.draftId"] = draftId.toString()
         mutableEditorState.update {
             it.copy(
                 draftState = DraftState.Active(draftId),

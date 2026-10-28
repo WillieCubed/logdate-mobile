@@ -134,12 +134,20 @@ internal fun EntryEditorViewModel.loadDraftImpl(draftId: Uuid) {
                     if (generation != loadGeneration || mutableEditorState.value.contentRevision != requestedContentRevision) {
                         return@withLock
                     }
+                    savedStateHandle["editor.draftId"] = loaded.draftId.toString()
                     mutateEditorContent { currentState ->
                         if (generation != loadGeneration || currentState.contentRevision != requestedContentRevision) {
                             currentState
                         } else {
                             currentState.copy(
                                 blocks = recoveredBlocks,
+                                expandedBlockId =
+                                    recoveredBlocks
+                                        .filterIsInstance<AudioBlockUiState>()
+                                        .firstOrNull {
+                                            it.captureState is AudioCaptureState.Recording ||
+                                                it.captureState is AudioCaptureState.Failed
+                                        }?.id,
                                 entryEditBase = loaded.editBase,
                                 selectedJournalIds = loaded.selectedJournalIds,
                                 visitContext = loaded.visitContext,

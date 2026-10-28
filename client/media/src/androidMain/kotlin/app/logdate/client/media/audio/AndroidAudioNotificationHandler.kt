@@ -66,20 +66,12 @@ class AndroidAudioNotificationHandler(
      * Creates a main activity PendingIntent to return to the editor
      */
     private fun createMainActivityIntent(): PendingIntent {
-        val packageName = context.packageName
-        val launchIntent =
-            context.packageManager.getLaunchIntentForPackage(packageName)
-                ?: return PendingIntent.getActivity(
-                    context,
-                    0,
-                    Intent(),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                )
-        launchIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val draftId = KoinPlatform.getKoinOrNull()?.getOrNull<AudioRecordingManager>()?.currentRecordingDraftId
+        val launchIntent = recordingReturnIntent(context, draftId)
 
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
-        return PendingIntent.getActivity(context, 0, launchIntent, flags)
+        return PendingIntent.getActivity(context, NAV_SOURCE_AUDIO_RECORDING.hashCode(), launchIntent, flags)
     }
 
     /**

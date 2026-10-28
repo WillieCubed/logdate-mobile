@@ -15,6 +15,56 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class RecordingDraftLifecycleTest : RecordingManagerTestFixture() {
     @Test
+    fun `a new session never exposes the preceding draft while preparation is suspended`() =
+        testScope.runTest {
+            val previous = Uuid.random()
+            val replacement = Uuid.random()
+            var preparationGate: CompletableDeferred<Unit>? = null
+            val session =
+                object : SuccessfulSession() {
+                    override var draftId: Uuid? = previous
+
+                    override suspend fun prepare(
+                        blockId: Uuid,
+                        path: String,
+                    ) {
+                        preparationGate?.await()
+                        if (preparationGate != null) draftId = replacement
+                    }
+                }
+            val manager = buildManager(draftSession = session)
+            startAndConfirm(manager)
+            manager.stopRecording()
+            preparationGate = CompletableDeferred()
+            val starting = launch { manager.startRecording(Uuid.random()) }
+            runCurrent()
+            assertTrue(manager.isStartingRecording)
+            assertEquals(null, manager.currentRecordingDraftId)
+            preparationGate.complete(Unit)
+            runCurrent()
+            controller.emit(RecordingServiceState(isRecording = true))
+            starting.join()
+            assertEquals(replacement, manager.currentRecordingDraftId)
+            manager.stopRecording()
+        }
+
+    @Test
+    fun `active recording exposes its durable editor destination and releases it after handoff`() =
+        testScope.runTest {
+            val destination = Uuid.random()
+            val session =
+                object : SuccessfulSession() {
+                    override val draftId = destination
+                }
+            val manager = buildManager(draftSession = session)
+            assertEquals(null, manager.currentRecordingDraftId)
+            startAndConfirm(manager)
+            assertEquals(destination, manager.currentRecordingDraftId)
+            manager.stopRecording()
+            assertEquals(null, manager.currentRecordingDraftId)
+        }
+
+    @Test
     fun `queued audio publication does not complete the draft or announce success`() =
         testScope.runTest {
             var completed = false
