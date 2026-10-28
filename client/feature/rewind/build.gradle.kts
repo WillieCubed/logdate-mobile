@@ -92,6 +92,7 @@ kotlin {
         }
 
         androidMain.dependencies {
+            implementation(libs.play.services.maps)
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.koin.android)
             implementation(libs.accompanist.permissions)

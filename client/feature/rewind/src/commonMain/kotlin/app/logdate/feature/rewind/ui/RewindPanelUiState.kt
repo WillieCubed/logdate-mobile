@@ -260,17 +260,14 @@ data class ReflectionPromptRewindPanelUiState(
 /**
  * UI state for a panel that visualizes where the user actually was during the rewind.
  *
- * Built from the rewind's downsampled location path. The renderer projects each point
- * into a bounding-box-relative position on a Compose Canvas — no map tiles, no API
- * keys, just dots and a polyline on a deep accent background. The point is to give
- * the user a visceral "this is the shape your week traced" panel without the visual
- * weight of a real map.
+ * Built from the rewind's downsampled location path and displayed over the
+ * platform's geographic basemap. Automatic framing keeps the main area legible;
+ * the backdrop leaves touch gestures to story navigation.
  *
- * @property points The downsampled lat/lon path. Order is chronological — the polyline
- *   connects them in sequence.
- * @property title Localized headline ("Where your week was") rendered above the canvas.
- * @property subtitle Localized supporting line (typically "{N} places" or "{N} stops").
- * @property accentSeed Seed used to vary the canvas background hue per rewind.
+ * @property points Downsampled locations in chronological order.
+ * @property title Localized headline above the map.
+ * @property subtitle Localized supporting line, typically a place or stop count.
+ * @property accentSeed Seed for the surrounding story background.
  */
 data class LocationMapRewindPanelUiState(
     val points: List<MapPanelPoint>,
