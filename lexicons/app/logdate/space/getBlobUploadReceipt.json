@@ -67,7 +67,8 @@
           "type": "integer",
           "minimum": 0
         }
-      }
+      },
+      "description": "The encrypted blob committed for an opaque upload identity in the caller's own space."
     }
   }
 }
