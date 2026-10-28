@@ -23,4 +23,15 @@ class SupportingSheetTest {
         assertEquals(220.dp, anchors.peek)
         assertTrue(anchors.expanded <= 520.dp)
     }
+
+    @Test fun largeTextKeepsThreeDistinctUsefulOverlayAnchors() {
+        val anchors = supportingSheetAnchors(600.dp, 320.dp)
+        assertTrue(anchors.browsing - anchors.peek >= 48.dp)
+        assertTrue(anchors.expanded - anchors.browsing >= 48.dp)
+    }
+
+    @Test fun tinyViewportHasNoCoincidentDragAnchors() {
+        val anchors = supportingSheetAnchors(48.dp).dragAnchors(48f, 1f)
+        assertTrue(anchors.positionOf(SupportingExtent.Peek) != anchors.positionOf(SupportingExtent.Focused))
+    }
 }

@@ -211,3 +211,19 @@ sizes, dark theme, right-to-left layout, and large text.
 Every change reaches `main` through a pull request merged with a rebase. The
 [Git guidelines](reference/standards/git-guidelines.md#branch-and-pull-request-workflow) describe
 the branch, pull request, and merge steps.
+
+### Places supporting-sheet interactions
+
+Places uses the shared `WorkspaceSupportingSheet` for direct finger tracking, velocity-based settling,
+content-scroll handoff and Back-to-peek. Its overlay anchors remain distinct at large text sizes;
+short windows use the focused layout. Resizing preserves the mounted map and selected content.
+The shared rail separates navigation targets by 8dp while retaining its bounded native widths.
+All Home destinations continue to use the same shell search field; contextual Places search replaces
+that field instead of adding a second search control.
+
+Run `:client:ui:desktopTest` and `checkHomeWorkspaceContract` for these changes. Native interaction
+and capture coverage is `:app:android-main:phoneApi34DebugAndroidTest
+-Plogdate.androidTestClass=app.logdate.client.e2e.PlacesSheetGestureE2ETest`. It retains a bounded,
+silent interaction video and normal-mobile, foldable-sized and landscape-tablet screenshots.
+The capture fixture uses production components with synthetic places/memories in a test Activity.
+Resized emulator windows do not certify physical hinges, production Activity system bars or native map tiles.

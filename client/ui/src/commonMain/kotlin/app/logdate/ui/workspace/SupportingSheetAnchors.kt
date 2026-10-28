@@ -18,10 +18,11 @@ fun supportingSheetAnchors(
 ): SupportingSheetAnchors {
     val expanded = (height - 180.dp).coerceAtLeast(0.dp)
     val peek = peekHeight.coerceAtMost(expanded)
+    val canOverlay = expanded - peek >= 96.dp
     return SupportingSheetAnchors(
         peek,
-        (height * .45f).coerceIn(peek, expanded),
+        if (canOverlay) (height * .45f).coerceIn(peek + 48.dp, expanded - 48.dp) else peek,
         expanded,
-        height >= 180.dp + peekHeight + 48.dp,
+        canOverlay,
     )
 }
