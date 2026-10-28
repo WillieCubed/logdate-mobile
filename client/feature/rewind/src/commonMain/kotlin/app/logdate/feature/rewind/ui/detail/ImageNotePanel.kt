@@ -139,7 +139,7 @@ fun ImageNotePanel(
                             .drawBehind {
                                 drawRect(
                                     Brush.verticalGradient(
-                                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.56f)),
+                                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.68f)),
                                         endY = 48.dp.toPx().coerceAtMost(size.height),
                                     ),
                                 )

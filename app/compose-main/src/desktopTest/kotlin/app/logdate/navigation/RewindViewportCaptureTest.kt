@@ -6,10 +6,12 @@ package app.logdate.navigation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
@@ -91,7 +93,7 @@ class RewindViewportCaptureTest {
     ) = runDesktopComposeUiTest(width = width, height = height) {
         val id = Uuid.parse("00000000-0000-0000-0000-000000000038")
         setContent {
-            val image = remember { ColorImage(Color(0xFFD8EBF7).toArgb()) }
+            val image = remember { ColorImage((if (width == 411) Color.White else Color(0xFFD8EBF7)).toArgb()) }
             val handler = remember(image) { AsyncImagePreviewHandler { image } }
             CompositionLocalProvider(
                 LocalDensity provides Density(1f, 1f),
@@ -136,6 +138,8 @@ class RewindViewportCaptureTest {
         val pixels = image.toPixelMap()
         val edgeX = scene.left.toInt() + 2
         assertTrue(pixels[edgeX, height - 2].red < 0.5f, "Caption contrast must reach the scene edge, without a padded rectangle")
+        val linkContrast = (darkColorScheme().primary.luminance() + 0.05f) / (pixels[edgeX, height - 2].luminance() + 0.05f)
+        assertTrue(linkContrast >= 4.5f, "Shared Markdown links need 4.5:1 contrast against the image caption: $linkContrast")
         for (y in height / 2 + 1 until height) {
             assertTrue(
                 kotlin.math.abs(pixels[edgeX, y].red - pixels[edgeX, y - 1].red) < 0.04f,
