@@ -53,6 +53,10 @@ import app.logdate.ui.foldable.calculateFoldableSplitLayout
 import app.logdate.ui.foldable.relativeTo
 import app.logdate.ui.foldable.rememberFoldableLayoutInfo
 import app.logdate.ui.foldable.rememberWindowOrigin
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.entry_page_back_to_writing
+import logdate.client.feature.editor.generated.resources.entry_page_return_to_writing
+import org.jetbrains.compose.resources.stringResource
 
 internal val LocalEntryCaptureBarHeight = compositionLocalOf { 0.dp }
 
@@ -70,6 +74,7 @@ internal fun EntryPageChrome(
     focusProgress: Float? = null,
     content: @Composable () -> Unit,
 ) {
+    val returnToWritingDescription = stringResource(Res.string.entry_page_return_to_writing)
     val density = LocalDensity.current
     val keyboardBottom = WindowInsets.ime.getBottom(density)
     val navigationBottom = WindowInsets.navigationBars.getBottom(density)
@@ -157,7 +162,7 @@ internal fun EntryPageChrome(
                         Modifier
                             .padding(16.dp)
                             .graphicsLayer { alpha = overview.browsingProgress }
-                            .semantics { contentDescription = "Return to writing" },
+                            .semantics { contentDescription = returnToWritingDescription },
                     colors =
                         ButtonDefaults.filledTonalButtonColors(
                             containerColor = StoryChrome,
@@ -165,7 +170,7 @@ internal fun EntryPageChrome(
                         ),
                 ) {
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack, null)
-                    Text("Back to writing", Modifier.padding(start = 8.dp))
+                    Text(stringResource(Res.string.entry_page_back_to_writing), Modifier.padding(start = 8.dp))
                 }
             }
         }

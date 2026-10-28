@@ -37,6 +37,10 @@ import app.logdate.ui.foldable.rememberWindowOrigin
 import app.logdate.util.localTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.entry_page_earlier_today
+import logdate.client.feature.editor.generated.resources.entry_page_later_entries
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 
 @Composable
@@ -62,7 +66,11 @@ internal fun EarlierDayHeading(modifier: Modifier = Modifier) {
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Earlier today", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                stringResource(Res.string.entry_page_earlier_today),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             Text(
                 "${date.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${date.year}",
                 style = MaterialTheme.typography.labelLarge,
@@ -98,7 +106,7 @@ internal fun EarlierDayBrowser(
                     BrowserEntries(notes.drop(midpoint), Modifier.width(split.rightPane.width)) {
                         Column(Modifier.heightIn(min = 96.dp).padding(horizontal = 16.dp), verticalArrangement = Arrangement.Center) {
                             Text(
-                                "Later entries",
+                                stringResource(Res.string.entry_page_later_entries),
                                 style = MaterialTheme.typography.headlineMedium,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )

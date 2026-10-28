@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<resources>
+    <string name="entry_page_earlier_today">Earlier today</string>
+    <string name="entry_page_later_entries">Later entries</string>
+    <string
+    name="entry_page_handwriting_newer_version"
+  >This handwriting needs a newer version of LogDate.</string>
+    <string name="entry_page_handwritten_entry">Handwritten entry</string>
+    <string name="entry_page_sample_date">October 18</string>
+    <string name="entry_page_back_to_writing">Back to writing</string>
+    <string name="entry_page_browse_earlier_today">Browse earlier today</string>
+    <string name="entry_page_now">Now</string>
+    <string name="entry_page_focus">Focus</string>
+    <string name="entry_page_entry">Entry</string>
+    <string name="entry_page_choose_journal">Choose journal</string>
+    <string name="entry_page_save">Save</string>
+    <string name="entry_page_options">Entry options</string>
+    <string name="entry_page_focus_block">Focus %1$s</string>
+    <string name="entry_page_return_to_writing">Return to writing</string>
+    <string name="entry_page_sample_journal">Everyday</string>
+    <string name="entry_page_block_focus">Block focus</string>
+    <string name="entry_page_return_to_entry">Return to entry</string>
+    <string name="entry_page_drafts_count">Drafts (%1$d)</string>
+</resources>

@@ -17,14 +17,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.entry_page_earlier_today
+import logdate.client.feature.editor.generated.resources.entry_page_sample_date
+import org.jetbrains.compose.resources.stringResource
 
 /** Read-only design fixtures; these never enter the draft's block list. */
 @Composable
 internal fun EarlierTodayPrototypeContent() {
     Column(Modifier.fillMaxWidth().testTag("earlier_today"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Earlier today", style = MaterialTheme.typography.titleSmall)
-            Text("October 18", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(Res.string.entry_page_earlier_today), style = MaterialTheme.typography.titleSmall)
+            Text(
+                stringResource(Res.string.entry_page_sample_date),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
