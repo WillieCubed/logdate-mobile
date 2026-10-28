@@ -89,6 +89,8 @@ Paths below are under `client/sync/src/` unless specified.
 - **`BuggyLostAck.cfg`** violates `NoCommittedPayloadReplay`: commit -> lose response -> retry same payload. The executable lost-ack draft test reproduced two payload calls; exact complete rich-draft reconciliation now leaves one call and settles the outbox. Different content and deletions retain their normal handling.
 - **`BuggyNotice.cfg`** violates `TruthfulNotification`: enter checking -> foreground timer -> backing-up title with total zero. `SyncForegroundNotificationTitleTest` reproduces the wrong phase, then verifies null/zero totals select checking while real pending work retains the memories title. `SyncForegroundRunTest` retains long-run protection, cancellation and notification-denial coverage.
 
+A scoped draft regression also verifies that a queued retry in backoff produces no active upload total, preserves its content, and uploads on the next pass once the retry becomes due. Single-type and full sync use the same due/profile/transport eligibility for progress.
+
 The separate 827-row regression proves that unsupported legacy media rows no longer constitute due upload work, remain intact, and do not prevent a real new note from being backed up.
 
 ## Release and device evidence boundaries

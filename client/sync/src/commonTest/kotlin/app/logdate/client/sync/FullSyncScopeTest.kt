@@ -60,11 +60,20 @@ class FullSyncScopeTest {
                         cloudMediaDataSource = DefaultCloudMediaDataSource(api),
                         dataUsagePolicy = policy,
                         syncScope = backgroundScope,
-                        deviceEnrollment = { if (liftDuringEnrollment) mode.value = DataUsageMode.Unrestricted },
+                        deviceEnrollment = {
+                            kotlinx.coroutines.delay(1_500)
+                            if (liftDuringEnrollment) mode.value = DataUsageMode.Unrestricted
+                        },
                     )
 
-                val deferred = manager.fullSync()
+                var advertisedUploads = 0
+                val deferred =
+                    withSyncForegroundRun(manager.syncStatusFlow, { true }, {
+                        advertisedUploads++
+                        true
+                    }) { manager.fullSync() }
 
+                assertEquals(0, advertisedUploads, "Network-deferred media must not be advertised as active uploads")
                 assertTrue(deferred.success, "A policy deferral is not a failed sync")
                 assertFalse(deferred.hasMorePending, "Policy deferral must not create a worker retry loop")
                 assertEquals(1, metadata.getPendingUploads(EntityType.NOTE).size)

@@ -153,8 +153,8 @@ internal suspend fun DefaultSyncManager.handledUploadTypes(): List<EntityType> =
     }
 
 /** Count only due operations this upload pass can handle; held legacy rows stay queued. */
-private suspend fun DefaultSyncManager.pendingUploadsForRun(): Int? {
-    val types = handledUploadTypes()
+private suspend fun DefaultSyncManager.pendingUploadsForRun(entityType: EntityType? = null): Int? {
+    val types = handledUploadTypes().filter { entityType == null || it == entityType }
     var count = 0
     for (type in types) {
         for (pending in syncMetadataService.getPendingUploads(type)) {
@@ -339,7 +339,7 @@ internal suspend fun DefaultSyncManager.syncEntityType(
             recoverMedia(accessToken, entityType)
             if (readinessGate.reason.value != null) return@withLock downloadResult
 
-            statusPublisher.beginRunForPending(entityType)
+            statusPublisher.beginRun(pendingUploadsForRun(entityType))
             val uploadResult = upload(accessToken)
 
             val success = uploadResult.success && downloadResult.success
