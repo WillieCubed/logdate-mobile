@@ -13,9 +13,11 @@ import app.logdate.server.logdate.LogDateMediaBlobRepository
 import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.responses.error
 import app.logdate.server.routes.docs.SyncStorageDocs
+import app.logdate.server.sync.StaleWriteException
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.shared.model.sync.DeviceId
 import app.logdate.shared.model.sync.MediaMetadataResponse
+import app.logdate.shared.model.sync.MediaUploadReceiptResponse
 import app.logdate.shared.model.sync.MediaUploadResponse
 import io.github.aakira.napier.Napier
 import io.github.smiley4.ktoropenapi.delete
@@ -56,6 +58,26 @@ internal fun Route.syncMediaRoutes(
 ) {
     val mediaAccessPolicy = config.mediaAccessPolicy
     route("/media") {
+        get("/receipts/{intent}", SyncStorageDocs.getMediaUploadReceipt) {
+            call.response.headers.append(HttpHeaders.CacheControl, "no-store")
+            val userId = extractSyncUserId(call, accessTokenVerifier, storageModes) ?: return@get
+            val intent = call.parameters["intent"].orEmpty()
+            if (!isMediaUploadIntent(intent)) {
+                return@get call.respond(HttpStatusCode.BadRequest, error("INVALID_UPLOAD_INTENT", "Invalid upload identity"))
+            }
+            val stored = mediaBlobRepository.getMedia(userId, receiptMediaId(userId, intent))
+            val receipt =
+                stored?.let {
+                    MediaUploadResponse(
+                        it.contentId,
+                        it.mediaId,
+                        resolveMediaDownloadUrl(call, it, mediaStorage, mediaAccessPolicy),
+                        it.createdAt,
+                        intent,
+                    )
+                }
+            call.respond(MediaUploadReceiptResponse(receipt))
+        }
         post(SyncStorageDocs.uploadMedia) {
             val start = System.currentTimeMillis()
             var success = false
@@ -67,6 +89,27 @@ internal fun Route.syncMediaRoutes(
                     return@post respondRateLimited(call, rateLimiter, "media-upload:$userId", MEDIA_UPLOAD_RATE_LIMIT)
                 }
 
+                val intent = call.request.headers["X-LogDate-Upload-Intent"]
+                if (intent != null && !isMediaUploadIntent(intent)) {
+                    return@post call.respond(HttpStatusCode.BadRequest, error("INVALID_UPLOAD_INTENT", "Invalid upload identity"))
+                }
+                // Receipts are immutable. A replay cannot replace a previously committed version.
+                if (intent != null) {
+                    mediaBlobRepository.getMedia(userId, receiptMediaId(userId, intent))?.let { stored ->
+                        call.respond(
+                            HttpStatusCode.Created,
+                            MediaUploadResponse(
+                                stored.contentId,
+                                stored.mediaId,
+                                resolveMediaDownloadUrl(call, stored, mediaStorage, mediaAccessPolicy),
+                                stored.createdAt,
+                                intent,
+                            ),
+                        )
+                        success = true
+                        return@post
+                    }
+                }
                 val req = call.receiveMediaMultipartUpload() ?: return@post
                 bytes = req.sizeBytes
                 Napier.d("Media upload started")
@@ -82,9 +125,8 @@ internal fun Route.syncMediaRoutes(
                 // the account twice and orphaning one. Deriving the id from what the upload is
                 // means a retry upserts the same row instead.
                 val mediaId =
-                    UUID
-                        .nameUUIDFromBytes("$userId:${req.contentId}:${req.fileName}".encodeToByteArray())
-                        .toString()
+                    intent?.let { receiptMediaId(userId, it) }
+                        ?: UUID.nameUUIDFromBytes("$userId:${req.contentId}:${req.fileName}".encodeToByteArray()).toString()
 
                 @OptIn(ExperimentalUuidApi::class)
                 val storageId = "$mediaId-${Uuid.random()}"
@@ -168,6 +210,17 @@ internal fun Route.syncMediaRoutes(
                         )
                     }.getOrElse { error ->
                         if (error is CancellationException) throw error
+                        if (error is StaleWriteException) {
+                            if (storagePath != null) {
+                                runCatching { withContext(Dispatchers.IO) { mediaStorage?.deleteBlob(storagePath) } }
+                                    .onFailure { Napier.w("Rejected media cleanup failed") }
+                            }
+                            metrics.recordConflict()
+                            return@post call.respond(
+                                HttpStatusCode.Conflict,
+                                error("DELETION_CONFLICT", "This media was deleted; keep the edit for review"),
+                            )
+                        }
                         // The write may have committed before its acknowledgement failed.
                         // Retain this immutable blob rather than deleting committed media.
                         Napier.e("Media metadata persistence failed")
@@ -176,6 +229,11 @@ internal fun Route.syncMediaRoutes(
                             error("MEDIA_METADATA_WRITE_FAILED", "Failed to store media metadata"),
                         )
                     }
+                // A concurrent request may have committed this write-once receipt first.
+                if (intent != null && storagePath != null && stored.storagePath != storagePath) {
+                    runCatching { withContext(Dispatchers.IO) { mediaStorage?.deleteBlob(storagePath) } }
+                        .onFailure { Napier.w("Uncommitted receipt upload cleanup failed") }
+                }
                 val previousPath = previous?.storagePath
                 if (previousPath != null && previousPath != stored.storagePath) {
                     try {
@@ -193,10 +251,14 @@ internal fun Route.syncMediaRoutes(
                         mediaId = stored.mediaId,
                         downloadUrl = downloadUrl,
                         uploadedAt = stored.createdAt,
+                        uploadIntentId = intent,
                     )
                 call.response.headers.append(HttpHeaders.Location, "/api/v1/media/${stored.mediaId}")
                 call.respond(HttpStatusCode.Created, response)
                 success = true
+            } catch (_: StaleWriteException) {
+                metrics.recordConflict()
+                call.respond(HttpStatusCode.Conflict, error("DELETION_CONFLICT", "This item was deleted; keep the edit for review"))
             } finally {
                 metrics.recordOperation(METRIC_MEDIA_UPLOAD, System.currentTimeMillis() - start, success, bytes)
             }
@@ -301,8 +363,8 @@ internal fun Route.syncMediaRoutes(
                             )
                         }
                     }
-                    mediaBlobRepository.deleteMedia(userId, mediaId, System.currentTimeMillis())
                 }
+                mediaBlobRepository.deleteMedia(userId, mediaId, System.currentTimeMillis())
                 call.respond(HttpStatusCode.NoContent)
                 success = true
             } finally {
@@ -311,3 +373,12 @@ internal fun Route.syncMediaRoutes(
         }
     }
 }
+
+/** Random client intent IDs are scoped to the authenticated owner, never caller-supplied owner IDs. */
+private fun isMediaUploadIntent(value: String): Boolean =
+    value.matches(Regex("[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"))
+
+private fun receiptMediaId(
+    owner: UUID,
+    intent: String,
+): String = "receipt-v1-" + UUID.nameUUIDFromBytes("$owner:upload-intent:$intent".encodeToByteArray()).toString()

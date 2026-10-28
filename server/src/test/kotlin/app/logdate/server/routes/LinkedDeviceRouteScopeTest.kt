@@ -257,6 +257,7 @@ class LinkedDeviceRouteScopeTest {
                 "GET /api/v1/drafts/changes",
                 "DELETE /api/v1/drafts/{draftId}",
                 "POST /api/v1/media",
+                "GET /api/v1/media/receipts/{intent}",
                 "GET /api/v1/media/{mediaId}",
                 "GET /api/v1/media/{mediaId}/binary",
                 "DELETE /api/v1/media/{mediaId}",

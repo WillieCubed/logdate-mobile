@@ -490,7 +490,16 @@ internal object SyncSchemaDocs {
                         "mediaId" to "The file's ID, derived from the account, entry and file name.",
                         "downloadUrl" to
                             "Where to fetch the bytes: a short-lived signed storage URL or this API's download endpoint. Treat as opaque.",
+                        "uploadIntentId" to "The opaque random intent echoed for a receipt-backed upload; null for legacy uploads.",
                         "uploadedAt" to "When the server stored the file. $EPOCH_MS",
+                    ),
+                ),
+            "MediaUploadReceiptResponse" to
+                SchemaDoc(
+                    "Result of an authenticated upload receipt lookup.",
+                    mapOf(
+                        "receipt" to
+                            "Committed account-owned upload, or null if absent. Never reuse an intent for changed bytes or encryption keys.",
                     ),
                 ),
             "MediaMetadataResponse" to

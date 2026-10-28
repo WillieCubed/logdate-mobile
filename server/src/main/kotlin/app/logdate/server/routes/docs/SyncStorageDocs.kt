@@ -19,6 +19,7 @@ import app.logdate.shared.model.sync.BackupInfoResponse
 import app.logdate.shared.model.sync.BackupListResponse
 import app.logdate.shared.model.sync.BackupUploadResponse
 import app.logdate.shared.model.sync.MediaMetadataResponse
+import app.logdate.shared.model.sync.MediaUploadReceiptResponse
 import app.logdate.shared.model.sync.MediaUploadResponse
 import io.github.smiley4.ktoropenapi.config.RequestConfig
 import io.github.smiley4.ktoropenapi.config.RouteConfig
@@ -67,7 +68,7 @@ internal object SyncStorageDocs {
 
     private fun RequestConfig.mediaId() {
         pathParameter<String>("mediaId") {
-            description = "The media ID the server assigned at upload (a UUID derived from the account, entry and file name)."
+            description = "The opaque media ID assigned at upload, derived from an owner-scoped intent or the legacy entry and file name."
             example("Example") { value = SyncExamples.MEDIA_ID }
         }
     }
@@ -115,6 +116,13 @@ internal object SyncStorageDocs {
             """,
         )
         request {
+            headerParameter<String>("X-LogDate-Upload-Intent") {
+                description = "Optional random UUID version 4. Creates a write-once receipt, scoped to the authenticated account. " +
+                    "Reuse only for the exact content and encryption version; check its receipt before replaying bytes. " +
+                    "Requests without this header keep legacy replacement behavior."
+                required = false
+            }
+
             multipartBody {
                 description = "The file and the fields that describe it. See the table above."
                 mediaTypes(ContentType.MultiPart.FormData)
@@ -169,6 +177,37 @@ internal object SyncStorageDocs {
                 ),
                 SyncExamples.serverMisconfigured,
             )
+        }
+    }
+
+    val getMediaUploadReceipt: RouteConfig.() -> Unit = {
+        bearerOperation(
+            "getMediaUploadReceipt",
+            ApiTags.MEDIA,
+            "Check an upload receipt",
+            "Returns a committed receipt for this account and upload intent, or null when none exists. " +
+                "Use before retrying a lost acknowledgement. Responses must not be cached. " +
+                "The client must bind the random intent to its owner, server, content bytes and encryption context locally.",
+        )
+        request {
+            pathParameter<String>("intent") {
+                description = "Lowercase random UUID version 4 generated and durably stored before the upload."
+                example("Intent") { value = "b88ce7fe-902c-4c01-862d-45238bf30928" }
+            }
+        }
+        response {
+            ok("Committed receipt, or null when no matching account-owned upload exists.", MediaUploadReceiptResponse(null))
+            syncUnauthorized()
+            syncStorageModeMismatch()
+            syncError(
+                HttpStatusCode.BadRequest,
+                ErrorCase(
+                    "INVALID_UPLOAD_INTENT",
+                    "Use a lowercase random UUID version 4.",
+                    "Invalid upload identity",
+                ),
+            )
+            syncServerError()
         }
     }
 
