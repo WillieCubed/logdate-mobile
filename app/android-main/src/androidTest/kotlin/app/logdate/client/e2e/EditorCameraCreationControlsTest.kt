@@ -10,6 +10,7 @@ import android.os.Build
 import android.view.View
 import android.view.ViewGroup
 import androidx.camera.view.PreviewView
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -17,8 +18,10 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEnabled
+import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -27,6 +30,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.test.core.app.ActivityScenario
@@ -65,6 +69,7 @@ class EditorCameraCreationControlsTest {
         val device = UiDevice.getInstance(instrumentation)
         val preferences = GlobalContext.get().get<LogdatePreferencesDataSource>()
         val previousMode = runBlocking { preferences.observeEntryStartMode().first() }
+        val previousHardwareIme = device.executeShellCommand("settings get secure show_ime_with_hard_keyboard").trim()
         val overlays = device.executeShellCommand("cmd overlay list")
         val previousNavigation =
             checkNotNull(
@@ -80,6 +85,7 @@ class EditorCameraCreationControlsTest {
         output.mkdirs()
         try {
             runBlocking { preferences.setEntryStartMode(EntryStartMode.TEXT) }
+            device.executeShellCommand("settings put secure show_ime_with_hard_keyboard 1")
             device.executeShellCommand("cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.gestural")
             val intent = Intent(context, MainActivity::class.java).putExtra(DEBUG_SKIP_ONBOARDING_EXTRA, true)
             ActivityScenario.launch<MainActivity>(intent).use { scenario ->
@@ -88,11 +94,13 @@ class EditorCameraCreationControlsTest {
                     val create =
                         hasText("Create Entry") or hasContentDescription("Create new entry") or hasContentDescription("Add a memory")
                     compose.waitUntil(20_000) { compose.onAllNodes(create).fetchSemanticsNodes().isNotEmpty() }
-                    tap(device, compose.onAllNodes(create).onFirst())
+                    tap(device, scenario, compose.onAllNodes(create).onFirst())
                     compose.waitUntil(20_000) {
                         compose.onAllNodes(hasContentDescription("Camera") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
                     }
-                    tap(device, compose.onNodeWithContentDescription("Camera").assertIsEnabled())
+                    awaitImeAndCameraTarget(scenario, output)
+                    check(device.takeScreenshot(File(output, "camera-choice-before-tap.png")))
+                    tap(device, scenario, compose.onNodeWithContentDescription("Camera").assertIsEnabled())
                     compose.waitUntil(20_000) {
                         compose.onAllNodes(hasContentDescription("Take Photo") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
                     }
@@ -114,7 +122,7 @@ class EditorCameraCreationControlsTest {
                     val route = compose.onNodeWithTag(MediaDeviceSelectorTags.chip("Camera")).assertIsDisplayed().assertIsEnabled()
                     val backBounds = compose.onNodeWithContentDescription("Return to entry").fetchSemanticsNode().boundsInRoot
                     assertTrue(route.fetchSemanticsNode().boundsInRoot.top >= backBounds.bottom, "Camera route must clear Return to entry")
-                    tap(device, route)
+                    tap(device, scenario, route)
                     compose.onNodeWithTag(MediaDeviceSelectorTags.sheet("Camera")).assertIsDisplayed()
                     device.pressBack()
                     compose.waitUntil(10_000) {
@@ -134,7 +142,7 @@ class EditorCameraCreationControlsTest {
                             }
                         }
                     windowSizes.captureCameraSizes()
-                    tap(device, compose.onNodeWithContentDescription("Take Photo"))
+                    tap(device, scenario, compose.onNodeWithContentDescription("Take Photo"))
                     compose.waitUntil(20_000) { compose.onAllNodesWithText("Use Photo").fetchSemanticsNodes().isNotEmpty() }
                     windowSizes.awaitReviewImage()
                     var safeBottom = 0
@@ -164,13 +172,13 @@ class EditorCameraCreationControlsTest {
                     }
                     check(device.takeScreenshot(File(output, "mobile-camera-review.png")))
                     windowSizes.captureReviewSizes()
-                    tap(device, compose.onNodeWithText("Use Photo"))
+                    tap(device, scenario, compose.onNodeWithText("Use Photo"))
                     compose.waitUntil(
                         15_000,
                     ) { compose.onAllNodesWithContentDescription("Captured photo").fetchSemanticsNodes().isNotEmpty() }
                     compose.onNodeWithTag(focused).assertIsDisplayed()
                     compose.onNodeWithTag("entry_capture_tools").assertIsNotDisplayed()
-                    tap(device, compose.onNodeWithContentDescription("Return to entry"))
+                    tap(device, scenario, compose.onNodeWithContentDescription("Return to entry"))
                     compose.onNodeWithTag("entry_add_memory").assertIsDisplayed()
                     var gestureBottom = 0
                     for (navigation in listOf("gestural", "threebutton")) {
@@ -235,6 +243,55 @@ class EditorCameraCreationControlsTest {
         } finally {
             device.executeShellCommand("cmd overlay enable-exclusive --category $previousNavigation")
             runBlocking { preferences.setEntryStartMode(previousMode) }
+            device.executeShellCommand(
+                if (previousHardwareIme == "null") {
+                    "settings delete secure show_ime_with_hard_keyboard"
+                } else {
+                    "settings put secure show_ime_with_hard_keyboard $previousHardwareIme"
+                },
+            )
+        }
+    }
+
+    private fun awaitImeAndCameraTarget(
+        scenario: ActivityScenario<MainActivity>,
+        output: File,
+    ) {
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("editor_text_input") and isFocused()).fetchSemanticsNodes().size == 1
+        }
+        var previous: Triple<Rect, Int, Pair<Int, Int>>? = null
+        var unchangedSamples = 0
+        val observations = ArrayDeque<String>()
+        compose.waitUntil(10_000) {
+            var imeBottom = 0
+            var windowHeight = 0
+            var imeVisible = false
+            var origin = 0 to 0
+            scenario.onActivity {
+                val decor = it.window.decorView
+                val insets = ViewCompat.getRootWindowInsets(decor)
+                imeBottom = insets?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: 0
+                imeVisible = insets?.isVisible(WindowInsetsCompat.Type.ime()) == true
+                windowHeight = decor.height
+                val screen = IntArray(2)
+                val window = IntArray(2)
+                decor.getLocationOnScreen(screen)
+                decor.getLocationInWindow(window)
+                origin = screen[0] - window[0] to screen[1] - window[1]
+            }
+            val camera = compose.onNodeWithContentDescription("Camera").fetchSemanticsNode()
+            val bounds = camera.boundsInWindow
+            val current = Triple(bounds, imeBottom, origin)
+            unchangedSamples = if (current == previous) unchangedSamples + 1 else 0
+            previous = current
+            observations.addLast(
+                "root=${camera.boundsInRoot} window=$bounds screenOrigin=$origin " +
+                    "imeVisible=$imeVisible imeBottom=$imeBottom windowHeight=$windowHeight stable=$unchangedSamples",
+            )
+            if (observations.size > 20) observations.removeFirst()
+            File(output, "camera-choice-readiness.txt").writeText(observations.joinToString("\n"))
+            imeVisible && imeBottom > 0 && bounds.bottom <= windowHeight - imeBottom && unchangedSamples >= 2
         }
     }
 
@@ -247,12 +304,21 @@ class EditorCameraCreationControlsTest {
 
     private fun tap(
         device: UiDevice,
+        scenario: ActivityScenario<MainActivity>,
         node: SemanticsNodeInteraction,
     ) {
         compose.waitForIdle()
         device.waitForIdle(2_000)
         node.assertIsDisplayed().assertIsEnabled()
-        val center = node.fetchSemanticsNode().boundsInRoot.center
-        check(device.click(center.x.roundToInt(), center.y.roundToInt()))
+        val center = node.fetchSemanticsNode().boundsInWindow.center
+        var origin = 0 to 0
+        scenario.onActivity {
+            val screen = IntArray(2)
+            val window = IntArray(2)
+            it.window.decorView.getLocationOnScreen(screen)
+            it.window.decorView.getLocationInWindow(window)
+            origin = screen[0] - window[0] to screen[1] - window[1]
+        }
+        check(device.click(center.x.roundToInt() + origin.first, center.y.roundToInt() + origin.second))
     }
 }
