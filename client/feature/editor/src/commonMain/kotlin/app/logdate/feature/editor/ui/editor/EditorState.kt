@@ -42,6 +42,8 @@ class EditorState(
     val blocks: List<EntryBlockUiState> = emptyList(),
     val expandedBlockId: Uuid? = null,
     val readOnlyBlocks: Map<Uuid, Boolean> = emptyMap(),
+    /** Transient attempts awaiting recorder admission; never persisted as captured audio. */
+    val audioCaptureStartReservations: Map<Uuid, Uuid> = emptyMap(),
     val entryEditBase: EntryEditBase? = null,
     val entryEditConflict: Boolean = false,
     val availableJournals: List<Journal> = emptyList(),
@@ -96,6 +98,7 @@ class EditorState(
      * exiting or leaving a single empty block stranded in the editor.
      */
     fun shouldReturnToPickerOnBack(): Boolean {
+        if (audioCaptureStartReservations.isNotEmpty()) return false
         if (draftState is DraftState.Active) return false
         val block = blocks.singleOrNull() ?: return false
         return !block.hasContent() && block.supportsPickerReturnTransition()
@@ -124,6 +127,7 @@ class EditorState(
         blocks: List<EntryBlockUiState> = this.blocks,
         expandedBlockId: Uuid? = this.expandedBlockId,
         readOnlyBlocks: Map<Uuid, Boolean> = this.readOnlyBlocks,
+        audioCaptureStartReservations: Map<Uuid, Uuid> = this.audioCaptureStartReservations,
         entryEditBase: EntryEditBase? = this.entryEditBase,
         entryEditConflict: Boolean = this.entryEditConflict,
         availableJournals: List<Journal> = this.availableJournals,
@@ -150,6 +154,7 @@ class EditorState(
             blocks = blocks,
             expandedBlockId = expandedBlockId,
             readOnlyBlocks = readOnlyBlocks,
+            audioCaptureStartReservations = audioCaptureStartReservations,
             entryEditBase = entryEditBase,
             entryEditConflict = entryEditConflict,
             availableJournals = availableJournals,
@@ -180,6 +185,7 @@ class EditorState(
         if (blocks != other.blocks) return false
         if (expandedBlockId != other.expandedBlockId) return false
         if (readOnlyBlocks != other.readOnlyBlocks) return false
+        if (audioCaptureStartReservations != other.audioCaptureStartReservations) return false
         if (entryEditBase != other.entryEditBase) return false
         if (entryEditConflict != other.entryEditConflict) return false
         if (availableJournals != other.availableJournals) return false
@@ -211,6 +217,7 @@ class EditorState(
         result = 31 * result + (visitContext?.hashCode() ?: 0)
         result = 31 * result + (expandedBlockId?.hashCode() ?: 0)
         result = 31 * result + readOnlyBlocks.hashCode()
+        result = 31 * result + audioCaptureStartReservations.hashCode()
         result = 31 * result + (entryEditBase?.hashCode() ?: 0)
         result = 31 * result + entryEditConflict.hashCode()
         result = 31 * result + availableJournals.hashCode()

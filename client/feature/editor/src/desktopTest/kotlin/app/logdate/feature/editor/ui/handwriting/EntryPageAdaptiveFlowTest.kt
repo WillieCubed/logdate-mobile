@@ -14,16 +14,20 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asSkiaBitmap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
@@ -50,7 +54,7 @@ import kotlin.test.assertTrue
 class EntryPageAdaptiveFlowTest(
     private val kind: String,
 ) {
-    @Test
+    @Test(timeout = 120_000)
     fun writingAndBrowsingSurvivePostureChanges() =
         runDesktopComposeUiTest(width = 1280, height = 900) {
             val folding = kind == "foldable"
@@ -125,13 +129,20 @@ class EntryPageAdaptiveFlowTest(
                 deviceOnly: Boolean = false,
             ) {
                 val node = if (deviceOnly) onNodeWithTag("adaptive_device") else onRoot()
-                file.writeBytes(Image.makeFromBitmap(node.captureToImage().asSkiaBitmap()).encodeToData()!!.bytes)
+                node.captureToImage().asSkiaBitmap().use { bitmap ->
+                    Image.makeFromBitmap(bitmap).use { image ->
+                        checkNotNull(image.encodeToData()).use { data -> file.writeBytes(data.bytes) }
+                    }
+                }
             }
 
             fun frames(count: Int) {
                 repeat(count) {
                     mainClock.advanceTimeBy(40)
-                    save(File(output, "frame-${(frame++).toString().padStart(4, '0')}.png"))
+                    if (frame % 5 == 0 && frame < 640) {
+                        save(File(output, "frame-${frame.toString().padStart(4, '0')}.png"))
+                    }
+                    frame++
                 }
             }
 
@@ -140,7 +151,7 @@ class EntryPageAdaptiveFlowTest(
             fun assertCaptureBarFits() {
                 onAllNodesWithTag("entry_capture_tools").assertCountEquals(1)
                 val device = onNodeWithTag("adaptive_device").fetchSemanticsNode().boundsInRoot
-                val bar = onNodeWithTag("entry_capture_tools").fetchSemanticsNode().boundsInRoot
+                val bar = onNodeWithTag("entry_creation_actions").fetchSemanticsNode().boundsInRoot
                 assertTrue(
                     bar.left >= device.left - 1f && bar.right <= device.right + 1f && bar.bottom <= device.bottom + 1f,
                     "$bar escapes $device",
@@ -191,10 +202,16 @@ class EntryPageAdaptiveFlowTest(
                 "anchor-trace.txt",
             ).writeText("created: ${overview.focusedAnchor}, scroll=${overview.scroll.value}, width=${overview.viewportWidth}\n")
             assertEquals(4, latest.size)
-            onNodeWithContentDescription("Handwrite").performClick()
+            onNodeWithTag("entry_capture_tools").assertIsNotDisplayed()
+            onNodeWithContentDescription("Return to entry").performClick()
+            frames(20)
+            mainClock.autoAdvance = true
+            onNodeWithTag("memory_block_${ink.id}").performScrollTo()
+            mainClock.autoAdvance = false
+            onNodeWithTag("memory_block_${ink.id}").performClick()
             frames(20)
             onNodeWithTag("focused_block_${ink.id}").assertExists()
-            assertCaptureBarFits()
+            onNodeWithTag("entry_capture_tools").assertIsNotDisplayed()
             if (folding) {
                 runOnIdle {
                     size = IntSize(360, 800)
@@ -202,12 +219,30 @@ class EntryPageAdaptiveFlowTest(
                 }
                 frames(24)
                 onNodeWithTag("focused_block_${ink.id}").assertExists()
-                assertCaptureBarFits()
+                onNodeWithTag("entry_capture_tools").assertIsNotDisplayed()
                 assertEquals(draftIds, latest.map { it.id })
                 assertEquals(ink.page, latest.filterIsInstance<HandwritingBlockUiState>().single().page)
                 save(File(output, "closed-handwriting.png"), true)
             }
-            onNodeWithContentDescription("Write").performClick()
+            onNodeWithContentDescription("Return to entry").performClick()
+            frames(20)
+            mainClock.autoAdvance = true
+            onNodeWithTag("memory_block_${writing.id}").performScrollTo()
+            val memory = onNodeWithTag("memory_block_${writing.id}")
+            val footer = onNodeWithTag("entry_creation_actions")
+            val overlap = memory.fetchSemanticsNode().boundsInRoot.bottom - footer.fetchSemanticsNode().boundsInRoot.top + 16f
+            if (overlap > 0f) {
+                onNodeWithTag("entry_page_scroll").performSemanticsAction(SemanticsActions.ScrollBy) { scrollBy -> scrollBy(0f, overlap) }
+                waitForIdle()
+            }
+            assertTrue(
+                memory
+                    .fetchSemanticsNode()
+                    .boundsInRoot.center.y < footer.fetchSemanticsNode().boundsInRoot.top,
+                "Scroll the retained memory clear of the floating Add action before its physical tap",
+            )
+            mainClock.autoAdvance = false
+            memory.performClick()
             frames(20)
             onNodeWithTag("focused_block_${writing.id}").assertExists()
             if (folding) {
@@ -238,7 +273,7 @@ class EntryPageAdaptiveFlowTest(
                 "after-return: ${overview.focusedAnchor}, scroll=${overview.scroll.value}, width=${overview.viewportWidth}, positions=${overview.blockPositions}\n",
             )
             onNodeWithTag("memory_block_${writing.id}").assertIsDisplayed()
-            if (!folding) assertEquals(previousScroll, range().value(), 1f) else assertTrue(range().value() > 0f)
+            assertTrue(range().value() > 0f, "Returning to the retained last memory must keep its scroll anchor visible")
             assertEquals(draftIds, latest.map { it.id })
             save(File(output, "returned-draft.png"), true)
             frames(8)

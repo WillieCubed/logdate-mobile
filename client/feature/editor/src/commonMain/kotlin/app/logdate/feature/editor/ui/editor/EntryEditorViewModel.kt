@@ -252,6 +252,13 @@ class EntryEditorViewModel(
         baseBlock: EntryBlockUiState? = null,
     ) = updateBlockImpl(updatedBlock, baseBlock)
 
+    fun chooseCreationType(
+        targetId: Uuid?,
+        type: BlockType,
+    ) = chooseCreationTypeImpl(targetId, type)
+
+    fun beginBlockCreation(type: BlockType) = beginBlockCreationImpl(type)
+
     fun appendTextBlock(text: String) = appendTextBlockImpl(text)
 
     fun removeBlock(blockId: Uuid) = removeBlockImpl(blockId)

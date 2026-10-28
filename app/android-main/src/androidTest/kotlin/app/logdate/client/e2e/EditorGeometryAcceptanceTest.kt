@@ -166,8 +166,8 @@ class EditorGeometryAcceptanceTest {
                         it.config.getOrElse(SemanticsProperties.TestTag) { "" }.startsWith("memory_block_")
                     },
                 ).getUnclippedBoundsInRoot()
-        val first = compose.onNodeWithContentDescription("Write").getUnclippedBoundsInRoot()
-        val last = compose.onNodeWithContentDescription("Photos").getUnclippedBoundsInRoot()
+        val first = compose.onNodeWithTag("entry_creation_actions").getUnclippedBoundsInRoot()
+        val last = first
         assertTrue(
             abs((chooser.left + chooser.right).value - (header.left + header.right).value) <= 1f,
             "$label chooser is off center: $chooser, $header",

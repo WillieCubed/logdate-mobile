@@ -15,6 +15,7 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDisplayed
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -32,6 +33,8 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import app.logdate.client.MainActivity
+import app.logdate.client.datastore.EntryStartMode
+import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.media.audio.AndroidAudioNotificationHandler
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackStatusProvider
@@ -150,20 +153,34 @@ class EditorRecordingLifecycleTest {
             compose.onNodeWithContentDescription("Save entry").assertIsDisplayed().performClick()
             compose.waitForIdle()
             capture(context, "recording-saved")
-            repeat(3) {
-                compose
-                    .onAllNodes(createEntry)
-                    .onFirst()
-                    .assertIsDisplayed()
-                    .performClick()
-                compose.onNodeWithTag("editor_text_input").assertIsDisplayed()
-                capture(context, "reopened-editor-$it")
-                repeat(4) {
-                    if (!compose.onAllNodes(createEntry).onFirst().isDisplayed()) {
-                        device.pressBack()
-                        compose.waitForIdle()
+            val preferences = KoinPlatform.getKoin().get<LogdatePreferencesDataSource>()
+            val previousMode = runBlocking { preferences.observeEntryStartMode().first() }
+            try {
+                runBlocking { preferences.setEntryStartMode(EntryStartMode.TEXT) }
+                repeat(3) { visit ->
+                    compose.waitUntil(15_000) {
+                        !compose.onNodeWithContentDescription("Save entry").isDisplayed() &&
+                            !compose.onNodeWithContentDescription("Return to entry").isDisplayed() &&
+                            compose.onAllNodes(createEntry and isEnabled()).onFirst().isDisplayed()
+                    }
+                    compose
+                        .onAllNodes(createEntry and isEnabled())
+                        .onFirst()
+                        .assertIsDisplayed()
+                        .performClick()
+                    capture(context, "reopened-editor-opening-$visit")
+                    compose.waitUntil(15_000) { compose.onNodeWithTag("editor_text_input").isDisplayed() }
+                    compose.onNodeWithTag("editor_text_input").assertIsDisplayed()
+                    capture(context, "reopened-editor-$visit")
+                    repeat(4) {
+                        if (!compose.onAllNodes(createEntry).onFirst().isDisplayed()) {
+                            device.pressBack()
+                            compose.waitForIdle()
+                        }
                     }
                 }
+            } finally {
+                runBlocking { preferences.setEntryStartMode(previousMode) }
             }
         }
     }

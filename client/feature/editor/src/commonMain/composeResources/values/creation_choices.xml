@@ -1,0 +1,5 @@
+<resources>
+    <string name="entry_creation_handwrite">Handwrite</string>
+    <string name="entry_creation_voice">Voice</string>
+    <string name="entry_creation_photos">Photos</string>
+</resources>

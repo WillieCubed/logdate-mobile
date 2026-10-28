@@ -23,8 +23,10 @@ import app.logdate.feature.editor.audio.AudioLabelResolver
 import app.logdate.feature.editor.audio.formatAudioLabel
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.AudioCaptureState
+import app.logdate.feature.editor.ui.editor.LocalAudioCaptureStartGate
 import app.logdate.feature.editor.ui.editor.RecordingState
 import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
+import app.logdate.feature.editor.ui.editor.startReservedAudioCapture
 import app.logdate.feature.editor.ui.layout.EditorBlockCornerRadius
 import app.logdate.feature.editor.ui.layout.LocalEditorCorners
 import app.logdate.ui.audio.AudioContextProcessor
@@ -86,6 +88,7 @@ fun AudioBlockEditor(
     // (lastTargetNoteId) at a time, so a second block's recording would silently steal ownership
     // from the first.
     val audioViewModel: AudioViewModel = koinViewModel(key = block.id.toString())
+    val captureStartGate = LocalAudioCaptureStartGate.current
     LaunchedEffect(audioViewModel, block.id) {
         audioViewModel.attachToRecording(block.id, (block.captureState as? AudioCaptureState.Recording)?.fallbackFilePath)
         onResolverReady(block.id, audioViewModel)
@@ -221,6 +224,14 @@ fun AudioBlockEditor(
 
     val scope = rememberCoroutineScope()
     var recovering by remember(block.id) { mutableStateOf(false) }
+    val requestRecordingStart = {
+        startReservedAudioCapture(captureStartGate, block.id) {
+            if (block.startOnOpen) onBlockUpdated(block.copy(startOnOpen = false))
+            audioViewModel.startRecording(targetNoteId = block.id) { path, fallbackPath ->
+                onPersistRecordingTarget(block.id, path, fallbackPath)
+            }
+        }
+    }
     Box(modifier = modifier) {
         val failure = block.captureState as? AudioCaptureState.Failed
         if (failure != null) {
@@ -325,19 +336,14 @@ fun AudioBlockEditor(
                     LaunchedEffect(block.id, block.startOnOpen) {
                         if (!block.startOnOpen) return@LaunchedEffect
                         snapshotFlow { windowInfo.isWindowFocused }.first { it }
-                        onBlockUpdated(block.copy(startOnOpen = false))
-                        audioViewModel.startRecording(targetNoteId = block.id) { path, fallbackPath ->
-                            onPersistRecordingTarget(block.id, path, fallbackPath)
-                        }
+                        requestRecordingStart()
                     }
                     AudioRecordingControls(
                         recordingState = recordingState,
                         audioLevels = audioLevels,
                         recordingDuration = audioUiState.duration,
                         onStartRecording = {
-                            audioViewModel.startRecording(targetNoteId = block.id) { path, fallbackPath ->
-                                onPersistRecordingTarget(block.id, path, fallbackPath)
-                            }
+                            requestRecordingStart()
                         },
                         onStopRecording = { audioViewModel.stopRecording() },
                         modifier = Modifier.fillMaxSize(),

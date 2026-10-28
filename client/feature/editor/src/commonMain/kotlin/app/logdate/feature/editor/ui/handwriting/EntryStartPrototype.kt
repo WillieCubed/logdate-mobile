@@ -28,6 +28,7 @@ import app.logdate.feature.editor.ui.LocalSharedTransitionScope
 import app.logdate.feature.editor.ui.MainEditorContent
 import app.logdate.feature.editor.ui.common.NoteEditorToolbar
 import app.logdate.feature.editor.ui.content.EditorBottomContent
+import app.logdate.feature.editor.ui.content.blockType
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.BlockType
 import app.logdate.feature.editor.ui.editor.CameraBlockUiState
@@ -37,6 +38,8 @@ import app.logdate.feature.editor.ui.editor.HandwritingBlockUiState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
+import app.logdate.feature.editor.ui.editor.beginEmptyCreationBlock
+import app.logdate.feature.editor.ui.editor.replaceEmptyCreationBlock
 import app.logdate.feature.editor.ui.layout.EditorFocus
 import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
 import app.logdate.feature.editor.ui.layout.LocalEditorContextControlsVisible
@@ -155,8 +158,12 @@ fun EntryStartPrototype(
         )
     val focusedBlock = blocks.firstOrNull { it.id == selected }
     val chooseCapture: (StoryCaptureMode) -> Unit = { mode ->
-        val existing = if (selected != null) blocks.lastOrNull { captureModeForBlock(it) == mode } else null
-        if (existing != null) selected = existing.id else uiState.onCreateBlock(mode.blockType(), Uuid.random())
+        val current = EditorState(blocks = blocks, expandedBlockId = selected)
+        val next =
+            selected?.let { current.replaceEmptyCreationBlock(it, mode.blockType(), Uuid.random()) }
+                ?: current.beginEmptyCreationBlock(mode.blockType(), Uuid.random(), onlyEmptyEntry = true)
+        blocks = next.blocks
+        selected = next.expandedBlockId
     }
     if (continuousOverview && overviewStudyState != null) {
         val returnToOverview: () -> Unit = {
@@ -178,6 +185,15 @@ fun EntryStartPrototype(
             onExit,
             chooseCapture,
             focusProgress = focusProgress,
+            onAddMemory = {
+                val next =
+                    EditorState(
+                        blocks = blocks,
+                        expandedBlockId = selected,
+                    ).beginEmptyCreationBlock(studyDefaultMode.blockType(), Uuid.random())
+                blocks = next.blocks
+                selected = next.expandedBlockId
+            },
         ) {
             MainEditorContent(
                 uiState,

@@ -542,6 +542,8 @@ dependencies {
     debugImplementation(projects.client.media)
 
     testImplementation(libs.kotlin.test)
+    testImplementation(libs.robolectric)
+    testImplementation(projects.client.ui)
     testImplementation(libs.androidx.datastore.preferences)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -654,6 +656,7 @@ dependencies {
     androidTestImplementation(projects.client.feature.search)
     androidTestImplementation(projects.client.theme)
     androidTestImplementation(projects.client.ui)
+    androidTestImplementation(libs.androidx.camera.view)
     androidTestImplementation(libs.compose.material.icons.extended)
 
     screenshotTestImplementation(libs.androidx.ui.tooling)

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
@@ -56,7 +57,7 @@ class EntryRecordingChromeTest {
             }
             val content = onNodeWithTag("recording_content").getUnclippedBoundsInRoot()
             assertTrue(content.top >= 64.dp, "Recording content overlaps the persistent header: $content")
-            onNodeWithTag("entry_capture_tools").assertDoesNotExist()
+            onNodeWithTag("entry_capture_tools").assertIsNotDisplayed()
             onNodeWithText("Finish").performTouchInput { click() }
             runOnIdle { assertEquals(1, finishes) }
         }

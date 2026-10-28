@@ -12,7 +12,6 @@ import android.view.KeyboardShortcutGroup
 import android.view.Menu
 import android.view.WindowManager
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
@@ -33,6 +32,7 @@ import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.ui.keyboard.AppShortcutScope
 import app.logdate.ui.keyboard.appKeyboardShortcutGroups
+import app.logdate.ui.platform.enableTransparentSystemBars
 import app.logdate.ui.theme.LogDateTheme
 import io.github.aakira.napier.Napier
 import io.github.vinceglb.filekit.core.FileKit
@@ -72,7 +72,7 @@ class EditorActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableTransparentSystemBars()
         whenApplicationReady {
             bootstrapReady = true
             completeStartup()
@@ -114,7 +114,7 @@ class EditorActivity : FragmentActivity() {
         val handoffDraftId = handoffDraftId(intent.getStringExtra(EXTRA_HANDOFF_DRAFT_ID))
 
         // Configure window features
-        enableEdgeToEdge()
+        enableTransparentSystemBars()
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
 
         // Set up lifecycle-aware operations

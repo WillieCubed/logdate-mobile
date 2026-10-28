@@ -5,7 +5,6 @@ package app.logdate.feature.editor.ui.handwriting
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.absoluteOffset
@@ -46,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import app.logdate.client.datastore.EntryStartMode
 import app.logdate.feature.editor.ui.editor.EditorState
+import app.logdate.feature.editor.ui.editor.isEmptyCreationBlock
 import app.logdate.feature.editor.ui.layout.EditorContentLayer
 import app.logdate.feature.editor.ui.layout.EntryPageRailMaxWidth
 import app.logdate.feature.editor.ui.layout.LocalEditorContextControlsVisible
@@ -53,6 +53,8 @@ import app.logdate.feature.editor.ui.layout.LocalEditorFocusPresentation
 import app.logdate.feature.editor.ui.layout.LocalEditorRecordingActive
 import app.logdate.feature.editor.ui.layout.LocalEntryChromeHeight
 import app.logdate.feature.editor.ui.layout.LocalEntryContentInsets
+import app.logdate.feature.editor.ui.layout.LocalEntryCreationReserve
+import app.logdate.feature.editor.ui.layout.LocalEntryHeaderReserve
 import app.logdate.feature.editor.ui.layout.editorFocus
 import app.logdate.feature.editor.ui.layout.editorFocusPresentation
 import app.logdate.ui.foldable.FoldableSplitLayout
@@ -60,6 +62,7 @@ import app.logdate.ui.foldable.calculateFoldableSplitLayout
 import app.logdate.ui.foldable.relativeTo
 import app.logdate.ui.foldable.rememberFoldableLayoutInfo
 import app.logdate.ui.foldable.rememberWindowOrigin
+import app.logdate.ui.platform.rememberSystemReduceMotion
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.entry_page_back_to_writing
@@ -81,6 +84,7 @@ internal fun EntryPageChrome(
     header: (@Composable () -> Unit)? = null,
     focusProgress: Float? = null,
     safeInsets: WindowInsets = WindowInsets.safeDrawing,
+    onAddMemory: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val returnToWriting = stringResource(Res.string.entry_page_return_to_writing)
@@ -91,6 +95,20 @@ internal fun EntryPageChrome(
     val focused = editor.expandedBlockId != null
     val block = editor.blocks.firstOrNull { it.id == editor.expandedBlockId }
     val journal = editor.availableJournals.firstOrNull()
+    val creationAllowed =
+        !editor.isEditingLocked &&
+            !editor.isSaving &&
+            !editor.shouldExit &&
+            !editor.isRecordingAudio &&
+            editor.audioCaptureStartReservations.isEmpty() &&
+            !editor.disableEmptyBlockCreation &&
+            (block == null || !editor.isReadOnly(block.id))
+    val showModes = creationAllowed && !overview.earlierExpanded && (block?.isEmptyCreationBlock() == true || editor.blocks.isEmpty())
+    val showAdd = creationAllowed && !overview.earlierExpanded && !focused && editor.blocks.isNotEmpty()
+    val reduceMotion = rememberSystemReduceMotion().value
+    val modeProgress = rememberCreationProgress(showModes, reduceMotion)
+    val addProgress = rememberCreationProgress(showAdd, reduceMotion)
+    val dockProgress = maxOf(modeProgress, addProgress)
     val defaultCapture =
         when (defaultMode) {
             EntryStartMode.TEXT -> StoryCaptureMode.Write
@@ -133,7 +151,7 @@ internal fun EntryPageChrome(
             } else {
                 minOf(safeWidth, EntryPageRailMaxWidth)
             }
-        val focusTop = maxHeight - chromeHeight - with(density) { maxOf(keyboardBottom, safeBottom).toDp() } - Spacing.lg
+        val focusTop = maxHeight - (chromeHeight + Spacing.lg) * dockProgress - with(density) { maxOf(keyboardBottom, safeBottom).toDp() }
         val progress = focusProgress ?: if (focused) 1f else 0f
         val overviewLeft = anchor?.let { with(density) { it.left.toDp() - origin.x } } ?: safeLeft
         val overviewWidth = anchor?.let { with(density) { it.width.toDp() } } ?: safeWidth
@@ -143,15 +161,20 @@ internal fun EntryPageChrome(
         val barWidth = lerp(overviewWidth, focusWidth, progress)
         val writingTop = lerp(overviewTop, focusTop, progress)
         val barTop = lerp(writingTop, maxHeight + 80.dp, overview.browsingProgress)
-        val barAlpha = 1f - overview.browsingProgress
+        val barAlpha = (1f - overview.browsingProgress) * dockProgress
         val pullProgress = (-overview.pull / with(density) { 112.dp.toPx() }).coerceIn(0f, 1f)
-        CompositionLocalProvider(LocalEntryChromeHeight provides chromeHeight, LocalEntryContentInsets provides safeInsets) {
+        CompositionLocalProvider(
+            LocalEntryChromeHeight provides chromeHeight,
+            LocalEntryHeaderReserve provides chromeHeight,
+            LocalEntryContentInsets provides safeInsets,
+            LocalEntryCreationReserve provides (chromeHeight + Spacing.lg) * modeProgress,
+        ) {
             CompositionLocalProvider(
                 LocalEditorFocusPresentation provides
                     editorFocusPresentation(editor.editorFocus(), maxWidth, split != FoldableSplitLayout.None, keyboardBottom > 0),
                 LocalEditorContextControlsVisible provides false,
                 LocalEditorRecordingActive provides editor.isRecordingAudio,
-                LocalEntryCaptureBarHeight provides if (editor.isRecordingAudio) 0.dp else chromeHeight,
+                LocalEntryCaptureBarHeight provides chromeHeight * modeProgress,
             ) {
                 EditorContentLayer(
                     Modifier
@@ -213,18 +236,29 @@ internal fun EntryPageChrome(
                     }
                 }
             }
-            if (!editor.isRecordingAudio) {
-                Row(
+            EntryCreationDock(
+                mode = captureModeForBlock(block) ?: defaultCapture,
+                onMode = onCapture,
+                onAddMemory = { onAddMemory?.invoke() ?: onCapture(defaultCapture) },
+                modeEligible = showModes && overview.browsingProgress == 0f,
+                addEligible = showAdd && overview.browsingProgress == 0f,
+                modeProgress = modeProgress,
+                addProgress = addProgress,
+                chromeHeight = chromeHeight,
+                modifier =
                     Modifier
                         .align(AbsoluteAlignment.TopLeft)
                         .absoluteOffset(barLeft, barTop)
                         .width(barWidth)
-                        .height(chromeHeight)
+                        .height(chromeHeight * dockProgress)
                         .padding(horizontal = Spacing.lg)
                         .captureBarPullGestures(overview, enabled = !focused && !overview.earlierExpanded)
                         .then(
-                            if (!editor.isEditingLocked && !editor.isSaving && !editor.shouldExit && !editor.isRecordingAudio) {
-                                Modifier.captureModeSwipes(captureModeForBlock(block) ?: defaultCapture, onCapture)
+                            if (showModes && modeProgress >= 0.99f && overview.browsingProgress == 0f) {
+                                Modifier.captureModeSwipes(
+                                    captureModeForBlock(block) ?: defaultCapture,
+                                    onCapture,
+                                )
                             } else {
                                 Modifier
                             },
@@ -232,24 +266,12 @@ internal fun EntryPageChrome(
                             alpha = barAlpha
                             scaleX = 1f + pullProgress * 0.025f
                             scaleY = 1f + pullProgress * 0.025f
-                        }.testTag("entry_capture_tools")
-                        .semantics {
+                        }.semantics {
                             isTraversalGroup = true
                             traversalIndex = 2f
                             progressBarRangeInfo = ProgressBarRangeInfo(pullProgress, 0f..1f)
                         },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    StoriesCaptureModes(
-                        captureModeForBlock(block) ?: defaultCapture,
-                        onCapture,
-                        compact = true,
-                        horizontalInset = 0.dp,
-                        enabled =
-                            !editor.isEditingLocked && !editor.isSaving && !editor.shouldExit && !editor.isRecordingAudio,
-                    )
-                }
-            }
+            )
         }
     }
 }

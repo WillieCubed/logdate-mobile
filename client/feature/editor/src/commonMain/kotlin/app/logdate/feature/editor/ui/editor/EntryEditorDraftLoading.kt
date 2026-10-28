@@ -21,7 +21,7 @@ import kotlin.uuid.Uuid
  */
 
 internal fun EntryEditorViewModel.setExpandedBlockIdImpl(blockId: Uuid?) {
-    mutableEditorState.update { it.copy(expandedBlockId = blockId) }
+    mutableEditorState.update { if (it.audioCaptureStartReservations.isNotEmpty()) it else it.copy(expandedBlockId = blockId) }
 }
 
 /**
@@ -78,12 +78,10 @@ internal fun EntryEditorViewModel.clearSingleEmptyBlockImpl(): Boolean {
  * @return true if a block was dismissed, false if no block was expanded
  */
 internal fun EntryEditorViewModel.dismissExpandedBlockImpl(): Boolean {
-    val currentExpandedId = mutableEditorState.value.expandedBlockId
-    return if (currentExpandedId != null) {
-        setExpandedBlockId(null)
-        true
-    } else {
-        false
+    while (true) {
+        val current = mutableEditorState.value
+        if (current.expandedBlockId == null || current.audioCaptureStartReservations.isNotEmpty()) return false
+        if (mutableEditorState.compareAndSet(current, current.copy(expandedBlockId = null))) return true
     }
 }
 

@@ -37,6 +37,7 @@ internal fun EntryEditorFrame(
     entryLocked: Boolean,
     animateContextControls: Boolean,
     drawingBackdrop: Color,
+    onAddMemory: (() -> Unit)? = null,
 ) {
     if (blockFocusEnabled) {
         EntryPageChrome(
@@ -46,6 +47,7 @@ internal fun EntryEditorFrame(
             onReturn,
             onExit,
             onCapture,
+            onAddMemory = onAddMemory,
             modifier = modifier,
             header = topBarContent,
             focusProgress = focusProgress,

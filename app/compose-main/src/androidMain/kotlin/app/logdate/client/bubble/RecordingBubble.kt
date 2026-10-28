@@ -9,7 +9,6 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -35,6 +34,7 @@ import app.logdate.client.notifications.RecordingBubbleSwitch
 import app.logdate.feature.editor.ui.audio.RecorderBubbleContent
 import app.logdate.feature.editor.ui.audio.RecorderBubbleState
 import app.logdate.feature.editor.ui.audio.recorderBubbleStates
+import app.logdate.ui.platform.enableTransparentSystemBars
 import app.logdate.ui.theme.LogDateTheme
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
@@ -69,7 +69,7 @@ class RecordingBubbleActivity :
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableTransparentSystemBars()
         setContent {
             LogDateTheme {
                 val states = remember { recorder.bubbleStates() }

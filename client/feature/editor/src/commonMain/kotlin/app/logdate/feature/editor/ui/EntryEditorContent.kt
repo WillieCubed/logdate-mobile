@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import app.logdate.client.text.resolve
+import app.logdate.feature.editor.ui.content.blockType
 import app.logdate.feature.editor.ui.content.entryDayContext
 import app.logdate.feature.editor.ui.content.rememberEntryStartPreferences
 import app.logdate.feature.editor.ui.dialog.DraftsBottomSheet
@@ -51,17 +52,18 @@ import app.logdate.feature.editor.ui.dialog.alert.ConfirmEntryExitDialog
 import app.logdate.feature.editor.ui.drop.EntryKeyboardContentReceiver
 import app.logdate.feature.editor.ui.drop.entryDropTarget
 import app.logdate.feature.editor.ui.drop.entryPasteTarget
+import app.logdate.feature.editor.ui.editor.EditorAudioCaptureStartGate
 import app.logdate.feature.editor.ui.editor.EditorBackgroundSaveEffect
 import app.logdate.feature.editor.ui.editor.EditorExitReason
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
+import app.logdate.feature.editor.ui.editor.LocalAudioCaptureStartGate
 import app.logdate.feature.editor.ui.editor.delegate.DefaultAudioBlockFinalizer
 import app.logdate.feature.editor.ui.editor.rememberEditorAutoSave
 import app.logdate.feature.editor.ui.handwriting.EntryPageOverview
 import app.logdate.feature.editor.ui.handwriting.EntryPageScrollAnchor
 import app.logdate.feature.editor.ui.handwriting.StoryCaptureMode
 import app.logdate.feature.editor.ui.handwriting.blockType
-import app.logdate.feature.editor.ui.handwriting.captureModeForBlock
 import app.logdate.feature.editor.ui.handwriting.rememberEntryPageState
 import app.logdate.feature.editor.ui.handwriting.rememberHandwritingBlockPresentations
 import app.logdate.feature.editor.ui.layout.EditorFocus
@@ -77,7 +79,6 @@ import logdate.client.feature.editor.generated.resources.draft_deleted
 import logdate.client.feature.editor.generated.resources.undo
 import org.jetbrains.compose.resources.getString
 import org.koin.compose.viewmodel.koinViewModel
-import kotlin.uuid.Uuid
 
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
 val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
@@ -101,6 +102,7 @@ fun EntryEditorContent(
     blockFocusEnabled: Boolean = false,
 ) {
     val editorState by viewModel.editorState.collectAsState()
+    val audioCaptureStartGate = remember(viewModel) { EditorAudioCaptureStartGate(viewModel) }
     val startPreferences = rememberEntryStartPreferences(viewModel, blockFocusEnabled, handwritingEnabled)
     val focus = editorState.editorFocus()
     val page = rememberEntryPageState()
@@ -179,21 +181,23 @@ fun EntryEditorContent(
     var isExitDraftSaving by remember { mutableStateOf(false) }
 
     val handleEditorBack: () -> Unit = {
-        when {
-            editorState.isSaving || editorState.shouldExit -> Unit
-            activeCamera || activeHandwriting || (blockFocusEnabled && editorState.expandedBlockId != null) -> {
-                viewModel.dismissExpandedBlockOrClearSingleEmpty()
-                Unit
-            }
-            shouldReturnToPickerOnBack -> {
-                viewModel.clearSingleEmptyBlock()
-                Unit
-            }
-            !editorState.canExitWithoutSaving -> {
-                showExitConfirmation = true
-            }
-            else -> {
-                onNavigateBack()
+        audioCaptureStartGate.runWhenIdle {
+            when {
+                editorState.isSaving || editorState.shouldExit -> Unit
+                activeCamera || activeHandwriting || (blockFocusEnabled && editorState.expandedBlockId != null) -> {
+                    viewModel.dismissExpandedBlockOrClearSingleEmpty()
+                    Unit
+                }
+                shouldReturnToPickerOnBack -> {
+                    viewModel.clearSingleEmptyBlock()
+                    Unit
+                }
+                !editorState.canExitWithoutSaving -> {
+                    showExitConfirmation = true
+                }
+                else -> {
+                    onNavigateBack()
+                }
             }
         }
     }
@@ -204,8 +208,7 @@ fun EntryEditorContent(
                 !activeCamera &&
                     !activeHandwriting &&
                     !(blockFocusEnabled && editorState.expandedBlockId != null) &&
-                    !page.earlierExpanded &&
-                    (shouldReturnToPickerOnBack || !editorState.canExitWithoutSaving),
+                    !page.earlierExpanded,
             onCommit = handleEditorBack,
         )
 
@@ -309,30 +312,36 @@ fun EntryEditorContent(
 
     var dropActive by remember { mutableStateOf(false) }
     val canSave =
-        focus !is EditorFocus.Recording && !editorState.isEditingLocked && !editorState.isSaving && !editorState.shouldExit
+        focus !is EditorFocus.Recording &&
+            !editorState.isEditingLocked &&
+            !editorState.isSaving &&
+            !editorState.shouldExit &&
+            editorState.audioCaptureStartReservations.isEmpty()
     val onMediaImport = entryMediaImportHandler(viewModel, snackbarHostState, scope)
     val focusedBlock = editorState.blocks.firstOrNull { it.id == editorState.expandedBlockId }
     val returnToEntry: () -> Unit = {
-        editorState.expandedBlockId?.let { id ->
-            page.focusedAnchor =
-                EntryPageScrollAnchor(
-                    id,
-                    page.blockPositions[id] ?: page.focusedAnchor?.takeIf { it.blockId == id }?.top ?: page.viewportTop + 88f,
-                    page.viewportWidth,
-                )
+        audioCaptureStartGate.runWhenIdle {
+            editorState.expandedBlockId?.let { id ->
+                page.focusedAnchor =
+                    EntryPageScrollAnchor(
+                        id,
+                        page.blockPositions[id] ?: page.focusedAnchor?.takeIf { it.blockId == id }?.top ?: page.viewportTop + 88f,
+                        page.viewportWidth,
+                    )
+            }
+            focusManager.clearFocus()
+            keyboard?.hide()
+            viewModel.dismissExpandedBlockOrClearSingleEmpty()
         }
-        focusManager.clearFocus()
-        keyboard?.hide()
-        viewModel.dismissExpandedBlockOrClearSingleEmpty()
     }
     val chooseCapture: (StoryCaptureMode) -> Unit = { mode ->
-        if (!editorState.isEditingLocked && !editorState.isRecordingAudio) {
-            val existing = if (focusedBlock != null) editorState.blocks.lastOrNull { captureModeForBlock(it) == mode } else null
-            if (existing != null) viewModel.setExpandedBlockId(existing.id) else viewModel.createNewBlock(mode.blockType(), Uuid.random())
-        }
+        viewModel.chooseCreationType(focusedBlock?.id, mode.blockType())
     }
     SharedTransitionLayout {
-        CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+        CompositionLocalProvider(
+            LocalSharedTransitionScope provides this,
+            LocalAudioCaptureStartGate provides audioCaptureStartGate,
+        ) {
             EntryKeyboardContentReceiver(onMediaImported = onMediaImport) {
                 EntryEditorFrame(
                     state = editorState,
@@ -343,6 +352,7 @@ fun EntryEditorContent(
                     onReturn = returnToEntry,
                     onExit = handleEditorBack,
                     onCapture = chooseCapture,
+                    onAddMemory = { viewModel.beginBlockCreation(startPreferences.mode.blockType()) },
                     modifier =
                         modifier
                             .then(exitBackModifier)

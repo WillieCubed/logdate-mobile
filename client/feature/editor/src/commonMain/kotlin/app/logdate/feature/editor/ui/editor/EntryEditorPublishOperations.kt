@@ -177,7 +177,13 @@ internal fun EntryEditorViewModel.tryBeginExclusiveOperation(
     if (requestedState.shouldExit) return null
     while (true) {
         val currentState = mutableEditorState.value
-        if (currentState.shouldExit || currentState.isSaving || currentState.isEditingLocked) return null
+        if (currentState.shouldExit ||
+            currentState.isSaving ||
+            currentState.isEditingLocked ||
+            currentState.audioCaptureStartReservations.isNotEmpty()
+        ) {
+            return null
+        }
         if (
             mutableEditorState.compareAndSet(
                 currentState,

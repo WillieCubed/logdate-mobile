@@ -21,6 +21,8 @@ internal val LocalEntryChromeHeight = compositionLocalOf { 64.dp }
 
 /** Safe layout belongs to the inner document/controls, never the full-window painted surface. */
 internal val LocalEntryContentInsets = compositionLocalOf { WindowInsets(0, 0, 0, 0) }
+internal val LocalEntryCreationReserve = compositionLocalOf { 0.dp }
+internal val LocalEntryHeaderReserve = compositionLocalOf { 0.dp }
 
 /** Apply after painting the owning surface; shared by writing and recording's inner layout. */
 @Composable

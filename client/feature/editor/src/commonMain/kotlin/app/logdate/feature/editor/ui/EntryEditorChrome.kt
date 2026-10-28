@@ -33,13 +33,13 @@ internal fun EntryEditorTopBar(
     floating: Boolean = false,
 ) {
     val recording = state.editorFocus() is EditorFocus.Recording
-    val enabled = !state.isSaving && !state.shouldExit
+    val enabled = !state.isSaving && !state.shouldExit && state.audioCaptureStartReservations.isEmpty()
     if (blockFocusEnabled) {
         val selectedJournal = state.availableJournals.firstOrNull { it.id in state.selectedJournalIds }
         EntryFocusPrototypeHeader(
             block = state.blocks.firstOrNull { it.id == state.expandedBlockId },
             canvasOnly = immersive,
-            recording = state.isRecordingAudio,
+            recording = state.isRecordingAudio || state.audioCaptureStartReservations.isNotEmpty(),
             onReturnToEntry = onReturnToEntry,
             onExit = onBack,
             journal = selectedJournal,
@@ -67,7 +67,7 @@ internal fun EntryEditorTopBar(
             autoSaveStatus = autoSaveStatus,
             actionsVisible = !immersive,
             optionsVisible = !recording,
-            saveEnabled = !recording && !state.isEditingLocked,
+            saveEnabled = !recording && !state.isEditingLocked && enabled,
             actionsEnabled = enabled,
         )
     }

@@ -96,7 +96,7 @@ class EditorLongPageAcceptanceTest {
                         }
                         compose.waitForIdle()
                         val longText = compose.onNodeWithTag("editor_text_input").getUnclippedBoundsInRoot()
-                        val initialCapture = compose.onNodeWithTag("entry_capture_tools").getUnclippedBoundsInRoot()
+                        val initialCapture = compose.onNodeWithTag("entry_creation_actions").getUnclippedBoundsInRoot()
                         assertTrue(longText.bottom > initialCapture.bottom, "Fixture must overflow before any scroll: $longText")
                         assertSafeCapture(scenario, "$mode-$name-initial")
                         check(device.takeScreenshot(File(output, "$mode-$name-initial.png")))
@@ -104,7 +104,7 @@ class EditorLongPageAcceptanceTest {
                         compose.waitForIdle()
                         assertSafeCapture(scenario, "$mode-$name-end", expectBalancedMargin = true)
                         val textBounds = compose.onNodeWithTag("editor_text_input").getUnclippedBoundsInRoot()
-                        val capture = compose.onNodeWithTag("entry_capture_tools").getUnclippedBoundsInRoot()
+                        val capture = compose.onNodeWithTag("entry_creation_actions").getUnclippedBoundsInRoot()
                         assertTrue(
                             textBounds.bottom.value <= capture.top.value + 1f,
                             "Last content line cannot scroll clear of the selector: $textBounds, $capture",
@@ -174,7 +174,7 @@ class EditorLongPageAcceptanceTest {
             right = (view.width - insets.right) / scale
             bottom = (view.height - insets.bottom) / scale
         }
-        val capture = compose.onNodeWithTag("entry_capture_tools").getUnclippedBoundsInRoot()
+        val capture = compose.onNodeWithTag("entry_creation_actions").getUnclippedBoundsInRoot()
         if (expectBalancedMargin) {
             val railWidth = minOf(right - left, 640f)
             val railLeft = left + (right - left - railWidth) / 2f
