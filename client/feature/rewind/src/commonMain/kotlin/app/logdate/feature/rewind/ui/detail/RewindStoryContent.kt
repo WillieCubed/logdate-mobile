@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,7 +37,7 @@ import app.logdate.feature.rewind.ui.SubtitledRewindPanelUiState
 import app.logdate.feature.rewind.ui.TextNoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.TransitionRewindPanelUiState
 import app.logdate.feature.rewind.ui.WeatherChipUiState
-import app.logdate.ui.content.ImageScrimOverlay
+import app.logdate.ui.workspace.LocalWorkspacePlaybackInsets
 import coil3.compose.AsyncImage
 import logdate.client.feature.rewind.generated.resources.*
 import logdate.client.feature.rewind.generated.resources.Res
@@ -60,7 +60,7 @@ import kotlin.uuid.Uuid
  * - **Consistent Layout**: All panels follow similar spacing and typography patterns
  * - **Visual Hierarchy**: Clear distinction between titles, subtitles, and body content
  * - **Background Flexibility**: Supports both solid colors and background images
- * - **Readability**: Text overlays use gradients for legibility over images
+ * - **Readability**: Text uses localized scrims for legibility over images
  *
  * @param panel The rewind panel data to render
  * @param modifier Modifier for customizing the content container
@@ -205,7 +205,7 @@ fun RewindStoryContent(
  * A simple text panel with optional background image.
  *
  * Displays centered text content with flexible background options. When a background
- * image is provided, applies a subtle gradient overlay to ensure text readability.
+ * image is provided, keeps contrast behind its text without darkening the whole image.
  *
  * ## Visual Design:
  * - **Typography**: Uses headline medium for prominent text display
@@ -237,9 +237,6 @@ private fun BasicTextPanel(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-
-            // Gradient overlay for text readability
-            ImageScrimOverlay(topAlpha = 0.3f, bottomAlpha = 0.6f)
         } else {
             Box(
                 modifier =
@@ -256,7 +253,18 @@ private fun BasicTextPanel(
             color = Color.White,
             textAlign = TextAlign.Center,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(32.dp),
+            modifier =
+                Modifier
+                    .padding(24.dp)
+                    .background(
+                        if (backgroundImageUri !=
+                            null
+                        ) {
+                            Color.Black.copy(alpha = 0.6f)
+                        } else {
+                            Color.Transparent
+                        },
+                    ).padding(16.dp),
         )
     }
 }
@@ -300,9 +308,6 @@ private fun SubtitledPanel(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-
-            // Gradient overlay
-            ImageScrimOverlay(topAlpha = 0.2f, bottomAlpha = 0.7f)
         } else {
             Box(
                 modifier =
@@ -319,7 +324,9 @@ private fun SubtitledPanel(
             modifier =
                 Modifier
                     .align(Alignment.Center)
-                    .padding(32.dp),
+                    .padding(24.dp)
+                    .background(if (backgroundImageUri != null) Color.Black.copy(alpha = 0.6f) else Color.Transparent)
+                    .padding(16.dp),
         ) {
             Text(
                 text = title,
@@ -346,7 +353,7 @@ private fun SubtitledPanel(
                 modifier =
                     Modifier
                         .align(Alignment.TopEnd)
-                        .statusBarsPadding()
+                        .windowInsetsPadding(LocalWorkspacePlaybackInsets.current)
                         .padding(top = 56.dp, end = 16.dp),
             )
         }
@@ -400,9 +407,6 @@ private fun StatisticPanel(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-
-            // Gradient overlay
-            ImageScrimOverlay(topAlpha = 0.3f, bottomAlpha = 0.6f)
         } else {
             Box(
                 modifier =
@@ -416,7 +420,18 @@ private fun StatisticPanel(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(24.dp),
-            modifier = Modifier.padding(32.dp),
+            modifier =
+                Modifier
+                    .padding(24.dp)
+                    .background(
+                        if (backgroundImageUri !=
+                            null
+                        ) {
+                            Color.Black.copy(alpha = 0.6f)
+                        } else {
+                            Color.Transparent
+                        },
+                    ).padding(16.dp),
         ) {
             Text(
                 text = title,

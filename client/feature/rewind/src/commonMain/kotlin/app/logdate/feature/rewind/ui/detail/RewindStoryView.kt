@@ -19,12 +19,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,6 +45,7 @@ import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindPanelUiState
 import app.logdate.ui.platform.PlatformPredictiveBackHandler
 import app.logdate.ui.platform.rememberSystemReduceMotion
+import app.logdate.ui.workspace.LocalWorkspacePlaybackInsets
 import app.logdate.ui.workspace.WorkspacePlaybackLayout
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -401,8 +400,10 @@ fun RewindStoryView(
     ) {
         WorkspacePlaybackLayout(
             focus = {
+                RewindSystemBars()
                 TapNavigationLayer(Modifier.fillMaxSize().testTag("rewind-story-focus")) {
                     StoryPanel(Modifier.fillMaxSize())
+                    RewindSystemBarScrims()
                 }
             },
             controls = {
@@ -423,7 +424,7 @@ fun RewindStoryView(
                         Modifier
                             .fillMaxWidth()
                             .graphicsLayer { alpha = 1f - easeDismiss(dismissProgress.value) }
-                            .windowInsetsPadding(WindowInsets.safeDrawing)
+                            .windowInsetsPadding(LocalWorkspacePlaybackInsets.current)
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                 )
             },

@@ -11,7 +11,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -26,7 +25,7 @@ import androidx.compose.ui.unit.dp
  *
  * ## Visual Design:
  * - **Typography**: Medium-sized, italic text for transitional feel
- * - **Background**: Subtle gradient to distinguish from main content
+ * - **Background**: Flat surface that keeps attention on the text
  * - **Styling**: Minimal decoration to avoid overwhelming the narrative
  * - **Purpose**: Guide the viewer through the story's progression
  *
@@ -48,15 +47,7 @@ fun TransitionPanel(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors =
-                            listOf(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                            ),
-                    ),
-                ),
+                .background(MaterialTheme.colorScheme.surface),
         contentAlignment = Alignment.Center,
     ) {
         Text(

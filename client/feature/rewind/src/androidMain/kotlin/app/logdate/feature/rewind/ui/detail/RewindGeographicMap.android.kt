@@ -39,6 +39,7 @@ import com.google.android.gms.maps.GoogleMapOptions
 import com.google.android.gms.maps.MapView
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.android.gms.maps.model.MarkerOptions
 import kotlinx.coroutines.delay
 import logdate.client.feature.rewind.generated.resources.Res
@@ -101,6 +102,7 @@ internal actual fun RewindGeographicMap(
                                 if (!requested && right > left && bottom > top) {
                                     requested = true
                                     getMapAsync { map ->
+                                        map.setMapStyle(MapStyleOptions(rewindMapStyle))
                                         map.uiSettings.setAllGesturesEnabled(false)
                                         map.uiSettings.isMapToolbarEnabled = false
                                         map.uiSettings.isZoomControlsEnabled = false
@@ -149,12 +151,13 @@ internal actual fun RewindGeographicMap(
         val bitmap = image
         if (bitmap != null) {
             val loadedDescription = stringResource(Res.string.rewind_map_loaded)
+            val loadingDescription = stringResource(Res.string.rewind_map_loading)
             Image(
                 bitmap,
                 stringResource(Res.string.rewind_map_accessibility),
                 Modifier.fillMaxSize().graphicsLayer { alpha = reveal }.testTag("rewind-native-map").semantics {
                     stateDescription =
-                        loadedDescription
+                        if (reveal >= 0.99f) loadedDescription else loadingDescription
                 },
                 contentScale = ContentScale.FillBounds,
             )
@@ -179,3 +182,18 @@ internal actual fun RewindGeographicMap(
         )
     }
 }
+
+// A quiet geographic palette keeps white story text readable without darkening a band of tiles.
+private val rewindMapStyle =
+    """
+    [
+      {"elementType":"geometry","stylers":[{"color":"#242d32"}]},
+      {"elementType":"labels.text.fill","stylers":[{"color":"#68767c"}]},
+      {"elementType":"labels.text.stroke","stylers":[{"color":"#242d32"}]},
+      {"elementType":"labels.icon","stylers":[{"visibility":"off"}]},
+      {"featureType":"road","elementType":"geometry","stylers":[{"color":"#38454b"}]},
+      {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#45535a"}]},
+      {"featureType":"water","elementType":"geometry","stylers":[{"color":"#193944"}]},
+      {"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#2c3d36"}]}
+    ]
+    """.trimIndent()

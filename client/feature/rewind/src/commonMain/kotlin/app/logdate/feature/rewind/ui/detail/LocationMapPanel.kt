@@ -8,11 +8,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -25,15 +30,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.MapPanelPoint
+import app.logdate.ui.workspace.LocalWorkspacePlaybackInsets
 import logdate.client.feature.rewind.generated.resources.Res
 import logdate.client.feature.rewind.generated.resources.rewind_map_loading
 import logdate.client.feature.rewind.generated.resources.rewind_map_main_area
@@ -56,13 +62,21 @@ fun LocationMapPanel(
     BoxWithConstraints(modifier.fillMaxSize().background(panelAccentBackground(accentSeed)).testTag("rewind-map-surface")) {
         var headingHeight by remember(maxWidth, maxHeight, density.fontScale) { mutableStateOf(0.dp) }
         var noticeHeight by remember(maxWidth, maxHeight, density.fontScale) { mutableStateOf(0.dp) }
+        val safeInsets = LocalWorkspacePlaybackInsets.current
+        val safePadding = safeInsets.asPaddingValues()
         val compact = maxHeight < 480.dp
+        val chromeClearance = if (compact) 80.dp else 96.dp
+        val headingMaxHeight =
+            maxOf(maxHeight * 0.45f, safePadding.calculateTopPadding() + chromeClearance + 80.dp).coerceAtMost(
+                maxHeight * 0.75f,
+            )
+        val direction = LocalLayoutDirection.current
         val contentInsets =
             PaddingValues(
-                start = 24.dp,
-                end = 24.dp,
+                start = safePadding.calculateStartPadding(direction) + 24.dp,
+                end = safePadding.calculateEndPadding(direction) + 24.dp,
                 top = (headingHeight + 24.dp).coerceAtMost(maxHeight * 0.6f),
-                bottom = if (geometry.hasLocationsOutsideFrame) noticeHeight + 16.dp else 32.dp,
+                bottom = if (geometry.hasLocationsOutsideFrame) noticeHeight + 16.dp else safePadding.calculateBottomPadding() + 24.dp,
             )
         MapBackdrop(
             geometry,
@@ -70,24 +84,14 @@ fun LocationMapPanel(
             headingHeight > 0.dp && (!geometry.hasLocationsOutsideFrame || noticeHeight > 0.dp),
             Modifier.fillMaxSize(),
         )
-        val scrimHeight = (headingHeight + 80.dp).coerceAtMost(maxHeight)
-        val fadeStart = (headingHeight.value / scrimHeight.value.coerceAtLeast(1f)).coerceIn(0f, 0.95f)
-        Box(
-            Modifier.fillMaxWidth().height(scrimHeight).background(
-                Brush.verticalGradient(
-                    0f to Color.Black.copy(alpha = 0.78f),
-                    fadeStart to Color.Black.copy(alpha = 0.62f),
-                    1f to Color.Transparent,
-                ),
-            ),
-        )
         Column(
             Modifier
                 .align(Alignment.TopCenter)
                 .onSizeChanged { headingHeight = with(density) { it.height.toDp() } }
                 .fillMaxWidth()
-                .heightIn(max = maxHeight * 0.45f)
-                .padding(start = 24.dp, end = 24.dp, top = if (compact) 80.dp else 96.dp, bottom = 16.dp)
+                .heightIn(max = headingMaxHeight)
+                .windowInsetsPadding(safeInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                .padding(start = 24.dp, end = 24.dp, top = chromeClearance, bottom = 16.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -101,9 +105,8 @@ fun LocationMapPanel(
                     .onSizeChanged { noticeHeight = with(density) { it.height.toDp() } }
                     .testTag("rewind-map-notice")
                     .heightIn(max = maxHeight * 0.3f)
-                    .padding(start = 24.dp, end = 24.dp, bottom = 24.dp)
-                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
-                    .padding(12.dp),
+                    .windowInsetsPadding(safeInsets.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
+                    .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
             ) { MainAreaNotice(geometry, Modifier.verticalScroll(rememberScrollState())) }
         }
     }
