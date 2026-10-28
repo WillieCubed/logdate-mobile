@@ -3,9 +3,13 @@
 package app.logdate.feature.rewind.ui.detail
 
 import android.view.View
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,15 +22,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import app.logdate.ui.maps.rememberGoogleMapsEnabled
+import app.logdate.ui.platform.rememberSystemReduceMotion
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMapOptions
 import com.google.android.gms.maps.MapView
@@ -45,22 +52,40 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 internal actual fun RewindGeographicMap(
     geometry: RewindMapGeometry,
+    contentInsets: PaddingValues,
     modifier: Modifier,
 ) {
     val enabled = rememberGoogleMapsEnabled()
     val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
+    val reduceMotion by rememberSystemReduceMotion()
     BoxWithConstraints(modifier) {
         val width = with(density) { maxWidth.roundToPx() }.coerceAtLeast(1)
         val height = with(density) { maxHeight.roundToPx() }.coerceAtLeast(1)
-        val padding = minOf(with(density) { 32.dp.roundToPx() }, width / 5, height / 5)
-        var image by remember(geometry, width, height) { mutableStateOf<ImageBitmap?>(null) }
-        var timedOut by remember(geometry, width, height) { mutableStateOf(false) }
+        val leftInset = with(density) { contentInsets.calculateLeftPadding(layoutDirection).roundToPx() }
+        val rightInset = with(density) { contentInsets.calculateRightPadding(layoutDirection).roundToPx() }
+        val topInset = with(density) { contentInsets.calculateTopPadding().roundToPx() }
+        val bottomInset = with(density) { contentInsets.calculateBottomPadding().roundToPx() }
+        val padding =
+            minOf(
+                with(density) { 32.dp.roundToPx() },
+                (width - leftInset - rightInset).coerceAtLeast(1) / 5,
+                (height - topInset - bottomInset).coerceAtLeast(1) / 5,
+            )
+        var image by remember(geometry, width, height, contentInsets) { mutableStateOf<ImageBitmap?>(null) }
+        var timedOut by remember(geometry, width, height, contentInsets) { mutableStateOf(false) }
         if (enabled) {
-            key(geometry, width, height) {
+            key(geometry, width, height, contentInsets) {
                 AndroidView(
                     factory = { mapContext ->
                         val center = geometry.center!!
-                        val zoom = geometry.zoomForSize(width, height, padding, density.density)
+                        val zoom =
+                            geometry.zoomForSize(
+                                width - leftInset - rightInset,
+                                height - topInset - bottomInset,
+                                padding,
+                                density.density,
+                            )
                         val target = LatLng(center.latitude, center.longitude)
                         MapView(mapContext, GoogleMapOptions().liteMode(true).camera(CameraPosition.fromLatLngZoom(target, zoom))).apply {
                             // Keep the staging renderer drawable without letting a
@@ -80,8 +105,7 @@ internal actual fun RewindGeographicMap(
                                         map.uiSettings.isMapToolbarEnabled = false
                                         map.uiSettings.isZoomControlsEnabled = false
                                         map.uiSettings.isCompassEnabled = false
-                                        val attributionInset = with(density) { 12.dp.roundToPx() }
-                                        map.setPadding(attributionInset, attributionInset, attributionInset, attributionInset)
+                                        map.setPadding(leftInset, topInset, rightInset, bottomInset)
                                         map.isMyLocationEnabled = false
                                         geometry.points.forEach { point ->
                                             map.addMarker(MarkerOptions().position(LatLng(point.latitude, point.longitude)))
@@ -111,32 +135,41 @@ internal actual fun RewindGeographicMap(
                 )
             }
         }
-        LaunchedEffect(image, geometry, width, height) {
+        LaunchedEffect(image, geometry, width, height, contentInsets) {
             if (image == null) {
                 delay(15_000)
                 timedOut = true
             }
         }
+        val reveal by animateFloatAsState(
+            targetValue = if (image != null) 1f else 0f,
+            animationSpec = tween(if (reduceMotion) 0 else 280),
+            label = "RewindMapReveal",
+        )
         val bitmap = image
         if (bitmap != null) {
             val loadedDescription = stringResource(Res.string.rewind_map_loaded)
             Image(
                 bitmap,
                 stringResource(Res.string.rewind_map_accessibility),
-                Modifier.fillMaxSize().testTag("rewind-native-map").semantics { stateDescription = loadedDescription },
+                Modifier.fillMaxSize().graphicsLayer { alpha = reveal }.testTag("rewind-native-map").semantics {
+                    stateDescription =
+                        loadedDescription
+                },
                 contentScale = ContentScale.FillBounds,
             )
         } else {
-            RewindMapMessage(
-                stringResource(
+            Crossfade(
+                targetState =
                     when {
                         !enabled -> Res.string.rewind_map_not_configured
                         timedOut -> Res.string.rewind_map_unavailable
                         else -> Res.string.rewind_map_loading
                     },
-                ),
-                Modifier.align(Alignment.Center),
-            )
+                animationSpec = tween(if (reduceMotion) 0 else 180),
+                modifier = Modifier.align(Alignment.Center),
+                label = "RewindMapStatus",
+            ) { message -> RewindMapMessage(stringResource(message)) }
         }
         // Keep hit testing in Compose so the story owns taps, holds and swipes.
         Box(

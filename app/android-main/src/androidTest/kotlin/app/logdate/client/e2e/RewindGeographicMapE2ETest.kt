@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
@@ -17,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.unit.Density
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import app.logdate.client.text.toUiText
@@ -26,6 +28,7 @@ import app.logdate.feature.rewind.ui.SubtitledRewindPanelUiState
 import app.logdate.feature.rewind.ui.detail.RewindStoryContent
 import app.logdate.feature.rewind.ui.detail.RewindStoryView
 import app.logdate.ui.maps.LocalGoogleMapsAvailabilityOverride
+import app.logdate.ui.platform.LocalReduceMotionOverride
 import app.logdate.ui.theme.LogDateTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -50,6 +53,21 @@ class RewindGeographicMapE2ETest {
         capture("rewind-single-location-map")
     }
 
+    @Test fun reducedMotionKeepsTheImmersiveMapAndStoryNavigation() {
+        showMap(OUTLIER_POINTS, reduceMotion = true, fontScale = 2f)
+        awaitMap()
+        capture("rewind-immersive-map-reduced-motion-large-text")
+        compose.onNodeWithTag("rewind-native-map").performTouchInput { click(Offset(width * 0.75f, height * 0.65f)) }
+        compose.onNodeWithText("Next moment").assertIsDisplayed()
+    }
+
+    @Test fun distantLocationsKeepTheOutlierNoticeAndAttributionVisible() {
+        showMap(OUTLIER_POINTS)
+        awaitMap()
+        compose.onNodeWithTag("rewind-map-notice").assertIsDisplayed()
+        capture("rewind-immersive-map-outlier")
+    }
+
     @Test fun mapSwipesNavigateTheStoryInsteadOfPanning() {
         showMap(listOf(MapPanelPoint(36.1699, -115.1398)))
         awaitMap()
@@ -68,12 +86,29 @@ class RewindGeographicMapE2ETest {
         compose.onNodeWithText("No locations to show on this map.").assertIsDisplayed()
     }
 
+    private companion object {
+        val OUTLIER_POINTS =
+            listOf(
+                MapPanelPoint(36.1699, -115.1398),
+                MapPanelPoint(36.1716, -115.1460),
+                MapPanelPoint(36.1740, -115.1320),
+                MapPanelPoint(-33.86, 151.21),
+            )
+    }
+
     private fun showMap(
         points: List<MapPanelPoint>,
         mapsEnabled: Boolean? = null,
+        reduceMotion: Boolean? = null,
+        fontScale: Float? = null,
     ) {
         compose.setContent {
-            CompositionLocalProvider(LocalGoogleMapsAvailabilityOverride provides mapsEnabled) {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalGoogleMapsAvailabilityOverride provides mapsEnabled,
+                LocalReduceMotionOverride provides reduceMotion,
+                LocalDensity provides Density(density.density, fontScale ?: density.fontScale),
+            ) {
                 LogDateTheme {
                     RewindStoryView(
                         panels =
@@ -102,6 +137,11 @@ class RewindGeographicMapE2ETest {
                 .isNotEmpty()
         }
         compose.onNodeWithTag("rewind-native-map").assertIsDisplayed()
+        assertEquals(
+            "Geography must fill the Rewind surface behind its overlay text",
+            compose.onNodeWithTag("rewind-map-surface").fetchSemanticsNode().boundsInRoot,
+            compose.onNodeWithTag("rewind-native-map").fetchSemanticsNode().boundsInRoot,
+        )
     }
 
     private fun capture(name: String) {
@@ -113,22 +153,25 @@ class RewindGeographicMapE2ETest {
         compose.waitForIdle()
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         device.waitForIdle()
-        compose.waitUntil(10_000) { device.takeScreenshot(file) }
         val map =
             compose
                 .onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Map loaded"))
                 .fetchSemanticsNodes()
                 .firstOrNull()
-        if (map != null) {
+        compose.waitUntil(10_000) {
+            if (!device.takeScreenshot(file)) return@waitUntil false
+            if (map == null) return@waitUntil true
             val bounds = map.boundsInWindow
-            val image = BitmapFactory.decodeFile(file.absolutePath)
-            val gapY = (bounds.top - 8).toInt()
-            assertEquals(
-                "Native map must not paint over the story heading",
-                image.getPixel((bounds.left - 8).toInt(), gapY),
-                image.getPixel(bounds.center.x.toInt(), gapY),
-            )
+            val image = BitmapFactory.decodeFile(file.absolutePath) ?: return@waitUntil false
+            // Reject captures taken before the fade has delivered geography.
+            val samples = listOf(0.15f to 0.55f, 0.85f to 0.55f, 0.15f to 0.75f, 0.85f to 0.75f)
+            val visible =
+                samples.count { (x, y) ->
+                    val pixel = image.getPixel((bounds.left + bounds.width * x).toInt(), (bounds.top + bounds.height * y).toInt())
+                    android.graphics.Color.red(pixel) > 100 && android.graphics.Color.green(pixel) > 100
+                }
             image.recycle()
+            visible >= 2
         }
     }
 }
