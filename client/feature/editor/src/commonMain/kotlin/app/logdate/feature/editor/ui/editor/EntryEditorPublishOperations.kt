@@ -206,11 +206,13 @@ internal fun EntryEditorViewModel.tryBeginExclusiveOperation(
  * completes, to avoid relying on [editorState] (a combined flow) re-emitting
  * synchronously within this coroutine.
  */
-internal suspend fun EntryEditorViewModel.finalizePendingAudio(): Map<Uuid, AudioCaptureState>? {
-    val initialState = editorState.value
+internal suspend fun EntryEditorViewModel.finalizePendingAudio(blockIds: Set<Uuid>? = null): Map<Uuid, AudioCaptureState>? {
+    val initialState = mutableEditorState.value
     val pendingBlocks =
         initialState.blocks.filterIsInstance<AudioBlockUiState>().filter { block ->
-            !initialState.isReadOnly(block.id) && (!block.isPersistable() || block.durationMs <= 0L)
+            (blockIds == null || block.id in blockIds) &&
+                !initialState.isReadOnly(block.id) &&
+                (!block.isPersistable() || block.durationMs <= 0L)
         }
     if (pendingBlocks.isEmpty()) return emptyMap()
 

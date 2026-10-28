@@ -189,6 +189,94 @@ class EntryEditorViewModelAudioSaveTest {
         return seeded
     }
 
+    @Test
+    fun `discard stops its live recording before deleting the durable owner`() =
+        testScope.runTest {
+            var stopped = false
+            val viewModel =
+                buildViewModel(
+                    AudioBlockFinalizer { _, _ ->
+                        assertTrue(
+                            entryDraftRepository.getDrafts().first().isNotEmpty(),
+                            "The recorder must retain its draft until stopped",
+                        )
+                        assertTrue(mediaCleaner.deletedPaths.isEmpty(), "The recorder must stop before its file can be deleted")
+                        stopped = true
+                        AudioCaptureState.Ready("file:///audio_notes/discard.m4a", 1_000)
+                    },
+                )
+            viewModel.editorState.first()
+            val audio = viewModel.seedAudioBlock(AudioCaptureState.Empty)
+            advanceUntilIdle()
+            assertTrue(viewModel.persistAudioRecordingTarget(audio.id, "/audio_notes/discard.m4a"))
+
+            assertTrue(viewModel.discardAndExit())
+            advanceUntilIdle()
+
+            assertTrue(stopped, "Discard must stop capture, even though a durable session survives editor disposal")
+            assertTrue(entryDraftRepository.getDrafts().first().isEmpty())
+            assertTrue(viewModel.editorState.value.shouldExit)
+        }
+
+    @Test
+    fun `discard retains the recording draft when its stop fails`() =
+        testScope.runTest {
+            val viewModel =
+                buildViewModel(
+                    AudioBlockFinalizer { _, state ->
+                        AudioCaptureState.Failed(
+                            Res.string.editor_error_recording_not_finalized,
+                            (state as AudioCaptureState.Recording).filePath,
+                        )
+                    },
+                )
+            viewModel.editorState.first()
+            val audio = viewModel.seedAudioBlock(AudioCaptureState.Empty)
+            advanceUntilIdle()
+            assertTrue(viewModel.persistAudioRecordingTarget(audio.id, "/audio_notes/retained.m4a"))
+
+            assertFalse(viewModel.discardAndExit())
+            advanceUntilIdle()
+
+            assertTrue(entryDraftRepository.getDrafts().first().isNotEmpty())
+            assertTrue(mediaCleaner.deletedPaths.isEmpty())
+            assertFalse(viewModel.editorState.value.shouldExit)
+            assertFalse(viewModel.editorState.value.isEditingLocked)
+        }
+
+    @Test
+    fun `discard refuses to remove the owner if its finalizer still reports recording`() =
+        testScope.runTest {
+            val viewModel = buildViewModel(AudioBlockFinalizer.NoOp)
+            viewModel.editorState.first()
+            val audio = viewModel.seedAudioBlock(AudioCaptureState.Empty)
+            advanceUntilIdle()
+            assertTrue(viewModel.persistAudioRecordingTarget(audio.id, "/audio_notes/active.m4a"))
+
+            assertFalse(viewModel.discardAndExit())
+            advanceUntilIdle()
+
+            assertTrue(entryDraftRepository.getDrafts().first().isNotEmpty())
+            assertTrue(mediaCleaner.deletedPaths.isEmpty())
+            assertFalse(viewModel.editorState.value.shouldExit)
+        }
+
+    @Test
+    fun `an already failed recovery can be explicitly discarded without finalizing it again`() =
+        testScope.runTest {
+            val viewModel = buildViewModel(AudioBlockFinalizer { _, _ -> error("A failed recovery has no live capture to stop") })
+            viewModel.editorState.first()
+            viewModel.seedAudioBlock(AudioCaptureState.Failed(Res.string.editor_error_recording_not_finalized, "/audio_notes/failed.m4a"))
+            advanceUntilIdle()
+            assertNotNull(viewModel.persistDraft(viewModel.editorState.value))
+
+            assertTrue(viewModel.discardAndExit())
+            advanceUntilIdle()
+
+            assertTrue(entryDraftRepository.getDrafts().first().isEmpty())
+            assertTrue(viewModel.editorState.value.shouldExit)
+        }
+
     /** Headline-bug regression. */
     @Test
     fun `save entry with pending audio persists journal note audio`() =

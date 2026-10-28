@@ -170,13 +170,24 @@ internal suspend fun EntryEditorViewModel.saveAsDraftImpl(state: EditorState): B
     }
 }
 
-/** Deletes every durable draft owned by this editor before allowing navigation. */
+/** Stops this editor's capture before deleting its durable drafts and allowing navigation. */
 internal suspend fun EntryEditorViewModel.discardAndExitImpl(): Boolean {
     if (tryBeginExclusiveOperation(mutableEditorState.value, lockEditing = true) == null) {
         return false
     }
 
     return try {
+        val recordingBlocks =
+            mutableEditorState.value.blocks.filterIsInstance<AudioBlockUiState>().filter {
+                it.captureState is AudioCaptureState.Recording || it.captureState is AudioCaptureState.Stopping
+            }
+        if (recordingBlocks.isNotEmpty()) {
+            val resolved = finalizePendingAudio(recordingBlocks.map { it.id }.toSet()) ?: return false
+            check(resolved.values.none { it is AudioCaptureState.Recording || it is AudioCaptureState.Stopping }) {
+                "Recording has not stopped"
+            }
+            applyResolvedAudio(resolved)
+        }
         draftPersistenceMutex.withLock {
             val activeDraftId = (mutableEditorState.value.draftState as? DraftState.Active)?.id
             draftManager.draftIdsForCleanup(activeDraftId).forEach { draftId ->
