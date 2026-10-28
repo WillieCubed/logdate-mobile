@@ -8,7 +8,7 @@ bash tests/e2e/managed-editor-interruption-acceptance.sh /tmp/logdate-editor-int
 
 The script uses Gradle Managed Devices only and never clears application data. It
 builds and hashes the app and probe APKs, retains test sources and source hashes,
-and requires five passing instrumentation cases without skips:
+and requires six passing instrumentation cases without skips:
 
 - A separate, unshipped driver starts a real recording and sends SIGKILL to its
   process after AAC frames reach disk. It opens the app normally, finds the draft

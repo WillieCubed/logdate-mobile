@@ -77,7 +77,7 @@ from pathlib import Path
 import sys
 import xml.etree.ElementTree as ET
 output = Path(sys.argv[1])
-for directory, expected in [("live-death-results", 1), ("dismissal-results", 4)]:
+for directory, expected in [("live-death-results", 1), ("dismissal-results", 5)]:
     cases = [case for path in (output / directory).glob("TEST-*.xml") for case in ET.parse(path).getroot().iter("testcase")]
     assert len(cases) == expected, (directory, len(cases))
     assert all(not list(case) for case in cases), "Acceptance requires passed cases without failures or skips"
