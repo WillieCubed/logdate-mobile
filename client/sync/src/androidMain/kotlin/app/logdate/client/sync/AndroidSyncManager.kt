@@ -284,12 +284,13 @@ class AndroidSyncManager(
         } catch (_: Exception) {
             Napier.e("Could not release upload backoff for a manual backup")
         }
-        return resumeScheduledSync(consent)
+        return resumeScheduledSync(consent, userInitiated = true)
     }
 
     private suspend fun resumeScheduledSync(
         consent: UploadScope? = null,
         ownerChanged: Boolean = false,
+        userInitiated: Boolean = false,
     ): Operation =
         immediateScheduleMutex.withLock {
             val policy =
@@ -314,7 +315,14 @@ class AndroidSyncManager(
                         else -> ExistingWorkPolicy.KEEP
                     }
                 }
-            scheduleImmediateSync(AndroidLogDateSyncWorker.SYNC_TYPE_FULL, policy = policy, consent = consent).also { it.await() }
+            scheduleImmediateSync(
+                AndroidLogDateSyncWorker.SYNC_TYPE_FULL,
+                policy = policy,
+                consent = consent,
+                expedited = userInitiated,
+            ).also {
+                it.await()
+            }
         }
 
     /**
@@ -324,8 +332,9 @@ class AndroidSyncManager(
         syncType: String = AndroidLogDateSyncWorker.SYNC_TYPE_FULL,
         policy: ExistingWorkPolicy = ExistingWorkPolicy.KEEP,
         consent: UploadScope? = null,
+        expedited: Boolean = false,
     ): Operation {
-        val request = immediateSyncRequest(syncType, consent)
+        val request = immediateSyncRequest(syncType, consent, expedited)
 
         // Unique, and an already-running sync wins. Stacking runs would put several writers on
         // the same account's repo at once, which is exactly the contention that used to drop
