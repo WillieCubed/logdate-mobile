@@ -31,9 +31,25 @@ object SyncForegroundNotification {
         val builder =
             NotificationCompat
                 .Builder(context, channel.id)
-                .setSmallIcon(android.R.drawable.stat_sys_upload)
-                .setContentTitle(context.getString(R.string.sync_notification_title))
-                .setContentText(text)
+                .setSmallIcon(
+                    if (syncNotificationPhase(total) ==
+                        SyncNotificationPhase.CHECKING
+                    ) {
+                        android.R.drawable.stat_notify_sync
+                    } else {
+                        android.R.drawable.stat_sys_upload
+                    },
+                ).setContentTitle(
+                    context.getString(
+                        if (syncNotificationPhase(total) ==
+                            SyncNotificationPhase.CHECKING
+                        ) {
+                            R.string.sync_notification_starting
+                        } else {
+                            R.string.sync_notification_title
+                        },
+                    ),
+                ).setContentText(text)
                 .setOngoing(true)
                 .setSilent(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)

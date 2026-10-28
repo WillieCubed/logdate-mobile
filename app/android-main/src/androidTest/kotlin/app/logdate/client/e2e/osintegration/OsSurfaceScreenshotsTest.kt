@@ -201,7 +201,7 @@ class OsSurfaceScreenshotsTest {
         )
         OsSurfaceCapture.capture(surface = "live-updates", state = "sync-status-chip")
         OsSurfaceCapture.openNotifications()
-        OsSurfaceCapture.waitForText("Backing up your journal")
+        OsSurfaceCapture.waitForText("Backing up your memories")
         OsSurfaceCapture.capture(surface = "live-updates", state = "sync-progress")
     }
 
