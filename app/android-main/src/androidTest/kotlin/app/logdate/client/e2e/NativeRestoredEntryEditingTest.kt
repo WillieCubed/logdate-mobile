@@ -41,7 +41,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNotSame
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -57,7 +59,8 @@ class NativeRestoredEntryEditingTest {
             val now = kotlin.time.Instant.fromEpochMilliseconds(Clock.System.now().toEpochMilliseconds())
             val original = JournalNote.Text(content = "Today's retained entry ".repeat(6_000), creationTimestamp = now, lastUpdated = now)
             repository.create(original)
-            val model = withContext(Dispatchers.Main) { koin.get<EntryEditorViewModel>() }
+            val owner = withContext(Dispatchers.Main) { RestoredEditorTestOwner() }
+            val model = withContext(Dispatchers.Main) { owner.editor() }
             val collection = launch { model.editorState.collect { } }
             try {
                 withContext(Dispatchers.Main) { model.loadExistingEntry(original.uid) }
@@ -78,6 +81,7 @@ class NativeRestoredEntryEditingTest {
                 assertEquals(expected, (repository.getNoteById(original.uid) as JournalNote.Text).content)
             } finally {
                 collection.cancel()
+                withContext(Dispatchers.Main) { owner.close() }
             }
         }
 
@@ -282,17 +286,13 @@ class NativeRestoredEntryEditingTest {
         drafts: EntryDraftRepository? = null,
         block: suspend (EntryEditorViewModel) -> Unit,
     ) = coroutineScope {
+        val owner = withContext(Dispatchers.Main) { RestoredEditorTestOwner() }
         val model =
             withContext(Dispatchers.Main) {
                 val koin = GlobalContext.get()
-                if (drafts == null) {
-                    koin.get<EntryEditorViewModel>()
-                } else {
-                    EntryEditorViewModel(
-                        observeEditorData = koin.get(),
-                        saveEntryUseCase = koin.get(),
-                        contentLoader = koin.get(),
-                        draftManager =
+                owner.editor(
+                    draftManager =
+                        drafts?.let {
                             DraftManager(
                                 UpdateEntryDraftUseCase(drafts),
                                 CreateEntryDraftUseCase(drafts),
@@ -300,17 +300,62 @@ class NativeRestoredEntryEditingTest {
                                 DeleteEntryDraftUseCase(drafts, koin.get()),
                                 DeleteAllDraftsUseCase(drafts),
                                 CleanupExpiredDraftsUseCase(drafts),
-                            ),
-                    )
-                }
+                            )
+                        },
+                )
             }
         val collection = launch { model.editorState.collect { } }
         try {
             block(model)
         } finally {
             collection.cancel()
+            withContext(Dispatchers.Main) { owner.close() }
         }
     }
+
+    @Test
+    fun restoredOwnerRetainsDraftIdentityAndFreshEditorsHaveIndependentHandles() =
+        runBlocking {
+            requireEmulatorFixture()
+            val owners = mutableListOf<RestoredEditorTestOwner>()
+
+            suspend fun owner() = withContext(Dispatchers.Main) { RestoredEditorTestOwner().also(owners::add) }
+            val firstOwner = owner()
+            val otherOwner = owner()
+            val first = withContext(Dispatchers.Main) { firstOwner.editor() }
+            val other = withContext(Dispatchers.Main) { otherOwner.editor() }
+            val firstCollection = launch { first.editorState.collect { } }
+            var restoredCollection: kotlinx.coroutines.Job? = null
+            try {
+                withContext(Dispatchers.Main) {
+                    assertSame(first, firstOwner.editor(), "One visit must retain its ViewModel")
+                    assertNotSame(first, other)
+                    first.appendTextBlock("Retained owner draft")
+                }
+                val edited = withTimeout(15_000) { first.editorState.first { it.blocks.isNotEmpty() } }
+                assertTrue(withContext(Dispatchers.Main) { first.saveAsDraft(edited) })
+                val draftId = (first.editorState.value.draftState as DraftState.Active).id
+                assertEquals(draftId, first.recoverableDraftId)
+                assertNull(other.recoverableDraftId, "Another editor must not inherit the recording/draft handle")
+                val snapshot = withContext(Dispatchers.Main) { firstOwner.save().also { firstOwner.close() } }
+                owners.remove(firstOwner)
+                val restoredOwner = withContext(Dispatchers.Main) { RestoredEditorTestOwner(snapshot).also(owners::add) }
+                val restored = withContext(Dispatchers.Main) { restoredOwner.editor() }
+                assertNotSame(first, restored, "Restoration must construct a new ViewModel")
+                assertEquals(draftId, restored.recoverableDraftId, "SavedStateRegistry must restore the durable draft destination")
+                restoredCollection = launch { restored.editorState.collect { } }
+                withContext(Dispatchers.Main) { restored.loadDraft(draftId) }
+                val loaded = withTimeout(15_000) { restored.editorState.first { it.draftState == DraftState.Active(draftId) } }
+                assertEquals("Retained owner draft", (loaded.blocks.single() as TextBlockUiState).content)
+                val fresh = withContext(Dispatchers.Main) { owner().editor() }
+                assertNull(fresh.recoverableDraftId)
+                assertFalse(fresh.editorState.value.shouldExit)
+            } finally {
+                firstCollection.cancel()
+                restoredCollection?.cancel()
+                withContext(Dispatchers.Main) { owners.forEach(RestoredEditorTestOwner::close) }
+            }
+        }
 
     private fun requireEmulatorFixture() {
         assumeTrue(InstrumentationRegistry.getArguments().getString("restoredEntryEditing") == "true")
