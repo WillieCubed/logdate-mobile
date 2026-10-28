@@ -102,13 +102,11 @@ fun WorkspaceSupportingSheet(
         val mapBounds = composition.focus
         val anchors = supportingSheetAnchors(mapBounds.height, 160.dp * density.fontScale.coerceAtMost(2f))
         val side = composition.browse
-        val focused = extent == SupportingExtent.Focused || (side == null && !anchors.canOverlay && extent != SupportingExtent.Peek)
-        val motion =
-            rememberSupportingSheetMotion(
-                extent,
-                anchors.dragAnchors(with(density) { mapBounds.height.toPx() }, density.density),
-                onSettled = { extent = it },
-            )
+        val dragAnchors = anchors.dragAnchors(with(density) { mapBounds.height.toPx() }, density.density)
+        val presentationExtent = if (side == null) dragAnchors.availableExtent(extent) else extent
+        val allowsFocus = !dragAnchors.positionOf(SupportingExtent.Focused).isNaN()
+        val focused = presentationExtent == SupportingExtent.Focused
+        val motion = rememberSupportingSheetMotion(extent, dragAnchors, onSettled = { extent = it })
         val sheetHeight = side?.height ?: with(density) { (-motion.state.requireOffset()).toDp() }
         val mapPlacement =
             if (mapBounds.x > 0.dp ||
@@ -163,10 +161,12 @@ fun WorkspaceSupportingSheet(
                                 .fillMaxWidth()
                                 .semantics {
                                     if (side == null) {
-                                        stateDescription = extent.name
-                                        expand {
-                                            extent = if (anchors.canOverlay) SupportingExtent.Expanded else SupportingExtent.Focused
-                                            true
+                                        stateDescription = presentationExtent.name
+                                        if (allowsFocus) {
+                                            expand {
+                                                extent = if (anchors.canOverlay) SupportingExtent.Expanded else SupportingExtent.Focused
+                                                true
+                                            }
                                         }
                                         collapse {
                                             extent = SupportingExtent.Peek
@@ -180,15 +180,15 @@ fun WorkspaceSupportingSheet(
                                     Box(Modifier.weight(1f)) { header() }
                                     if (side == null) {
                                         val expandLabel =
-                                            when (extent) {
+                                            when (presentationExtent) {
                                                 SupportingExtent.Peek -> stringResource(Res.string.workspace_sheet_browse)
                                                 SupportingExtent.Browsing -> stringResource(Res.string.workspace_sheet_expand)
                                                 else -> stringResource(Res.string.workspace_sheet_collapse)
                                             }
                                         IconTooltip(label = expandLabel) {
-                                            IconButton(onClick = {
+                                            IconButton(enabled = allowsFocus || presentationExtent != SupportingExtent.Peek, onClick = {
                                                 extent =
-                                                    when (extent) {
+                                                    when (presentationExtent) {
                                                         SupportingExtent.Peek ->
                                                             if (anchors.canOverlay) SupportingExtent.Browsing else SupportingExtent.Focused
                                                         SupportingExtent.Browsing -> SupportingExtent.Expanded
@@ -199,7 +199,11 @@ fun WorkspaceSupportingSheet(
                                                     PlatformIcons.expandMore(),
                                                     expandLabel,
                                                     Modifier.then(
-                                                        if ((extent == SupportingExtent.Peek || extent == SupportingExtent.Browsing)) {
+                                                        if ((
+                                                                presentationExtent == SupportingExtent.Peek ||
+                                                                    presentationExtent == SupportingExtent.Browsing
+                                                            )
+                                                        ) {
                                                             Modifier.graphicsLayer {
                                                                 rotationZ =
                                                                     180f
@@ -218,7 +222,7 @@ fun WorkspaceSupportingSheet(
                                                 stringResource(Res.string.workspace_sheet_full_view)
                                             }
                                         IconTooltip(label = fullViewLabel) {
-                                            IconButton(onClick = {
+                                            IconButton(enabled = allowsFocus, onClick = {
                                                 extent =
                                                     if (focused) {
                                                         if (anchors.canOverlay) SupportingExtent.Browsing else SupportingExtent.Peek
@@ -231,9 +235,9 @@ fun WorkspaceSupportingSheet(
                                     headerActions()
                                 }
                             } else {
-                                TextButton(onClick = {
+                                TextButton(enabled = allowsFocus || presentationExtent != SupportingExtent.Peek, onClick = {
                                     extent =
-                                        if (extent ==
+                                        if (presentationExtent ==
                                             SupportingExtent.Peek
                                         ) {
                                             if (anchors.canOverlay) SupportingExtent.Browsing else SupportingExtent.Focused
@@ -242,21 +246,21 @@ fun WorkspaceSupportingSheet(
                                         }
                                 }) {
                                     Text(
-                                        if (extent == SupportingExtent.Peek) {
+                                        if (presentationExtent == SupportingExtent.Peek) {
                                             stringResource(Res.string.workspace_sheet_browse)
                                         } else {
                                             stringResource(Res.string.workspace_sheet_collapse)
                                         },
                                     )
                                 }
-                                if (extent ==
+                                if (presentationExtent ==
                                     SupportingExtent.Browsing
                                 ) {
                                     TextButton(onClick = { extent = SupportingExtent.Expanded }) {
                                         Text(stringResource(Res.string.workspace_sheet_expand))
                                     }
                                 }
-                                TextButton(onClick = {
+                                TextButton(enabled = allowsFocus, onClick = {
                                     extent =
                                         if (focused) {
                                             if (anchors.canOverlay) SupportingExtent.Browsing else SupportingExtent.Peek
@@ -289,7 +293,7 @@ fun WorkspaceSupportingSheet(
                                 ) {
                                     SupportingExtent.Browsing
                                 } else {
-                                    extent
+                                    presentationExtent
                                 },
                             )
                         }

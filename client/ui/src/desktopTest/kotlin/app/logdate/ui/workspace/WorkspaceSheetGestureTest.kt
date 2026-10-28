@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -23,6 +24,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeWithVelocity
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.platform.LocalReduceMotionOverride
 import app.logdate.ui.theme.LogDateTheme
@@ -139,7 +141,11 @@ class WorkspaceSheetGestureTest {
             onNode(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Expanded")).fetchSemanticsNode()
         }
 
-    @Test fun shortResizePreservesSelectedContentAndMapComposition() =
+    @Test fun shortResizePreservesSelectedContentAndMapComposition() = verifyTemporaryResize(300.dp)
+
+    @Test fun tinyResizeRestoresThePreviousChoiceWhenSpaceReturns() = verifyTemporaryResize(48.dp)
+
+    private fun verifyTemporaryResize(shortHeight: Dp) =
         runDesktopComposeUiTest(width = 411, height = 800) {
             var height by mutableStateOf(800.dp)
             var mapCompositions = 0
@@ -163,9 +169,16 @@ class WorkspaceSheetGestureTest {
                     }
                 }
             }
-            height = 300.dp
-            onNodeWithText("Selected place").fetchSemanticsNode()
+            val beforeResize = onNodeWithText("Browse places").fetchSemanticsNode().boundsInRoot.top
+            height = shortHeight
+            onNodeWithText("Browse places").fetchSemanticsNode()
             height = 800.dp
+            assertEquals(
+                beforeResize,
+                onNodeWithText("Browse places").fetchSemanticsNode().boundsInRoot.top,
+                1f,
+                "A temporary short window must restore the previous browse extent",
+            )
             onNodeWithText("Selected place").fetchSemanticsNode()
             assertEquals(1, mapCompositions, "Resize must not remount the map or reset its selection")
         }
@@ -193,6 +206,59 @@ class WorkspaceSheetGestureTest {
             }
             assertTrue(header.fetchSemanticsNode().boundsInRoot.top < start - 60f)
             header.performTouchInput { up() }
+        }
+
+    @Test fun collapsingInAShortWindowKeepsTheExplicitChoice() =
+        runDesktopComposeUiTest(width = 411, height = 800) {
+            var height by mutableStateOf(800.dp)
+            setContent {
+                LogDateTheme {
+                    Box(Modifier.fillMaxSize()) {
+                        Box(Modifier.height(height)) {
+                            WorkspaceSupportingSheet(
+                                "Summary",
+                                initialExtent = SupportingExtent.Browsing,
+                                header = { Text("Browse places") },
+                                focus = {},
+                                supporting = { Text("Selected place") },
+                            )
+                        }
+                    }
+                }
+            }
+            height = 300.dp
+            onNode(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Focused")).fetchSemanticsNode()
+            onNodeWithContentDescription("Collapse").performClick()
+            height = 800.dp
+            onNodeWithText("Summary").fetchSemanticsNode()
+            onNode(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Peek")).fetchSemanticsNode()
+        }
+
+    @Test fun explicitFullViewSurvivesATemporaryShortWindow() =
+        runDesktopComposeUiTest(width = 411, height = 800) {
+            var height by mutableStateOf(800.dp)
+            setContent {
+                LogDateTheme {
+                    Box(Modifier.fillMaxSize()) {
+                        Box(Modifier.height(height)) {
+                            WorkspaceSupportingSheet(
+                                "Summary",
+                                initialExtent = SupportingExtent.Browsing,
+                                header = { Text("Browse places") },
+                                focus = {},
+                                supporting = { Text("Selected place") },
+                            )
+                        }
+                    }
+                }
+            }
+            onNodeWithContentDescription("Full view").performClick()
+            val full = onNodeWithText("Browse places").fetchSemanticsNode().boundsInRoot.top
+            height = 300.dp
+            onNodeWithText("Selected place").fetchSemanticsNode()
+            height = 800.dp
+            assertEquals(full, onNodeWithText("Browse places").fetchSemanticsNode().boundsInRoot.top, 1f)
+            onNode(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Focused")).fetchSemanticsNode()
         }
 
     @Test fun aContentDragInterruptsAnInFlightHeaderFling() =
@@ -241,7 +307,7 @@ class WorkspaceSheetGestureTest {
                 }
             }
             assertEquals(48f, onNodeWithTag("tiny_sheet").fetchSemanticsNode().boundsInRoot.height)
-            onNodeWithContentDescription("Full view").performClick()
+            onNodeWithContentDescription("Full view").assertIsNotEnabled().performClick()
             onNode(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Peek")).fetchSemanticsNode()
         }
 }

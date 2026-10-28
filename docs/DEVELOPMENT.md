@@ -216,7 +216,8 @@ the branch, pull request, and merge steps.
 
 Places uses the shared `WorkspaceSupportingSheet` for direct finger tracking, velocity-based settling,
 content-scroll handoff and Back-to-peek. Its overlay anchors remain distinct at large text sizes;
-short windows use the focused layout. Resizing preserves the mounted map and selected content.
+short windows temporarily use the focused layout and restore the chosen extent when space returns.
+Resizing preserves the mounted map and selected content, while explicit collapse/full-view choices persist.
 The shared rail separates navigation targets by 8dp while retaining its bounded native widths.
 All Home destinations continue to use the same shell search field; contextual Places search replaces
 that field instead of adding a second search control.

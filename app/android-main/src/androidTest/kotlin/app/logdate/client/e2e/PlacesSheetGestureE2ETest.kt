@@ -2,6 +2,8 @@ package app.logdate.client.e2e
 
 import android.graphics.Color
 import android.os.Build
+import android.os.SystemClock
+import android.view.WindowInsets
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -13,6 +15,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.test.core.app.ActivityScenario
+import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
@@ -43,6 +46,7 @@ import kotlin.time.Instant
 /** Production Places components, synthetic memories, real Android touch input and a bounded video.
  * Resized windows prove layout; they do not simulate a physical fold or certify native map tiles.
  */
+@SdkSuppress(minSdkVersion = 34)
 class PlacesSheetGestureE2ETest {
     @Test(timeout = 180_000)
     fun fingerTrackingReversalBackAndThreeWindowSizes() {
@@ -51,9 +55,11 @@ class PlacesSheetGestureE2ETest {
         val device = UiDevice.getInstance(instrumentation)
         val oldSize = overrideValue(device.executeShellCommand("wm size"))
         val oldDensity = overrideValue(device.executeShellCommand("wm density"))
+        val oldImePolicy = device.executeShellCommand("settings get secure show_ime_with_hard_keyboard").trim()
         val output = File(checkNotNull(InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")), "places-sheet")
         check(output.mkdirs() || output.isDirectory)
         try {
+            device.executeShellCommand("settings put secure show_ime_with_hard_keyboard 1")
             for ((label, size) in listOf(
                 "normal-mobile" to (411 to 891),
                 "foldable-sized-mobile" to (720 to 960),
@@ -86,6 +92,16 @@ class PlacesSheetGestureE2ETest {
                                 pointer.moveBy(Offset(0f, 45f), 300)
                                 device.waitForIdle(1_000)
                                 assertEquals(45f, (headerTop() - raised).toFloat(), 3f)
+                                val beforeRapidReversal = headerTop()
+                                pointer.moveBy(Offset(0f, -100f), 160)
+                                pointer.moveBy(Offset(0f, 90f), 140)
+                                device.waitForIdle(1_000)
+                                assertEquals(
+                                    (beforeRapidReversal - 10).toFloat(),
+                                    headerTop().toFloat(),
+                                    3f,
+                                    "Rapid reversal must keep following the same finger",
+                                )
                             }
                             val memory =
                                 checkNotNull(
@@ -102,6 +118,19 @@ class PlacesSheetGestureE2ETest {
                                 assertTrue(headerTop() > afterScroll + 60, "At the list top, downward drag must return to the sheet")
                             }
                             device.waitForIdle(1_000)
+                            val beforeIme = headerTop()
+                            check(device.click(device.displayWidth / 2, 68))
+                            awaitIme(scenario, true)
+                            checkNotNull(device.wait(Until.findObject(By.desc("Show map")), 5_000))
+                            device.pressBack()
+                            awaitIme(scenario, false)
+                            device.waitForIdle(1_000)
+                            assertEquals(
+                                beforeIme.toFloat(),
+                                headerTop().toFloat(),
+                                3f,
+                                "Closing the IME must restore browsing instead of leaving full view",
+                            )
                             device.pressBack()
                             checkNotNull(device.wait(Until.findObject(By.desc("Browse")), 5_000))
                             val peek = headerTop()
@@ -132,9 +161,31 @@ class PlacesSheetGestureE2ETest {
                 "API34 Gradle-managed Pixel 9 Pro; density160 resized windows; production Places/workspace components with synthetic places/memories. Test ComponentActivity has transparent bars; this does not certify MainActivity window setup, native map tiles, or hinge hardware.\n",
             )
         } finally {
+            if (oldImePolicy == "null") {
+                device.executeShellCommand("settings delete secure show_ime_with_hard_keyboard")
+            } else {
+                device.executeShellCommand("settings put secure show_ime_with_hard_keyboard $oldImePolicy")
+            }
             device.executeShellCommand("wm size $oldSize")
             device.executeShellCommand("wm density $oldDensity")
         }
+    }
+
+    private fun awaitIme(
+        scenario: ActivityScenario<ComponentActivity>,
+        visible: Boolean,
+    ) {
+        val deadline = SystemClock.elapsedRealtime() + 5_000
+        while (SystemClock.elapsedRealtime() < deadline) {
+            var shown = false
+            scenario.onActivity {
+                shown = it.window.decorView.rootWindowInsets
+                    ?.isVisible(WindowInsets.Type.ime()) == true
+            }
+            if (shown == visible) return
+            SystemClock.sleep(50)
+        }
+        error("IME did not reach visible=$visible")
     }
 
     private fun overrideValue(value: String): String =
