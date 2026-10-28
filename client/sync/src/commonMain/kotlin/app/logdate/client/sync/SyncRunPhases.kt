@@ -139,14 +139,22 @@ internal suspend fun DefaultSyncManager.runPendingUploads(): SyncResult =
         )
     }
 
+/** Queue kinds with a handler in this device's active transport. Held rows are never discarded. */
+internal suspend fun DefaultSyncManager.handledUploadTypes(): List<EntityType> =
+    buildList {
+        addAll(listOf(EntityType.JOURNAL, EntityType.NOTE, EntityType.JOURNAL_MERGE, EntityType.ASSOCIATION))
+        if (profile.syncsDrafts) add(EntityType.DRAFT)
+        if (momentUploader != null) add(EntityType.MOMENT)
+        if (historyEngine != null) {
+            for (type in app.logdate.client.sync.location.LOCATION_ENTITY_TYPES) {
+                if (space?.activeKind(type) != null) add(type)
+            }
+        }
+    }
+
 /** Count only due operations this upload pass can handle; held legacy rows stay queued. */
 private suspend fun DefaultSyncManager.pendingUploadsForRun(): Int? {
-    val types =
-        buildList {
-            addAll(listOf(EntityType.JOURNAL, EntityType.NOTE, EntityType.JOURNAL_MERGE, EntityType.ASSOCIATION))
-            if (profile.syncsDrafts) add(EntityType.DRAFT)
-            if (momentUploader != null) add(EntityType.MOMENT)
-        }
+    val types = handledUploadTypes()
     var count = 0
     for (type in types) {
         for (pending in syncMetadataService.getPendingUploads(type)) {

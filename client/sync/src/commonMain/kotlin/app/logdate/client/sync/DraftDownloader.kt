@@ -284,7 +284,9 @@ internal class DraftDownloader(
                 return
             }
 
-            if (existingDraft != null && existingDraft.lastModifiedAt > remoteDraft.lastUpdated) {
+            // The outer timestamp is milliseconds; the encrypted draft preserves the edit's full precision.
+            val remoteModifiedAt = remoteDraft.richDraft?.lastModifiedAt ?: remoteDraft.lastUpdated
+            if (existingDraft != null && existingDraft.lastModifiedAt > remoteModifiedAt) {
                 syncMetadataService.enqueuePending(
                     entityId = existingDraft.id.toString(),
                     entityType = EntityType.DRAFT,

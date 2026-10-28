@@ -158,8 +158,14 @@ class DefaultSyncManager(
     /** Work a periodic cycle can attempt now; backed-off and parked records do not count. */
     suspend fun hasDueWork(): Boolean {
         if (!isEnabled || !readinessGate.canProbe()) return false
-        for (type in EntityType.entries) {
-            if (syncMetadataService.getPendingUploads(type).any { retryCoordinator.shouldAttempt(type, it) }) return true
+        for (type in handledUploadTypes()) {
+            if (syncMetadataService.getPendingUploads(type).any {
+                    (it.operation != app.logdate.client.sync.metadata.PendingOperation.UPDATE || profile.uploadsUpdates) &&
+                        retryCoordinator.shouldAttempt(type, it)
+                }
+            ) {
+                return true
+            }
         }
         if ((downloadInbox?.dueCount() ?: 0) > 0) return true
         val token = sessionStorage.getSession()?.accessToken ?: return false
