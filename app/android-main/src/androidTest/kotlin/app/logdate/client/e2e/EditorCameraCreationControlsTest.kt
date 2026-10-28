@@ -4,7 +4,6 @@ import android.Manifest
 import android.app.Application
 import android.content.Intent
 import android.content.pm.ActivityInfo
-import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.os.Build
 import android.view.View
@@ -180,47 +179,7 @@ class EditorCameraCreationControlsTest {
                     compose.onNodeWithTag("entry_capture_tools").assertIsNotDisplayed()
                     tap(device, scenario, compose.onNodeWithContentDescription("Return to entry"))
                     compose.onNodeWithTag("entry_add_memory").assertIsDisplayed()
-                    var gestureBottom = 0
-                    for (navigation in listOf("gestural", "threebutton")) {
-                        device.executeShellCommand(
-                            "cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.$navigation",
-                        )
-                        compose.waitForIdle()
-                        compose.waitUntil(10_000) {
-                            var actualBottom = 0
-                            scenario.onActivity {
-                                actualBottom =
-                                    WindowInsetsCompat
-                                        .toWindowInsetsCompat(it.window.decorView.rootWindowInsets)
-                                        .getInsets(WindowInsetsCompat.Type.navigationBars())
-                                        .bottom
-                            }
-                            if (navigation == "threebutton") actualBottom > gestureBottom else actualBottom > 0
-                        }
-                        var bottomInset = 0
-                        var topInset = 0
-                        scenario.onActivity {
-                            assertFalse(it.window.isNavigationBarContrastEnforced)
-                            bottomInset =
-                                WindowInsetsCompat
-                                    .toWindowInsetsCompat(it.window.decorView.rootWindowInsets)
-                                    .getInsets(WindowInsetsCompat.Type.navigationBars())
-                                    .bottom
-                        }
-                        if (navigation == "gestural") gestureBottom = bottomInset
-                        val screenshot = File(output, "mobile-$navigation-transparent-bars.png")
-                        check(device.takeScreenshot(screenshot))
-                        val bitmap = checkNotNull(BitmapFactory.decodeFile(screenshot.absolutePath))
-                        try {
-                            assertEquals(
-                                bitmap.getPixel(bitmap.width / 8, bitmap.height - bottomInset - 4),
-                                bitmap.getPixel(bitmap.width / 8, bitmap.height - bottomInset / 2),
-                                "App background must continue behind the $navigation navigation area without a scrim",
-                            )
-                        } finally {
-                            bitmap.recycle()
-                        }
-                    }
+                    ManagedSystemBarCaptures(device, compose, scenario, output).captureGestureAndThreeButtonBars()
                 } finally {
                     device.takeScreenshot(File(output, "camera-terminal.png"))
                     scenario.onActivity { activity ->
