@@ -45,7 +45,7 @@ fun EntryEditorSurface(
                 Modifier
                     .fillMaxWidth()
                     // Apply height constraints based on the actual available pane/window width.
-                    .then(if (wrapContentHeight) Modifier else Modifier.heightIn(min = 120.dp, max = maxHeight)),
+                    .then(if (wrapContentHeight) Modifier else Modifier.heightIn(min = EditorBlockMinHeight, max = maxHeight)),
             colors =
                 CardDefaults.cardColors(
                     containerColor = containerColor,
