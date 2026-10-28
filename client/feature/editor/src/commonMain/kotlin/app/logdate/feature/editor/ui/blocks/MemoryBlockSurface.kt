@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -41,6 +42,7 @@ import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
 import app.logdate.feature.editor.ui.handwriting.handwritingSharedElement
 import app.logdate.feature.editor.ui.layout.EditorBlockCornerRadius
+import app.logdate.feature.editor.ui.layout.EditorBlockMinHeight
 import app.logdate.feature.editor.ui.layout.LocalEditorRecordingActive
 import app.logdate.shared.model.PhotoPresentation
 import app.logdate.ui.common.DropdownMenu
@@ -100,6 +102,7 @@ internal fun MemoryBlockSurface(
         modifier =
             modifier
                 .fillMaxWidth()
+                .heightIn(min = EditorBlockMinHeight)
                 .then(if (sharedPaper) Modifier.handwritingSharedElement(block.id, progress) else Modifier)
                 .testTag(
                     "memory_block_${block.id}",

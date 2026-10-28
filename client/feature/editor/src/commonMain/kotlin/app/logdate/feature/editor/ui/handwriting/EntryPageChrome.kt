@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.lerp
 import app.logdate.client.datastore.EntryStartMode
 import app.logdate.feature.editor.ui.editor.EditorState
 import app.logdate.feature.editor.ui.layout.EditorContentLayer
+import app.logdate.feature.editor.ui.layout.EntryPageRailMaxWidth
 import app.logdate.feature.editor.ui.layout.LocalEditorContextControlsVisible
 import app.logdate.feature.editor.ui.layout.LocalEditorFocusPresentation
 import app.logdate.feature.editor.ui.layout.LocalEditorRecordingActive
@@ -57,7 +58,7 @@ import app.logdate.ui.foldable.calculateFoldableSplitLayout
 import app.logdate.ui.foldable.relativeTo
 import app.logdate.ui.foldable.rememberFoldableLayoutInfo
 import app.logdate.ui.foldable.rememberWindowOrigin
-
+import app.logdate.ui.theme.Spacing
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.entry_page_back_to_writing
 import logdate.client.feature.editor.generated.resources.entry_page_return_to_writing
@@ -79,7 +80,7 @@ internal fun EntryPageChrome(
     focusProgress: Float? = null,
     content: @Composable () -> Unit,
 ) {
-    val returnToWritingDescription = stringResource(Res.string.entry_page_return_to_writing)
+    val returnToWriting = stringResource(Res.string.entry_page_return_to_writing)
     val density = LocalDensity.current
     val keyboardBottom = WindowInsets.ime.getBottom(density)
     val safeBottom = WindowInsets.safeDrawing.getBottom(density)
@@ -110,8 +111,17 @@ internal fun EntryPageChrome(
         val safeHeight = maxHeight - with(density) { (safeBottom + safeTop).toDp() }
         val chromeHeight = if (safeHeight < 240.dp) 48.dp else 64.dp
         val anchor = overview.captureBounds
-        val focusLeft = if (split is FoldableSplitLayout.Vertical) split.rightPane.left else (maxWidth - minOf(maxWidth, 640.dp)) / 2
-        val focusWidth = if (split is FoldableSplitLayout.Vertical) split.rightPane.width else minOf(maxWidth, 640.dp)
+        val focusLeft =
+            if (split is FoldableSplitLayout.Vertical) {
+                split.rightPane.left
+            } else {
+                (
+                    maxWidth -
+                        minOf(maxWidth, EntryPageRailMaxWidth)
+                ) /
+                    2
+            }
+        val focusWidth = if (split is FoldableSplitLayout.Vertical) split.rightPane.width else minOf(maxWidth, EntryPageRailMaxWidth)
         val focusTop = maxHeight - chromeHeight - with(density) { maxOf(keyboardBottom, safeBottom).toDp() }
         val progress = focusProgress ?: if (focused) 1f else 0f
         val overviewLeft = with(density) { (anchor?.left?.toDp() ?: origin.x) - origin.x }
@@ -185,7 +195,7 @@ internal fun EntryPageChrome(
                             Modifier
                                 .padding(16.dp)
                                 .graphicsLayer { alpha = overview.browsingProgress }
-                                .semantics { contentDescription = returnToWritingDescription },
+                                .semantics { contentDescription = returnToWriting },
                         colors =
                             ButtonDefaults.filledTonalButtonColors(
                                 containerColor = StoryChrome,
@@ -204,7 +214,7 @@ internal fun EntryPageChrome(
                         .absoluteOffset(barLeft, barTop)
                         .width(barWidth)
                         .height(chromeHeight)
-                        .padding(horizontal = 12.dp)
+                        .padding(horizontal = Spacing.lg)
                         .captureBarPullGestures(overview, enabled = !focused && !overview.earlierExpanded)
                         .then(
                             if (!editor.isEditingLocked && !editor.isSaving && !editor.shouldExit && !editor.isRecordingAudio) {

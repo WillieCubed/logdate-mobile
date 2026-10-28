@@ -4,7 +4,7 @@ Run the focused acceptance tests on a repository-declared Gradle Managed Device:
 
 ```sh
 ./gradlew :app:android-main:phoneApi34DebugAndroidTest \
-  -Plogdate.androidTestClass=app.logdate.client.e2e.EditorSafeAreaAcceptanceTest,app.logdate.client.e2e.SurfaceSafeAreaAcceptanceTest \
+  -Plogdate.androidTestClass=app.logdate.client.e2e.EditorSafeAreaAcceptanceTest,app.logdate.client.e2e.SurfaceSafeAreaAcceptanceTest,app.logdate.client.e2e.EditorGeometryAcceptanceTest \
   -Plogdate.androidTestCoverage=false \
   -Plogdate.androidTestOrchestrator=false
 ```
@@ -43,3 +43,30 @@ The frame owns system insets and persistent chrome. Shared transition overlays b
 to `EditorContentLayer`, below that chrome. A recording or stopping take owns its
 transport area; the capture selector returns when that ownership ends. In short
 keyboard viewports both chrome rows use 48dp targets to preserve space for writing.
+
+## Memory geometry and continuity
+
+Inline memory surfaces have a shared 120dp minimum, including empty, loading,
+failed and ready content. This reuses the editor surface's established minimum;
+48dp is an interactive target size, not a document block height. Taller content
+can grow. Focused content adapts to the available keyboard viewport instead of
+forcing the inline minimum into a shorter writing area.
+
+Overview memory surfaces and mode-selector ends share a centered rail capped at
+640dp with 16dp framing inside the safe area. The journal chooser centers on the
+safe header using equal reservations for the measured leading and trailing
+actions. Below 360dp, Save uses an accessible icon button so the chooser retains
+at least a 48dp target; long titles ellipsize without overlapping controls.
+
+`EntryGeometryContractTest` measures both edges, chooser center and target size
+(including 280dp, 200% text and RTL), the surface minimum through content changes
+and sampled focus frames, and stable semantics identity through capture-state
+updates and insertion of another memory. Overview compositions key memories by
+block ID, independently of capture state and recording elapsed time.
+
+`EditorGeometryAcceptanceTest` measures the production block height, chooser
+center and both rail edges in portrait/landscape at normal and 200% Android text.
+It exercises the real IME and captures six bounded images in `editor-geometry/`,
+including the two large-text keyboard states. Inspect their pixels separately
+from the measurements. Native runs do not cover a 280dp window or RTL; those are
+headless layout regressions.

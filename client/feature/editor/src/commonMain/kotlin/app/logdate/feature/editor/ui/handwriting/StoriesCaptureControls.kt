@@ -2,28 +2,17 @@
 
 package app.logdate.feature.editor.ui.handwriting
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -31,10 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,12 +28,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -63,20 +46,11 @@ import app.logdate.feature.editor.ui.editor.VideoBlockUiState
 import app.logdate.feature.editor.ui.layout.LocalEntryChromeHeight
 import app.logdate.shared.model.Journal
 import app.logdate.ui.adaptive.FoldableBookLayout
-import app.logdate.ui.common.DropdownMenu
 import logdate.client.feature.editor.generated.resources.Res
-import logdate.client.feature.editor.generated.resources.close
 import logdate.client.feature.editor.generated.resources.entry_page_block_focus
-import logdate.client.feature.editor.generated.resources.entry_page_choose_journal
-import logdate.client.feature.editor.generated.resources.entry_page_drafts_count
 import logdate.client.feature.editor.generated.resources.entry_page_entry
 import logdate.client.feature.editor.generated.resources.entry_page_focus
-import logdate.client.feature.editor.generated.resources.entry_page_options
 import logdate.client.feature.editor.generated.resources.entry_page_return_to_entry
-import logdate.client.feature.editor.generated.resources.entry_page_save
-import logdate.client.feature.editor.generated.resources.entry_start_default_mode
-import logdate.client.feature.editor.generated.resources.save_entry
-import logdate.client.feature.editor.generated.resources.saving
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 
@@ -110,13 +84,10 @@ internal fun EntryFocusPrototypeHeader(
     onChooseDefaultMode: (() -> Unit)? = null,
     floating: Boolean = false,
 ) {
-    var journalOpen by remember { mutableStateOf(false) }
-    var optionsOpen by remember { mutableStateOf(false) }
     val focused = block != null
-    val savingDescription = stringResource(Res.string.saving)
-    val paneDescription = stringResource(if (focused) Res.string.entry_page_block_focus else Res.string.entry_page_entry)
-    val returnToEntryDescription = stringResource(Res.string.entry_page_return_to_entry)
-    val saveDescription = stringResource(Res.string.save_entry)
+    val blockFocusTitle = stringResource(Res.string.entry_page_block_focus)
+    val entryTitle = stringResource(Res.string.entry_page_entry)
+    val returnToEntry = stringResource(Res.string.entry_page_return_to_entry)
     val largeText = LocalDensity.current.fontScale >= 1.5f
     val header: @Composable () -> Unit = {
         Row(
@@ -126,7 +97,7 @@ internal fun EntryFocusPrototypeHeader(
                 .padding(horizontal = 12.dp)
                 .then(if (recording || canvasOnly) Modifier else Modifier.captureModeSwipes(captureModeForBlock(block), onCaptureMode))
                 .testTag(if (focused) "entry_mode_focus" else "entry_mode_overview")
-                .semantics { paneTitle = paneDescription },
+                .semantics { paneTitle = if (focused) blockFocusTitle else entryTitle },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -139,7 +110,7 @@ internal fun EntryFocusPrototypeHeader(
                             containerColor = StoryChrome,
                             contentColor = MaterialTheme.colorScheme.onSurface,
                         ),
-                    modifier = Modifier.semantics { contentDescription = returnToEntryDescription },
+                    modifier = Modifier.semantics { contentDescription = returnToEntry },
                 ) {
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack, null, Modifier.size(20.dp))
                 }
@@ -161,116 +132,33 @@ internal fun EntryFocusPrototypeHeader(
                         }
                     }
                 }
-            } else {
-                FilledTonalIconButton(
-                    onClick = onExit,
-                    colors =
-                        IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = StoryChrome,
-                            contentColor = MaterialTheme.colorScheme.onSurface,
-                        ),
-                ) { Icon(Icons.Outlined.Close, stringResource(Res.string.close)) }
-                Box(Modifier.weight(1f).height(48.dp)) {
-                    Column(
-                        (
-                            if (floating) {
-                                Modifier
-                                    .align(
-                                        Alignment.Center,
-                                    ).background(StoryChrome, RoundedCornerShape(24.dp))
-                                    .padding(horizontal = 12.dp)
-                            } else {
-                                Modifier.fillMaxWidth()
-                            }
-                        ).height(48.dp).clickable { journalOpen = true },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        if (!largeText && !floating) {
-                            Text(
-                                stringResource(Res.string.entry_page_entry),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                if (journalSelected) journal?.title.orEmpty() else stringResource(Res.string.entry_page_choose_journal),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = StoryMuted,
-                            )
-                            Icon(Icons.Outlined.ExpandMore, null, Modifier.size(16.dp), tint = StoryMuted)
-                        }
-                    }
-                    DropdownMenu(journalOpen, onDismissRequest = { journalOpen = false }) {
-                        availableJournals.forEach { item ->
-                            DropdownMenuItem(
-                                text = { Text(item.title) },
-                                trailingIcon = { if (journalSelected && item.id == journal?.id) Icon(Icons.Outlined.Check, null) },
-                                onClick = {
-                                    onSelectJournal?.invoke(item) ?: onJournalSelection()
-                                    journalOpen = false
-                                },
-                            )
-                        }
-                    }
-                }
-                Button(
-                    onClick = onSave,
-                    enabled = saveEnabled && !saveInProgress,
-                    modifier =
-                        Modifier.height(40.dp).semantics {
-                            contentDescription = saveDescription
-                            if (saveInProgress) stateDescription = savingDescription
-                            liveRegion = LiveRegionMode.Polite
-                        },
-                    contentPadding = PaddingValues(horizontal = 12.dp),
-                ) {
-                    if (saveInProgress) {
-                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else if (largeText) {
-                        Icon(Icons.Outlined.Check, null, Modifier.size(20.dp))
-                    } else {
-                        Text(stringResource(Res.string.entry_page_save), maxLines = 1)
-                    }
-                }
-                if (onShowDrafts != null) {
-                    Box {
-                        FilledTonalIconButton(
-                            onClick = { optionsOpen = true },
-                            modifier = Modifier.size(40.dp),
-                        ) { Icon(Icons.Outlined.MoreVert, stringResource(Res.string.entry_page_options)) }
-                        DropdownMenu(optionsOpen, { optionsOpen = false }) {
-                            onChooseDefaultMode?.let { chooseDefault ->
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(Res.string.entry_start_default_mode)) },
-                                    onClick = {
-                                        optionsOpen = false
-                                        chooseDefault()
-                                    },
-                                )
-                            }
-                            DropdownMenuItem(
-                                text = { Text(stringResource(Res.string.entry_page_drafts_count, draftCount)) },
-                                enabled = draftCount > 0,
-                                modifier = Modifier.testTag("entry_open_drafts"),
-                                onClick = {
-                                    optionsOpen = false
-                                    onShowDrafts()
-                                },
-                            )
-                        }
-                    }
-                }
             }
         }
     }
+    val overviewHeader: @Composable () -> Unit = {
+        EntryJournalHeader(
+            journal,
+            journalSelected,
+            availableJournals,
+            onSelectJournal,
+            onJournalSelection,
+            onExit,
+            onSave,
+            saveEnabled,
+            saveInProgress,
+            onShowDrafts,
+            draftCount,
+            onChooseDefaultMode,
+            floating,
+            modifier = if (recording || canvasOnly) Modifier else Modifier.captureModeSwipes(null, onCaptureMode),
+        )
+    }
     FoldableBookLayout(
-        modifier = Modifier.fillMaxWidth().height(64.dp),
+        modifier = Modifier.fillMaxWidth().height(LocalEntryChromeHeight.current),
         minPaneWidth = 320.dp,
-        startPane = { header() },
+        startPane = { if (focused) header() else overviewHeader() },
         endPane = {},
-        standardContent = { header() },
+        standardContent = { if (focused) header() else overviewHeader() },
     )
 }
 

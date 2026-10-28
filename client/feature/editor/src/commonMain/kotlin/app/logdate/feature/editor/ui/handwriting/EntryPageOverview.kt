@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,6 +76,7 @@ import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
 import app.logdate.feature.editor.ui.editorBlockFocusElement
 import app.logdate.feature.editor.ui.layout.EditorBlockCornerRadius
+import app.logdate.feature.editor.ui.layout.EntryPageRailMaxWidth
 import app.logdate.feature.editor.ui.state.BlocksUiState
 import app.logdate.feature.editor.ui.text.TextBlockContent
 import app.logdate.ui.foldable.FoldableSplitLayout
@@ -83,6 +85,7 @@ import app.logdate.ui.foldable.relativeTo
 import app.logdate.ui.foldable.rememberFoldableLayoutInfo
 import app.logdate.ui.foldable.rememberWindowOrigin
 import app.logdate.ui.platform.rememberLogDateHaptics
+import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.entry_page_browse_earlier_today
@@ -237,7 +240,9 @@ internal fun EntryPageOverview(
                             Icon(Icons.Outlined.History, stringResource(Res.string.entry_page_browse_earlier_today))
                         }
                     }
-                    EarlierEntryContext(notes, showHeading = false)
+                    Box(Modifier.padding(horizontal = Spacing.lg)) {
+                        EarlierEntryContext(notes, showHeading = false)
+                    }
                 }
             }
         }
@@ -249,7 +254,9 @@ internal fun EntryPageOverview(
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                EntryBlocks(uiState, state, viewportWidthPx, viewportHeightPx, onAudioResolverReady)
+                Column(Modifier.padding(horizontal = Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                    EntryBlocks(uiState, state, viewportWidthPx, viewportHeightPx, onAudioResolverReady)
+                }
                 Box(
                     Modifier.fillMaxWidth().height(80.dp).testTag("entry_page_creation").onGloballyPositioned {
                         state.captureBounds = Rect(it.positionInWindow(), Size(it.size.width.toFloat(), it.size.height.toFloat()))
@@ -288,7 +295,7 @@ internal fun EntryPageOverview(
                         }
                     } else {
                         Column(
-                            Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(top = contentTop, bottom = 16.dp),
+                            Modifier.widthIn(max = EntryPageRailMaxWidth).fillMaxWidth().padding(top = contentTop, bottom = 16.dp),
                             verticalArrangement = Arrangement.spacedBy(24.dp),
                         ) {
                             reading()
@@ -313,67 +320,69 @@ private fun EntryBlocks(
     val visibility = LocalAnimatedVisibilityScope.current
     val scope = rememberCoroutineScope()
     uiState.blocks.forEach { block ->
-        val focus = {
-            state.focusedAnchor = EntryPageScrollAnchor(block.id, state.blockPositions[block.id] ?: 88f, viewportWidth)
-            uiState.onBlockFocused(block.id)
-        }
-        val bounds =
-            if (block is HandwritingBlockUiState || shared == null || visibility == null) {
-                Modifier
-            } else {
-                with(shared) {
-                    Modifier.editorBlockFocusElement(
-                        shared,
-                        visibility,
-                        block.id,
-                        EditorBlockCornerRadius,
-                        LocalBlockFocusProgress.current ?: 0f,
-                    )
-                }
+        key(block.id) {
+            val focus = {
+                state.focusedAnchor = EntryPageScrollAnchor(block.id, state.blockPositions[block.id] ?: 88f, viewportWidth)
+                uiState.onBlockFocused(block.id)
             }
-        Box(
-            Modifier.fillMaxWidth().onGloballyPositioned { coordinates ->
-                val top = coordinates.positionInWindow().y
-                state.blockPositions[block.id] = top
-                val anchor = state.focusedAnchor
-                if (anchor?.blockId == block.id && anchor.width != viewportWidth) {
-                    val desiredTop = anchor.top.coerceAtMost(state.viewportTop + viewportHeight / 2f)
-                    state.focusedAnchor = anchor.copy(top = desiredTop, width = viewportWidth)
-                    scope.launch { state.scroll.scrollTo(state.scroll.value + (top - desiredTop).roundToInt()) }
-                }
-            },
-        ) {
-            MemoryBlockSurface(
-                block,
-                false,
-                focus,
-                uiState.onUpdateBlock,
-                { uiState.onDeleteBlock(block.id) },
-                modifier = bounds,
-                morphSurface = true,
-                customPresentation = block is HandwritingBlockUiState,
-                focusTransitionProgress = uiState.blockPresentations[block.id]?.focusTransitionProgress ?: 0f,
-            ) {
-                if (block is TextBlockUiState) {
-                    TextBlockContent(
-                        block,
-                        isExpanded = false,
-                        onTextChanged = { uiState.onUpdateBlock(block.copy(content = it)) },
-                        onFocused = focus,
-                    )
+            val bounds =
+                if (block is HandwritingBlockUiState || shared == null || visibility == null) {
+                    Modifier
                 } else {
-                    MemoryBlockContent(
-                        block,
-                        requestTextFocus = false,
-                        isSelected = false,
-                        editRequest = 0,
-                        onSelect = focus,
-                        onUpdate = uiState.onUpdateBlock,
-                        onRemove = { uiState.onDeleteBlock(block.id) },
-                        onAudioResolverReady = onAudioResolverReady,
-                        onPersistAudioRecordingTarget = uiState.onPersistAudioRecordingTarget,
-                        presentation = uiState.blockPresentations[block.id],
-                    )
+                    with(shared) {
+                        Modifier.editorBlockFocusElement(
+                            shared,
+                            visibility,
+                            block.id,
+                            EditorBlockCornerRadius,
+                            LocalBlockFocusProgress.current ?: 0f,
+                        )
+                    }
+                }
+            Box(
+                Modifier.fillMaxWidth().onGloballyPositioned { coordinates ->
+                    val top = coordinates.positionInWindow().y
+                    state.blockPositions[block.id] = top
+                    val anchor = state.focusedAnchor
+                    if (anchor?.blockId == block.id && anchor.width != viewportWidth) {
+                        val desiredTop = anchor.top.coerceAtMost(state.viewportTop + viewportHeight / 2f)
+                        state.focusedAnchor = anchor.copy(top = desiredTop, width = viewportWidth)
+                        scope.launch { state.scroll.scrollTo(state.scroll.value + (top - desiredTop).roundToInt()) }
+                    }
+                },
+            ) {
+                MemoryBlockSurface(
+                    block,
+                    false,
+                    focus,
+                    uiState.onUpdateBlock,
+                    { uiState.onDeleteBlock(block.id) },
+                    modifier = bounds,
+                    morphSurface = true,
+                    customPresentation = block is HandwritingBlockUiState,
+                    focusTransitionProgress = uiState.blockPresentations[block.id]?.focusTransitionProgress ?: 0f,
+                ) {
+                    if (block is TextBlockUiState) {
+                        TextBlockContent(
+                            block,
+                            isExpanded = false,
+                            onTextChanged = { uiState.onUpdateBlock(block.copy(content = it)) },
+                            onFocused = focus,
+                        )
+                    } else {
+                        MemoryBlockContent(
+                            block,
+                            requestTextFocus = false,
+                            isSelected = false,
+                            editRequest = 0,
+                            onSelect = focus,
+                            onUpdate = uiState.onUpdateBlock,
+                            onRemove = { uiState.onDeleteBlock(block.id) },
+                            onAudioResolverReady = onAudioResolverReady,
+                            onPersistAudioRecordingTarget = uiState.onPersistAudioRecordingTarget,
+                            presentation = uiState.blockPresentations[block.id],
+                        )
+                    }
                 }
             }
         }
