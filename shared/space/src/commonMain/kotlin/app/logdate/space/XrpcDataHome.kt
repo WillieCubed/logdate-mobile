@@ -22,6 +22,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.client.statement.readRawBytes
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
@@ -63,7 +64,8 @@ public class XrpcDataHome(
     private val httpClient: HttpClient,
     private val baseUrl: String,
     private val auth: suspend () -> XrpcAuth,
-) : DataHome {
+) : DataHome,
+    BlobUploadReceipts {
     private val json = Json { ignoreUnknownKeys = true }
 
     override suspend fun putRecord(
@@ -254,6 +256,52 @@ public class XrpcDataHome(
                     sink.flush()
                     true
                 }
+        }
+    }
+
+    override suspend fun lookupBlobUpload(
+        space: SpaceRef,
+        intent: String,
+    ): BlobUploadReceiptLookup {
+        val token = bearerToken(auth())
+        return refusals {
+            transport {
+                val response =
+                    httpClient.get("${baseUrl.trimEnd('/')}/xrpc/app.logdate.space.getBlobUploadReceipt") {
+                        parameter("space", space.uri)
+                        parameter("intent", intent)
+                        bearer(token)
+                    }
+                if (response.status == HttpStatusCode.NotFound) return@transport BlobUploadReceiptLookup(false)
+                if (!response.status.isSuccess()) {
+                    val failure = response.failure()
+                    if (failure.error == "MethodNotImplemented" || failure.error == "UnknownMethod") {
+                        return@transport BlobUploadReceiptLookup(false)
+                    }
+                    throw failure
+                }
+                json.decodeFromString<BlobUploadReceiptLookup>(response.bodyAsText())
+            }
+        }
+    }
+
+    override suspend fun uploadBlobWithIntent(
+        space: SpaceRef,
+        intent: String,
+        sizeBytes: Long,
+        open: () -> RawSource,
+    ): String {
+        val token = bearerToken(auth())
+        return transport {
+            val response =
+                httpClient.post(url(UPLOAD_BLOB)) {
+                    parameter("space", space.uri)
+                    header("X-LogDate-Upload-Intent", intent)
+                    bearer(token)
+                    setBody(StreamedBlob(sizeBytes, open))
+                }
+            if (!response.status.isSuccess()) throw response.failure()
+            blobCid(response.bodyAsText())
         }
     }
 
