@@ -4,15 +4,21 @@ import android.Manifest
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Point
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -128,11 +134,15 @@ class EditorRecordingLifecycleTest {
             compose.waitForIdle()
             capture(context, "recording-saved")
             repeat(3) {
-                compose.onNode(createEntry).assertIsDisplayed().performClick()
+                compose
+                    .onAllNodes(createEntry)
+                    .onFirst()
+                    .assertIsDisplayed()
+                    .performClick()
                 compose.onNodeWithTag("editor_text_input").assertIsDisplayed()
                 capture(context, "reopened-editor-$it")
                 repeat(4) {
-                    if (!compose.onNode(createEntry).isDisplayed()) {
+                    if (!compose.onAllNodes(createEntry).onFirst().isDisplayed()) {
                         device.pressBack()
                         compose.waitForIdle()
                     }
@@ -174,10 +184,131 @@ class EditorRecordingLifecycleTest {
             }
             assertTrue(File(path.removePrefix("file://")).length() > 0)
             capture(context, "recording-exit-retained")
-            compose.onNode(createEntry).assertIsDisplayed().performClick()
+            compose
+                .onAllNodes(createEntry)
+                .onFirst()
+                .assertIsDisplayed()
+                .performClick()
             compose.onNodeWithTag("editor_text_input").assertIsDisplayed()
             assertTrue(!manager.isRecording, "Reopening Add entry must not start another recording")
             capture(context, "recording-exit-reopened")
+        }
+    }
+
+    @Test
+    fun systemEdgeBackCancelDialogDismissAndDiscardAllowFreshAddEntry() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        val overlays = device.executeShellCommand("cmd overlay list").lineSequence()
+        val previousNavigation =
+            overlays
+                .firstOrNull {
+                    it.startsWith("[x]") && it.contains("com.android.internal.systemui.navbar.")
+                }?.substringAfter("] ")
+        device.executeShellCommand("cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.gestural")
+        try {
+            val text = "Synthetic entry for explicit discard"
+            val launch =
+                Intent(context, MainActivity::class.java).apply {
+                    action = app.logdate.client.capture.ACTION_CAPTURE
+                    putExtra(app.logdate.client.capture.EXTRA_CAPTURE_MODE, "text")
+                    putExtra(app.logdate.client.capture.EXTRA_CAPTURE_TEXT, text)
+                    putExtra(DEBUG_SKIP_ONBOARDING_EXTRA, true)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            ActivityScenario.launch<MainActivity>(launch).use {
+                compose.waitUntil(30_000) { compose.onNodeWithText(text).isDisplayed() }
+                compose.waitForIdle()
+                if (compose.onNodeWithContentDescription("Return to entry").isDisplayed()) {
+                    compose.onNodeWithContentDescription("Return to entry").performClick()
+                }
+                compose.waitForIdle()
+                capture(context, "edge-back-initial-entry")
+                val y = device.displayHeight / 2
+                check(device.swipe(arrayOf(Point(1, y), Point(device.displayWidth / 5, y), Point(1, y)), 40))
+                compose.waitForIdle()
+                compose.onNodeWithText(text).assertIsDisplayed()
+                assertTrue(!compose.onNodeWithTag("exit_dialog_discard").isDisplayed(), "Cancelled edge back must keep editing")
+                capture(context, "edge-back-cancel-retains-text")
+                check(device.swipe(1, y, device.displayWidth / 2, y, 60))
+                compose.waitUntil(10_000) { compose.onNodeWithTag("exit_dialog_discard").isDisplayed() }
+                capture(context, "edge-back-commit-confirms-exit")
+                device.pressBack()
+                compose.waitForIdle()
+                compose.onNodeWithText(text).assertIsDisplayed()
+                assertTrue(!compose.onNodeWithTag("exit_dialog_discard").isDisplayed(), "Dismissing confirmation must preserve input")
+                check(device.swipe(1, y, device.displayWidth / 2, y, 60))
+                compose.waitUntil(10_000) { compose.onNodeWithTag("exit_dialog_discard").isDisplayed() }
+                compose.onNodeWithTag("exit_dialog_discard").performClick()
+                compose.waitUntil(15_000) { compose.onAllNodes(createEntry).onFirst().isDisplayed() }
+                val drafts = KoinPlatform.getKoin().get<EntryDraftRepository>()
+                assertTrue(
+                    runBlocking {
+                        drafts.getDrafts().first().none { draft ->
+                            draft.notes.any { note ->
+                                note is JournalNote.Text &&
+                                    note.content == text
+                            }
+                        }
+                    },
+                )
+                repeat(3) { visit ->
+                    compose.onAllNodes(createEntry).onFirst().performClick()
+                    compose
+                        .onNodeWithTag("editor_text_input")
+                        .assertIsDisplayed()
+                        .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
+                    capture(context, "discard-reopened-$visit")
+                    repeat(4) {
+                        if (!compose.onAllNodes(createEntry).onFirst().isDisplayed()) {
+                            device.pressBack()
+                            compose.waitForIdle()
+                        }
+                    }
+                    compose.onAllNodes(createEntry).onFirst().assertIsDisplayed()
+                }
+            }
+        } finally {
+            previousNavigation?.let { device.executeShellCommand("cmd overlay enable-exclusive --category $it") }
+        }
+    }
+
+    @Test
+    fun explicitRecordingDiscardStopsItsServiceAndAddEntryDoesNotRestartIt() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val launch =
+            Intent(context, MainActivity::class.java).apply {
+                action = app.logdate.client.capture.ACTION_CAPTURE
+                putExtra(app.logdate.client.capture.EXTRA_CAPTURE_MODE, "voice")
+                putExtra(DEBUG_SKIP_ONBOARDING_EXTRA, true)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        ActivityScenario.launch<MainActivity>(launch).use {
+            val manager = KoinPlatform.getKoin().get<AudioRecordingManager>()
+            compose.waitUntil(30_000) { manager.isRecording }
+            val draftId = assertNotNull(manager.currentRecordingDraftId)
+            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            repeat(3) {
+                if (!compose.onNodeWithTag("exit_dialog_discard").isDisplayed()) {
+                    device.pressBack()
+                    compose.waitForIdle()
+                }
+            }
+            compose.onNodeWithTag("exit_dialog_discard").assertIsDisplayed().performClick()
+            compose.waitUntil(30_000) {
+                !manager.isRecording &&
+                    !manager.isStartingRecording &&
+                    compose.onAllNodes(createEntry).onFirst().isDisplayed()
+            }
+            val drafts = KoinPlatform.getKoin().get<EntryDraftRepository>()
+            assertTrue(runBlocking { drafts.getDrafts().first().none { it.id == draftId } })
+            compose.onAllNodes(createEntry).onFirst().performClick()
+            compose
+                .onNodeWithTag("editor_text_input")
+                .assertIsDisplayed()
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
+            assertTrue(!manager.isRecording && !manager.isStartingRecording)
+            capture(context, "recording-discard-reopened")
         }
     }
 
