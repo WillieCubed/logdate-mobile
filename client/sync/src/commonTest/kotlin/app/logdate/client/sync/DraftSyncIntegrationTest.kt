@@ -44,6 +44,48 @@ import kotlin.uuid.Uuid
 
 class DraftSyncIntegrationTest {
     @Test
+    fun `a draft held in retry backoff is not announced as active upload work`() =
+        runTest {
+            val api = fakeCloudApiClient()
+            val drafts = FakeJournalRepository()
+            val metadata = fakeSyncMetadataService()
+            val draft = testDraft(content = "synthetic pending edit")
+            drafts.saveDraftFromSync(draft)
+            metadata.enqueuePending(draft.id.toString(), EntityType.DRAFT, PendingOperation.CREATE)
+            api.uploadDraftResponse = Result.failure(IllegalStateException("temporary server failure"))
+            val schedules =
+                app.logdate.client.sync.test
+                    .InMemorySyncRetryScheduleStore()
+            var retryExpired = false
+            val retrySchedule =
+                object : app.logdate.client.sync.metadata.SyncRetryScheduleStore by schedules {
+                    override suspend fun nextAttemptAt(
+                        entityType: EntityType,
+                        entityId: String,
+                    ): Long? = if (retryExpired) 0L else schedules.nextAttemptAt(entityType, entityId)
+                }
+            val manager =
+                testDefaultSyncManager(
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(api, cipher(), supportsRichDrafts = { true }),
+                    journalRepository = drafts,
+                    syncMetadataService = metadata,
+                    supportsRichDrafts = { true },
+                    syncScope = backgroundScope,
+                    retryScheduleStore = retrySchedule,
+                )
+            assertFalse(manager.syncDrafts().success)
+            manager.syncDrafts()
+            assertEquals(1, api.uploadDraftCalls.size, "Backoff must continue to prevent another request")
+            assertEquals(1, metadata.getPendingUploads(EntityType.DRAFT).size, "Pending content must be preserved")
+            assertEquals(null, manager.syncStatusFlow.value.totalForRun, "A held retry is not an active upload denominator")
+            retryExpired = true
+            api.uploadDraftResponse = null
+            assertTrue(manager.syncDrafts().success)
+            assertEquals(2, api.uploadDraftCalls.size, "The next eligible pass must back up the preserved change")
+            assertTrue(metadata.getPendingUploads(EntityType.DRAFT).isEmpty())
+        }
+
+    @Test
     fun `a matching committed rich draft settles a lost acknowledgement without replaying payload`() =
         runTest {
             val api = fakeCloudApiClient()
