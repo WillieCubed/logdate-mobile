@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<resources>
+    <string name="audio_preview_loading">Loading recording…</string>
+    <string name="audio_preview_checking">Checking recording…</string>
+    <string name="audio_preview_unavailable">Recording unavailable</string>
+    <string
+    name="audio_preview_unavailable_details"
+  >This recording cannot be played right now. Its details have been kept so you can try again.</string>
+    <string name="audio_preview_retry_playback">Retry playback</string>
+</resources>

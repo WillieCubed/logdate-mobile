@@ -8,8 +8,11 @@ import android.graphics.Point
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -30,9 +33,12 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import app.logdate.client.MainActivity
 import app.logdate.client.media.audio.AndroidAudioNotificationHandler
+import app.logdate.client.media.audio.AudioPlaybackManager
+import app.logdate.client.media.audio.AudioPlaybackStatusProvider
 import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.testing.onboarding.DEBUG_SKIP_ONBOARDING_EXTRA
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -44,6 +50,8 @@ import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 /** Runs only through Gradle Managed Devices; never targets an operator device or clears app data. */
 @RunWith(AndroidJUnit4::class)
@@ -125,11 +133,20 @@ class EditorRecordingLifecycleTest {
             compose.onNodeWithContentDescription("Save entry").assertIsDisplayed().performClick()
             compose.waitForIdle()
             compose.waitUntil(15_000) { compose.onNodeWithText("Retained scratch entry").isDisplayed() }
-            capture(context, "second-editor-restored-after-recording")
             if (compose.onNodeWithContentDescription("Return to entry").isDisplayed()) {
                 compose.onNodeWithContentDescription("Return to entry").performClick()
             }
             compose.waitUntil(15_000) { compose.onNodeWithContentDescription("Save entry").isDisplayed() }
+            compose.waitUntil(15_000) { compose.onNodeWithTag("audio_preview_ready").isDisplayed() }
+            compose.onNodeWithText("Audio").assertDoesNotExist()
+            compose.onNodeWithContentDescription("Play").assertIsDisplayed().assertHasClickAction()
+            val playback = KoinPlatform.getKoin().get<AudioPlaybackManager>() as AudioPlaybackStatusProvider
+            compose.onNodeWithContentDescription("Play").performClick()
+            compose.waitUntil(15_000) { playback.playbackStatus.value.isPlaying }
+            compose.waitUntil(15_000) { compose.onNodeWithContentDescription("Pause").isDisplayed() }
+            compose.onNodeWithContentDescription("Pause").assertHasClickAction().performClick()
+            compose.waitUntil(15_000) { !playback.playbackStatus.value.isPlaying }
+            capture(context, "second-editor-restored-after-recording")
             compose.onNodeWithContentDescription("Save entry").assertIsDisplayed().performClick()
             compose.waitForIdle()
             capture(context, "recording-saved")
@@ -309,6 +326,56 @@ class EditorRecordingLifecycleTest {
                 .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
             assertTrue(!manager.isRecording && !manager.isStartingRecording)
             capture(context, "recording-discard-reopened")
+        }
+    }
+
+    @Test
+    fun unavailableEarlierRecordingRetainsDurationAndOffersRecoveryWithoutStartingCapture() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val launch =
+            Intent(context, MainActivity::class.java).apply {
+                action = app.logdate.client.capture.ACTION_CAPTURE
+                putExtra(app.logdate.client.capture.EXTRA_CAPTURE_MODE, "text")
+                putExtra(app.logdate.client.capture.EXTRA_CAPTURE_TEXT, "Review retained recordings")
+                putExtra(DEBUG_SKIP_ONBOARDING_EXTRA, true)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        ActivityScenario.launch<MainActivity>(launch).use {
+            compose.waitUntil(30_000) { compose.onNodeWithTag("editor_text_input").isDisplayed() }
+            if (compose.onNodeWithContentDescription("Return to entry").isDisplayed()) {
+                compose.onNodeWithContentDescription("Return to entry").performClick()
+            }
+            val notes = KoinPlatform.getKoin().get<JournalNotesRepository>()
+            val now = Clock.System.now()
+            val note =
+                JournalNote.Audio(
+                    mediaRef = File(context.filesDir, "audio_notes/missing_${Uuid.random()}.m4a").toURI().toString(),
+                    durationMs = 12_345,
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    caption = "Retained recording details",
+                )
+            runBlocking { notes.create(note) }
+            try {
+                val row = hasAnyAncestor(hasTestTag("earlier_note_${note.uid}"))
+                compose.waitUntil(15_000) { compose.onNode(hasTestTag("audio_preview_retry") and row).isDisplayed() }
+                compose.onNode(hasText("Recording unavailable") and row).assertIsDisplayed()
+                compose.onNode(hasText("00:12") and row).assertIsDisplayed()
+                compose.onNode(hasContentDescription("Play") and row).assertDoesNotExist()
+                compose.onNode(hasTestTag("audio_preview_retry") and row).performClick()
+                compose.waitUntil(15_000) { compose.onNode(hasTestTag("audio_preview_retry") and row).isDisplayed() }
+                compose.onNode(hasText("Recording unavailable") and row).assertIsDisplayed()
+                compose.onNode(hasText("Retained recording details") and row).assertIsDisplayed()
+                val retained = runBlocking { notes.getNoteById(note.uid) } as JournalNote.Audio
+                assertEquals(note.mediaRef, retained.mediaRef)
+                assertEquals(note.durationMs, retained.durationMs)
+                assertEquals(note.caption, retained.caption)
+                val recorder = KoinPlatform.getKoin().get<AudioRecordingManager>()
+                assertTrue(!recorder.isRecording && !recorder.isStartingRecording)
+                capture(context, "earlier-audio-unavailable-retains-details")
+            } finally {
+                runBlocking { notes.removeById(note.uid) }
+            }
         }
     }
 
