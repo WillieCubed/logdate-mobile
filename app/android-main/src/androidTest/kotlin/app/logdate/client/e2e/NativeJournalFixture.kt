@@ -122,15 +122,20 @@ internal class NativeJournalFixture(
         assertNull(journals.getJournalById(id(1)), "fixture already exists; use fresh emulator data")
         journals.create(Journal(id = id(1), title = "Native transfer journal"))
         journals.create(Journal(id = id(2), title = "Second transferred journal"))
+        nativeTransferPhase("source_journals_created")
         val now = Clock.System.now()
         notes.create(JournalNote.Text(id(3), now, now, "Text retained through native backup"), id(1))
         links.addContentToJournal(id(3), id(2))
+        nativeTransferPhase("source_text_created")
         val unfinishedCapture = File(context.filesDir, "camera-captures/logdate-camera-unfinished.mp4")
         check(unfinishedCapture.parentFile?.mkdirs() == true || unfinishedCapture.parentFile?.isDirectory == true)
         unfinishedCapture.writeBytes("unfinished camera output".encodeToByteArray())
         val image = save("proof.png", "image/png")
+        nativeTransferPhase("source_image_saved")
         val audio = save("proof.wav", "audio/wav")
+        nativeTransferPhase("source_audio_saved")
         val video = save("proof.mp4", "video/mp4")
+        nativeTransferPhase("source_video_saved")
         seedRecordingTransferFixture(context)
         // D2D selects live journal references; an orphan file is deliberately not a selected original.
         val recording = File(context.filesDir, "audio_notes/transfer-recording.m4a").toURI().toString()
@@ -160,6 +165,7 @@ internal class NativeJournalFixture(
                 selectedJournalIds = listOf(id(1), id(2)),
             ),
         )
+        nativeTransferPhase("source_rich_draft_saved")
         if (includePendingCameraDraft) {
             val capture = File(context.filesDir, "camera-captures/pending-camera-transfer.jpg")
             check(capture.parentFile?.mkdirs() == true || capture.parentFile?.isDirectory == true)
