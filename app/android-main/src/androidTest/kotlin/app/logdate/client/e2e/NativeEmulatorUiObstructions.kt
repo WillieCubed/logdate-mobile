@@ -15,6 +15,7 @@ internal fun dismissNativeEmulatorPlatformDialog(
             "Bluetooth keeps stopping" to "android:id/aerr_close",
             "Digital Wellbeing isn't responding" to "android:id/aerr_close",
             "System UI isn't responding" to "android:id/aerr_wait",
+            "Process system isn't responding" to "android:id/aerr_wait",
         ).map { (text, action) -> By.pkg("android").res("android:id/alertTitle").text(text) to action }
             .firstOrNull { (title, _) -> device.hasObject(title) } ?: return false
     val action = checkNotNull(device.findObject(By.pkg("android").res(obstruction.second)))
