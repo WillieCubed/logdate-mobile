@@ -167,7 +167,7 @@ class NativeBackgroundCredentialCallbackTest {
         }
         assertTrue(context.cacheDir.isDirectory, "The callback's isolated cache directory must exist")
         assertTrue(context.cacheDir.canWrite(), "The callback's isolated cache directory must be writable")
-        if (!supportsFullRestoreInput()) return
+        if (!transferredPreferences.supportsFullRestoreInput()) return
         val inputType =
             assertNotNull(
                 try {
@@ -236,15 +236,18 @@ class NativeBackgroundCredentialCallbackTest {
                 }
             }
         agent.initialize(context)
-
+        runBlocking { deliverPreferences(agent, incomingPreferences("BIOMETRIC")) }
         agent.onRestoreFinished()
         val delivery = assertNotNull(PostRestoreDetector(context).pendingContentRecoveryId())
         val account = assertNotNull(PostRestoreDetector(context).pendingAccountRecoveryId())
         val media = assertNotNull(PostRestoreDetector(context).pendingMediaQuarantineId())
+        val generation = PostRestoreDetector(context).nativeRestoreSessionId()
+        assertTrue(!PostRestoreDetector(context).hasMissingNativePrivacyPayload())
 
         agent.onRestoreFinished()
 
         assertEquals(listOf<String?>(account, account), observedAccountRecoveries)
+        assertEquals(generation, PostRestoreDetector(context).nativeRestoreSessionId())
         assertEquals(delivery, PostRestoreDetector(context).pendingContentRecoveryId())
         assertEquals(account, PostRestoreDetector(context).pendingAccountRecoveryId())
         assertEquals(media, PostRestoreDetector(context).pendingMediaQuarantineId())
@@ -262,14 +265,17 @@ class NativeBackgroundCredentialCallbackTest {
             }.also { it.initialize(context) }
 
         val firstAgent = agent()
-
+        runBlocking { deliverPreferences(firstAgent, incomingPreferences("BIOMETRIC")) }
         firstAgent.onRestoreFinished()
         val delivery = assertNotNull(PostRestoreDetector(context).pendingContentRecoveryId())
         val account = assertNotNull(PostRestoreDetector(context).pendingAccountRecoveryId())
         val media = assertNotNull(PostRestoreDetector(context).pendingMediaQuarantineId())
+        val generation = PostRestoreDetector(context).nativeRestoreSessionId()
+        assertTrue(!PostRestoreDetector(context).hasMissingNativePrivacyPayload())
         agent().onRestoreFinished()
 
         assertEquals(listOf<String?>(account, account), observedAccountRecoveries)
+        assertEquals(generation, PostRestoreDetector(context).nativeRestoreSessionId())
         assertEquals(delivery, PostRestoreDetector(context).pendingContentRecoveryId())
         assertEquals(account, PostRestoreDetector(context).pendingAccountRecoveryId())
         assertEquals(media, PostRestoreDetector(context).pendingMediaQuarantineId())
@@ -296,35 +302,61 @@ class NativeBackgroundCredentialCallbackTest {
 
     @Test
     fun `duplicate completion retries an interrupted installation identity reset`() {
-        val preferencesFile = File(context.filesDir, "logdate.preferences_pb")
-        withUncachedPreferences { preferences ->
-            preferences.edit { values -> values[stringPreferencesKey("device.id")] = "source-device" }
-        }
-        preferencesFile.writeBytes(byteArrayOf(0xFF.toByte()))
         val observedDeviceIds = mutableListOf<String?>()
         val agent =
             object : NativeBackupAgent() {
+                override suspend fun retainAccountRecovery(
+                    preferences: DataStore<Preferences>,
+                    freshDelivery: Boolean,
+                ) {
+                    if (freshDelivery) error("Simulated interruption before installation reset")
+                }
+
                 override suspend fun restoreAccount(preferences: DataStore<Preferences>) {
                     observedDeviceIds += preferences.data.first()[stringPreferencesKey("device.id")]
                 }
             }
         agent.initialize(context)
-
+        runBlocking { deliverPreferences(agent, incomingPreferences("BIOMETRIC", "source-device")) }
         agent.onRestoreFinished()
+        assertTrue(observedDeviceIds.isEmpty())
+        withPreferences { assertEquals("source-device", it.data.first()[stringPreferencesKey("device.id")]) }
+        val generation = PostRestoreDetector(context).nativeRestoreSessionId()
         val content = assertNotNull(PostRestoreDetector(context).pendingContentRecoveryId())
         val account = assertNotNull(PostRestoreDetector(context).pendingAccountRecoveryId())
         val media = assertNotNull(PostRestoreDetector(context).pendingMediaQuarantineId())
 
-        preferencesFile.delete()
-        withPreferences { preferences ->
-            preferences.edit { values -> values[stringPreferencesKey("device.id")] = "source-device" }
-        }
         agent.onRestoreFinished()
 
         assertEquals(listOf<String?>(null), observedDeviceIds)
+        assertEquals(generation, PostRestoreDetector(context).nativeRestoreSessionId())
+        withPreferences { assertEquals("BIOMETRIC", it.data.first()[stringPreferencesKey("security_level")]) }
         assertEquals(content, PostRestoreDetector(context).pendingContentRecoveryId())
         assertEquals(account, PostRestoreDetector(context).pendingAccountRecoveryId())
         assertEquals(media, PostRestoreDetector(context).pendingMediaQuarantineId())
+    }
+
+    @Test
+    fun corruptPrivacyDuplicatePreservesBytesAndAccountDelivery() {
+        val preferencesFile = File(context.filesDir, "logdate.preferences_pb")
+        withUncachedPreferences { preferences ->
+            preferences.edit { it[stringPreferencesKey("device.id")] = "source-device" }
+        }
+        val corrupt = byteArrayOf(0xFF.toByte())
+        preferencesFile.writeBytes(corrupt)
+        var accountRetries = 0
+        val agent =
+            object : NativeBackupAgent() {
+                override suspend fun restoreAccount(preferences: DataStore<Preferences>) {
+                    accountRetries++
+                }
+            }.also { it.initialize(context) }
+        agent.onRestoreFinished()
+        val accepted = assertNotNull(PostRestoreDetector(context).capturePrivacyRepairIdentity())
+        agent.onRestoreFinished()
+        assertEquals(0, accountRetries)
+        assertEquals(accepted, PostRestoreDetector(context).capturePrivacyRepairIdentity())
+        assertEquals(corrupt.toList(), preferencesFile.readBytes().toList())
     }
 
     @Test
@@ -429,52 +461,17 @@ class NativeBackgroundCredentialCallbackTest {
             assertEquals("BIOMETRIC", live.data.first()[stringPreferencesKey("security_level")])
         }
 
+    private val transferredPreferences by lazy { NativeBackgroundRestorePreferences(context, folder) }
+
     private fun deliverPreferences(
         agent: NativeBackupAgent,
         source: File,
-    ) {
-        ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
-            if (supportsFullRestoreInput()) {
-                val inputType = Class.forName("android.app.backup.FullRestoreDataInput")
-                val input =
-                    nativeModernRestoreInput(
-                        inputType,
-                        descriptor,
-                        File(context.filesDir, "logdate.preferences_pb"),
-                        source.length(),
-                        0x180L,
-                    )
-                NativeBackupAgent::class.java.getDeclaredMethod("onRestoreFile", inputType).invoke(agent, input)
-                return
-            }
-            agent.onRestoreFile(
-                descriptor,
-                source.length(),
-                File(context.filesDir, "logdate.preferences_pb"),
-                BackupAgent.TYPE_FILE,
-                0x180L,
-                1L,
-            )
-        }
-    }
+    ) = transferredPreferences.deliver(agent, source)
 
-    private fun supportsFullRestoreInput(): Boolean =
-        Build.VERSION.SDK_INT >= 36 && Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1
-
-    private suspend fun incomingPreferences(policy: String?): File {
-        val file = File(folder, "incoming-${Uuid.random()}.preferences_pb")
-        val job = SupervisorJob()
-        try {
-            val store = PreferenceDataStoreFactory.create(scope = CoroutineScope(job + Dispatchers.IO)) { file }
-            store.edit {
-                it[stringPreferencesKey("identity.canonical_owner_id")] = "native-test-owner"
-                if (policy != null) it[stringPreferencesKey("security_level")] = policy
-            }
-        } finally {
-            job.cancelAndJoin()
-        }
-        return file
-    }
+    private suspend fun incomingPreferences(
+        policy: String?,
+        deviceId: String? = null,
+    ): File = transferredPreferences.incoming(policy, deviceId)
 
     private fun withPreferences(block: suspend (DataStore<Preferences>) -> Unit) =
         runBlocking { block(createAndroidMainDataStore(context)) }
