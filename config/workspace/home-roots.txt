@@ -1,6 +1,6 @@
 client/feature/core/src/commonMain/kotlin/app/logdate/feature/core/main/HomeScreen.kt|HomeScreen
 client/ui/src/commonMain/kotlin/app/logdate/ui/timeline/TimelinePane.kt|TimelinePane
-client/feature/location-timeline/src/commonMain/kotlin/app/logdate/feature/location/timeline/ui/history/HumanLocationHistoryContent.kt|HumanHistoryWorkspace
+client/feature/location-timeline/src/commonMain/kotlin/app/logdate/feature/location/timeline/ui/history/HumanHistoryWorkspace.kt|HumanHistoryWorkspace
 client/feature/location-timeline/src/commonMain/kotlin/app/logdate/feature/location/timeline/ui/history/HistoryPlaces.kt|HistoryPlacesList
 client/feature/journal/src/commonMain/kotlin/app/logdate/feature/journals/ui/JournalListPanel.kt|JournalListPanel
 client/feature/journal/src/commonMain/kotlin/app/logdate/feature/journals/ui/JournalsOverviewScreen.kt|JournalsOverviewScreenContent
