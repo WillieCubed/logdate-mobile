@@ -1,0 +1,18 @@
+<resources>
+    <string name="capture_default_title">Default capture mode</string>
+    <string
+    name="capture_default_description"
+  >Open new entries directly in this mode.</string>
+    <string name="capture_default_text">Text</string>
+    <string name="capture_default_handwriting">Handwriting</string>
+    <string name="capture_default_camera">Camera</string>
+    <string name="capture_default_audio">Audio</string>
+    <string name="capture_default_gallery">Gallery</string>
+    <string name="capture_default_loading">Loading capture mode…</string>
+    <string
+    name="capture_default_unavailable"
+  >Couldn’t load your default capture mode. Reopen Settings to try again.</string>
+    <string
+    name="capture_default_save_failed"
+  >Couldn’t save your default capture mode. Try again.</string>
+</resources>
