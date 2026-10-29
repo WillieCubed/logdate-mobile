@@ -116,12 +116,49 @@ class RewindViewportCaptureTest {
             val initialBounds = initial.boundsInRoot
             assertEquals(600f, initial.boundsInRoot.width)
             assertEquals(240f, initial.boundsInRoot.height)
+
+            fun assertClippedCorner() {
+                val pixels = onRoot().captureToImage().toPixelMap()
+                assertEquals(Color.Black.toArgb(), pixels[initialBounds.left.toInt() + 1, initialBounds.top.toInt() + 1].toArgb())
+            }
+            assertClippedCorner()
             for (next in listOf(RewindMemoryLoadState.Ready, RewindMemoryLoadState.Unavailable)) {
                 runOnIdle { state.value = next }
                 val actual = onNodeWithTag("rewind_memory_stable-bounded-memory").fetchSemanticsNode()
                 assertEquals(initial.id, actual.id)
                 assertEquals(initialBounds, actual.boundsInRoot)
+                assertClippedCorner()
             }
+        }
+
+    @Test fun uncaptionedPhotoClipsItsBitmapAtTheWholeMemoryCorner() =
+        runDesktopComposeUiTest(width = 1280, height = 800) {
+            setContent {
+                val handler = remember { AsyncImagePreviewHandler { ColorImage(Color.White.toArgb(), 600, 400) } }
+                CompositionLocalProvider(
+                    LocalDensity provides Density(1f, 1f),
+                    LocalInspectionMode provides true,
+                    LocalAsyncImagePreviewHandler provides handler,
+                ) {
+                    LogDateTheme(dynamicColor = false) {
+                        ImageNotePanel("fixture://bare-photo", null, "Tuesday", memoryId = "bare-photo")
+                    }
+                }
+            }
+            waitUntil(timeoutMillis = 5_000) {
+                onNodeWithTag("rewind_memory_bare-photo").fetchSemanticsNode().config[SemanticsProperties.StateDescription] ==
+                    "Memory loaded"
+            }
+            val bounds = onNodeWithTag("rewind_memory_bare-photo").fetchSemanticsNode().boundsInRoot
+            val pixels = onRoot().captureToImage().toPixelMap()
+            val x = bounds.left.toInt()
+            val y = bounds.bottom.toInt() - 2
+            assertEquals(
+                Color.Black.toArgb(),
+                pixels[x + 3, y].toArgb(),
+                "Clip the decoded bitmap with the uncaptioned memory's 24dp shape",
+            )
+            assertEquals(Color.White.toArgb(), pixels[x + 30, y].toArgb(), "The bitmap must still reach the flat part of the lower edge")
         }
 
     @Test fun delayedPortraitKeepsTheActualFrameStable() =
@@ -329,6 +366,18 @@ class RewindViewportCaptureTest {
         if (scrollToEnd) onNodeWithText("Last detail").performScrollTo().assertIsDisplayed()
         val image = onRoot().captureToImage()
         val pixels = image.toPixelMap()
+        val memoryShape = onNodeWithTag("rewind_memory_$id").fetchSemanticsNode().boundsInRoot
+
+        fun framePixel(
+            x: Int,
+            y: Int,
+        ) = pixels[memoryShape.left.toInt() + x, memoryShape.top.toInt() + y].toArgb()
+        assertEquals(Color.Black.toArgb(), framePixel(1, 1), "Clip the background and content at the complete memory's corner")
+        assertEquals(
+            if (reading) Color.Black.toArgb() else Color(0xFF1A1A1A).toArgb(),
+            framePixel(3, 3),
+            "Reading/audio and captioned media retain their distinct Apple corner treatments",
+        )
         val edgeX = scene.left.toInt() + 2
         assertEquals(
             Color.Black.toArgb(),

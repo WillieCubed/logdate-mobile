@@ -16,8 +16,9 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.hideFromAccessibility
@@ -46,6 +47,7 @@ fun RewindMemoryFrame(
     modifier: Modifier = Modifier,
     errorMessage: String? = null,
     backgroundColor: Color = Color(0xFF1A1A1A),
+    shape: Shape = RoundedCornerShape(24.dp),
     content: @Composable BoxScope.() -> Unit,
 ) {
     val description =
@@ -56,7 +58,7 @@ fun RewindMemoryFrame(
         }
     key(memoryId) {
         Box(
-            modifier.clipToBounds().background(backgroundColor).testTag("rewind_memory_$memoryId").semantics {
+            modifier.clip(shape).background(backgroundColor).testTag("rewind_memory_$memoryId").semantics {
                 stateDescription =
                     description
             },
