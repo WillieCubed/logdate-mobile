@@ -91,12 +91,23 @@ class NativeRestorePrivacyRuntimeTest {
         context: Context,
         device: UiDevice,
     ) {
-        val visible = device.wait(Until.hasObject(By.textContains("privacy settings weren’t restored")), 15_000)
-        if (!visible) {
+        try {
+            val deadline = SystemClock.elapsedRealtime() + 15_000
+            var visible = false
+            while (!visible && SystemClock.elapsedRealtime() < deadline) {
+                dismissNativeEmulatorPlatformDialog(device, (deadline - SystemClock.elapsedRealtime()).coerceIn(1, 5_000))
+                visible =
+                    device.wait(
+                        Until.hasObject(By.textContains("privacy settings weren’t restored")),
+                        (deadline - SystemClock.elapsedRealtime()).coerceIn(1, 500),
+                    )
+            }
+            assertTrue(visible, "Protected privacy recovery state must be visible and reachable")
+        } catch (failure: Throwable) {
             runCatching { device.takeScreenshot(File(context.noBackupFilesDir, "native-privacy-failure.png")) }
             runCatching { device.dumpWindowHierarchy(File(context.noBackupFilesDir, "native-privacy-failure.xml")) }
+            throw failure
         }
-        assertTrue(visible, "Protected privacy recovery state must be visible and reachable")
     }
 
     private suspend fun awaitPrivacyFailure(
