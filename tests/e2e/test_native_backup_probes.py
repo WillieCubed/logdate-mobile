@@ -281,17 +281,21 @@ class CloudRestoreProcessRestartProbeTest(unittest.TestCase):
     @patch.object(
         NATIVE_RESTORE_WORK_ACCEPTANCE,
         "radio_state",
-        side_effect=[(True, b"0"), (False, b"1")],
+        side_effect=[
+            (True, b"0", (1, False, False)),
+            (True, b"0", (1, False, False)),
+            (False, b"1", (1, True, True)),
+        ],
     )
     @patch.object(NATIVE_RESTORE_WORK_ACCEPTANCE, "adb")
     def test_waits_for_android_to_apply_restored_radio_state(
         self, adb, radio_state, sleep
     ):
-        original = (False, b"1")
+        original = (False, b"1", (1, True, True))
 
         NATIVE_RESTORE_WORK_ACCEPTANCE.restore_radio_state("emulator-5554", original)
 
-        self.assertEqual(2, radio_state.call_count)
+        self.assertEqual(3, radio_state.call_count)
         sleep.assert_called_once()
         self.assertEqual(
             [
@@ -305,13 +309,16 @@ class CloudRestoreProcessRestartProbeTest(unittest.TestCase):
                     timeout=5,
                 ),
                 call("emulator-5554", "shell", "svc", "wifi", "enable", timeout=5),
+                call("emulator-5554", "shell", "svc", "data", "enable", timeout=5),
             ],
             adb.call_args_list,
         )
 
     @patch.object(time, "sleep")
     @patch.object(
-        NATIVE_RESTORE_WORK_ACCEPTANCE, "radio_state", return_value=(True, b"0")
+        NATIVE_RESTORE_WORK_ACCEPTANCE,
+        "radio_state",
+        return_value=(True, b"0", (1, False, False)),
     )
     @patch.object(NATIVE_RESTORE_WORK_ACCEPTANCE, "adb")
     def test_fails_if_radio_state_does_not_return_to_original(
@@ -321,14 +328,16 @@ class CloudRestoreProcessRestartProbeTest(unittest.TestCase):
             RuntimeError, "Could not restore the emulator's original network state"
         ):
             NATIVE_RESTORE_WORK_ACCEPTANCE.restore_radio_state(
-                "emulator-5554", (False, b"1")
+                "emulator-5554", (False, b"1", (1, True, True))
             )
 
         self.assertGreater(radio_state.call_count, 1)
 
     @patch.object(time, "sleep")
     @patch.object(
-        NATIVE_RESTORE_WORK_ACCEPTANCE, "radio_state", return_value=(True, b"0")
+        NATIVE_RESTORE_WORK_ACCEPTANCE,
+        "radio_state",
+        return_value=(True, b"0", (1, False, False)),
     )
     @patch.object(NATIVE_RESTORE_WORK_ACCEPTANCE, "adb")
     def test_radio_failure_reports_expected_and_observed_state(
@@ -338,5 +347,5 @@ class CloudRestoreProcessRestartProbeTest(unittest.TestCase):
             RuntimeError, "expected.*False.*1.*observed.*True.*0"
         ):
             NATIVE_RESTORE_WORK_ACCEPTANCE.restore_radio_state(
-                "emulator-5554", (False, b"1")
+                "emulator-5554", (False, b"1", (1, True, True))
             )

@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import runpy
+import shlex
 import subprocess
 import time
 
@@ -17,11 +18,18 @@ instrumentation_passed = runpy.run_path(
 )["instrumentation_passed"]
 
 
+radio_read_refusal = runpy.run_path(
+    str(Path(__file__).with_name("native-work-radio-diagnostics.py"))
+)["radio_read_refusal"]
+
+
 NATIVE = runpy.run_path(str(Path(__file__).with_name("native-backup-acceptance.py")))
 add_failure_note = NATIVE["add_failure_note"]
 
 
-PACKAGE = os.environ.get("LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.transfer.debug")
+PACKAGE = os.environ.get(
+    "LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.transfer.debug"
+)
 RUNNER = PACKAGE + ".test/androidx.test.runner.AndroidJUnitRunner"
 PROBE = "app.logdate.client.e2e.CloudRestoreWorkPersistenceProbeTest"
 
@@ -45,8 +53,14 @@ def adb(serial, *arguments, timeout=180):
 
 def probe(serial, mode, output):
     account_transitions = mode == "account-transitions"
-    probe_class = "app.logdate.client.e2e.AndroidSyncAccountTransitionRuntimeTest" if account_transitions else PROBE
-    argument = "syncAccountTransitions" if account_transitions else "cloudRestoreWorkMode"
+    probe_class = (
+        "app.logdate.client.e2e.AndroidSyncAccountTransitionRuntimeTest"
+        if account_transitions
+        else PROBE
+    )
+    argument = (
+        "syncAccountTransitions" if account_transitions else "cloudRestoreWorkMode"
+    )
     value = "true" if account_transitions else mode
     result = adb(
         serial,
@@ -79,33 +93,167 @@ def network_read_timeout(deadline):
 
 
 def radio_state(serial, deadline=None):
-    airplane = adb(serial, "shell", "settings", "get", "global", "airplane_mode_on",
-                   timeout=network_read_timeout(deadline)).strip() == b"1"
-    wifi = adb(serial, "shell", "settings", "get", "global", "wifi_on",
-               timeout=network_read_timeout(deadline)).strip()
-    if wifi not in (b"0", b"1", b"2"):
-        raise RuntimeError("Android Wi-Fi state could not be read")
-    return airplane, wifi
+    if deadline is None:
+        deadline = time.monotonic() + 5
+    # AOSP14 PhoneInterfaceManager controls the current default data subscription.
+    # GlobalSettingsHelper uses mobile_data only for a single actual phone.
+    script = (
+        "printf 'LOGDATE_RADIO_SETTINGS\\n'; "
+        "settings get global airplane_mode_on; settings get global wifi_on; "
+        "settings get global mobile_data; settings get global multi_sim_data_call; "
+        "printf 'LOGDATE_PHONE_BEGIN\\n'; dumpsys activity service com.android.phone/.TelephonyDebugService; "
+        "printf 'LOGDATE_PHONE_END\\n'; settings get global multi_sim_data_call"
+    )
+    raw = adb(
+        serial,
+        "shell",
+        shlex.join(["sh", "-c", script]),
+        timeout=network_read_timeout(deadline),
+    )
+    raw = raw.replace(b"\r\n", b"\n")
+    if (
+        len(raw) > 1_048_576
+        or raw.count(b"LOGDATE_PHONE_BEGIN\n") != 1
+        or raw.count(b"LOGDATE_PHONE_END\n") != 1
+    ):
+        raise radio_read_refusal(
+            "Android radio state readback was missing or ambiguous", raw
+        )
+    settings, rest = raw.split(b"LOGDATE_PHONE_BEGIN\n")
+    phone, after = rest.split(b"LOGDATE_PHONE_END\n")
+    fields = settings.splitlines()
+    if len(fields) != 5 or fields[0] != b"LOGDATE_RADIO_SETTINGS":
+        raise radio_read_refusal(
+            "Android radio settings were missing or ambiguous", raw
+        )
+    _, airplane, wifi, mobile, subscription = fields
+    if (
+        airplane not in (b"0", b"1")
+        or wifi not in (b"0", b"1", b"2")
+        or mobile not in (b"0", b"1")
+    ):
+        raise radio_read_refusal(
+            "Android radio settings could not be read explicitly", raw
+        )
+    if (
+        not re.fullmatch(rb"0|[1-9][0-9]*", subscription)
+        or int(subscription) >= 2**31 - 1
+        or after.splitlines() != [subscription]
+    ):
+        raise radio_read_refusal(
+            "Android default cellular subscription was missing or changed", raw
+        )
+    phones = re.findall(
+        rb"^\s*GsmCdmaPhone extends:\s*\n\s*Phone: subId=([0-9]+)\s*\n\s*mPhoneId=([0-9]+)\s*$",
+        phone,
+        re.MULTILINE,
+    )
+    managers = re.findall(
+        rb"^\s*DataSettingsManager-([0-9]+):\s*$", phone, re.MULTILINE
+    )
+    users = re.findall(rb"^\s*isUserDataEnabled=(true|false)\s*$", phone, re.MULTILINE)
+    provisioned = re.findall(
+        rb"^\s*device_provisioned=([0-9]+)\s*$", phone, re.MULTILINE
+    )
+    if (
+        phones != [(subscription, b"0")]
+        or managers != [b"0"]
+        or len(users) != 1
+        or provisioned != [b"1"]
+    ):
+        raise radio_read_refusal(
+            "Android single-phone cellular policy could not be bound to the default subscription",
+            raw,
+        )
+    return (
+        airplane == b"1",
+        wifi,
+        (int(subscription), mobile == b"1", users[0] == b"true"),
+    )
 
 
-def set_offline(serial, output=None):
+def require_stable_radio_policy(observed):
+    if observed[1] not in (b"0", b"1"):
+        raise RuntimeError(
+            "Android original Wi-Fi policy is changing; exact restoration cannot be promised"
+        )
+    if observed[2][1] != observed[2][2]:
+        raise RuntimeError(
+            "Android cellular policy is changing; original state cannot be captured safely"
+        )
+
+
+def set_offline(serial, output=None, *, expected_radio=None, on_radio_mutation=None):
     deadline = time.monotonic() + 10
     connectivity, observed, default_network, failure = b"", None, None, None
     try:
-        adb(serial, "shell", "cmd", "connectivity", "airplane-mode", "enable",
-            timeout=network_read_timeout(deadline))
-        adb(serial, "shell", "svc", "wifi", "disable", timeout=network_read_timeout(deadline))
+        original = radio_state(serial, deadline=deadline)
+        require_stable_radio_policy(original)
+        if expected_radio is not None and original != expected_radio:
+            raise RuntimeError(
+                "Captured original radio policy changed before offline admission"
+            )
+        if on_radio_mutation is not None:
+            on_radio_mutation()
+        adb(
+            serial,
+            "shell",
+            "svc",
+            "data",
+            "disable",
+            timeout=network_read_timeout(deadline),
+        )
+        adb(
+            serial,
+            "shell",
+            "cmd",
+            "connectivity",
+            "airplane-mode",
+            "enable",
+            timeout=network_read_timeout(deadline),
+        )
+        adb(
+            serial,
+            "shell",
+            "svc",
+            "wifi",
+            "disable",
+            timeout=network_read_timeout(deadline),
+        )
         while True:
-            connectivity = adb(serial, "shell", "dumpsys", "connectivity", timeout=network_read_timeout(deadline))
-            defaults = [line.strip() for line in connectivity.splitlines()
-                        if line.lstrip().startswith(b"Active default network:")]
-            match = re.fullmatch(rb"Active default network:\s*(none|[0-9]+)", defaults[0]) if len(defaults) == 1 else None
+            connectivity = adb(
+                serial,
+                "shell",
+                "dumpsys",
+                "connectivity",
+                timeout=network_read_timeout(deadline),
+            )
+            defaults = [
+                line.strip()
+                for line in connectivity.splitlines()
+                if line.lstrip().startswith(b"Active default network:")
+            ]
+            match = (
+                re.fullmatch(rb"Active default network:\s*(none|[0-9]+)", defaults[0])
+                if len(defaults) == 1
+                else None
+            )
             if match is None:
-                raise RuntimeError("Android default network readback was missing or ambiguous")
+                raise RuntimeError(
+                    "Android default network readback was missing or ambiguous"
+                )
             default_network = match.group(1).decode()
             observed = radio_state(serial, deadline=deadline)
             remaining = network_read_timeout(deadline)
-            if observed == (True, b"0") and default_network == "none":
+            if observed[2][0] != original[2][0]:
+                raise RuntimeError(
+                    "Android default cellular subscription changed during offline admission"
+                )
+            if (
+                observed[:2] == (True, b"0")
+                and observed[2][1:] == (False, False)
+                and default_network == "none"
+            ):
                 return
             time.sleep(min(0.1, remaining))
     except BaseException as error:
@@ -114,31 +262,64 @@ def set_offline(serial, output=None):
     finally:
         if output is not None:
             try:
-                NATIVE["private_file"](output / "offline-connectivity.log", connectivity[:131072])
-                NATIVE["private_file"](output / "offline-radio.json", json.dumps({
-                    "airplane": observed[0] if observed else None,
-                    "wifi": observed[1].decode() if observed else None,
-                    "defaultNetwork": default_network, "admitted": failure is None,
-                    "failure": type(failure).__name__ if failure else None,
-                }).encode())
+                NATIVE["private_file"](
+                    output / "offline-connectivity.log", connectivity[:131072]
+                )
+                NATIVE["private_file"](
+                    output / "offline-radio.json",
+                    json.dumps(
+                        {
+                            "airplane": observed[0] if observed else None,
+                            "wifi": observed[1].decode() if observed else None,
+                            "cellular": observed[2][1] if observed else None,
+                            "cellularUserPolicy": observed[2][2] if observed else None,
+                            "defaultNetwork": default_network,
+                            "admitted": failure is None,
+                            "failure": type(failure).__name__ if failure else None,
+                        }
+                    ).encode(),
+                )
             except Exception as diagnostic_error:
                 if failure is None:
                     raise
-                add_failure_note(failure, f"Offline diagnostics could not be retained: {type(diagnostic_error).__name__}")
+                add_failure_note(
+                    failure,
+                    f"Offline diagnostics could not be retained: {type(diagnostic_error).__name__}",
+                )
 
 
 def restore_radio_state(serial, original):
-    airplane, wifi = original
+    airplane, wifi, cellular = original
+    require_stable_radio_policy(original)
     failures = []
+    # Existing cleanup had up to two five-second controls plus five-second readback.
+    # All three controls and their readbacks now share that same 15-second ceiling.
+    deadline = time.monotonic() + 15
     for label, arguments in (
-        ("airplane", ("shell", "cmd", "connectivity", "airplane-mode", "enable" if airplane else "disable")),
+        (
+            "airplane",
+            (
+                "shell",
+                "cmd",
+                "connectivity",
+                "airplane-mode",
+                "enable" if airplane else "disable",
+            ),
+        ),
         ("Wi-Fi", ("shell", "svc", "wifi", "disable" if wifi == b"0" else "enable")),
+        ("cellular", ("shell", "svc", "data", "enable" if cellular[1] else "disable")),
     ):
         try:
-            adb(serial, *arguments, timeout=5)
+            if (
+                label == "cellular"
+                and radio_state(serial, deadline=deadline)[2][0] != cellular[0]
+            ):
+                raise RuntimeError(
+                    "Default cellular subscription changed; refusing to mutate another subscription"
+                )
+            adb(serial, *arguments, timeout=network_read_timeout(deadline))
         except Exception:
             failures.append(label)
-    deadline = time.monotonic() + 5
     observed = None
     for _ in range(20):
         if time.monotonic() >= deadline:
@@ -150,18 +331,53 @@ def restore_radio_state(serial, original):
         except Exception:
             failures.append("readback")
         time.sleep(min(0.25, max(0, deadline - time.monotonic())))
-    raise RuntimeError(f"Could not restore the emulator's original network state: expected {original!r}, observed {observed!r}; "
-                       f"{', '.join(dict.fromkeys(failures)) or 'state mismatch'}")
+    raise RuntimeError(
+        f"Could not restore the emulator's original network state: expected {original!r}, observed {observed!r}; "
+        f"{', '.join(dict.fromkeys(failures)) or 'state mismatch'}"
+    )
 
 
 def require_empty_install(serial, allow_preinstalled_empty=False):
-    packages = adb(serial, "shell", "pm", "list", "packages", PACKAGE).decode().splitlines()
+    packages = (
+        adb(serial, "shell", "pm", "list", "packages", PACKAGE).decode().splitlines()
+    )
     if "package:" + PACKAGE not in packages:
         return
     if not allow_preinstalled_empty:
-        raise RuntimeError("use a fresh isolated application install; the harness never clears app data")
-    if NATIVE["contains_user_content"](NATIVE["package_user_files"](serial, package=PACKAGE)):
+        raise RuntimeError(
+            "use a fresh isolated application install; the harness never clears app data"
+        )
+    if NATIVE["contains_user_content"](
+        NATIVE["package_user_files"](serial, package=PACKAGE)
+    ):
         raise RuntimeError("The installed managed source contains retained data")
+
+
+def cleanup_after_probe(
+    serial, output, original_radio, primary, *, cleanup_work, restore_radios
+):
+    failure = primary
+    actions = []
+    if cleanup_work:
+        actions.append(
+            ("work cleanup", lambda: probe(serial, "cleanup", output / "cleanup.log"))
+        )
+    if restore_radios:
+        actions.append(
+            ("radio restoration", lambda: restore_radio_state(serial, original_radio))
+        )
+    for label, action in actions:
+        try:
+            action()
+        except BaseException as error:
+            if failure is None:
+                failure = error
+            elif failure is not error:
+                add_failure_note(
+                    failure, f"{label} also failed: {type(error).__name__}"
+                )
+    if primary is None and failure is not None:
+        raise failure
 
 
 def main():
@@ -181,19 +397,48 @@ def main():
 
     adb(options.emulator, "install", "-r", "-t", str(options.app_apk.resolve()))
     adb(options.emulator, "install", "-r", "-t", str(options.test_apk.resolve()))
-    original_radio = radio_state(options.emulator)
+    original_radio = radio_state(options.emulator, deadline=time.monotonic() + 5)
+    require_stable_radio_policy(original_radio)
+    primary = None
+    radios_touched = False
+    admitted = False
+
+    def on_radio_mutation():
+        nonlocal radios_touched
+        radios_touched = True
+
     try:
-        set_offline(options.emulator, options.output)
-        probe(options.emulator, "account-transitions", options.output / "account-transitions.log")
+        set_offline(
+            options.emulator,
+            options.output,
+            expected_radio=original_radio,
+            on_radio_mutation=on_radio_mutation,
+        )
+        admitted = True
+        probe(
+            options.emulator,
+            "account-transitions",
+            options.output / "account-transitions.log",
+        )
         probe(options.emulator, "enqueue", options.output / "enqueue.log")
         adb(options.emulator, "shell", "am", "force-stop", PACKAGE)
         probe(options.emulator, "verify", options.output / "after-process-restart.log")
+    except BaseException as error:
+        primary = error
+        raise
     finally:
-        try:
-            probe(options.emulator, "cleanup", options.output / "cleanup.log")
-        finally:
-            restore_radio_state(options.emulator, original_radio)
-    print("Unique Cloud Restore work survived process death and duplicate enqueue", flush=True)
+        cleanup_after_probe(
+            options.emulator,
+            options.output,
+            original_radio,
+            primary,
+            cleanup_work=admitted,
+            restore_radios=radios_touched,
+        )
+    print(
+        "Unique Cloud Restore work survived process death and duplicate enqueue",
+        flush=True,
+    )
 
 
 if __name__ == "__main__":
