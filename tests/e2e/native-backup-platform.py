@@ -91,6 +91,8 @@ def assert_snapshot_preserved(
             "databases/logdate-wal",
             "databases/logdate-shm",
             "files/logdate.preferences_pb.tmp",
+            # Firebase Sessions persists process IDs/background times independently of journal backup.
+            "files/datastore/firebaseSessions/sessionDataStore.data",
         } or path.startswith(h.RUNTIME_ONLY_SNAPSHOT_PREFIXES):
             return True
         return path.startswith("files/datastore/firebaseSessions/") and path.endswith(
