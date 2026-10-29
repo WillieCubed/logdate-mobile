@@ -17,6 +17,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.logdate.client.datastore.EntryStartMode
 import app.logdate.client.domain.recommendation.RecallMode
 import app.logdate.client.domain.recommendation.WidgetContentType
 import app.logdate.ui.adaptive.FoldableBookLayout
@@ -63,6 +64,7 @@ fun MemoriesSettingsScreen(
     viewModel: MemoriesSettingsViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val captureModeState by viewModel.captureModeState.collectAsState()
 
     MemoriesSettingsContent(
         onBack = onBack,
@@ -77,6 +79,8 @@ fun MemoriesSettingsScreen(
         widgetContentTypes = uiState.settings.widgetContentTypes,
         onToggleContentType = viewModel::toggleWidgetContentType,
         modifier = modifier,
+        captureModeState = captureModeState,
+        onCaptureModeSelected = viewModel::setDefaultCaptureMode,
     )
 }
 
@@ -94,6 +98,8 @@ fun MemoriesSettingsContent(
     widgetContentTypes: Set<WidgetContentType>,
     onToggleContentType: (WidgetContentType, Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    captureModeState: DefaultCaptureModeState = DefaultCaptureModeState.Loading,
+    onCaptureModeSelected: (EntryStartMode) -> Unit = {},
 ) {
     FoldableBookLayout(
         modifier = modifier.fillMaxSize(),
@@ -107,6 +113,11 @@ fun MemoriesSettingsContent(
                         .padding(vertical = Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
+                DefaultCaptureModeSettingsSection(
+                    captureModeState,
+                    onCaptureModeSelected,
+                    Modifier.padding(horizontal = Spacing.lg),
+                )
                 MemoriesRecommendationsSection(
                     contextualRecommendationsEnabled = contextualRecommendationsEnabled,
                     onToggleContextualRecommendations = onToggleContextualRecommendations,
@@ -145,6 +156,13 @@ fun MemoriesSettingsContent(
                 onBack = onBack,
                 modifier = modifier,
             ) {
+                item {
+                    DefaultCaptureModeSettingsSection(
+                        captureModeState,
+                        onCaptureModeSelected,
+                        Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
                 item {
                     MemoriesRecommendationsSection(
                         contextualRecommendationsEnabled = contextualRecommendationsEnabled,

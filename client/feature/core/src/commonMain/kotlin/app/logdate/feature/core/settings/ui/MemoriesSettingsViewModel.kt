@@ -2,14 +2,19 @@ package app.logdate.feature.core.settings.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.datastore.EntryStartMode
+import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.domain.recommendation.AmbientPromptTime
 import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.domain.recommendation.RecallMode
 import app.logdate.client.domain.recommendation.WidgetContentType
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -20,7 +25,50 @@ import kotlinx.coroutines.launch
 class MemoriesSettingsViewModel(
     private val settingsRepository: MemoriesSettingsRepository,
     private val widgetInstallController: MemoriesWidgetInstallController,
+    private val preferences: LogdatePreferencesDataSource,
 ) : ViewModel() {
+    private val mutableCaptureModeState = MutableStateFlow<DefaultCaptureModeState>(DefaultCaptureModeState.Loading)
+    val captureModeState: StateFlow<DefaultCaptureModeState> = mutableCaptureModeState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            try {
+                preferences.observeEntryStartMode().collect { mode ->
+                    val previous = mutableCaptureModeState.value as? DefaultCaptureModeState.Ready
+                    mutableCaptureModeState.value =
+                        DefaultCaptureModeState.Ready(
+                            mode,
+                            saving = previous?.saving == true,
+                            saveFailed = previous?.saveFailed == true,
+                        )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Napier.e("Could not read the default capture mode", error)
+                mutableCaptureModeState.value = DefaultCaptureModeState.Unavailable
+            }
+        }
+    }
+
+    fun setDefaultCaptureMode(mode: EntryStartMode) {
+        val previous = mutableCaptureModeState.value as? DefaultCaptureModeState.Ready ?: return
+        if (previous.saving || previous.mode == mode) return
+        mutableCaptureModeState.value = previous.copy(saving = true, saveFailed = false)
+        viewModelScope.launch {
+            try {
+                preferences.setEntryStartMode(mode)
+                mutableCaptureModeState.value = DefaultCaptureModeState.Ready(mode)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Napier.e("Could not save the default capture mode", error)
+                val current = mutableCaptureModeState.value as? DefaultCaptureModeState.Ready ?: previous
+                mutableCaptureModeState.value = current.copy(saving = false, saveFailed = true)
+            }
+        }
+    }
+
     data class UiState(
         val settings: MemoriesSettings = MemoriesSettings(),
         val widgetInstallUiState: MemoriesWidgetInstallUiState = MemoriesWidgetInstallUiState.Hidden,

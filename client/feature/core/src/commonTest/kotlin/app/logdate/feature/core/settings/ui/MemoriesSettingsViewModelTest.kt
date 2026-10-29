@@ -1,5 +1,9 @@
 package app.logdate.feature.core.settings.ui
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
+import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.domain.recommendation.RecallMode
@@ -51,6 +55,7 @@ class MemoriesSettingsViewModelTest {
                 )
             val viewModel =
                 MemoriesSettingsViewModel(
+                    preferences = LogdatePreferencesDataSource(CapturePreferenceStore()),
                     settingsRepository = FakeMemoriesSettingsRepository(),
                     widgetInstallController = widgetInstallController,
                 )
@@ -70,6 +75,7 @@ class MemoriesSettingsViewModelTest {
             val widgetInstallController = FakeMemoriesWidgetInstallController()
             val viewModel =
                 MemoriesSettingsViewModel(
+                    preferences = LogdatePreferencesDataSource(CapturePreferenceStore()),
                     settingsRepository = FakeMemoriesSettingsRepository(),
                     widgetInstallController = widgetInstallController,
                 )
@@ -92,6 +98,7 @@ class MemoriesSettingsViewModelTest {
                 )
             val viewModel =
                 MemoriesSettingsViewModel(
+                    preferences = LogdatePreferencesDataSource(CapturePreferenceStore()),
                     settingsRepository = settingsRepository,
                     widgetInstallController = FakeMemoriesWidgetInstallController(),
                 )
@@ -133,4 +140,15 @@ class MemoriesSettingsViewModelTest {
             requestCount++
         }
     }
+}
+
+private class CapturePreferenceStore : DataStore<Preferences> {
+    private val values = MutableStateFlow(emptyPreferences())
+    override val data: Flow<Preferences> = values
+
+    override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
+        transform(values.value).also {
+            values.value =
+                it
+        }
 }
