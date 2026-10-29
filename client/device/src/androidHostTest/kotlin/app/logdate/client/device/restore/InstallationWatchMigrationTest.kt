@@ -43,6 +43,18 @@ class InstallationWatchMigrationTest {
         }
 
     @Test
+    fun `native restore history excludes copied trust and counters even with a matching key`() =
+        runTest {
+            seed()
+            val migration = InstallationWatchMigration({ legacy() }, { keys[it] }, canAdoptLegacy = { false })
+            val migrated = migration.migrate(emptyPreferences())
+            assertEquals("{}", migrated[linkKey])
+            assertNull(migrated[revisionKey])
+            assertNull(migrated[stringPreferencesKey("journal.setting")])
+            assertFalse(migration.shouldMigrate(migrated))
+        }
+
+    @Test
     fun `replay cannot remigrate portable metadata over a destination exchange`() =
         runTest {
             seed()

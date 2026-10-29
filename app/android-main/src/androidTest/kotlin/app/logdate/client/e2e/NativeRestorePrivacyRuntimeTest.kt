@@ -55,9 +55,11 @@ class NativeRestorePrivacyRuntimeTest {
                 assertIs<DatabaseStartupState.Ready>(koin.get<DatabaseStartupMonitor>().state.value)
             } else {
                 val error = runCatching { koin.get<LogDateDatabase>() }.exceptionOrNull()
+                val chain = generateSequence(error) { it.cause }.take(20).map { it.javaClass.simpleName }.toList()
                 assertTrue(
                     generateSequence(error) { it.cause }.take(20).any { it is NativeRestorePrivacyMetadataRequiredException },
-                    "Every database consumer must be refused unknown restored privacy",
+                    "Every database consumer must be refused unknown restored privacy; " +
+                        "causes=$chain; state=${koin.get<DatabaseStartupMonitor>().state.value.javaClass.simpleName}",
                 )
                 assertIs<DatabaseStartupState.RecoveryRequired>(koin.get<DatabaseStartupMonitor>().state.value)
                 ActivityScenario.launch(MainActivity::class.java).use { activity ->
