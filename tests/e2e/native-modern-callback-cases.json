@@ -11,7 +11,8 @@
     "corrupt restored server leaves local content and account recovery pending",
     "transferred sign out preference prevents background account recovery without changing content",
     "cachedUnlockedPolicyIsReplacedByTransferredBiometricPolicyInSameProcess",
-    "incompletePolicyCanBeRepairedWithoutReplacingLivePreferencesReaders"
+    "incompletePolicyCanBeRepairedWithoutReplacingLivePreferencesReaders",
+    "corruptPrivacyDuplicatePreservesBytesAndAccountDelivery"
   ],
   "app.logdate.client.e2e.NativeModernRestoreFormatTest": [
     "iosAndVersionedInputsPreserveEveryNativeDestination",

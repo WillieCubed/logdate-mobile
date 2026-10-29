@@ -128,10 +128,20 @@ class NativeWorkflowSafety:
             ROOT
             / "app/android-main/src/androidTest/kotlin/app/logdate/client/e2e/NativeBackgroundCredentialCallbackTest.kt"
         ).read_text()
-        self.assertIn("if (!supportsFullRestoreInput()) return", probe)
+        support = (
+            ROOT
+            / "app/android-main/src/androidTest/kotlin/app/logdate/client/e2e/NativeBackgroundRestorePreferences.kt"
+        ).read_text()
+        self.assertIn(
+            "if (!transferredPreferences.supportsFullRestoreInput()) return", probe
+        )
+        self.assertIn(
+            "private val transferredPreferences by lazy { NativeBackgroundRestorePreferences(context, folder) }",
+            probe,
+        )
         self.assertIn(
             "Build.VERSION.SDK_INT >= 36 && Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1",
-            probe,
+            support,
         )
         self.assertIn("assertNotNull(", probe)
         self.assertIn("android.app.backup.FullRestoreDataInput", probe)
