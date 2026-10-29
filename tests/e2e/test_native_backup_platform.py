@@ -28,18 +28,57 @@ class NativeD2DRestoreEvidenceTest(unittest.TestCase):
         )
         probe = probe_path.read_text()
 
-        backup_call = harness.index(
-            "backup_d2d_source(serial, output)", harness.index("def exercise_d2d(")
+        exercise = next(
+            node
+            for node in ast.parse(harness).body
+            if isinstance(node, ast.FunctionDef) and node.name == "exercise_d2d"
         )
-        mutation_probe = harness.index('HARNESS.probe(serial, "post-backup-mutation"')
-        restore_call = harness.index('HARNESS.adb(serial, "shell", "bmgr", "restore"')
+        calls = [node for node in ast.walk(exercise) if isinstance(node, ast.Call)]
 
-        self.assertLess(backup_call, mutation_probe)
-        self.assertLess(mutation_probe, restore_call)
-        verification = harness.index('HARNESS.probe(serial, "verify-in-place"')
-        self.assertLess(restore_call, verification)
-        self.assertIn(
-            'recording_transport="d2d"', harness[verification : verification + 180]
+        def single_call(name, mode=None, adb_prefix=None):
+            matched = []
+            for node in calls:
+                if ast.unparse(node.func) != name:
+                    continue
+                if mode is not None and (
+                    len(node.args) < 2
+                    or not isinstance(node.args[1], ast.Constant)
+                    or node.args[1].value != mode
+                ):
+                    continue
+                if (
+                    adb_prefix is not None
+                    and [
+                        arg.value if isinstance(arg, ast.Constant) else None
+                        for arg in node.args[1:4]
+                    ]
+                    != adb_prefix
+                ):
+                    continue
+                matched.append(node)
+            self.assertEqual(
+                1,
+                len(matched),
+                f"One exact {name} call required for {mode or adb_prefix}",
+            )
+            return matched[0]
+
+        backup_call = single_call("backup_d2d_source")
+        mutation_probe = single_call("HARNESS.probe", mode="post-backup-mutation")
+        restore_call = single_call(
+            "HARNESS.adb", adb_prefix=["shell", "bmgr", "restore"]
+        )
+        verification = single_call("HARNESS.probe", mode="verify-in-place")
+        self.assertLess(backup_call.lineno, mutation_probe.lineno)
+        self.assertLess(mutation_probe.lineno, restore_call.lineno)
+        self.assertLess(restore_call.lineno, verification.lineno)
+        self.assertTrue(
+            any(
+                keyword.arg == "recording_transport"
+                and isinstance(keyword.value, ast.Constant)
+                and keyword.value.value == "d2d"
+                for keyword in verification.keywords
+            )
         )
         self.assertIn('"post-backup-mutation"', probe)
         self.assertIn("Mutated after native D2D backup", probe)
