@@ -158,6 +158,32 @@ class ManagedPairDiscoveryTest(unittest.TestCase):
             f.run(budget=0.5)
         self.assertEqual({101, 202, 303}, f.observed)
 
+    def test_timeout_retains_latest_observation_without_admitting_it(self):
+        f = DiscoveryFixture(
+            [
+                {p: candidate(p) for p in (101, 202, 303)},
+                {p: candidate(p) for p in (101, 202)},
+            ],
+        )
+        with self.assertRaisesRegex(RuntimeError, "boot observation expired"):
+            f.run(budget=0.5)
+        self.assertEqual(
+            {p: candidate(p) for p in (101, 202)},
+            f.custody.get("observedCandidates"),
+        )
+        self.assertEqual({101, 202, 303}, f.observed)
+        self.assertEqual({}, f.custody["targets"])
+        self.assertEqual([], f.operations)
+
+    def test_persistent_ambiguity_remains_distinct_from_admitted_targets(self):
+        selected = {p: candidate(p) for p in (101, 202, 303)}
+        f = DiscoveryFixture([selected])
+        with self.assertRaisesRegex(RuntimeError, "boot observation expired"):
+            f.run(budget=0.5)
+        self.assertEqual(selected, f.custody.get("observedCandidates"))
+        self.assertEqual({}, f.custody["targets"])
+        self.assertEqual([], f.operations)
+
     def test_stale_admitted_target_is_never_carried_into_a_replacement_pair(self):
         f = DiscoveryFixture(
             [

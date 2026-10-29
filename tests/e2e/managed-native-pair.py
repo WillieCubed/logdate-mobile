@@ -399,6 +399,7 @@ def discover_managed_pair(
             output / "managed-emulator-launches", candidates, nonce
         )
         observed_managed_pids.update(candidates)
+        custody["observedCandidates"] = candidates
         if candidates:
             deadline = h.managed_boot_deadline(
                 deadline, h.time.monotonic(), budget["boot"]

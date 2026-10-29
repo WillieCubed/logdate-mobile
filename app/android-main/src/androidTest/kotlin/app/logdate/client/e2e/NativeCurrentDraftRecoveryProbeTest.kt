@@ -75,8 +75,7 @@ class NativeCurrentDraftRecoveryProbeTest {
             require(credentials.sourceDevice != null)
             ensureLogDateApplicationStarted(context.applicationContext as Application)
             report("before_activity_launch")
-            ActivityScenario.launch(MainActivity::class.java).use {
-                report("activity_launched")
+            withRecoveryActivity {
                 koin.get<LogDateConfigDataSource>().awaitConfigurationLoaded()
                 report("configuration_ready")
                 assertEquals(credentials.origin, koin.get<LogDateConfigRepository>().getCurrentBackendUrl())
@@ -89,11 +88,12 @@ class NativeCurrentDraftRecoveryProbeTest {
                 val scope = UploadScope(credentials.owner, credentials.origin)
                 if (stage == "base-prepare" || stage == "base-complete") {
                     recoverEditBase(stage, scope)
-                    return@runBlocking
+                    return@withRecoveryActivity
                 }
                 if (stage == "prepare") {
                     prepare(scope)
-                    return@runBlocking
+                    report("prepare_finished")
+                    return@withRecoveryActivity
                 }
                 val expected = Json.decodeFromString<EntryDraft>(marker.readText())
                 withTimeout(30_000) {
@@ -144,8 +144,10 @@ class NativeCurrentDraftRecoveryProbeTest {
         require(!marker.exists())
         val drafts = koin.get<EntryDraftRepository>()
         val original = snapshot()
+        report("draft_snapshot_loaded")
         val refs = koin.get<MediaSyncRefStore>()
         val uploaded = requireNotNull(refs.getScoped(imageId, scope))
+        report("media_reference_loaded")
         val uri =
             requireNotNull(
                 context.contentResolver.insert(
@@ -157,8 +159,11 @@ class NativeCurrentDraftRecoveryProbeTest {
                     },
                 ),
             )
+        report("provider_item_created")
         requireNotNull(context.contentResolver.openOutputStream(uri)).use { it.write(proof() + byteArrayOf(42)) }
+        report("provider_output_closed")
         refs.upsert(uploaded.copy(noteId = imageId.toString(), localUri = uri.toString(), localAliases = emptyList()))
+        report("media_reference_updated")
         val staging = File(context.cacheDir, "recordings/excluded-$pendingId.m4a")
         assertFalse(staging.exists())
         val pending =
@@ -178,7 +183,11 @@ class NativeCurrentDraftRecoveryProbeTest {
                 pendingMedia = listOf(pending),
             ),
         )
-        writeDurably(marker, Json.encodeToString(snapshot()))
+        report("draft_snapshot_saved")
+        val persisted = snapshot()
+        report("draft_snapshot_reloaded")
+        writeDurably(marker, Json.encodeToString(persisted))
+        report("draft_marker_written")
         val quarantine = File(context.noBackupFilesDir, ".logdate_media_quarantine_pending")
         require(quarantine.createNewFile())
         writeDurably(quarantine, Uuid.random().toString())
@@ -348,6 +357,26 @@ class NativeCurrentDraftRecoveryProbeTest {
     private fun digest(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).toList()
 
     private fun id(number: Int) = Uuid.parse("00000000-0000-0000-0000-${number.toString().padStart(12, '0')}")
+
+    private inline fun withRecoveryActivity(block: () -> Unit) {
+        val trace = NativeDraftProbeTrace(Thread.currentThread())
+        try {
+            ActivityScenario.launch(MainActivity::class.java).use {
+                report("activity_launched")
+                try {
+                    block()
+                } catch (failure: Throwable) {
+                    trace.reportFailure(failure)
+                    throw failure
+                } finally {
+                    report("before_activity_close")
+                }
+            }
+            report("activity_closed")
+        } finally {
+            trace.close()
+        }
+    }
 
     private fun report(phase: String) {
         android.util.Log.i("NativeCurrentDraftRecovery", phase)
