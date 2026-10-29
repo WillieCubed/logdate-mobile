@@ -12,11 +12,15 @@ import app.logdate.client.media.storage.MediaClaimFence
 import app.logdate.client.repository.journals.EntryDraft
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import java.io.File
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 import kotlin.uuid.Uuid
 
 private val Context.entryDraftDataStore by preferencesDataStore(name = "entry_drafts")
@@ -29,13 +33,25 @@ class AndroidLocalEntryDraftStore internal constructor(
     private val admitContent: suspend () -> Unit = {},
     private val claimFence: MediaClaimFence = MediaClaimFence.Disabled,
 ) : LocalEntryDraftStore,
-    RecoveryEntryDraftStore {
+    RecoveryEntryDraftStore,
+    EntryDraftMutationGuard {
     constructor(
         context: Context,
         claimFence: MediaClaimFence = MediaClaimFence.Disabled,
     ) : this(context.entryDraftDataStore, { admitNativeContent(File(context.filesDir, "datastore")) }, claimFence)
 
     private val json = Json { ignoreUnknownKeys = true }
+
+    override suspend fun <T> withDraftMutation(
+        admitContent: Boolean,
+        block: suspend () -> T,
+    ): T {
+        if (admitContent && currentCoroutineContext()[AdmittedDraftStore]?.store !== this) {
+            this.admitContent()
+            return withContext(AdmittedDraftStore(this)) { claimFence.withClaim(block) }
+        }
+        return claimFence.withClaim(block)
+    }
 
     override suspend fun insertIfAbsentForRecovery(
         draft: EntryDraft,
@@ -111,8 +127,7 @@ class AndroidLocalEntryDraftStore internal constructor(
     }
 
     override suspend fun saveDraft(draft: EntryDraft) {
-        admitContent()
-        claimFence.withClaim {
+        withDraftMutation(admitContent = true) {
             val key = stringPreferencesKey(draft.id.toString())
             val serializedDraft = json.encodeToString(draft)
             dataStore.edit { preferences -> preferences[key] = serializedDraft }
@@ -160,6 +175,12 @@ class AndroidLocalEntryDraftStore internal constructor(
                 }
             }
         }
+    }
+
+    private class AdmittedDraftStore(
+        val store: AndroidLocalEntryDraftStore,
+    ) : AbstractCoroutineContextElement(AdmittedDraftStore) {
+        companion object : CoroutineContext.Key<AdmittedDraftStore>
     }
 
     private fun nativeTransferMarkerKey(id: Uuid) = booleanPreferencesKey("native_transfer_admitted.$id")

@@ -134,7 +134,10 @@ class RetainedJournalReconciliationJobService : JobService() {
                 if (repositories == null) {
                     false
                 } else {
-                    app.logdate.client.media.storage.AndroidMediaClaimFence(noBackupFilesDir).withClaim {
+                    RetainedJournalReconciliationLock.withMediaClaim(
+                        app.logdate.client.media.storage
+                            .AndroidMediaClaimFence(noBackupFilesDir),
+                    ) {
                         reconcileLocked(repositories)
                     }
                 }

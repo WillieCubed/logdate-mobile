@@ -45,11 +45,11 @@ class OfflineFirstEntryDraftRepository(
         ownerId: String,
     ): Uuid? {
         initializationComplete.await()
-        return mutationMutex.withLock {
+        return withDraftMutation {
             val draft =
                 draftsFlow.value.values.firstOrNull { draft -> draft.pendingMedia.any { it.blockId == blockId } }
-                    ?: return@withLock null
-            val updated = draft.checkpointRecording(blockId, path, ownerId) ?: return@withLock null
+                    ?: return@withDraftMutation null
+            val updated = draft.checkpointRecording(blockId, path, ownerId) ?: return@withDraftMutation null
             saveRecordingDraft(updated)
         }
     }
@@ -62,21 +62,21 @@ class OfflineFirstEntryDraftRepository(
         quietSave: Boolean,
     ): Uuid? {
         initializationComplete.await()
-        return mutationMutex.withLock {
+        return withDraftMutation {
             val draft =
                 draftsFlow.value.values.firstOrNull { draft ->
                     draft.pendingMedia.any { it.blockId == blockId } || draft.notes.any { it.uid == blockId }
-                } ?: return@withLock null
-            val updated = draft.completeRecording(blockId, path, durationMs, ownerId, quietSave) ?: return@withLock null
+                } ?: return@withDraftMutation null
+            val updated = draft.completeRecording(blockId, path, durationMs, ownerId, quietSave) ?: return@withDraftMutation null
             saveRecordingDraft(updated)
         }
     }
 
     override suspend fun acknowledgeQuietSave(draftId: Uuid) {
         initializationComplete.await()
-        mutationMutex.withLock {
+        withDraftMutation {
             val draft = requireDraft(draftId)
-            val outcome = draft.quietSave ?: return@withLock
+            val outcome = draft.quietSave ?: return@withDraftMutation
             saveRecordingDraft(draft.copy(quietSave = outcome.copy(acknowledged = true)))
         }
     }
@@ -112,8 +112,8 @@ class OfflineFirstEntryDraftRepository(
     ): Boolean {
         require(expected.id == replacement.id) { "Recovery cannot change draft identity" }
         initializationComplete.await()
-        return mutationMutex.withLock {
-            if (!canCommit() || draftsFlow.value[expected.id] != expected) return@withLock false
+        return withDraftMutation(admitContent = false) {
+            if (!canCommit() || draftsFlow.value[expected.id] != expected) return@withDraftMutation false
             val recoveryStore = draftStore as? RecoveryEntryDraftStore ?: error("Draft store cannot commit guarded recovery")
             recordReclamationCandidates(expected)
             try {
@@ -142,8 +142,8 @@ class OfflineFirstEntryDraftRepository(
         scopeFence: suspend (commit: suspend () -> Boolean) -> Boolean,
     ): Boolean {
         initializationComplete.await()
-        return mutationMutex.withLock {
-            if (!canCommit() || draftsFlow.value.containsKey(draft.id)) return@withLock false
+        return withDraftMutation(admitContent = false) {
+            if (!canCommit() || draftsFlow.value.containsKey(draft.id)) return@withDraftMutation false
             val recoveryStore = draftStore as? RecoveryEntryDraftStore ?: error("Draft store cannot commit guarded recovery")
             val inserted = scopeFence { recoveryStore.insertIfAbsentForRecovery(draft, canCommit) }
             if (inserted) {
@@ -175,10 +175,10 @@ class OfflineFirstEntryDraftRepository(
         scopeFence: suspend (commit: suspend () -> Boolean) -> Boolean,
     ): Boolean {
         initializationComplete.await()
-        return mutationMutex.withLock {
+        return withDraftMutation(admitContent = false) {
             val recoveryStore = draftStore as? RecoveryEntryDraftStore ?: error("Draft store cannot commit guarded recovery")
-            if (recoveryStore.isNativeTransferRecoveryAdmitted(draft.id, transferMarker)) return@withLock true
-            if (!canCommit() || draftsFlow.value.containsKey(draft.id)) return@withLock false
+            if (recoveryStore.isNativeTransferRecoveryAdmitted(draft.id, transferMarker)) return@withDraftMutation true
+            if (!canCommit() || draftsFlow.value.containsKey(draft.id)) return@withDraftMutation false
             val commit: suspend () -> Boolean = {
                 recoveryStore.insertForNativeTransferRecovery(draft, transferMarker, canCommit)
             }
@@ -241,7 +241,7 @@ class OfflineFirstEntryDraftRepository(
         }
 
     override suspend fun saveDraftSnapshot(draft: EntryDraft): Uuid =
-        mutationMutex.withLock {
+        withDraftMutation {
             val existing = draftsFlow.value[draft.id] ?: draftStore.getDraft(draft.id)
             val saved =
                 (existing?.mergeRecordingSnapshot(draft) ?: draft).copy(
@@ -286,7 +286,7 @@ class OfflineFirstEntryDraftRepository(
         visitContext: VisitMemoryContext?,
         markId: String?,
     ): Uuid =
-        mutationMutex.withLock {
+        withDraftMutation {
             val now = Clock.System.now()
             val existing = draftsFlow.value[uid] ?: draftStore.getDraft(uid)
             val draft =
@@ -312,7 +312,7 @@ class OfflineFirstEntryDraftRepository(
         uid: Uuid,
         notes: List<JournalNote>,
     ): Uuid =
-        mutationMutex.withLock {
+        withDraftMutation {
             val existingDraft = requireDraft(uid)
             persistUpdatedDraft(
                 existingDraft = existingDraft,
@@ -328,7 +328,7 @@ class OfflineFirstEntryDraftRepository(
         pendingMedia: List<PendingMediaRecord>,
         selectedJournalIds: List<Uuid>,
     ): Uuid =
-        mutationMutex.withLock {
+        withDraftMutation {
             persistUpdatedDraft(
                 existingDraft = requireDraft(uid),
                 notes = notes,
@@ -353,15 +353,15 @@ class OfflineFirstEntryDraftRepository(
         visitContext: VisitMemoryContext?,
         markId: String?,
     ): Uuid =
-        mutationMutex.withLock {
+        withDraftMutation {
             persistUpdatedDraft(requireDraft(uid), notes, pendingMedia, selectedJournalIds, visitContext, markId)
         }
 
     override suspend fun setPendingMedia(
         uid: Uuid,
         pendingMedia: List<PendingMediaRecord>,
-    ) = mutationMutex.withLock {
-        val existingDraft = findDraft(uid) ?: return@withLock
+    ) = withDraftMutation {
+        val existingDraft = findDraft(uid) ?: return@withDraftMutation
         persistUpdatedDraft(
             existingDraft = existingDraft,
             notes = existingDraft.notes,
@@ -374,8 +374,8 @@ class OfflineFirstEntryDraftRepository(
     override suspend fun setSelectedJournalIds(
         uid: Uuid,
         selectedJournalIds: List<Uuid>,
-    ) = mutationMutex.withLock {
-        val existingDraft = findDraft(uid) ?: return@withLock
+    ) = withDraftMutation {
+        val existingDraft = findDraft(uid) ?: return@withDraftMutation
         persistUpdatedDraft(
             existingDraft = existingDraft,
             notes = existingDraft.notes,
@@ -386,7 +386,7 @@ class OfflineFirstEntryDraftRepository(
     }
 
     override suspend fun deleteDraft(uid: Uuid) =
-        mutationMutex.withLock {
+        withDraftMutation {
             if (mediaReclamation !== MediaReclamationJournal.None) {
                 findDraft(uid)?.let { recordReclamationCandidates(it) }
             }
@@ -395,7 +395,7 @@ class OfflineFirstEntryDraftRepository(
         }
 
     override suspend fun deleteAllDrafts() =
-        mutationMutex.withLock {
+        withDraftMutation {
             if (mediaReclamation !== MediaReclamationJournal.None) {
                 (draftStore.getAllDrafts() + draftsFlow.value.values)
                     .distinctBy(EntryDraft::id)
@@ -406,7 +406,7 @@ class OfflineFirstEntryDraftRepository(
         }
 
     override suspend fun deleteExpiredDrafts(maxAge: Duration): Int =
-        mutationMutex.withLock {
+        withDraftMutation {
             val now = Clock.System.now()
             val persistedDrafts = draftStore.getAllDrafts()
             val knownDrafts =
@@ -425,6 +425,11 @@ class OfflineFirstEntryDraftRepository(
             draftsFlow.value = draftsFlow.value - expiredIds.toSet()
             expiredIds.size
         }
+
+    private suspend fun <T> withDraftMutation(
+        admitContent: Boolean = true,
+        block: suspend () -> T,
+    ): T = draftStore.withEntryDraftMutation(mutationMutex, admitContent, block)
 
     private suspend fun resolveSelection(ids: List<Uuid>): List<Uuid> = ids.map { journalRepository?.resolveJournalId(it) ?: it }.distinct()
 
