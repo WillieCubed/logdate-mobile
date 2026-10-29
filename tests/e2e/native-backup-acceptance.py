@@ -5,11 +5,13 @@ Android restores application files from the source transport's payload. Fixtures
 cover phrase-derived and account-unlocked encryption identities.
 """
 
+import hashlib as hashlib
 import json
 import os
 from pathlib import Path
 import runpy
 import subprocess
+import tarfile as tarfile
 import time
 import uuid
 
