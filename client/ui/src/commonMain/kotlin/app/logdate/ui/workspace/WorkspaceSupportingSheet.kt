@@ -32,8 +32,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.collapse
 import androidx.compose.ui.semantics.expand
 import androidx.compose.ui.semantics.semantics
@@ -65,6 +68,7 @@ fun WorkspaceSupportingSheet(
     summary: String,
     modifier: Modifier = Modifier,
     summaryDetail: String? = null,
+    focusAvailable: Boolean = true,
     initialExtent: SupportingExtent = SupportingExtent.Peek,
     supportingContextKey: String? = null,
     supportingContainment: PanelContainment = PanelContainment.Working,
@@ -101,13 +105,24 @@ fun WorkspaceSupportingSheet(
             )
         val mapBounds = composition.focus
         val anchors = supportingSheetAnchors(mapBounds.height, 160.dp * density.fontScale.coerceAtMost(2f))
-        val side = composition.browse
+        val side = composition.browse.takeIf { focusAvailable }
+        val overlay = focusAvailable && side == null
         val dragAnchors = anchors.dragAnchors(with(density) { mapBounds.height.toPx() }, density.density)
-        val presentationExtent = if (side == null) dragAnchors.availableExtent(extent) else extent
+        val presentationExtent =
+            if (!focusAvailable) {
+                SupportingExtent.Focused
+            } else if (side ==
+                null
+            ) {
+                dragAnchors.availableExtent(extent)
+            } else {
+                extent
+            }
         val allowsFocus = !dragAnchors.positionOf(SupportingExtent.Focused).isNaN()
         val focused = presentationExtent == SupportingExtent.Focused
         val motion = rememberSupportingSheetMotion(extent, dragAnchors, onSettled = { extent = it })
-        val sheetHeight = side?.height ?: with(density) { (-motion.state.requireOffset()).toDp() }
+        val normalSheetHeight = composition.browse?.height ?: with(density) { (-motion.state.requireOffset()).toDp() }
+        val sheetHeight = if (!focusAvailable) maxHeight else normalSheetHeight
         val mapPlacement =
             if (mapBounds.x > 0.dp ||
                 parentPlacement == PanelPlacement.Floating
@@ -116,9 +131,19 @@ fun WorkspaceSupportingSheet(
             } else {
                 PanelPlacement.EdgeAttached
             }
-        val overlap = if (side == null) sheetHeight.coerceAtMost((mapBounds.height - 180.dp).coerceAtLeast(0.dp)) else 0.dp
+        val overlap =
+            if (composition.browse ==
+                null
+            ) {
+                normalSheetHeight.coerceAtMost((mapBounds.height - 180.dp).coerceAtLeast(0.dp))
+            } else {
+                0.dp
+            }
         Box(
-            Modifier.absoluteOffset { IntOffset(mapBounds.x.roundToPx(), mapBounds.y.roundToPx()) }.size(mapBounds.width, mapBounds.height),
+            Modifier
+                .absoluteOffset { IntOffset(mapBounds.x.roundToPx(), mapBounds.y.roundToPx()) }
+                .size(mapBounds.width, mapBounds.height)
+                .then(if (focusAvailable) Modifier else Modifier.unavailableFocus()),
         ) {
             CompositionLocalProvider(LocalSupportingOverlap provides overlap) {
                 WorkspacePanel(
@@ -127,10 +152,10 @@ fun WorkspaceSupportingSheet(
                 ) { focus() }
             }
         }
-        val sheetX = side?.x ?: mapBounds.x
-        val sheetY = side?.y ?: (mapBounds.y + mapBounds.height - sheetHeight)
-        val sheetWidth = side?.width ?: mapBounds.width
-        PlatformBackHandler(enabled = side == null && extent != SupportingExtent.Peek && supportingContextKey == null) {
+        val sheetX = if (!focusAvailable) 0.dp else side?.x ?: mapBounds.x
+        val sheetY = if (!focusAvailable) 0.dp else side?.y ?: (mapBounds.y + mapBounds.height - sheetHeight)
+        val sheetWidth = if (!focusAvailable) maxWidth else side?.width ?: mapBounds.width
+        PlatformBackHandler(enabled = overlay && extent != SupportingExtent.Peek && supportingContextKey == null) {
             extent =
                 SupportingExtent.Peek
         }
@@ -143,7 +168,7 @@ fun WorkspaceSupportingSheet(
             ) {
                 Column(
                     Modifier.fillMaxSize().then(
-                        if (side == null) {
+                        if (overlay) {
                             Modifier.nestedScroll(motion.nestedScroll).anchoredDraggable(
                                 state = motion.state,
                                 orientation = Orientation.Vertical,
@@ -160,7 +185,7 @@ fun WorkspaceSupportingSheet(
                             Modifier
                                 .fillMaxWidth()
                                 .semantics {
-                                    if (side == null) {
+                                    if (overlay) {
                                         stateDescription = presentationExtent.name
                                         if (allowsFocus) {
                                             expand {
@@ -178,7 +203,7 @@ fun WorkspaceSupportingSheet(
                             if (header != null) {
                                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                     Box(Modifier.weight(1f)) { header() }
-                                    if (side == null) {
+                                    if (overlay) {
                                         val expandLabel =
                                             when (presentationExtent) {
                                                 SupportingExtent.Peek -> stringResource(Res.string.workspace_sheet_browse)
@@ -234,7 +259,7 @@ fun WorkspaceSupportingSheet(
                                     }
                                     headerActions()
                                 }
-                            } else {
+                            } else if (focusAvailable) {
                                 TextButton(enabled = allowsFocus || presentationExtent != SupportingExtent.Peek, onClick = {
                                     extent =
                                         if (presentationExtent ==
@@ -279,14 +304,14 @@ fun WorkspaceSupportingSheet(
                             }
                         }
                     }
-                    if (side == null && extent == SupportingExtent.Peek && sheetHeight <= anchors.peek) {
+                    if (overlay && extent == SupportingExtent.Peek && sheetHeight <= anchors.peek) {
                         if (anchors.canOverlay) PanelHeader(summary, subtitle = summaryDetail)
                     } else {
                         Box(Modifier.weight(1f)) {
                             supporting(
-                                if (side !=
-                                    null
-                                ) {
+                                if (!focusAvailable) {
+                                    SupportingExtent.Focused
+                                } else if (side != null) {
                                     SupportingExtent.Expanded
                                 } else if (extent ==
                                     SupportingExtent.Peek
@@ -303,3 +328,13 @@ fun WorkspaceSupportingSheet(
         }
     }
 }
+
+/** Suppress this mounted focus host, rather than placing an intercepting layer over the collection. */
+private fun Modifier.unavailableFocus(): Modifier =
+    graphicsLayer { alpha = 0f }.clearAndSetSemantics {}.pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+            }
+        }
+    }

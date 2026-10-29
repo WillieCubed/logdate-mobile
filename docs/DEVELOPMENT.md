@@ -225,6 +225,11 @@ that field instead of adding a second search control.
 Run `:client:ui:desktopTest` and `checkHomeWorkspaceContract` for these changes. Native interaction
 and capture coverage is `:app:android-main:phoneApi34DebugAndroidTest
 -Plogdate.androidTestClass=app.logdate.client.e2e.PlacesSheetGestureE2ETest`. It retains a bounded,
-silent interaction video and normal-mobile, foldable-sized and landscape-tablet screenshots.
-The capture fixture uses production components with synthetic places/memories in a test Activity.
+silent interaction video with an explicitly synthetic map viewport. Native map readiness fallback
+coverage is `PlacesMapFallbackE2ETest`: cards fill the available area, filtering and place actions work,
+and no standalone map error or unavailable map controls remain. Its phone 411x891, foldable-sized
+720x960 and landscape-tablet 1280x800 captures use actual native unconfigured-map readiness and
+production components with synthetic memories. The real map host remains composed for late ready
+callbacks; recovery restores the requested sheet extent and existing selection. Card reading width
+remains bounded without reserving an empty map pane.
 Resized emulator windows do not certify physical hinges, production Activity system bars or native map tiles.

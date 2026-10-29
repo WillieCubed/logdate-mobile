@@ -3,6 +3,7 @@
 package app.logdate.feature.location.timeline.ui.history
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
 import app.logdate.shared.model.location.LocationDayItem
 import app.logdate.ui.workspace.PanelHeader
@@ -19,10 +20,15 @@ internal actual fun NativeHistoryMap(
     modifier: Modifier,
     onInteraction: () -> Unit,
     historyKey: String?,
+    showStatus: Boolean,
+    onReadyChanged: (Boolean) -> Unit,
 ) {
-    PanelHeader(
-        stringResource(Res.string.history_map_unavailable_on_device),
-        modifier,
-        stringResource(Res.string.history_map_unavailable_on_device_body),
-    )
+    SideEffect { onReadyChanged(false) }
+    if (showStatus) {
+        PanelHeader(
+            stringResource(Res.string.history_map_unavailable_on_device),
+            modifier,
+            stringResource(Res.string.history_map_unavailable_on_device_body),
+        )
+    }
 }
