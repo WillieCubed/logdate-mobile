@@ -74,8 +74,11 @@ class NativeCurrentDraftRecoveryProbeTest {
             val credentials = readNativeDeviceEnrollmentCredentials(context)
             require(credentials.sourceDevice != null)
             ensureLogDateApplicationStarted(context.applicationContext as Application)
+            report("before_activity_launch")
             ActivityScenario.launch(MainActivity::class.java).use {
+                report("activity_launched")
                 koin.get<LogDateConfigDataSource>().awaitConfigurationLoaded()
+                report("configuration_ready")
                 assertEquals(credentials.origin, koin.get<LogDateConfigRepository>().getCurrentBackendUrl())
                 report("configuration_loaded")
                 val sessions = koin.get<SessionStorage>()
@@ -347,6 +350,7 @@ class NativeCurrentDraftRecoveryProbeTest {
     private fun id(number: Int) = Uuid.parse("00000000-0000-0000-0000-${number.toString().padStart(12, '0')}")
 
     private fun report(phase: String) {
+        android.util.Log.i("NativeCurrentDraftRecovery", phase)
         InstrumentationRegistry.getInstrumentation().sendStatus(0, Bundle().apply { putString("currentDraftPhase", phase) })
     }
 
