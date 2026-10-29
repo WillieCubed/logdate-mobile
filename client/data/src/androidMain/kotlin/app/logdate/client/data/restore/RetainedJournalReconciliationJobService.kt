@@ -1,11 +1,7 @@
 package app.logdate.client.data.restore
 
-import android.app.job.JobInfo
 import android.app.job.JobParameters
-import android.app.job.JobScheduler
 import android.app.job.JobService
-import android.content.ComponentName
-import android.content.Context
 import android.os.UserManager
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.database.openRetainedDatabaseCopy
@@ -38,45 +34,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import org.koin.core.context.GlobalContext
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.LinkOption
 import kotlin.uuid.Uuid
-
-private const val RETAINED_JOURNAL_RECONCILIATION_JOB = 0x4e4a5235
-
-/** Local, durable reconciliation. It has no network requirement and never clears source custody. */
-fun scheduleRetainedJournalReconciliation(context: Context): Boolean =
-    try {
-        val scheduler = context.getSystemService(JobScheduler::class.java)
-        val job =
-            JobInfo
-                .Builder(
-                    RETAINED_JOURNAL_RECONCILIATION_JOB,
-                    ComponentName(context, RetainedJournalReconciliationJobService::class.java),
-                ).setPersisted(true)
-                .setBackoffCriteria(30_000, JobInfo.BACKOFF_POLICY_EXPONENTIAL)
-                .build()
-        scheduler.schedule(job) == JobScheduler.RESULT_SUCCESS
-    } catch (_: Exception) {
-        Napier.w("Retained journal reconciliation remains pending")
-        false
-    }
-
-/** Called by app startup as well as each staged native delivery. */
-fun resumeRetainedJournalReconciliation(context: Context) {
-    if (!context.getSystemService(UserManager::class.java).isUserUnlocked) return
-    val workspace = retainedJournalWorkspace(context)
-    if (runCatching { workspace.current()?.phase == RetainedJournalWorkspace.Phase.WORKING }.getOrDefault(false) ||
-        NativeJournalReplayCustody(context).hasInputs()
-    ) {
-        scheduleRetainedJournalReconciliation(context)
-    }
-}
 
 class RetainedJournalReconciliationJobService : JobService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -218,8 +178,8 @@ class RetainedJournalReconciliationJobService : JobService() {
         val mediaSources = allSources.values.toList() + independentIncoming
         val activePreferences = createAndroidMainDataStore(this)
         val scratchRoot = File(noBackupFilesDir, "retained-journal-merge-scratch")
-        clearAbandonedDatabaseCopies(scratchRoot)
-        clearAbandonedDraftCopies(File(noBackupFilesDir, "retained-draft-reads"))
+        clearAbandonedDatabaseCopies(scratchRoot, noBackupFilesDir)
+        clearAbandonedDraftCopies(File(noBackupFilesDir, "retained-draft-reads"), noBackupFilesDir)
         var mediaPending = false
         var allSourcesCovered = true
         for ((generation, files) in allSources) {
@@ -253,12 +213,7 @@ class RetainedJournalReconciliationJobService : JobService() {
     ): Boolean {
         refreshStagedNativeMediaInventories(this)
         retireStagedNativeAuxiliary(this, repositories.expectedScope, createAndroidMainDataStore(this), sourcesCovered)
-        if (candidates.none { files ->
-                files.keys.any { path ->
-                    listOf("files/media/", "files/user_media/", "files/audio_notes/").any(path::startsWith)
-                }
-            }
-        ) {
+        if (!shouldReconcileRetainedMedia(candidates, NativeJournalReplayCustody(this).sealedPayloads())) {
             return false
         }
         val job = kotlinx.coroutines.currentCoroutineContext()[Job]
@@ -331,7 +286,7 @@ class RetainedJournalReconciliationJobService : JobService() {
             } ?: return NativeSourceOutcome(false, false)
         val opened = openRetainedSource(databaseFiles, candidateFiles, scratchRoot) ?: return NativeSourceOutcome(false, false)
         opened.copy.use {
-            verifyEncryptedScope(files, opened, sourceScope, preferenceFile)
+            verifyEncryptedScope(files, opened.copy.database, sourceScope, preferenceFile)
             val merger =
                 mergerFor(
                     generation,
@@ -365,7 +320,7 @@ class RetainedJournalReconciliationJobService : JobService() {
         generation: String,
         files: Map<String, File>,
         receiptFile: File,
-        opened: OpenedSource,
+        opened: RetainedOpenedSource,
         sourceScope: RetainedJournalSourceScope,
         coverageComplete: Boolean,
         repositories: Repositories,
@@ -440,7 +395,7 @@ class RetainedJournalReconciliationJobService : JobService() {
     private fun mergerFor(
         generation: String,
         files: Map<String, File>,
-        opened: OpenedSource,
+        opened: RetainedOpenedSource,
         sourceScope: RetainedJournalSourceScope,
         activePreferences: androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>,
         scratchRoot: File,
@@ -469,33 +424,6 @@ class RetainedJournalReconciliationJobService : JobService() {
                 }
             },
         )
-
-    private fun verifyEncryptedScope(
-        files: Map<String, File>,
-        opened: OpenedSource,
-        sourceScope: RetainedJournalSourceScope,
-        preferenceFile: File,
-    ) {
-        if (files["source_scope.json"]?.readText()?.let {
-                Json
-                    .parseToJsonElement(it)
-                    .jsonObject["version"]
-                    ?.jsonPrimitive
-                    ?.intOrNull
-            } in setOf(2, 3, 4)
-        ) {
-            check(
-                app.logdate.client.database
-                    .readNativeJournalSnapshotScope(opened.copy.database) ==
-                    app.logdate.client.database.NativeJournalSnapshotScope(
-                        checkNotNull(sourceScope.ownerId),
-                        sourceScope.bound,
-                        sourceScope.backendOrigin,
-                        nativeSnapshotChecksum(preferenceFile),
-                    ),
-            ) { "Encrypted source scope does not match native preferences" }
-        }
-    }
 
     private fun admitMergedSource(
         generation: String,
@@ -532,25 +460,15 @@ class RetainedJournalReconciliationJobService : JobService() {
         }
     }
 
-    private data class NativeSourceOutcome(
-        val mediaPending: Boolean,
-        val coverageComplete: Boolean,
-    )
-
-    private data class OpenedSource(
-        val copy: app.logdate.client.database.RetainedDatabaseCopy,
-        val keyFile: File,
-    )
-
     private fun openRetainedSource(
         databaseFiles: Map<String, File>,
         candidateFiles: List<File>,
         scratchRoot: File,
-    ): OpenedSource? {
+    ): RetainedOpenedSource? {
         for (candidate in candidateFiles) {
             val passphrases = readRetainedDatabasePassphrases(listOf(candidate))
             try {
-                openRetainedDatabaseCopy(this, databaseFiles, passphrases, scratchRoot)?.let { return OpenedSource(it, candidate) }
+                openRetainedDatabaseCopy(this, databaseFiles, passphrases, scratchRoot)?.let { return RetainedOpenedSource(it, candidate) }
             } finally {
                 passphrases.forEach { it.fill(0) }
             }
@@ -571,63 +489,8 @@ class RetainedJournalReconciliationJobService : JobService() {
         val backendOrigin: () -> String,
     )
 
-    private fun databaseKeyFiles(files: Map<String, File>): List<File> =
-        files
-            .filter { (path, _) ->
-                path.substringAfterLast('/') in setOf("passphrase_backup", "working_passphrase_backup") &&
-                    !path.endsWith(".part") &&
-                    (path.startsWith("db_recovery/") || path.startsWith("files/db_recovery/"))
-            }.values
-            .toList()
-
-    private fun clearAbandonedDatabaseCopies(root: File) {
-        val expectedParent = noBackupFilesDir.canonicalFile
-        check(root.absoluteFile.parentFile?.canonicalFile == expectedParent && root.name == "retained-journal-merge-scratch")
-        if (root.exists()) {
-            check(Files.isDirectory(root.toPath(), LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(root.toPath()))
-            root
-                .listFiles()
-                .orEmpty()
-                .filter { candidate ->
-                    (
-                        candidate.name.startsWith("retained-db-") ||
-                            candidate.name.startsWith("preferences-read-")
-                    ) &&
-                        Files.isDirectory(candidate.toPath(), LinkOption.NOFOLLOW_LINKS) &&
-                        !Files.isSymbolicLink(candidate.toPath())
-                }.forEach { candidate -> check(candidate.deleteRecursively()) }
-        } else {
-            check(root.mkdirs())
-        }
-    }
-
-    private fun clearAbandonedDraftCopies(root: File) {
-        check(root.absoluteFile.parentFile?.canonicalFile == noBackupFilesDir.canonicalFile && root.name == "retained-draft-reads")
-        if (!root.exists()) return
-        check(Files.isDirectory(root.toPath(), LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(root.toPath()))
-        root
-            .listFiles()
-            .orEmpty()
-            .filter { candidate ->
-                candidate.name.startsWith("draft-read-") &&
-                    Files.isDirectory(candidate.toPath(), LinkOption.NOFOLLOW_LINKS) &&
-                    !Files.isSymbolicLink(candidate.toPath())
-            }.forEach { candidate -> check(candidate.deleteRecursively()) }
-    }
-
     private companion object {
         const val RECONCILIATION_TIMEOUT_MS = 5 * 60 * 1000L
-        const val MAX_KEY_CANDIDATES = 128
         val DATABASE_FILES = setOf("logdate", "logdate-wal", "logdate-shm", "logdate-journal")
     }
-}
-
-internal suspend fun importReceiptPinnedCameraDrafts(
-    coverageComplete: Boolean,
-    import: suspend () -> Boolean,
-    admitSource: suspend () -> Unit,
-): Boolean {
-    if (!import()) return false
-    if (coverageComplete) admitSource()
-    return true
 }
