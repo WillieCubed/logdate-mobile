@@ -134,7 +134,7 @@ internal fun EntryEditorViewModel.loadDraftImpl(draftId: Uuid) {
                         val recoveredBlocks = recoverPendingAudio(loaded.blocks)
                         val focusedAudio =
                             recoveredBlocks.filterIsInstance<AudioBlockUiState>().firstOrNull {
-                                it.captureState is AudioCaptureState.Recording || it.captureState is AudioCaptureState.Failed
+                                it.captureState is AudioCaptureState.Recording
                             }
                         accepted =
                             acceptEditorContentLoad(load) { current ->
