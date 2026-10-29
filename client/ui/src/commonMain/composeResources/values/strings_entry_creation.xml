@@ -1,0 +1,9 @@
+<resources>
+    <string name="workspace_entry_pull_new">New entry</string>
+    <string
+    name="workspace_entry_pull_hint"
+  >Pull down to start a new entry</string>
+    <string
+    name="workspace_entry_pull_release"
+  >Release to start a new entry</string>
+</resources>
