@@ -183,6 +183,9 @@ class NativeRetainedDraftShortcutProbeTest {
                             }
                         }
                         assertTrue(visible, "Published shortcut must open the retained editor text")
+                        val screenshot = File(context.noBackupFilesDir, "native-retained-draft-shortcut.png")
+                        assertTrue(device.takeScreenshot(screenshot), "Retained editor screenshot must be captured")
+                        instrumentation.sendStatus(0, Bundle().apply { putString("retainedDraftScreenshot", "saved") })
                     }
                 }
                 val retained = drafts.getDraft(id).first().getOrThrow()
