@@ -145,6 +145,7 @@ def transfer(
         or exercise_pending_camera_draft
     )
     archive_fixture = None
+    source_preparation = {}
     archive_fixture_label = "transfer-" + uuid.uuid4().hex
     if exercise_archive_recovery:
         archive_probe(
@@ -165,6 +166,12 @@ def transfer(
             archive_state["journal"],
             archive_state["extraJournal"],
         ]
+        source_preparation["prepare_for_snapshot"] = lambda: archive_probe(
+            source,
+            "source-waiting",
+            output / "archive-source-waiting.log",
+            fixture_label=archive_fixture_label,
+        )
     with data_only_source_session(
         source, output, exercise_data_only
     ) as source_session_id:
@@ -181,6 +188,7 @@ def transfer(
             source,
             output / "native-backup.log",
             verify_after_backup=validate_source_integrity,
+            **source_preparation,
         )
     payload = adb(source, "exec-out", "tar", "-C", TRANSPORT_FILES, "-cf", "-", "1")
     original_payload = payload

@@ -23,7 +23,6 @@ import app.logdate.client.ensureLogDateApplicationStarted
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.repository.journals.JournalNote
-import app.logdate.feature.core.restore.ArchiveMediaRecoveryWorker
 import app.logdate.feature.core.restore.RestoreSummary
 import app.logdate.feature.core.restore.RestoreWorker
 import app.logdate.shared.model.Journal
@@ -78,6 +77,7 @@ class ArchiveMediaRecoveryE2ETest : ArchiveRecoveryCancellationFixture() {
                         "repair",
                         "automatic",
                         "waiting",
+                        "source-waiting",
                         "verify",
                         "cleanup-rejected-fixture",
                         "cancel-running",
@@ -94,6 +94,7 @@ class ArchiveMediaRecoveryE2ETest : ArchiveRecoveryCancellationFixture() {
                 "repair" -> repair()
                 "automatic" -> automaticRepair()
                 "waiting" -> verifyRetainedWaitingState()
+                "source-waiting" -> verifyRetainedWaitingState(settleSourceWork = true)
                 "verify" -> verify()
                 "cleanup-rejected-fixture" -> cleanupRejectedFixture()
                 "cancel-running" -> cancelRunningRecovery()
@@ -202,20 +203,16 @@ class ArchiveMediaRecoveryE2ETest : ArchiveRecoveryCancellationFixture() {
         archive.delete()
     }
 
-    private suspend fun verifyRetainedWaitingState() {
+    private suspend fun verifyRetainedWaitingState(settleSourceWork: Boolean = false) {
         require(koin.get<app.logdate.client.datastore.SessionStorage>().getSession() == null)
-        val state = JSONObject(fixture.readText())
-        val worker =
-            TestListenableWorkerBuilder<ArchiveMediaRecoveryWorker>(context)
-                .setInputData(Data.Builder().putString(RestoreWorker.RECOVERY_ID_KEY, state.getString("recoveryId")).build())
-                .build()
-        assertIs<ListenableWorker.Result.Success>(worker.doWork())
-        val record = JSONObject(context.filesDir.resolve("archive_recovery/records/${state.getString("recoveryId")}.json").readText())
-        val retained = json.decodeFromString<RestoreSummary>(record.getJSONObject("summary").toString())
-        assertEquals(2, retained.unavailableOriginals)
-        assertFalse(retained.recoveringMedia)
-        assertEquals(2, record.getJSONArray("pending").length())
-        verifyEdits(state)
+        verifyRetainedArchiveWaitingState(
+            context,
+            JSONObject(fixture.readText()),
+            notes,
+            journals,
+            settleSourceWork,
+            ::verifyEdits,
+        )
     }
 
     private suspend fun automaticRepair() {
