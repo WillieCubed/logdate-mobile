@@ -1,0 +1,393 @@
+"""Native backup probes; dependencies are supplied by the entry point."""
+
+import base64
+import re
+import shlex
+import uuid
+
+
+def probe(
+    h,
+    serial,
+    mode,
+    output,
+    metadata=None,
+    identity="phrase",
+    missing_media_path=None,
+    source_has_session=False,
+    source_session_id=None,
+    installation_trust=False,
+    recording_transport="cloud",
+    pending_camera_draft=False,
+):
+    arguments = [
+        "shell",
+        "am",
+        "instrument",
+        "-w",
+        "-r",
+        "-e",
+        "class",
+        h.PROBE,
+        "-e",
+        "nativeBackupMode",
+        mode,
+        "-e",
+        "nativeIdentityMode",
+        identity,
+    ]
+    if mode == "seed" and installation_trust is True:
+        arguments.extend(("-e", "nativeInstallationTrustFixture", "true"))
+    if metadata:
+        for name, key in (
+            ("sourceOwner", "owner"),
+            ("sourceDevice", "device"),
+            ("sourceFingerprint", "fingerprint"),
+            ("sourceMediaNonce", "mediaNonce"),
+            ("sourceMediaCiphertext", "mediaCiphertext"),
+        ):
+            value = metadata.get(key)
+            if key == "mediaNonce" and not value:
+                value = base64.b64encode(bytes(12)).decode()
+            if value is None:
+                raise ValueError(f"existing source fixture is missing {key}")
+            arguments.extend(("-e", name, value))
+        if metadata.get("recordingTransferFixture"):
+            if recording_transport not in ("cloud", "d2d"):
+                raise ValueError(
+                    "recording probe requires a known Android backup transport"
+                )
+            arguments.extend(("-e", "sourceRecordingTransferFixture", "true"))
+            arguments.extend(("-e", "sourceRecordingTransport", recording_transport))
+        if metadata.get("installationTrustFixture") is True:
+            arguments.extend(("-e", "sourceInstallationTrustFixture", "true"))
+    if mode == "source-backup-integrity":
+        arguments.extend(
+            ("-e", "sourceHasSession", "true" if source_has_session else "false")
+        )
+    if pending_camera_draft:
+        arguments.extend(("-e", "pendingCameraDraftFixture", "true"))
+    if source_session_id is not None:
+        arguments.extend(("-e", "sourceSessionId", source_session_id))
+    if missing_media_path:
+        arguments.extend(("-e", "expectedMissingMediaPath", missing_media_path))
+    arguments.append(h.RUNNER)
+    result = h.adb(serial, *arguments, timeout=h.INSTRUMENTATION_TIMEOUT_SECONDS)
+    h.private_file(output, result)
+    if not h.instrumentation_passed(result):
+        failure = RuntimeError(f"native {mode} probe failed; inspect {output}")
+        try:
+            h.private_file(
+                output.with_suffix(".logcat.log"),
+                h.adb(serial, "logcat", "-d", "-b", "crash", "-v", "threadtime"),
+            )
+        except Exception as error:
+            h.add_failure_note(
+                failure, f"Crash diagnostics could not be collected: {error}"
+            )
+        raise failure
+
+
+def verify_restarted_content(
+    h, serial, output, metadata, identity, *, recording_transport="cloud"
+):
+    arguments = [
+        "shell",
+        "am",
+        "instrument",
+        "-w",
+        "-r",
+        "-e",
+        "class",
+        "app.logdate.client.e2e.NativeRetainedOfflineEditProbeTest",
+        "-e",
+        "nativeRetainedEdit",
+        "true",
+    ]
+    if "archiveJournalIds" in metadata:
+        journals = metadata["archiveJournalIds"]
+        if (
+            not isinstance(journals, list)
+            or len(journals) != 2
+            or not all(isinstance(value, str) for value in journals)
+        ):
+            raise ValueError("Archive restart requires exactly two seeded journal IDs")
+        journals = [str(uuid.UUID(value)) for value in journals]
+        base = {
+            "00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-000000000002",
+        }
+        if len(set(journals)) != 2 or base.intersection(journals):
+            raise ValueError(
+                "Archive restart journal IDs must be distinct from the transfer fixture"
+            )
+        arguments.extend(("-e", "nativeRetainedArchiveJournals", ",".join(journals)))
+    result = h.adb(
+        serial, *arguments, h.RUNNER, timeout=h.INSTRUMENTATION_TIMEOUT_SECONDS
+    )
+    log = output / "destination-retained-offline-edit.log"
+    h.private_file(log, result)
+    if not h.instrumentation_passed(result):
+        raise RuntimeError(
+            f"The retained offline edit did not pass read-only verification; inspect {log}"
+        )
+    h.probe(
+        serial,
+        "verify",
+        output / "destination-restart.log",
+        metadata,
+        identity,
+        recording_transport=recording_transport,
+    )
+
+
+def privacy_probe(h, serial, mode, output):
+    result = h.adb(
+        serial,
+        "shell",
+        "am",
+        "instrument",
+        "-w",
+        "-r",
+        "-e",
+        "class",
+        "app.logdate.client.e2e.NativeRestorePrivacyRuntimeTest",
+        "-e",
+        "restorePrivacyMode",
+        mode,
+        h.RUNNER,
+        timeout=h.INSTRUMENTATION_TIMEOUT_SECONDS,
+    )
+    h.private_file(output, result)
+    if not h.instrumentation_passed(result):
+        raise RuntimeError(f"native privacy {mode} probe failed; inspect {output}")
+
+
+def verify_privacy_backup_refusal(h, result, diagnostics, started_at):
+    expected = f"Package {h.PACKAGE} with result: Transport rejected package because it wasn't able to process it at the time"
+    if expected not in result.decode().splitlines():
+        raise RuntimeError(
+            "Android did not report the expected package backup rejection"
+        )
+    agents = {}
+    for line in diagnostics.decode(errors="replace").splitlines():
+        match = re.match(
+            r"\s*(\d+\.\d+)\s+(\d+)\s+\d+\s+[VDIWEF]\s+BackupServiceBinder\s*:\s*(.*)",
+            line,
+        )
+        if match and float(match[1]) >= started_at:
+            agents.setdefault(match[2], []).append(match[3])
+    if not any(
+        "onFullBackup" in "\n".join(lines)
+        and "app.logdate.client.data.restore.NativeAccountBackupAgent"
+        in "\n".join(lines)
+        and "NativeRestorePrivacyMetadataRequiredException" in "\n".join(lines)
+        and "NativeRestorePrivacyPolicy$prepareBackup" in "\n".join(lines)
+        for lines in agents.values()
+    ):
+        raise RuntimeError(
+            "The current backup did not reach the agent's missing-privacy refusal"
+        )
+
+
+def runtime_permission_grant(h, package_state, permission):
+    requested = re.search(
+        rf"^\s*{re.escape(permission)}\s*$",
+        package_state,
+        re.MULTILINE,
+    )
+    if requested is None:
+        raise RuntimeError(f"Android did not report the runtime grant for {permission}")
+    state = re.search(
+        rf"^\s*{re.escape(permission)}: granted=(true|false)(?:, flags=\[[^\]]*\])?\s*$",
+        package_state,
+        re.MULTILINE,
+    )
+    if state is None:
+        if re.search(rf"^\s*{re.escape(permission)}:", package_state, re.MULTILINE):
+            raise RuntimeError(
+                f"Android reported an invalid runtime grant for {permission}"
+            )
+        return False
+    return state.group(1) == "true"
+
+
+def recording_policy_probe(h, serial, output):
+    permissions = ["android.permission.RECORD_AUDIO"]
+    sdk = int(h.adb(serial, "shell", "getprop", "ro.build.version.sdk").strip())
+    if sdk >= 33:
+        permissions.append("android.permission.POST_NOTIFICATIONS")
+    original = {}
+    package_state = h.adb(serial, "shell", "dumpsys", "package", h.PACKAGE).decode()
+    for permission in permissions:
+        original[permission] = h.runtime_permission_grant(package_state, permission)
+    probe_error = None
+    try:
+        h.probe(serial, "recording-policy", output)
+    except BaseException as error:
+        probe_error = error
+    finally:
+        cleanup_errors = []
+        for permission, was_granted in original.items():
+            try:
+                current_state = h.adb(
+                    serial, "shell", "dumpsys", "package", h.PACKAGE
+                ).decode()
+                current_grant = h.runtime_permission_grant(current_state, permission)
+                if current_grant != was_granted:
+                    action = "grant" if was_granted else "revoke"
+                    h.adb(
+                        serial,
+                        "shell",
+                        "pm",
+                        action,
+                        "--user",
+                        "0",
+                        h.PACKAGE,
+                        permission,
+                    )
+                restored_state = h.adb(
+                    serial, "shell", "dumpsys", "package", h.PACKAGE
+                ).decode()
+                if (
+                    h.runtime_permission_grant(restored_state, permission)
+                    != was_granted
+                ):
+                    raise RuntimeError(
+                        f"Android did not restore the original runtime grant for {permission}"
+                    )
+            except Exception as error:
+                cleanup_errors.append(f"{permission}: {error}")
+        if probe_error is not None:
+            for error in cleanup_errors:
+                h.add_failure_note(
+                    probe_error, f"Runtime permission cleanup also failed: {error}"
+                )
+            raise probe_error
+        if cleanup_errors:
+            raise RuntimeError(
+                "Could not restore recording probe permissions: "
+                + "; ".join(cleanup_errors)
+            )
+
+
+def archive_probe(h, serial, mode, output, fixture=None, fixture_label="transfer"):
+    arguments = [
+        "am",
+        "instrument",
+        "-w",
+        "-r",
+        "-e",
+        "class",
+        "app.logdate.client.e2e.ArchiveMediaRecoveryE2ETest",
+        "-e",
+        "archiveRecoveryMode",
+        mode,
+        "-e",
+        "archiveRecoveryFixtureLabel",
+        fixture_label,
+    ]
+    if fixture:
+        arguments.extend(("-e", "archiveRecoveryFixture", fixture))
+    arguments.append(h.RUNNER)
+    result = h.adb(
+        serial,
+        "shell",
+        shlex.join(arguments),
+        timeout=h.INSTRUMENTATION_TIMEOUT_SECONDS,
+    )
+    h.private_file(output, result)
+    if not h.instrumentation_passed(result):
+        raise RuntimeError(f"archive {mode} probe failed; inspect {output}")
+
+
+def verify_privacy_recovery(
+    h, destination, output, selected_source_files, original_payload
+):
+    print(
+        "Verifying missing privacy metadata blocks every database consumer",
+        flush=True,
+    )
+    h.privacy_probe(destination, "blocked", output / "destination-privacy-blocked.log")
+    started_at = float(h.adb(destination, "shell", "date", "+%s.%N").strip())
+    refused_backup = h.adb(destination, "shell", "bmgr", "backupnow", h.PACKAGE)
+    h.private_file(output / "destination-privacy-backup-refused.log", refused_backup)
+    diagnostics = h.adb(
+        destination, "logcat", "-d", "-v", "epoch", "-s", "BackupServiceBinder:D"
+    )
+    h.verify_privacy_backup_refusal(refused_backup, diagnostics, started_at)
+    h.privacy_probe(
+        destination, "blocked", output / "destination-privacy-after-backup.log"
+    )
+    h.private_file(
+        output / "destination-privacy-before-repair.json",
+        h.json.dumps(h.package_file_snapshot(destination), indent=2).encode(),
+    )
+    # Deliver the original source policy through Android, without clearing destination data.
+    h.adb(destination, "shell", "am", "force-stop", h.PACKAGE)
+    h.private_file(output / "native-transport-complete.tar", original_payload)
+    h.adb(
+        destination,
+        "push",
+        str(output / "native-transport-complete.tar"),
+        "/data/local/tmp/logdate-native-transport.tar",
+    )
+    h.adb(
+        destination,
+        "shell",
+        "tar",
+        "-C",
+        h.TRANSPORT_FILES,
+        "-xf",
+        "/data/local/tmp/logdate-native-transport.tar",
+    )
+    h.adb(
+        destination, "shell", "chown", "-R", "system:system", h.TRANSPORT_FILES + "/1"
+    )
+    h.adb(destination, "shell", "restorecon", "-R", h.TRANSPORT_FILES + "/1")
+    repaired = h.adb(destination, "shell", "bmgr", "restore", "1", h.PACKAGE)
+    h.private_file(output / "native-restore-complete.log", repaired)
+    if b"restoreFinished: 0" not in repaired:
+        raise RuntimeError(
+            "Android did not finish delivering the original privacy policy"
+        )
+    repaired_files = h.package_file_snapshot(destination)
+    h.private_file(
+        output / "destination-privacy-after-repair.json",
+        h.json.dumps(repaired_files, indent=2).encode(),
+    )
+    try:
+        h.verify_restored_snapshot(
+            repaired_files, selected_source_files, credentials_only=False
+        )
+    except Exception as failure:
+        try:
+            h.privacy_probe(
+                destination, "resolved", output / "destination-privacy-resolved.log"
+            )
+        except Exception as diagnostic:
+            h.add_failure_note(
+                failure,
+                f"Privacy repair probe also failed: {type(diagnostic).__name__}; inspect destination-privacy-resolved.log",
+            )
+        raise
+    h.privacy_probe(
+        destination, "resolved", output / "destination-privacy-resolved.log"
+    )
+    print(
+        "Original native preferences restored journal access without replacing its key",
+        flush=True,
+    )
+    return
+
+
+FUNCTIONS = {
+    "verify_privacy_recovery": verify_privacy_recovery,
+    "probe": probe,
+    "verify_restarted_content": verify_restarted_content,
+    "privacy_probe": privacy_probe,
+    "verify_privacy_backup_refusal": verify_privacy_backup_refusal,
+    "runtime_permission_grant": runtime_permission_grant,
+    "recording_policy_probe": recording_policy_probe,
+    "archive_probe": archive_probe,
+}

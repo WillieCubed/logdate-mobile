@@ -106,6 +106,7 @@ class NativeTransferredPublicationProbeTest : CloudArchiveWorkerFixture() {
         assertTrue(links.markConfirmed(peer, 2, 2, sealed.linkId))
         val scope = PeerDeliveryContext(sealed.linkId, source.getString("device"), peer, LinkMode.PAIR)
         repeat(3) { koin.get<WindowManifestStore>().reserveRevision(scope) }
+        assertEquals(3L, koin.get<WindowManifestStore>().revision(scope), "The source must own a nonzero local counter")
         koin.get<SecureStorage>().putString(sentinel, "owned-source-vault-sentinel")
         seedPlatformAccountTokens()
         source.put("platformAccountTokensSeeded", true)
@@ -146,7 +147,7 @@ class NativeTransferredPublicationProbeTest : CloudArchiveWorkerFixture() {
         assertNull(koin.get<SecureStorage>().getString(sentinel), "The source vault must not transfer")
         val oldPeer = PeerDeliveryContext(source.getString("link"), source.getString("device"), peer, LinkMode.PAIR)
         val manifests = koin.get<WindowManifestStore>()
-        assertEquals(3L, manifests.revision(oldPeer), "The native payload must deliver the old scoped counter")
+        assertEquals(0L, manifests.revision(oldPeer), "Installation-local counters must not transfer to the replacement")
         val links = koin.get<PhoneWatchLinkStore>()
         val keys = koin.get<PairKeyVault>()
         if (replay || receipt.exists()) {
@@ -187,7 +188,7 @@ class NativeTransferredPublicationProbeTest : CloudArchiveWorkerFixture() {
         val completed = JSONObject(receipt.readText()).put("published", true)
         writeReceipt(completed)
         assertNull(koin.get<SessionStorage>().getSession(), "The capture transport must not install authentication")
-        assertEquals(3L, manifests.revision(oldPeer))
+        assertEquals(0L, manifests.revision(oldPeer), "Publication and replay must not adopt the source counter")
     }
 
     private suspend fun verifyOutgoingArchive(current: JSONObject) {
@@ -299,6 +300,8 @@ class NativeTransferredPublicationProbeTest : CloudArchiveWorkerFixture() {
         require(File(context.noBackupFilesDir, "native-backup-fixture.json").isFile)
         if (!receipt.exists()) return
         val source = JSONObject(receipt.readText())
+        val scope = PeerDeliveryContext(source.getString("link"), source.getString("device"), peer, LinkMode.PAIR)
+        assertEquals(3L, koin.get<WindowManifestStore>().revision(scope), "Transfer must preserve the source counter")
         assertEquals(
             source.getString("device"),
             koin
