@@ -36,7 +36,9 @@ def verify_emulator(serial):
     if not serial.startswith("emulator-"):
         raise RuntimeError("D2D acceptance requires an explicit emulator serial")
     if HARNESS.adb(serial, "shell", "getprop", "ro.kernel.qemu").strip() != b"1":
-        raise RuntimeError("D2D acceptance target did not identify itself as an emulator")
+        raise RuntimeError(
+            "D2D acceptance target did not identify itself as an emulator"
+        )
 
 
 def restore_set_token(output):
@@ -49,32 +51,72 @@ def restore_set_token(output):
 
 
 def selected_transport(serial, timeout=180):
-    transports = HARNESS.adb(serial, "shell", "bmgr", "list", "transports", timeout=timeout).decode().splitlines()
-    return next((line.lstrip()[2:].strip() for line in transports if line.lstrip().startswith("* ")), None)
+    transports = (
+        HARNESS.adb(serial, "shell", "bmgr", "list", "transports", timeout=timeout)
+        .decode()
+        .splitlines()
+    )
+    selected = [
+        line.lstrip()[2:].strip()
+        for line in transports
+        if line.lstrip().startswith("* ")
+    ]
+    return selected[0] if len(selected) == 1 else None
 
 
 def source_fixture(serial):
-    return HARNESS.adb(serial, "exec-out", "run-as", HARNESS.PACKAGE, "cat", "no_backup/native-backup-fixture.json")
+    return HARNESS.adb(
+        serial,
+        "exec-out",
+        "run-as",
+        HARNESS.PACKAGE,
+        "cat",
+        "no_backup/native-backup-fixture.json",
+    )
 
 
 def require_empty_source(serial):
-    packages = HARNESS.adb(serial, "shell", "pm", "list", "packages", HARNESS.PACKAGE).decode().splitlines()
-    if "package:" + HARNESS.PACKAGE in packages and HARNESS.contains_user_content(HARNESS.package_user_files(serial)):
-        raise RuntimeError("Use a fresh emulator for D2D acceptance; the installed app contains retained user data")
+    packages = (
+        HARNESS.adb(serial, "shell", "pm", "list", "packages", HARNESS.PACKAGE)
+        .decode()
+        .splitlines()
+    )
+    if "package:" + HARNESS.PACKAGE in packages and HARNESS.contains_user_content(
+        HARNESS.package_user_files(serial)
+    ):
+        raise RuntimeError(
+            "Use a fresh emulator for D2D acceptance; the installed app contains retained user data"
+        )
 
 
 def restore_discovery_timeout(deadline):
     remaining = deadline - HARNESS.time.monotonic()
     if remaining <= 0:
-        raise RuntimeError("Google D2D restore-set discovery exceeded its 60-second deadline")
+        raise RuntimeError(
+            "Google D2D restore-set discovery exceeded its 60-second deadline"
+        )
     return remaining
 
 
 def select_d2d_restore_transport(serial, deadline=None):
-    HARNESS.adb(serial, "shell", "bmgr", "transport", GMS_BACKUP_TRANSPORT,
-                timeout=60 if deadline is None else restore_discovery_timeout(deadline))
-    if selected_transport(serial, timeout=180 if deadline is None else restore_discovery_timeout(deadline)) != GMS_BACKUP_TRANSPORT:
-        raise RuntimeError("Google backup transport was not selected for D2D test-mode restore")
+    HARNESS.adb(
+        serial,
+        "shell",
+        "bmgr",
+        "transport",
+        GMS_BACKUP_TRANSPORT,
+        timeout=60 if deadline is None else restore_discovery_timeout(deadline),
+    )
+    if (
+        selected_transport(
+            serial,
+            timeout=180 if deadline is None else restore_discovery_timeout(deadline),
+        )
+        != GMS_BACKUP_TRANSPORT
+    ):
+        raise RuntimeError(
+            "Google backup transport was not selected for D2D test-mode restore"
+        )
 
 
 def wait_for_d2d_restore_set(serial, output):
@@ -90,7 +132,9 @@ def wait_for_d2d_restore_set(serial, output):
                 raise expired from last_failure
             attempts += 1
             try:
-                sets = HARNESS.adb(serial, "shell", "bmgr", "list", "sets", timeout=timeout)
+                sets = HARNESS.adb(
+                    serial, "shell", "bmgr", "list", "sets", timeout=timeout
+                )
                 restore_discovery_timeout(deadline)
                 token = restore_set_token(sets)
             except (RuntimeError, OSError, subprocess.SubprocessError) as error:
@@ -107,15 +151,28 @@ def wait_for_d2d_restore_set(serial, output):
     finally:
         try:
             HARNESS.private_file(output / "d2d-restore-sets.log", sets)
-            HARNESS.private_file(output / "d2d-restore-readiness.json", json.dumps({
-                "ready": ready, "attempts": attempts,
-                "lastFailure": f"{type(last_failure).__name__}: {last_failure}" if last_failure else None,
-                "failure": f"{type(failure).__name__}: {failure}" if failure else None,
-            }).encode())
+            HARNESS.private_file(
+                output / "d2d-restore-readiness.json",
+                json.dumps(
+                    {
+                        "ready": ready,
+                        "attempts": attempts,
+                        "lastFailure": f"{type(last_failure).__name__}: {last_failure}"
+                        if last_failure
+                        else None,
+                        "failure": f"{type(failure).__name__}: {failure}"
+                        if failure
+                        else None,
+                    }
+                ).encode(),
+            )
         except Exception as diagnostic_error:
             if failure is None:
                 raise
-            add_failure_note(failure, f"D2D readiness diagnostics could not be retained: {type(diagnostic_error).__name__}")
+            add_failure_note(
+                failure,
+                f"D2D readiness diagnostics could not be retained: {type(diagnostic_error).__name__}",
+            )
 
 
 def select_d2d_transport(serial, attempts=30, output=None):
@@ -123,17 +180,29 @@ def select_d2d_transport(serial, attempts=30, output=None):
     selection = None
     for attempt in range(attempts):
         try:
-            registered = HARNESS.adb(serial, "shell", "bmgr", "list", "transports", timeout=60).decode().splitlines()
+            registered = (
+                HARNESS.adb(serial, "shell", "bmgr", "list", "transports", timeout=60)
+                .decode()
+                .splitlines()
+            )
             if any(line.lstrip("* ").strip() == D2D_TRANSPORT for line in registered):
-                selection = HARNESS.adb(serial, "shell", "bmgr", "transport", D2D_TRANSPORT, timeout=60)
-                initialized = HARNESS.adb(serial, "shell", "bmgr", "init", D2D_TRANSPORT, timeout=60)
+                selection = HARNESS.adb(
+                    serial, "shell", "bmgr", "transport", D2D_TRANSPORT, timeout=60
+                )
+                initialized = HARNESS.adb(
+                    serial, "shell", "bmgr", "init", D2D_TRANSPORT, timeout=60
+                )
                 if output is not None:
-                    HARNESS.private_file(output / f"d2d-init-{attempt + 1}.log", initialized)
+                    HARNESS.private_file(
+                        output / f"d2d-init-{attempt + 1}.log", initialized
+                    )
                 if selected_transport(serial) == D2D_TRANSPORT:
                     return
         except Exception as error:
             if attempt + 1 == attempts:
-                raise RuntimeError("Google D2D transport could not be selected and initialized") from error
+                raise RuntimeError(
+                    "Google D2D transport could not be selected and initialized"
+                ) from error
         if attempt + 1 < attempts:
             HARNESS.time.sleep(1)
     raise RuntimeError(
@@ -150,24 +219,51 @@ def capture_transport_failure(serial, output):
     }
     for name, command in commands.items():
         try:
-            HARNESS.private_file(output / name, HARNESS.adb(serial, *command, timeout=30))
+            HARNESS.private_file(
+                output / name, HARNESS.adb(serial, *command, timeout=30)
+            )
         except Exception as error:
             errors.append(f"{name}: {error}")
     if errors:
         try:
-            HARNESS.private_file(output / "d2d-diagnostic-errors.log", "\n".join(errors).encode())
+            HARNESS.private_file(
+                output / "d2d-diagnostic-errors.log", "\n".join(errors).encode()
+            )
         except Exception:
             print("D2D diagnostic output could not be retained", file=sys.stderr)
 
 
+def d2d_backup_timeout(deadline):
+    remaining = deadline - HARNESS.time.monotonic()
+    if remaining <= 0:
+        raise RuntimeError("Google D2D native backup exceeded its 180-second deadline")
+    return remaining
+
+
 def backup_d2d_source(serial, output):
+    deadline = HARNESS.time.monotonic() + 180
+    if (
+        selected_transport(serial, timeout=d2d_backup_timeout(deadline))
+        != D2D_TRANSPORT
+    ):
+        raise RuntimeError(
+            "Google D2D transport is not uniquely selected immediately before native backup"
+        )
     # Match Android Studio's backup tooling: a newly initialized transport needs
     # a full package-manager metadata snapshot, not an incremental baseline.
     backup = HARNESS.adb(
-        serial, "shell", "bmgr", "backupnow", "@pm@", HARNESS.PACKAGE,
-        "--non-incremental", "--monitor-verbose", timeout=180,
+        serial,
+        "shell",
+        "bmgr",
+        "backupnow",
+        "@pm@",
+        HARNESS.PACKAGE,
+        "--non-incremental",
+        "--monitor-verbose",
+        timeout=d2d_backup_timeout(deadline),
     )
     HARNESS.private_file(output / "d2d-backup.log", backup)
+    d2d_backup_timeout(deadline)
     required = [
         b"Package @pm@ with result: Success",
         f"Package {HARNESS.PACKAGE} with result: Success".encode(),
@@ -175,16 +271,28 @@ def backup_d2d_source(serial, output):
     ]
     if not all(result in backup for result in required):
         retain_transport_failure(serial, output, "backup")
-        raise RuntimeError("Google D2D test transport did not complete the native backup")
+        raise RuntimeError(
+            "Google D2D test transport did not complete the native backup"
+        )
 
 
-def restore_device_settings(serial, previous_transport, previous_mode, backup_was_enabled):
+def restore_device_settings(
+    serial, previous_transport, previous_mode, backup_was_enabled
+):
     errors = []
     try:
         if previous_mode in (b"", b"null"):
             HARNESS.adb(serial, "shell", "settings", "delete", "secure", D2D_TEST_MODE)
         else:
-            HARNESS.adb(serial, "shell", "settings", "put", "secure", D2D_TEST_MODE, previous_mode.decode())
+            HARNESS.adb(
+                serial,
+                "shell",
+                "settings",
+                "put",
+                "secure",
+                D2D_TEST_MODE,
+                previous_mode.decode(),
+            )
     except Exception as error:
         errors.append(f"D2D test-mode setting: {error}")
     try:
@@ -204,7 +312,10 @@ def restore_device_settings(serial, previous_transport, previous_mode, backup_wa
     except Exception as error:
         errors.append(f"backup enablement: {error}")
     if errors:
-        raise RuntimeError("Could not restore the emulator's original backup settings: " + "; ".join(errors))
+        raise RuntimeError(
+            "Could not restore the emulator's original backup settings: "
+            + "; ".join(errors)
+        )
 
 
 def retain_transport_failure(serial, output, phase):
@@ -212,11 +323,24 @@ def retain_transport_failure(serial, output, phase):
     # Keep bounded transport evidence without replacing the failed acceptance result.
     try:
         evidence = HARNESS.adb(
-            serial, "shell", "logcat", "-d", "-t", "500", "-v", "threadtime",
-            "BackupManagerService:V", "Backup:V", "PFTBT:V", "*:S", timeout=30,
+            serial,
+            "shell",
+            "logcat",
+            "-d",
+            "-t",
+            "500",
+            "-v",
+            "threadtime",
+            "BackupManagerService:V",
+            "Backup:V",
+            "PFTBT:V",
+            "*:S",
+            timeout=30,
         )
     except (OSError, subprocess.SubprocessError) as error:
-        evidence = f"Transport diagnostics unavailable: {type(error).__name__}\n".encode()
+        evidence = (
+            f"Transport diagnostics unavailable: {type(error).__name__}\n".encode()
+        )
     HARNESS.private_file(output / f"d2d-{phase}-transport.log", evidence)
 
 
@@ -228,13 +352,19 @@ def exercise_d2d(serial, app_apk, test_apk, output):
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
     HARNESS.ensure_emulator_setup_complete(serial)
     previous_transport = selected_transport(serial)
-    previous_mode = HARNESS.adb(serial, "shell", "settings", "get", "secure", D2D_TEST_MODE).strip()
-    backup_was_enabled = b"currently enabled" in HARNESS.adb(serial, "shell", "bmgr", "enabled").lower()
+    if previous_transport is None:
+        raise RuntimeError(
+            "The emulator's original backup transport is missing or ambiguous"
+        )
+    previous_mode = HARNESS.adb(
+        serial, "shell", "settings", "get", "secure", D2D_TEST_MODE
+    ).strip()
+    backup_was_enabled = (
+        b"currently enabled" in HARNESS.adb(serial, "shell", "bmgr", "enabled").lower()
+    )
     try:
         HARNESS.adb(serial, "shell", "bmgr", "enable", "true")
         HARNESS.adb(serial, "shell", "settings", "put", "secure", D2D_TEST_MODE, "1")
-        select_d2d_transport(serial, output=output)
-
         HARNESS.adb(serial, "install", "-r", "-t", str(app_apk.resolve()))
         HARNESS.adb(serial, "install", "-r", "-t", str(test_apk.resolve()))
         HARNESS.probe(serial, "seed", output / "source-seed.log")
@@ -242,26 +372,47 @@ def exercise_d2d(serial, app_apk, test_apk, output):
         metadata = json.loads(raw_fixture)
         HARNESS.private_file(output / "source-fixture.json", raw_fixture)
 
+        # The prepared app is the source of truth; select/init the test transport after setup.
+        select_d2d_transport(serial, output=output)
         backup_d2d_source(serial, output)
 
-        HARNESS.probe(serial, "post-backup-mutation", output / "post-backup-mutation.log")
+        HARNESS.probe(
+            serial, "post-backup-mutation", output / "post-backup-mutation.log"
+        )
         token = wait_for_d2d_restore_set(serial, output)
         HARNESS.adb(serial, "shell", "am", "force-stop", HARNESS.PACKAGE)
-        restore = HARNESS.adb(serial, "shell", "bmgr", "restore", token, HARNESS.PACKAGE, timeout=180)
+        restore = HARNESS.adb(
+            serial, "shell", "bmgr", "restore", token, HARNESS.PACKAGE, timeout=180
+        )
         HARNESS.private_file(output / "d2d-restore.log", restore)
         if b"restoreFinished: 0" not in restore:
             retain_transport_failure(serial, output, "restore")
-            raise RuntimeError("Google D2D test transport did not complete native restore")
+            raise RuntimeError(
+                "Google D2D test transport did not complete native restore"
+            )
 
         HARNESS.adb(serial, "install", "-r", "-t", str(test_apk.resolve()))
-        HARNESS.probe(serial, "native-restore-status", output / "d2d-callback-status.log")
-        HARNESS.probe(serial, "verify-in-place", output / "d2d-restored-content.log", metadata, recording_transport="d2d")
-        print("Google D2D test-mode backup, restore callback, and restored content passed", flush=True)
+        HARNESS.probe(
+            serial, "native-restore-status", output / "d2d-callback-status.log"
+        )
+        HARNESS.probe(
+            serial,
+            "verify-in-place",
+            output / "d2d-restored-content.log",
+            metadata,
+            recording_transport="d2d",
+        )
+        print(
+            "Google D2D test-mode backup, restore callback, and restored content passed",
+            flush=True,
+        )
     except Exception:
         capture_transport_failure(serial, output)
         raise
     finally:
-        restore_device_settings(serial, previous_transport, previous_mode, backup_was_enabled)
+        restore_device_settings(
+            serial, previous_transport, previous_mode, backup_was_enabled
+        )
 
 
 def main():

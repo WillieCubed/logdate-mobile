@@ -35,7 +35,11 @@ class NativeTransportSafety:
                 with (
                     patch.object(D2D, "verify_emulator"),
                     patch.object(D2D, "require_empty_source"),
-                    patch.object(D2D, "selected_transport", return_value="original"),
+                    patch.object(
+                        D2D,
+                        "selected_transport",
+                        side_effect=["original", D2D.D2D_TRANSPORT],
+                    ),
                     patch.object(D2D, "select_d2d_transport"),
                     patch.object(D2D, "source_fixture", return_value=b"{}"),
                     patch.object(D2D.HARNESS, "ensure_emulator_setup_complete"),
