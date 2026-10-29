@@ -9,7 +9,6 @@ import android.util.AtomicFile
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.ListenableWorker
-import androidx.work.WorkerParameters
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.AndroidAccountManager
@@ -40,8 +39,7 @@ import app.logdate.client.sync.v2.link.PhoneWatchLinkStore
 import app.logdate.client.sync.v2.window.WindowManifestStore
 import app.logdate.feature.core.export.CloudArchiveCipher
 import app.logdate.feature.core.export.CloudBackupWorker
-import io.mockk.every
-import io.mockk.mockk
+import app.logdate.feature.core.settings.ui.CloudArchiveStage
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
@@ -192,8 +190,8 @@ class NativeTransferredPublicationProbeTest : CloudArchiveWorkerFixture() {
     }
 
     private suspend fun verifyOutgoingArchive(current: JSONObject) {
-        val params = mockk<WorkerParameters>(relaxed = true)
-        every { params.id } returns java.util.UUID.fromString(Uuid.random().toString())
+        val params = workerParameters()
+        archiveProgress.clear()
         val delegate = FakeCloudBackupDataSource(Result.success(BackupUploadResult("synthetic", 1, 1)))
         val encrypted = File(context.cacheDir, "$peer.ldcb")
         val plaintext = File(context.cacheDir, "$peer.zip")
@@ -228,6 +226,9 @@ class NativeTransferredPublicationProbeTest : CloudArchiveWorkerFixture() {
                     cipher,
                 )
             assertTrue(worker.doWork() is ListenableWorker.Result.Success)
+            val stages = archiveProgress.mapNotNull { it.getString(CloudBackupWorker.PROGRESS_STAGE) }
+            assertTrue(CloudArchiveStage.CHECKING.name in stages, "The worker must report its actual checking progress")
+            assertTrue(CloudArchiveStage.UPLOADING.name in stages, "The worker must report its actual uploading progress")
             assertEquals(1, uploads)
             cipher.decrypt(encrypted, plaintext)
             ZipFile(plaintext).use { zip ->
