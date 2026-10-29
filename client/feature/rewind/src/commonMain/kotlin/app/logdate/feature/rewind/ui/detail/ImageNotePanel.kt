@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -98,6 +99,7 @@ fun ImageNotePanel(
                 memoryId,
                 loadState,
                 with(density) { Modifier.size(layout.width.toDp(), layout.height.toDp()) },
+                shape = RoundedCornerShape(if (caption.isNullOrBlank()) 24.dp else 8.dp),
             ) {
                 Column(Modifier.fillMaxWidth().testTag("rewind-media-content")) {
                     Row(
