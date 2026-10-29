@@ -21,10 +21,7 @@ class NativeJournalReplayCustody(
         size: Long,
         input: InputStream,
     ) {
-        val individualMedia =
-            path.startsWith("files/media/") ||
-                path.startsWith("files/user_media/") ||
-                path.startsWith("files/audio_notes/")
+        val individualMedia = isNativeSelectedOriginal(path)
         val id =
             if (individualMedia) {
                 Uuid.random().toString().also(journal::begin)
@@ -34,6 +31,7 @@ class NativeJournalReplayCustody(
                     active = it
                 }
             }
+        if (individualMedia) retainedJournalWriteAtomic(File(root, "$id/media-only"), "v1")
         journal.capture(id, path, size, input)
     }
 
@@ -163,6 +161,21 @@ class NativeJournalReplayCustody(
     fun hasInputs(): Boolean {
         cleanupConsumed()
         return root.listFiles().orEmpty().any { it.isDirectory && !it.name.startsWith('.') }
+    }
+
+    /** Media-only custody cannot turn a fresh snapshot callback into an occupied-journal replay. */
+    fun hasJournalInputs(): Boolean {
+        cleanupConsumed()
+        return root.listFiles().orEmpty().filter { !it.name.startsWith('.') }.any { directory ->
+            check(Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS))
+            val marker = File(directory, "media-only")
+            if (!Files.isRegularFile(marker.toPath(), LinkOption.NOFOLLOW_LINKS) || retainedJournalReadBounded(marker, 16) != "v1") {
+                true
+            } else {
+                val paths = journal.recordedPathsForRouting(directory.name)
+                paths.isEmpty() || paths.any { !isNativeSelectedOriginal(it) }
+            }
+        }
     }
 
     fun sealedPayloads(): List<NativeIncomingJournal.Payload> =

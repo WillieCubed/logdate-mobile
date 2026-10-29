@@ -1,6 +1,7 @@
 package app.logdate.client.e2e
 
 import android.Manifest
+import android.app.job.JobScheduler
 import android.os.Build
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
@@ -15,6 +16,7 @@ import app.logdate.client.database.encryption.DatabaseKeyRecoveryRequiredExcepti
 import app.logdate.client.database.encryption.PassphraseBackupStore
 import app.logdate.client.device.crypto.AndroidIdentityKeyBackupStore
 import app.logdate.client.device.crypto.IdentityKeyManager
+import app.logdate.client.device.restore.NativeJournalRestoreAuthority
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.restore.PostRestoreType
 import app.logdate.client.device.storage.SecureStorage
@@ -23,14 +25,21 @@ import app.logdate.client.media.MediaManager
 import app.logdate.client.media.audio.AndroidRecordingServiceController
 import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.media.audio.RecordingSessionOptions
+import app.logdate.client.media.storage.MediaReference
+import app.logdate.client.media.storage.UnavailableMediaReferences
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeout
 import org.koin.core.context.GlobalContext
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.security.MessageDigest
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -213,8 +222,24 @@ internal suspend fun verifyRecordingTransferFixture(
                 val koin = GlobalContext.get()
                 val notes = koin.get<JournalNotesRepository>()
                 val media = koin.get<MediaManager>()
-                withTimeout(30_000) {
-                    while (!media.exists(assertIs<JournalNote.Audio>(notes.getNoteById(nativeRecordingFixtureId)).mediaRef)) delay(50)
+                var observedReference: String? = null
+                try {
+                    withTimeout(30_000) {
+                        while (true) {
+                            val reference = assertIs<JournalNote.Audio>(notes.getNoteById(nativeRecordingFixtureId)).mediaRef
+                            observedReference = reference
+                            if (media.exists(reference)) break
+                            delay(50)
+                        }
+                    }
+                } catch (timeout: TimeoutCancellationException) {
+                    if (currentCoroutineContext().isActive) {
+                        val observation =
+                            runCatching { recordingRecoveryObservation(context, observedReference) }
+                                .getOrElse { "Native recovery observation failed: ${it.javaClass.simpleName}" }
+                        timeout.addSuppressed(IllegalStateException(observation))
+                    }
+                    throw timeout
                 }
                 media.readMedia(assertIs<JournalNote.Audio>(notes.getNoteById(nativeRecordingFixtureId)).mediaRef).data
             }
@@ -251,3 +276,56 @@ internal fun nativeRecordingTransferBytes(): ByteArray =
         .context.assets
         .open("recovery/completed-recording.m4a")
         .use { it.readBytes() }
+
+/** Read-only observations at the failed deadline, before instrumentation teardown can change jobs. */
+private fun recordingRecoveryObservation(
+    context: android.content.Context,
+    reference: String?,
+): String {
+    val fields = linkedMapOf<String, String>()
+
+    fun field(
+        name: String,
+        read: () -> Any?,
+    ) {
+        fields[name] = runCatching { read().toString() }.getOrElse { "read-error:${it.javaClass.simpleName}" }
+    }
+
+    fun observedFiles(root: File): List<File> {
+        if (!Files.exists(root.toPath(), LinkOption.NOFOLLOW_LINKS)) return emptyList()
+        check(Files.isDirectory(root.toPath(), LinkOption.NOFOLLOW_LINKS))
+        return checkNotNull(root.listFiles()).toList()
+    }
+    val jobId = 0x4e4a5235
+    val scheduler = context.getSystemService(JobScheduler::class.java)
+    field("jobPendingObserved") { scheduler.getPendingJob(jobId) != null }
+    field("jobReasonObserved") { if (Build.VERSION.SDK_INT >= 34) scheduler.getPendingJobReason(jobId) else "unsupported" }
+    field("deliveryComplete") { PostRestoreDetector(context).isNativeRestoreDeliveryComplete() }
+    field("privacyMissing") { PostRestoreDetector(context).hasMissingNativePrivacyPayload() }
+    val authority = NativeJournalRestoreAuthority(context)
+    field("completedReceiptPresent") { authority.completedReceipt() != null }
+    field("completedRecordingInventoryPresent") {
+        authority.completedMediaInventory()?.entry("files/audio_notes/transfer-recording.m4a") != null
+    }
+    field("referenceObserved") { reference != null }
+    field("referenceUnavailable") { reference?.let(UnavailableMediaReferences::isUnavailable) }
+    field("originalReferenceKind") {
+        reference?.let { MediaReference.parse(UnavailableMediaReferences.nativeSource(it) ?: it).javaClass.simpleName }
+    }
+    val custodyRoot = File(context.noBackupFilesDir, "native-journal-replay-custody")
+    val cohorts =
+        runCatching {
+            observedFiles(custodyRoot).filter { Files.isDirectory(it.toPath(), LinkOption.NOFOLLOW_LINKS) && !it.name.startsWith('.') }
+        }
+    field("custodyDirectoriesObserved") { cohorts.getOrThrow().size }
+    field("sealedDirectoriesObservedMax128") {
+        cohorts.getOrThrow().take(128).count { Files.isRegularFile(File(it, "manifest.json").toPath(), LinkOption.NOFOLLOW_LINKS) }
+    }
+    field("stagedAdmissionsObservedMax128") {
+        observedFiles(File(context.noBackupFilesDir, "native-journal-staged-sources")).take(128).count {
+            Files.isDirectory(it.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+                Files.isRegularFile(File(it, "admitted").toPath(), LinkOption.NOFOLLOW_LINKS)
+        }
+    }
+    return "Native recording recovery deadline observations: ${fields.entries.joinToString { "${it.key}=${it.value}" }}"
+}
