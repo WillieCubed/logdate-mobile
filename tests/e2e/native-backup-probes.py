@@ -85,7 +85,45 @@ def probe(
             h.add_failure_note(
                 failure, f"Crash diagnostics could not be collected: {error}"
             )
+        if mode in {"data-only", "verify", "verify-restored", "partial-media"}:
+            _capture_recovery_failure(h, serial, output, failure)
         raise failure
+
+
+def _capture_recovery_failure(h, serial, output, failure):
+    commands = (
+        ("jobs", ("shell", "dumpsys", "jobscheduler")),
+        (
+            "custody",
+            (
+                "exec-out",
+                "run-as",
+                h.PACKAGE,
+                "find",
+                "no_backup/native-journal-replay-custody",
+                "-type",
+                "f",
+                "-name",
+                "entry.json",
+                "-exec",
+                "cat",
+                "{}",
+                "+",
+            ),
+        ),
+        ("recovery-state", ("exec-out", "run-as", h.PACKAGE, "ls", "-la", "no_backup")),
+    )
+    for label, arguments in commands:
+        try:
+            h.private_file(
+                output.with_suffix(f".{label}.log"),
+                h.adb(serial, *arguments, timeout=20),
+            )
+        except Exception as error:
+            h.add_failure_note(
+                failure,
+                f"{label} recovery diagnostics could not be collected: {type(error).__name__}",
+            )
 
 
 def verify_restarted_content(
