@@ -1,6 +1,7 @@
 package app.logdate.client.data.restore
 
 import app.logdate.client.device.restore.NativeRestoreDeliveryGate
+import app.logdate.client.media.storage.MediaClaimFence
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -24,4 +25,9 @@ internal object RetainedJournalReconciliationLock {
     ): T = withLock { gate.withLock { block() } }
 
     suspend fun <T> withLock(block: suspend () -> T): T = mutex.withLock { block() }
+
+    suspend fun <T> withMediaClaim(
+        fence: MediaClaimFence,
+        block: suspend () -> T,
+    ): T = fence.withClaim(block)
 }
