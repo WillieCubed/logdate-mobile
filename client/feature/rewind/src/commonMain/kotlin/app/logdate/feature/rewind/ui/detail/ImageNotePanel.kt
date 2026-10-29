@@ -6,14 +6,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -29,14 +25,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import app.logdate.ui.workspace.LocalWorkspacePlaybackInsets
+import androidx.compose.ui.unit.sp
+import app.logdate.ui.common.parseMarkdownDocument
 import coil3.compose.AsyncImage
 import logdate.client.feature.rewind.generated.resources.Res
 import logdate.client.feature.rewind.generated.resources.cd_rewind_journal_photo
 import logdate.client.feature.rewind.generated.resources.cd_rewind_video_frame
 import logdate.client.feature.rewind.generated.resources.rewind_video_frame_label
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.roundToInt
 
 /**
  * Panel for displaying an image note within a rewind story.
@@ -64,64 +65,94 @@ fun ImageNotePanel(
     memoryId: String = "image-memory",
 ) {
     var loadState by remember(imageUri) { mutableStateOf<RewindMemoryLoadState>(RewindMemoryLoadState.Loading) }
-    val insets = LocalWorkspacePlaybackInsets.current
-    val safeTop = with(LocalDensity.current) { insets.getTop(this).toDp() }
-    val headerClearance = (LocalRewindChromeHeight.current - safeTop).coerceAtLeast(0.dp) + 12.dp
-    RewindMemoryFrame(memoryId, loadState, modifier.fillMaxSize()) {
-        BoxWithConstraints(
-            Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(insets)
-                .padding(horizontal = RewindMemoryContentPadding)
-                .padding(top = headerClearance, bottom = RewindMemoryContentPadding),
-            contentAlignment = Alignment.Center,
-        ) {
-            val captionLimit = maxHeight * 0.32f
-            Column(
-                Modifier
-                    .widthIn(max = RewindMediaMaxWidth)
-                    .fillMaxWidth()
-                    .heightIn(max = maxHeight)
-                    .testTag("rewind-media-content"),
-                horizontalAlignment = Alignment.Start,
-            ) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(dateFormatted, style = MaterialTheme.typography.labelLarge, color = Color.White)
-                    if (isVideoFrame) {
-                        Text(
-                            stringResource(Res.string.rewind_video_frame_label),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = Color.White,
-                        )
+    // Stored Rewind media has no dimensions. Keep its 3:2 viewport stable while Fit preserves the decoded bitmap's aspect.
+    val preferredAspectRatio = 1.5f
+    val density = LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
+    val captionStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp, lineHeight = 23.sp)
+    val plainCaption = remember(caption) { caption?.let { parseMarkdownDocument(it).plainText }.orEmpty() }
+    val headerStyle = MaterialTheme.typography.labelLarge
+    val headerHeight = with(density) { textMeasurer.measure(dateFormatted, headerStyle, maxLines = 1).size.height + 12.dp.toPx() }
+    RewindMemoryStage(modifier) { availableHeight ->
+        BoxWithConstraints {
+            val layout =
+                with(density) {
+                    resolveRewindMediaLayout(
+                        minOf(maxWidth, RewindMediaMaxWidth).toPx(),
+                        availableHeight.toPx(),
+                        preferredAspectRatio,
+                        headerHeight,
+                        RewindMinimumReadableWidth.toPx(),
+                        !caption.isNullOrBlank(),
+                    ) { width ->
+                        textMeasurer
+                            .measure(
+                                plainCaption,
+                                captionStyle,
+                                constraints = Constraints(maxWidth = (width - 48.dp.toPx()).roundToInt().coerceAtLeast(1)),
+                            ).size.height +
+                            24.dp.toPx()
                     }
                 }
-                Spacer(Modifier.height(12.dp))
-                AsyncImage(
-                    model = imageUri,
-                    contentDescription =
-                        if (isVideoFrame) {
-                            stringResource(Res.string.cd_rewind_video_frame, dateFormatted)
-                        } else {
-                            caption?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.cd_rewind_journal_photo, dateFormatted)
-                        },
-                    modifier = Modifier.weight(1f, fill = false).fillMaxWidth(),
-                    contentScale = ContentScale.Fit,
-                    onLoading = { loadState = RewindMemoryLoadState.Loading },
-                    onError = { loadState = RewindMemoryLoadState.Unavailable },
-                    onSuccess = {
-                        loadState = RewindMemoryLoadState.Ready
-                    },
-                )
-                if (!caption.isNullOrBlank()) {
-                    Spacer(Modifier.height(12.dp))
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = captionLimit)
-                            .verticalScroll(rememberScrollState())
-                            .padding(RewindMemoryContentPadding),
+            RewindMemoryFrame(
+                memoryId,
+                loadState,
+                with(density) { Modifier.size(layout.width.toDp(), layout.height.toDp()) },
+            ) {
+                Column(Modifier.fillMaxWidth().testTag("rewind-media-content")) {
+                    Row(
+                        with(density) { Modifier.fillMaxWidth().height(layout.headerHeight.toDp()) }.padding(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        RewindRichMemoryText(content = caption)
+                        Text(
+                            dateFormatted,
+                            Modifier.weight(1f),
+                            style = headerStyle,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (isVideoFrame) {
+                            Text(
+                                stringResource(Res.string.rewind_video_frame_label),
+                                style = headerStyle,
+                                color = Color.White,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                    AsyncImage(
+                        model = imageUri,
+                        contentDescription =
+                            if (isVideoFrame) {
+                                stringResource(Res.string.cd_rewind_video_frame, dateFormatted)
+                            } else {
+                                caption?.takeIf { it.isNotBlank() }
+                                    ?: stringResource(Res.string.cd_rewind_journal_photo, dateFormatted)
+                            },
+                        modifier =
+                            with(
+                                density,
+                            ) { Modifier.fillMaxWidth().height(layout.mediaHeight.toDp()).testTag("rewind_media_$memoryId") },
+                        contentScale = ContentScale.Fit,
+                        onLoading = { loadState = RewindMemoryLoadState.Loading },
+                        onError = { loadState = RewindMemoryLoadState.Unavailable },
+                        onSuccess = {
+                            loadState = RewindMemoryLoadState.Ready
+                        },
+                    )
+                    if (!caption.isNullOrBlank()) {
+                        Column(
+                            with(density) {
+                                Modifier.fillMaxWidth().height(layout.captionHeight.toDp())
+                            }.verticalScroll(rememberScrollState()).padding(
+                                horizontal = RewindMemoryContentPadding,
+                                vertical = minOf(12.dp, with(density) { layout.captionHeight.toDp() } / 6),
+                            ),
+                        ) {
+                            RewindRichMemoryText(content = caption, textStyle = captionStyle)
+                        }
                     }
                 }
             }

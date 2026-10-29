@@ -6,8 +6,13 @@ package app.logdate.navigation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -16,6 +21,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
@@ -27,16 +33,23 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import app.logdate.client.text.toUiText
 import app.logdate.feature.rewind.ui.AudioNoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.ImageRewindPanelUiState
 import app.logdate.feature.rewind.ui.TextNoteRewindPanelUiState
+import app.logdate.feature.rewind.ui.detail.ImageNotePanel
+import app.logdate.feature.rewind.ui.detail.RewindMemoryFrame
+import app.logdate.feature.rewind.ui.detail.RewindMemoryLoadState
+import app.logdate.feature.rewind.ui.detail.RewindMemoryStage
+import app.logdate.feature.rewind.ui.detail.RewindRichMemoryText
 import app.logdate.feature.rewind.ui.detail.RewindStoryContent
 import app.logdate.feature.rewind.ui.detail.RewindStoryView
 import app.logdate.ui.theme.LogDateTheme
 import coil3.ColorImage
 import coil3.compose.AsyncImagePreviewHandler
 import coil3.compose.LocalAsyncImagePreviewHandler
+import kotlinx.coroutines.CompletableDeferred
 import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
@@ -73,6 +86,90 @@ class RewindViewportCaptureTest {
 
     @Test fun tabletTallVideoMemoryFitsBelowChrome() =
         capture("tablet-portrait-video-memory", 1280, 800, scrollToEnd = true, portraitVideo = true)
+
+    @Test fun boundedMemoryKeepsItsIdentityAndSizeAcrossStates() =
+        runDesktopComposeUiTest(width = 1280, height = 800) {
+            val state = mutableStateOf<RewindMemoryLoadState>(RewindMemoryLoadState.Loading)
+            setContent {
+                CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
+                    LogDateTheme(dynamicColor = false) {
+                        RewindMemoryStage { availableHeight ->
+                            RewindMemoryFrame(
+                                "stable-bounded-memory",
+                                state.value,
+                                Modifier
+                                    .widthIn(
+                                        max = 600.dp,
+                                    ).fillMaxWidth()
+                                    .heightIn(min = minOf(240.dp, availableHeight), max = availableHeight),
+                            ) {
+                                RewindRichMemoryText(
+                                    "## A bounded memory\n\nThe same block stays mounted.",
+                                    Modifier.fillMaxWidth().padding(24.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            val initial = onNodeWithTag("rewind_memory_stable-bounded-memory").fetchSemanticsNode()
+            val initialBounds = initial.boundsInRoot
+            assertEquals(600f, initial.boundsInRoot.width)
+            assertEquals(240f, initial.boundsInRoot.height)
+            for (next in listOf(RewindMemoryLoadState.Ready, RewindMemoryLoadState.Unavailable)) {
+                runOnIdle { state.value = next }
+                val actual = onNodeWithTag("rewind_memory_stable-bounded-memory").fetchSemanticsNode()
+                assertEquals(initial.id, actual.id)
+                assertEquals(initialBounds, actual.boundsInRoot)
+            }
+        }
+
+    @Test fun delayedPortraitKeepsTheActualFrameStable() =
+        runDesktopComposeUiTest(width = 1280, height = 800) {
+            val gate = CompletableDeferred<Unit>()
+            setContent {
+                val handler =
+                    remember {
+                        AsyncImagePreviewHandler {
+                            gate.await()
+                            ColorImage(Color.White.toArgb(), 600, 1200)
+                        }
+                    }
+                CompositionLocalProvider(
+                    LocalDensity provides Density(1f, 1f),
+                    LocalInspectionMode provides true,
+                    LocalAsyncImagePreviewHandler provides handler,
+                ) {
+                    LogDateTheme(dynamicColor = false) {
+                        ImageNotePanel("fixture://delayed-portrait", "A portrait memory", "Tuesday", memoryId = "delayed-portrait")
+                    }
+                }
+            }
+            val initial = onNodeWithTag("rewind_memory_delayed-portrait").fetchSemanticsNode()
+            val initialBounds = initial.boundsInRoot
+            runOnIdle { gate.complete(Unit) }
+            waitUntil(timeoutMillis = 5_000) {
+                onNodeWithTag("rewind_memory_delayed-portrait").fetchSemanticsNode().config[SemanticsProperties.StateDescription] ==
+                    "Memory loaded"
+            }
+            onNodeWithText("A portrait memory").assertIsDisplayed()
+            val ready = onNodeWithTag("rewind_memory_delayed-portrait").fetchSemanticsNode()
+            assertEquals(initial.id, ready.id)
+            assertEquals(initialBounds, ready.boundsInRoot, "Actual image completion must not resize its placeholder")
+            val media = onNodeWithTag("rewind_media_delayed-portrait").fetchSemanticsNode().boundsInRoot
+            val pixels = onRoot().captureToImage().toPixelMap()
+            val span =
+                (media.left.toInt() until media.right.toInt()).count {
+                    pixels[it, media.center.y.toInt()].toArgb() ==
+                        Color.White.toArgb()
+                }
+            assertTrue(
+                kotlin.math.abs(span / media.height - 0.5f) < 0.03f,
+                "The actual portrait pixels must preserve their 1:2 aspect ratio",
+            )
+        }
+
+    @Test fun shortPortraitKeepsCaptionReadable() = capture("short-portrait-memory", 411, 400, scrollToEnd = true, portraitVideo = true)
 
     @Test fun firstEntryKeepsBackgroundAtSceneEdges() =
         runDesktopComposeUiTest(width = 411, height = 891) {
@@ -186,12 +283,30 @@ class RewindViewportCaptureTest {
         }
         onNodeWithText("A quiet walk", substring = true).assertIsDisplayed()
         val scene = onNodeWithTag("rewind-story-focus").fetchSemanticsNode().boundsInRoot
-        if (!audio) {
+        run {
             val memory = onNodeWithTag("rewind_memory_$id").fetchSemanticsNode().boundsInRoot
-            assertEquals(scene, memory)
+            assertTrue(
+                memory.width >= minOf(240f, scene.width * 0.76f),
+                "A short viewport must not collapse the whole memory below readable width: $memory",
+            )
+            assertTrue(memory.width <= if (reading) 600f else 760f, "The whole memory surface must be capped: $memory")
+            assertTrue(
+                memory.width < scene.width && memory.height <= scene.height * 0.82f,
+                "The whole memory must stay inside its scene: memory=$memory scene=$scene",
+            )
+            assertTrue(
+                memory.left > scene.left && memory.right < scene.right && memory.top > scene.top && memory.bottom < scene.bottom,
+                "Visible scene background must surround the whole memory",
+            )
+            assertTrue(kotlin.math.abs(memory.center.x - scene.center.x) <= 1f, "Center the whole memory, not only its text")
         }
         assertEquals(minOf(width, 1200).toFloat(), scene.width)
         assertEquals(height.toFloat(), scene.height)
+        if (audio) {
+            val transcript = onNodeWithText("A quiet walk", substring = true).fetchSemanticsNode().boundsInRoot
+            val toggle = onNodeWithText("Preview Transcript").fetchSemanticsNode().boundsInRoot
+            assertTrue(toggle.top >= transcript.bottom, "Transcript actions must not overlap its text")
+        }
         val readable = onAllNodes(hasScrollAction()).fetchSemanticsNodes().maxBy { it.boundsInRoot.width }.boundsInRoot
         assertTrue(readable.width <= if (reading) 600f else 760f, "Memory content needs its own Apple-aligned maximum: $readable")
         assertTrue(kotlin.math.abs(readable.center.x - scene.center.x) <= 1f, "Memory content must be centered inside its scene")
@@ -215,7 +330,11 @@ class RewindViewportCaptureTest {
         val image = onRoot().captureToImage()
         val pixels = image.toPixelMap()
         val edgeX = scene.left.toInt() + 2
-        assertTrue(pixels[edgeX, height - 2].red < 0.5f, "Caption contrast must reach the scene edge, without a padded rectangle")
+        assertEquals(
+            Color.Black.toArgb(),
+            pixels[edgeX, height / 2].toArgb(),
+            "The scene backdrop must surround the whole bounded memory surface",
+        )
         val linkContrast = (darkColorScheme().primary.luminance() + 0.05f) / (pixels[edgeX, height - 2].luminance() + 0.05f)
         assertTrue(linkContrast >= 4.5f, "Shared Markdown links need 4.5:1 contrast against the image caption: $linkContrast")
         for (y in height / 2 + 1 until height) {

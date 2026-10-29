@@ -69,11 +69,12 @@ class RewindMemoryPresentationE2ETest {
             }
         }
         val initial = compose.onNodeWithTag("rewind_memory_stable-memory").fetchSemanticsNode()
+        val initialBounds = initial.boundsInRoot
 
         fun tapMemoryLink() {
             val link = compose.onNodeWithText("Memory link", useUnmergedTree = true).fetchSemanticsNode()
             val firstLetter = Offset(link.boundsInRoot.left + 8f, link.boundsInRoot.center.y)
-            compose.onNodeWithTag("rewind_memory_stable-memory").performTouchInput { click(firstLetter - initial.boundsInRoot.topLeft) }
+            compose.onNodeWithTag("rewind_memory_stable-memory").performTouchInput { click(firstLetter - initialBounds.topLeft) }
         }
         tapMemoryLink()
         compose.runOnIdle { assertEquals(0, openedLinks) }
@@ -81,7 +82,7 @@ class RewindMemoryPresentationE2ETest {
         compose.runOnIdle { state.value = RewindMemoryLoadState.Ready }
         val ready = compose.onNodeWithTag("rewind_memory_stable-memory").fetchSemanticsNode()
         assertEquals(initial.id, ready.id)
-        assertEquals(initial.boundsInRoot, ready.boundsInRoot)
+        assertEquals(initialBounds, ready.boundsInRoot)
         compose.onNodeWithText("Your memory").assertIsDisplayed()
         capture("rewind-memory-ready", minimumContentPixels = 1000)
         tapMemoryLink()
@@ -89,7 +90,7 @@ class RewindMemoryPresentationE2ETest {
         compose.runOnIdle { state.value = RewindMemoryLoadState.Unavailable }
         val failed = compose.onNodeWithTag("rewind_memory_stable-memory").fetchSemanticsNode()
         assertEquals(initial.id, failed.id)
-        assertEquals(initial.boundsInRoot, failed.boundsInRoot)
+        assertEquals(initialBounds, failed.boundsInRoot)
         compose.onNodeWithText("This memory is unavailable.").assertIsDisplayed()
         tapMemoryLink()
         compose.runOnIdle { assertEquals(1, openedLinks) }

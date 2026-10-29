@@ -28,13 +28,13 @@ import app.logdate.feature.rewind.ui.SubtitledRewindPanelUiState
 import app.logdate.feature.rewind.ui.detail.RewindStoryContent
 import app.logdate.feature.rewind.ui.detail.RewindStoryView
 import app.logdate.ui.theme.LogDateTheme
-import kotlinx.datetime.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /** Synthetic bright/dark media checks; no personal journal or location data. */
@@ -93,17 +93,17 @@ class RewindScenePresentationE2ETest {
         }
         compose.onNodeWithText("A quiet walk", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Tuesday").assertIsDisplayed()
-        assertEquals(
-            compose.onNodeWithTag("rewind-story-focus").fetchSemanticsNode().boundsInRoot,
-            compose.onNodeWithTag("rewind_memory_$id").fetchSemanticsNode().boundsInRoot,
-        )
+        val sceneBounds = compose.onNodeWithTag("rewind-story-focus").fetchSemanticsNode().boundsInRoot
+        val memoryBounds = compose.onNodeWithTag("rewind_memory_$id").fetchSemanticsNode().boundsInRoot
+        assertTrue(memoryBounds.width < sceneBounds.width && memoryBounds.height < sceneBounds.height)
+        assertTrue(memoryBounds.left > sceneBounds.left && memoryBounds.right < sceneBounds.right)
         val directory =
             InstrumentationRegistry.getArguments().getString("additionalTestOutputDir") ?: error("Managed capture directory required")
         val capture = File(directory, "rewind-${if (dark) "dark" else "bright"}-media-flat.png")
         capture.parentFile?.mkdirs()
         compose.waitForIdle()
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        val bounds = compose.onNodeWithTag("rewind-story-focus").fetchSemanticsNode().boundsInWindow
+        val bounds = compose.onNodeWithTag("rewind_media_$id").fetchSemanticsNode().boundsInWindow
         val progress = compose.onNodeWithTag("rewind-story-progress").fetchSemanticsNode().boundsInWindow
         compose.waitUntil(10_000) {
             if (!device.takeScreenshot(capture)) return@waitUntil false

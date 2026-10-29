@@ -103,11 +103,12 @@ class RewindTransparentBarsE2ETest {
             fun matches(
                 x: Float,
                 y: Float,
+                expected: Int = Color.BLACK,
             ): Boolean {
                 val pixel = bitmap.getPixel(x.toInt().coerceIn(0, bitmap.width - 1), y.toInt().coerceIn(0, bitmap.height - 1))
-                return kotlin.math.abs(Color.red(pixel) - Color.red(SOURCE_COLOR)) <= 2 &&
-                    kotlin.math.abs(Color.green(pixel) - Color.green(SOURCE_COLOR)) <= 2 &&
-                    kotlin.math.abs(Color.blue(pixel) - Color.blue(SOURCE_COLOR)) <= 2
+                return kotlin.math.abs(Color.red(pixel) - Color.red(expected)) <= 2 &&
+                    kotlin.math.abs(Color.green(pixel) - Color.green(expected)) <= 2 &&
+                    kotlin.math.abs(Color.blue(pixel) - Color.blue(expected)) <= 2
             }
             val statusMatches = insets.top == 0 || listOf(0.3f, 0.7f).all { matches(bounds.left + bounds.width * it, insets.top * 0.5f) }
             val navigationMatches =
@@ -117,12 +118,13 @@ class RewindTransparentBarsE2ETest {
                     nav.right > 0 -> listOf(0.3f, 0.7f).all { matches(bitmap.width - nav.right * 0.5f, bounds.top + bounds.height * it) }
                     else -> true
                 }
+            val media = compose.onNodeWithTag("rewind_media_00000000-0000-0000-0000-000000000037").fetchSemanticsNode().boundsInWindow
+            val mediaMatches = matches(media.center.x, media.center.y, SOURCE_COLOR)
             bitmap.recycle()
-            statusMatches && navigationMatches
+            statusMatches && navigationMatches && mediaMatches
         }
         compose.waitUntil(5_000) {
-            val insideFullWidthScene = bounds.width >= view.width - 2
-            WindowInsetsControllerCompat(compose.activity.window, view).isAppearanceLightStatusBars == insideFullWidthScene
+            !WindowInsetsControllerCompat(compose.activity.window, view).isAppearanceLightStatusBars
         }
         capture("media")
     }
