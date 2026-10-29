@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.runningReduce
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -42,7 +45,7 @@ sealed interface StreamingTimelineRequest {
 @OptIn(ExperimentalCoroutinesApi::class)
 class GetStreamingTimelineUseCase(
     private val notesRepository: JournalNotesRepository,
-    private val getTimelineDayUseCase: GetTimelineDayUseCase,
+    private val getTimelineDayUseCase: TimelineDayBuilder,
     private val groupNotesByDayBoundsUseCase: GroupNotesByDayBoundsUseCase,
     private val eventRepository: EventRepository,
     private val marks: Flow<Map<LocalDate, List<app.logdate.client.repository.moments.MarkedMoment>>> =
@@ -57,7 +60,7 @@ class GetStreamingTimelineUseCase(
         when (request) {
             is StreamingTimelineRequest.RecentTimeline -> getRecentTimeline(request.sortOrder, request.pageSize)
             is StreamingTimelineRequest.TimelineInRange -> getTimelineInRange(request.start, request.end, request.sortOrder)
-        }.combine(marks) { timeline, markedDays ->
+        }.combine(marks.onStart { emit(emptyMap()) }) { timeline, markedDays ->
             val included =
                 if (request is StreamingTimelineRequest.TimelineInRange) {
                     markedDays
@@ -75,7 +78,7 @@ class GetStreamingTimelineUseCase(
                     is StreamingTimelineRequest.TimelineInRange -> request.sortOrder
                 }
             merged.copy(days = applySorting(merged.days, order))
-        }
+        }.runningReduce(::retainAvailableTimelineSummaries)
 
     private fun getRecentTimeline(
         sortOrder: TimelineSortOrder,
@@ -83,9 +86,8 @@ class GetStreamingTimelineUseCase(
     ): Flow<Timeline> =
         notesRepository
             .observeRecentNotes(pageSize)
-            .combine(eventRepository.observeAllEvents()) { recentNotes, events -> recentNotes to events }
-            .transformLatest { (recentNotes, events) ->
-                val basicTimeline = createBasicTimeline(recentNotes, sortOrder, events)
+            .transformLatest { recentNotes ->
+                val basicTimeline = createBasicTimeline(recentNotes, sortOrder, emptyList())
                 emit(basicTimeline)
 
                 if (basicTimeline.days.isEmpty()) {
@@ -94,16 +96,18 @@ class GetStreamingTimelineUseCase(
 
                 val recentDates = basicTimeline.days.map(TimelineDay::date).toSet()
                 emitAll(
-                    notesRepository.allNotesObserved.map { allNotes ->
+                    notesRepository.allNotesObserved.mapLatest { allNotes ->
                         createEnrichedTimeline(
                             recentDates = recentDates,
                             allNotes = allNotes,
                             fallbackNotes = recentNotes,
-                            events = events,
+                            events = emptyList(),
                             sortOrder = sortOrder,
                         )
                     },
                 )
+            }.combine(eventRepository.observeAllEvents().onStart { emit(emptyList()) }) { timeline, events ->
+                timeline.copy(days = timeline.days.map { day -> day.copy(events = events.overlapping(day.entries)) })
             }.distinctUntilChanged()
 
     private fun getTimelineInRange(
@@ -162,6 +166,7 @@ class GetStreamingTimelineUseCase(
             moments = inferMomentsHeuristically(date, entries, places),
             parts = extractDayParts(entries),
             entries = entries.sortedByDescending { it.creationTimestamp },
+            isRecentWindow = true,
         )
     }
 

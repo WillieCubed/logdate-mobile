@@ -256,11 +256,18 @@ class TimelineViewModel(
         return MomentUiState(
             id = id.toString(),
             capturedAt = estimatedStart,
+            sourceNoteIds = sourceNotes.map { it.uid }.toSet(),
             label = label,
             labelPlaceName = labelPlace?.name,
             timeOfDay = timeOfDay,
             textSnippet = textFragments.firstOrNull()?.text,
-            media = media.map { MomentMediaUiState(uri = it.uri, isVideo = it.isVideo) },
+            textNoteId = textFragments.firstOrNull()?.sourceNoteId,
+            media = media.map { MomentMediaUiState(uri = it.uri, isVideo = it.isVideo, noteId = it.sourceNoteId) },
+            handwriting =
+                sourceNotes
+                    .filterIsInstance<JournalNote.Handwriting>()
+                    .toUiState()
+                    .filterIsInstance<app.logdate.ui.timeline.HandwritingNoteUiState>(),
             audio =
                 audio.firstOrNull()?.let {
                     MomentAudioUiState(

@@ -89,6 +89,7 @@ private fun Moment.toMomentUiState(
     return MomentUiState(
         id = id.toString(),
         capturedAt = estimatedStart,
+        sourceNoteIds = sourceNotes.map { it.uid }.toSet(),
         label = label,
         labelPlaceName = labelPlace?.name,
         timeOfDay = timeOfDay,
@@ -97,7 +98,12 @@ private fun Moment.toMomentUiState(
             textFragments.firstOrNull()?.sourceNoteId?.takeIf { sourceId ->
                 sourceNotes.any { note -> note.uid == sourceId && note is JournalNote.Text }
             },
-        media = media.map { MomentMediaUiState(uri = it.uri, isVideo = it.isVideo) },
+        media = media.map { MomentMediaUiState(uri = it.uri, isVideo = it.isVideo, noteId = it.sourceNoteId) },
+        handwriting =
+            sourceNotes
+                .filterIsInstance<JournalNote.Handwriting>()
+                .toUiState()
+                .filterIsInstance<app.logdate.ui.timeline.HandwritingNoteUiState>(),
         audio =
             audio.firstOrNull()?.let {
                 MomentAudioUiState(

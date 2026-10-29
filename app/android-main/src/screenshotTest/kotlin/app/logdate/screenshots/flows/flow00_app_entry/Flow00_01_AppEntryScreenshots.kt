@@ -57,6 +57,7 @@ private val rootTimelineDays =
                 listOf(
                     MomentUiState(
                         id = "moment-2025-02-20-root-blue-bottle",
+                        sourceNoteIds = setOf(Uuid.parse("00000000-0000-0000-0000-000000000061")),
                         label = "At Blue Bottle Coffee",
                         timeOfDay = DaylightPeriod.AFTERNOON,
                         media = listOf(MomentMediaUiState(uri = ROOT_PREVIEW_IMAGE_URI)),
@@ -65,6 +66,7 @@ private val rootTimelineDays =
                     ),
                     MomentUiState(
                         id = "moment-2025-02-20-root-dolores-park",
+                        sourceNoteIds = setOf(Uuid.parse("00000000-0000-0000-0000-000000000062")),
                         label = "At Mission Dolores Park",
                         timeOfDay = DaylightPeriod.EVENING,
                         textSnippet = "Tightened the adaptive timeline shells for larger windows and made the cards feel intentional.",
@@ -93,6 +95,7 @@ private val rootTimelineDays =
                 listOf(
                     MomentUiState(
                         id = "moment-2025-02-19-root-home",
+                        sourceNoteIds = setOf(Uuid.parse("00000000-0000-0000-0000-000000000063")),
                         label = "At Home",
                         timeOfDay = DaylightPeriod.EVENING,
                         textSnippet =

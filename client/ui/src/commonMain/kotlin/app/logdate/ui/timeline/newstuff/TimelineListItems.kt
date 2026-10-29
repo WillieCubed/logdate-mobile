@@ -26,10 +26,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,9 +45,11 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.formatting.LocalToday
 import app.logdate.ui.common.formatting.asRelativeDate
 import app.logdate.ui.theme.Spacing
-import app.logdate.ui.timeline.TimelineDayCardLayout
+import app.logdate.ui.timeline.INITIAL_DAY_ENTRY_COUNT
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelineMediaItemUiState
+import app.logdate.ui.timeline.entryCount
+import app.logdate.ui.timeline.entryPreview
 import app.logdate.util.now
 import coil3.compose.AsyncImage
 import kotlinx.datetime.LocalDate
@@ -57,17 +62,12 @@ import logdate.client.ui.generated.resources.congrats_curious_explorer
 import logdate.client.ui.generated.resources.happy_birthday
 import logdate.client.ui.generated.resources.journey_days_count
 import logdate.client.ui.generated.resources.timeline_media_badge_clip
+import logdate.client.ui.generated.resources.timeline_show_fewer_entries
+import logdate.client.ui.generated.resources.timeline_show_more_entries
 import logdate.client.ui.generated.resources.youve_reached_the_end
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
-
-internal val placeholderLayouts =
-    listOf(
-        TimelineDayCardLayout.MEDIA_LED,
-        TimelineDayCardLayout.VOICE_LED,
-        TimelineDayCardLayout.PLACE_LED,
-        TimelineDayCardLayout.STORY_LED,
-    )
 
 @Composable
 internal fun TimeGapMessageItem(modifier: Modifier = Modifier) {
@@ -162,12 +162,15 @@ internal fun TimelineDayListItem(
     onOpenTextNote: (Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    var expanded by rememberSaveable(item.date.toString()) { mutableStateOf(false) }
+    val today = LocalToday.current
+    val preview = remember(item, expanded, today) { item.entryPreview(expanded || item.date != today) }
+    val remaining = if (item.date == today) item.entryCount() - INITIAL_DAY_ENTRY_COUNT else 0
     Column(
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
         modifier =
             modifier
                 .fillMaxWidth()
-                .clickable { onOpenDay(item.date) }
                 .padding(horizontal = Spacing.lg, vertical = Spacing.md),
     ) {
         item.supportingSummary?.let { summary ->
@@ -177,16 +180,29 @@ internal fun TimelineDayListItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().clickable { onOpenDay(item.date) },
             )
         }
         SemanticTimelineDayContent(
-            item = item,
+            item = preview,
             style = item.layout.style(),
             layoutMode = layoutMode,
             pendingMomentContent = pendingMomentContent,
             onOpenTextNote = onOpenTextNote,
         )
+        if (remaining > 0) {
+            TextButton(onClick = { expanded = !expanded }) {
+                Text(
+                    if (expanded) {
+                        stringResource(
+                            Res.string.timeline_show_fewer_entries,
+                        )
+                    } else {
+                        pluralStringResource(Res.plurals.timeline_show_more_entries, remaining, remaining)
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -201,10 +217,11 @@ internal fun TimelineDayListItem(
 internal fun TimelineDayHeaderBar(
     item: TimelineDayUiState,
     modifier: Modifier = Modifier,
+    onOpenDay: (LocalDate) -> Unit = {},
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().clickable { onOpenDay(item.date) },
     ) {
         Text(
             text = item.date.asRelativeDate(LocalToday.current),
@@ -222,13 +239,16 @@ fun TimelineMediaTile(
     aspectRatio: Float,
     modifier: Modifier = Modifier,
     previewPainter: Painter? = null,
+    noteId: Uuid? = null,
+    onOpenNote: (Uuid) -> Unit = {},
 ) {
     Box(
         modifier =
             modifier
                 .clip(RoundedCornerShape(28.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .aspectRatio(aspectRatio),
+                .aspectRatio(aspectRatio)
+                .then(if (noteId == null) Modifier else Modifier.clickable { onOpenNote(noteId) }),
     ) {
         val description = stringResource(if (media.isVideo) Res.string.cd_timeline_video else Res.string.cd_timeline_photo)
         if (previewPainter != null) {

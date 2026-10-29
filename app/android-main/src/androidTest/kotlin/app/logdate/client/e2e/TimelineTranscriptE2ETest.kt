@@ -2,9 +2,10 @@ package app.logdate.client.e2e
 
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.ui.audio.TranscriptionProvider
 import app.logdate.ui.audio.TranscriptionState
@@ -103,23 +104,24 @@ class TimelineTranscriptE2ETest {
     }
 
     @Test
-    fun `a day whose only content is a recording still opens on tap`() {
-        // Regression guard. The audio card once put a click handler on its whole body to expand
-        // itself, which swallowed the tap that opens the day. On a day holding nothing but a
-        // recording the card covers the entire row, so those days could not be opened at all.
+    fun `recording body opens its original entry instead of the day`() {
         val transcript = "A recording that fills the whole day card on its own."
+        val noteId = Uuid.random()
         var openedDay: LocalDate? = null
+        var openedNote: Uuid? = null
 
         composeRule.setContent {
             TimelineTestContent(
-                items = listOf(semanticAudioDay(transcript = transcript)),
+                items = listOf(semanticAudioDay(transcript = transcript, noteId = noteId)),
                 onOpenDay = { date -> openedDay = date },
+                onOpenNote = { openedNote = it },
             )
         }
 
-        composeRule.onNodeWithText(transcript, substring = true).performClick()
+        composeRule.onNodeWithText(transcript, substring = true).performTouchInput { click() }
 
-        assertEquals(LocalDate(2026, 3, 24), openedDay)
+        assertEquals(noteId, openedNote)
+        assertEquals(null, openedDay)
     }
 }
 
@@ -146,7 +148,10 @@ private fun providerBackedAudioDay(noteId: Uuid): TimelineDayUiState =
         dayPresentation = DayPresentation.FLOWING,
     )
 
-private fun semanticAudioDay(transcript: String): TimelineDayUiState =
+private fun semanticAudioDay(
+    transcript: String,
+    noteId: Uuid = Uuid.random(),
+): TimelineDayUiState =
     TimelineDayUiState(
         summary = "Semantic timeline day",
         supportingSummary = "A timeline moment includes an audio note",
@@ -162,6 +167,7 @@ private fun semanticAudioDay(transcript: String): TimelineDayUiState =
                             uri = "file:///moment-note.m4a",
                             durationMs = 18_000,
                             transcript = transcript,
+                            noteId = noteId,
                         ),
                     isHero = true,
                 ),
@@ -174,6 +180,7 @@ private fun TimelineTestContent(
     items: List<TimelineDayUiState>,
     transcriptionState: TranscriptionState = TranscriptionState(),
     onOpenDay: (LocalDate) -> Unit = {},
+    onOpenNote: (Uuid) -> Unit = {},
 ) {
     LogDateTheme(dynamicColor = false, darkTheme = false) {
         TranscriptionProvider(state = transcriptionState) {
@@ -181,6 +188,7 @@ private fun TimelineTestContent(
                 items = items,
                 endOfTimelineState = EndOfTimelineUiState.DiscoveryEasterEgg,
                 onOpenDay = onOpenDay,
+                onOpenTextNote = onOpenNote,
             )
         }
     }

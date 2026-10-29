@@ -42,19 +42,25 @@ import app.logdate.client.repository.transcription.TranscriptionStatus
 import app.logdate.shared.model.Event
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.Place
+import app.logdate.ui.timeline.HomeTimelineUiState
 import app.logdate.ui.timeline.ImageNoteUiState
+import app.logdate.ui.timeline.TimelineDaySelection
 import app.logdate.ui.timeline.VideoNoteUiState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.datetime.DateTimeUnit
@@ -64,6 +70,7 @@ import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -88,6 +95,103 @@ import app.logdate.client.health.util.UserPreferences as BoundaryUserPreferences
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
     private val dispatcher = StandardTestDispatcher()
+
+    @Test
+    fun `resubscribing never replaces an available summary with its pending snapshot`() =
+        runTest {
+            val notes = FakeJournalNotesRepository(generateSequentialDayNotes(1))
+            val at = Instant.parse("2026-03-31T18:00:00Z")
+            val entry = textNote("Retained day", at)
+            val pending = TimelineDay(start = at, end = at, tldr = "", date = LocalDate(2026, 3, 31), entries = listOf(entry))
+            var starts = 0
+            val recent: Flow<Timeline> =
+                flow {
+                    starts++
+                    emit(Timeline(listOf(pending)))
+                    if (starts == 1) emit(Timeline(listOf(pending.copy(tldr = "Available summary"))))
+                    awaitCancellation()
+                }
+            val model = createViewModel(notesRepository = notes, recentFlowOverride = recent)
+            val first = backgroundScope.launch { model.uiState.collect() }
+            advanceUntilIdle()
+            assertEquals(
+                "Available summary",
+                model.uiState.value.items
+                    .single()
+                    .summary,
+            )
+            first.cancel()
+            runCurrent()
+            advanceTimeBy(60_000)
+            runCurrent()
+            val reopened = backgroundScope.launch { model.uiState.collect() }
+            runCurrent()
+            advanceUntilIdle()
+
+            assertTrue(starts > 1)
+            assertEquals(
+                "Available summary",
+                model.uiState.value.items
+                    .single()
+                    .summary,
+            )
+            reopened.cancel()
+        }
+
+    @Test
+    fun `pending journal badges never hide locally loaded entries`() =
+        runTest {
+            val notes = FakeJournalNotesRepository(generateSequentialDayNotes(3))
+            val membership =
+                object : JournalContentRepository by FakeJournalContentRepository() {
+                    override fun observeJournalsForContents(contentIds: Set<Uuid>): Flow<Map<Uuid, List<Journal>>> =
+                        flow { awaitCancellation() }
+                }
+            val model = createViewModel(notes, membership)
+            backgroundScope.launch { model.uiState.collect() }
+            advanceUntilIdle()
+            assertEquals(3, model.uiState.value.items.size)
+            assertFalse(model.uiState.value.isLoading)
+            assertFalse(model.uiState.value.showEmptyState)
+        }
+
+    @Test
+    fun `switching days cannot apply the previous days notes to the new selection`() =
+        runTest {
+            val notes = FakeJournalNotesRepository(generateSequentialDayNotes(2))
+            val model = createViewModel(notes)
+            val observed = mutableListOf<HomeTimelineUiState>()
+            backgroundScope.launch { model.uiState.collect { observed += it } }
+            advanceUntilIdle()
+            val first = model.uiState.value.items[0]
+            val second = model.uiState.value.items[1]
+            model.selectDay(first.date)
+            advanceUntilIdle()
+            assertEquals(
+                first.notes.map { it.noteId },
+                model.uiState.value.selectedDay
+                    ?.notes
+                    ?.map { it.noteId },
+            )
+            notes.dayFlows[second.date] = flow { awaitCancellation() }
+            observed.clear()
+
+            model.selectDay(second.date)
+            advanceUntilIdle()
+
+            observed
+                .filter { it.selectedItem == TimelineDaySelection.DateSelected(second.date) }
+                .mapNotNull { it.selectedDay }
+                .forEach {
+                    assertEquals(second.date, it.date)
+                    assertEquals(second.notes.map { note -> note.noteId }, it.notes.map { note -> note.noteId })
+                }
+            assertEquals(
+                second.date,
+                model.uiState.value.selectedDay
+                    ?.date,
+            )
+        }
 
     @BeforeTest
     fun setUp() {
@@ -288,6 +392,7 @@ class HomeViewModelTest {
         notesRepository: FakeJournalNotesRepository,
         journalContentRepository: JournalContentRepository = FakeJournalContentRepository(),
         transcriptionRepository: TranscriptionRepository = FakeTranscriptionRepository(),
+        recentFlowOverride: Flow<Timeline>? = null,
     ): HomeViewModel {
         val dayBoundarySettingsRepository = FakeDayBoundarySettingsRepository()
         val pageUseCase =
@@ -346,7 +451,7 @@ class HomeViewModelTest {
             )
 
         return HomeViewModel(
-            recentTimelineFlow = recentTimelineFlow,
+            recentTimelineFlow = recentFlowOverride ?: recentTimelineFlow,
             loadTimelinePage = pageUseCase::invoke,
             notesRepository = notesRepository,
             getHomeRecommendation = getHomeRecommendation,
@@ -400,6 +505,12 @@ class HomeViewModelTest {
         notes: List<JournalNote>,
     ) : JournalNotesRepository {
         private val notesFlow = MutableStateFlow(notes.sortedByDescending(JournalNote::creationTimestamp))
+        val dayFlows = mutableMapOf<LocalDate, Flow<List<JournalNote>>>()
+
+        override fun observeNotesForDay(day: LocalDate): Flow<List<JournalNote>> =
+            dayFlows[day] ?: notesFlow.map { notes ->
+                notes.filter { it.creationTimestamp.toLocalDateTime(TimeZone.currentSystemDefault()).date == day }
+            }
 
         override val allNotesObserved: Flow<List<JournalNote>> = notesFlow
 

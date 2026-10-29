@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -36,13 +37,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.client.repository.moments.MarkedMoment
 import app.logdate.ui.audio.MomentAudioCard
+import app.logdate.ui.handwriting.HandwritingPreview
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.DayPresentation
+import app.logdate.ui.timeline.ImageNoteUiState
 import app.logdate.ui.timeline.MomentMediaUiState
 import app.logdate.ui.timeline.MomentUiState
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelineMediaItemUiState
+import app.logdate.ui.timeline.VideoNoteUiState
 import coil3.compose.AsyncImage
 import logdate.client.ui.generated.resources.Res
 import logdate.client.ui.generated.resources.timeline_moment_photo_count
@@ -79,9 +83,26 @@ internal fun SemanticTimelineDayContent(
             verticalArrangement = Arrangement.spacedBy(gap),
             modifier = modifier.fillMaxWidth(),
         ) {
-            item.moments.forEach { moment ->
+            item.moments.forEach { original ->
+                val moment =
+                    original.copy(
+                        media =
+                            original.media.map { media ->
+                                media.copy(
+                                    noteId =
+                                        media.noteId ?: item.notes
+                                            .firstOrNull { note ->
+                                                when (note) {
+                                                    is ImageNoteUiState -> note.uri == media.uri
+                                                    is VideoNoteUiState -> note.uri == media.uri || note.thumbnailUri == media.uri
+                                                    else -> false
+                                                }
+                                            }?.noteId,
+                                )
+                            },
+                    )
                 key(moment.id) {
-                    val itemModifier =
+                    val itemBounds =
                         if (moment.isHero || isCompact) {
                             Modifier
                                 .fillMaxWidth()
@@ -93,25 +114,34 @@ internal fun SemanticTimelineDayContent(
                                 .animateBounds(this@LookaheadScope)
                         }
 
-                    when (item.dayPresentation) {
-                        DayPresentation.FLOWING ->
-                            FlowingMomentItem(
-                                moment = moment,
-                                style = style,
-                                layoutMode = layoutMode,
-                                modifier = itemModifier,
-                                pendingMomentContent = pendingMomentContent,
-                                onOpenTextNote = onOpenTextNote,
-                            )
-                        DayPresentation.STACKED ->
-                            StackedMomentCard(
-                                moment = moment,
-                                style = style,
-                                layoutMode = layoutMode,
-                                modifier = itemModifier,
-                                pendingMomentContent = pendingMomentContent,
-                                onOpenTextNote = onOpenTextNote,
-                            )
+                    val itemModifier =
+                        itemBounds.openTextEntryOnClick(
+                            moment.entryNoteId()?.let { id -> { onOpenTextNote(id) } },
+                        )
+                    val pending = moment.pendingMark
+                    if (pending != null) {
+                        Box(itemModifier) { pendingMomentContent(pending) }
+                    } else {
+                        when (item.dayPresentation) {
+                            DayPresentation.FLOWING ->
+                                FlowingMomentItem(
+                                    moment = moment,
+                                    style = style,
+                                    layoutMode = layoutMode,
+                                    modifier = itemModifier,
+                                    pendingMomentContent = pendingMomentContent,
+                                    onOpenTextNote = onOpenTextNote,
+                                )
+                            DayPresentation.STACKED ->
+                                StackedMomentCard(
+                                    moment = moment,
+                                    style = style,
+                                    layoutMode = layoutMode,
+                                    modifier = itemModifier,
+                                    pendingMomentContent = pendingMomentContent,
+                                    onOpenTextNote = onOpenTextNote,
+                                )
+                        }
                     }
                 }
             }
@@ -158,7 +188,7 @@ private fun HeroMomentContainer(
 
         if (moment.media.isNotEmpty()) {
             Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp))) {
-                MomentMediaGrid(media = moment.media, layoutMode = layoutMode, emphasized = true)
+                MomentMediaGrid(media = moment.media, layoutMode = layoutMode, emphasized = true, onOpenNote = onOpenTextNote)
                 if (moment.places.isNotEmpty()) {
                     Box(
                         modifier =
@@ -186,29 +216,34 @@ private fun HeroMomentContainer(
 
         moment.textSnippet?.let { snippet ->
             if (moment.media.isEmpty()) {
-                // Text-only hero: large quote in primaryContainer
-                Surface(
-                    color = style.softAccentColor,
-                    shape = RoundedCornerShape(24.dp),
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .openTextEntryOnClick(moment.openTextEntryAction(onOpenTextNote)),
-                ) {
-                    Text(
-                        text = snippet,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 5,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(Spacing.lg),
-                    )
-                }
+                TimelineMemoryTextBlock(
+                    text = snippet,
+                    emphasized = true,
+                    maxLines = 5,
+                    containerColor = style.softAccentColor,
+                    onClick = moment.openTextEntryAction(onOpenTextNote),
+                )
             } else {
                 TextQuoteContainer(text = snippet, onClick = moment.openTextEntryAction(onOpenTextNote))
             }
         }
 
-        moment.audio?.let { audio -> MomentAudioCard(audio = audio, timeOfDay = moment.timeOfDay) }
+        moment.audio?.let { audio ->
+            MomentAudioCard(
+                audio = audio,
+                timeOfDay = moment.timeOfDay,
+                modifier =
+                    Modifier
+                        .openTextEntryOnClick(
+                            audio.noteId?.let { id ->
+                                {
+                                    onOpenTextNote(id)
+                                }
+                            },
+                        ),
+            )
+        }
+        MomentHandwritingContent(moment, onOpenTextNote)
         PersonAvatarRow(people = moment.people)
     }
 }
@@ -241,6 +276,7 @@ private fun SupportingMomentContainer(
             pendingMomentContent(pendingMark)
         } else {
             MomentHeader(moment = moment, timeOfDay = moment.timeOfDay, color = style.accentColor)
+            MomentHandwritingContent(moment, onOpenTextNote)
 
             if (useInlineLayout) {
                 Row(
@@ -249,6 +285,8 @@ private fun SupportingMomentContainer(
                 ) {
                     TimelineMediaTile(
                         media = TimelineMediaItemUiState(uri = moment.media.first().uri, isVideo = moment.media.first().isVideo),
+                        onOpenNote = onOpenTextNote,
+                        noteId = moment.media.first().noteId,
                         aspectRatio = 1f,
                         modifier = Modifier.weight(imageWeight),
                     )
@@ -266,9 +304,20 @@ private fun SupportingMomentContainer(
                 }
             } else {
                 if (moment.media.isNotEmpty()) {
-                    MomentMediaGrid(media = moment.media, layoutMode = layoutMode, emphasized = false)
+                    MomentMediaGrid(media = moment.media, layoutMode = layoutMode, emphasized = false, onOpenNote = onOpenTextNote)
                 }
-                moment.audio?.let { audio -> MomentAudioCard(audio = audio, timeOfDay = moment.timeOfDay) }
+                moment.audio?.let { audio ->
+                    MomentAudioCard(
+                        audio = audio,
+                        timeOfDay = moment.timeOfDay,
+                        modifier =
+                            Modifier.openTextEntryOnClick(
+                                audio.noteId?.let { id ->
+                                    { onOpenTextNote(id) }
+                                },
+                            ),
+                    )
+                }
                 moment.textSnippet?.let { snippet ->
                     TextQuoteContainer(text = snippet, maxLines = 6, onClick = moment.openTextEntryAction(onOpenTextNote))
                 }
@@ -307,10 +356,22 @@ private fun StackedMomentCard(
             modifier = Modifier.padding(cardPadding),
         ) {
             MomentHeader(moment = moment, timeOfDay = moment.timeOfDay, color = style.accentColor)
+            MomentHandwritingContent(moment, onOpenTextNote)
             if (moment.media.isNotEmpty()) {
-                MomentMediaGrid(media = moment.media, layoutMode = layoutMode, emphasized = moment.isHero)
+                MomentMediaGrid(media = moment.media, layoutMode = layoutMode, emphasized = moment.isHero, onOpenNote = onOpenTextNote)
             }
-            moment.audio?.let { audio -> MomentAudioCard(audio = audio, timeOfDay = moment.timeOfDay) }
+            moment.audio?.let { audio ->
+                MomentAudioCard(
+                    audio = audio,
+                    timeOfDay = moment.timeOfDay,
+                    modifier =
+                        Modifier.openTextEntryOnClick(
+                            audio.noteId?.let { id ->
+                                { onOpenTextNote(id) }
+                            },
+                        ),
+                )
+            }
             moment.textSnippet?.let { snippet ->
                 Text(
                     text = snippet,
@@ -335,20 +396,7 @@ private fun TextQuoteContainer(
     maxLines: Int = 4,
     onClick: (() -> Unit)? = null,
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        shape = RoundedCornerShape(16.dp),
-        modifier =
-            modifier.fillMaxWidth().openTextEntryOnClick(onClick),
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = maxLines,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(Spacing.md),
-        )
-    }
+    TimelineMemoryTextBlock(text, modifier = modifier, maxLines = maxLines, onClick = onClick)
 }
 
 private fun MomentUiState.openTextEntryAction(onOpenTextNote: (Uuid) -> Unit): (() -> Unit)? =
@@ -420,12 +468,15 @@ internal fun MomentMediaGrid(
     layoutMode: TimelineDayLayoutMode,
     emphasized: Boolean,
     modifier: Modifier = Modifier,
+    onOpenNote: (Uuid) -> Unit = {},
 ) {
     when (media.size) {
         0 -> Unit
         1 ->
             TimelineMediaTile(
                 media = TimelineMediaItemUiState(uri = media.first().uri, isVideo = media.first().isVideo),
+                onOpenNote = onOpenNote,
+                noteId = media.first().noteId,
                 // A lone photo derives its height from its own width, so a portrait ratio that
                 // reads well on a phone grows taller than the viewport once the column widens.
                 // Widen the ratio as the column does to keep the whole photo on screen.
@@ -445,11 +496,15 @@ internal fun MomentMediaGrid(
             ) {
                 TimelineMediaTile(
                     media = TimelineMediaItemUiState(uri = media[0].uri, isVideo = media[0].isVideo),
+                    onOpenNote = onOpenNote,
+                    noteId = media[0].noteId,
                     aspectRatio = if (emphasized) 0.95f else 1f,
                     modifier = Modifier.weight(1.2f),
                 )
                 TimelineMediaTile(
                     media = TimelineMediaItemUiState(uri = media[1].uri, isVideo = media[1].isVideo),
+                    onOpenNote = onOpenNote,
+                    noteId = media[1].noteId,
                     aspectRatio = if (layoutMode == TimelineDayLayoutMode.COMPACT) 0.95f else 1.15f,
                     modifier = Modifier.weight(1f),
                 )
@@ -461,6 +516,8 @@ internal fun MomentMediaGrid(
             ) {
                 TimelineMediaTile(
                     media = TimelineMediaItemUiState(uri = media.first().uri, isVideo = media.first().isVideo),
+                    onOpenNote = onOpenNote,
+                    noteId = media.first().noteId,
                     aspectRatio = if (emphasized) 0.9f else 1.05f,
                     modifier = Modifier.weight(1.35f),
                 )
@@ -471,6 +528,8 @@ internal fun MomentMediaGrid(
                     media.drop(1).take(2).forEach { item ->
                         TimelineMediaTile(
                             media = TimelineMediaItemUiState(uri = item.uri, isVideo = item.isVideo),
+                            onOpenNote = onOpenNote,
+                            noteId = item.noteId,
                             aspectRatio = 1.2f,
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -481,3 +540,26 @@ internal fun MomentMediaGrid(
 }
 
 // endregion
+
+private fun MomentUiState.entryNoteId(): Uuid? =
+    textNoteId ?: media.firstNotNullOfOrNull { it.noteId } ?: audio?.noteId ?: handwriting.firstOrNull()?.noteId
+
+@Composable
+private fun MomentHandwritingContent(
+    moment: MomentUiState,
+    onOpenNote: (Uuid) -> Unit,
+) {
+    moment.handwriting.forEach { note ->
+        key(note.noteId) {
+            HandwritingPreview(
+                document = note.document,
+                unreadable = note.unreadable,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .openTextEntryOnClick { onOpenNote(note.noteId) },
+            )
+        }
+    }
+}

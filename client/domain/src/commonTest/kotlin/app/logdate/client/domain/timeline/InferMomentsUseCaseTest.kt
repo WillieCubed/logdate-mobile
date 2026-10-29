@@ -47,6 +47,14 @@ import kotlin.uuid.Uuid
  */
 class InferMomentsUseCaseTest {
     @Test
+    fun `unchanged source notes keep their moment identity across refresh`() {
+        val notes = listOf(textNote("Retained entry", morningTime))
+        val first = inferMomentsHeuristically(date, notes, emptyList())
+        val refreshed = inferMomentsHeuristically(date, notes, emptyList())
+        assertEquals(first.map { it.id }, refreshed.map { it.id })
+    }
+
+    @Test
     fun `oversized retained notes use bounded moment previews and keep their source text`() =
         runTest {
             val content = "q".repeat(MAX_AI_INPUT_CHARACTERS + 1)

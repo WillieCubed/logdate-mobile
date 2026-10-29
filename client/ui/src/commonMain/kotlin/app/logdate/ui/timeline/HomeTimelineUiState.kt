@@ -144,11 +144,14 @@ data class MomentUiState(
      * Place that names the moment when [label] is blank, shown as "At <place>".
      */
     val labelPlaceName: String? = null,
+    val handwriting: List<HandwritingNoteUiState> = emptyList(),
+    val sourceNoteIds: Set<Uuid> = emptySet(),
 )
 
 data class MomentMediaUiState(
     val uri: String,
     val isVideo: Boolean = false,
+    val noteId: Uuid? = null,
 )
 
 data class MomentAudioUiState(

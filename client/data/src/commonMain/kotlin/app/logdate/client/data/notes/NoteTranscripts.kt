@@ -4,10 +4,18 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onStart
 
-internal fun Flow<List<JournalNote>>.withTranscripts(repository: TranscriptionRepository?): Flow<List<JournalNote>> {
+internal fun Flow<List<JournalNote>>.withTranscripts(
+    repository: TranscriptionRepository?,
+    waitForInitialTranscripts: Boolean = true,
+): Flow<List<JournalNote>> {
     if (repository == null) return this
-    return combine(repository.observeAllTranscriptions()) { notes, transcripts ->
+    val transcripts =
+        repository.observeAllTranscriptions().let { flow ->
+            if (waitForInitialTranscripts) flow else flow.onStart { emit(emptyList()) }
+        }
+    return combine(transcripts) { notes, transcripts ->
         val documents = transcripts.associate { it.noteId to it.transcriptDocument }
         notes.map { note ->
             if (note is JournalNote.Audio) note.copy(transcript = documents[note.uid] ?: note.transcript) else note
