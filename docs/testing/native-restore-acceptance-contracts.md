@@ -47,6 +47,17 @@ not make legacy files independent canonical/database candidates or authorize an 
 The existing completed source receipt, inventory digest, owner/backend scope, current
 reference, media-header validation, and reference CAS still control admission.
 
+Android's default restore handler reapplies the XML include list. Explicitly emitted
+selected originals outside those traversal roots must therefore enter immutable
+incoming custody before that handler can discard them. Do not expand default media
+traversal or write incoming originals over live paths to work around this filtering.
+
+An individually captured original is not a staged journal. A durable media-only marker
+and bounded path metadata distinguish that routing case across agent recreation;
+payload authentication remains in import. Fresh snapshot installation and both fresh
+and duplicate completion must still reach reconciliation. Unknown or mixed source
+cohorts remain journal inputs; all custody still blocks backup until safely retired.
+
 ## Installation-local publication state
 
 Watch links, sessions, keys, and delivery revisions belong to the installation. A source

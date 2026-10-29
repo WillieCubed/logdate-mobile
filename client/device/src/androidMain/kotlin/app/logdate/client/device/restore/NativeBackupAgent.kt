@@ -124,7 +124,7 @@ open class NativeBackupAgent : BackupAgent() {
                 super.onRestoreFinished()
                 return
             }
-            if (completedReplay.hasInputs()) {
+            if (completedReplay.hasJournalInputs()) {
                 if (NativeJournalRestoreAuthority(this).completedReceipt() == null && !wasNativeJournalTransferStaged()) {
                     restoreNativeJournalTransferSnapshot()
                 }
@@ -152,7 +152,7 @@ open class NativeBackupAgent : BackupAgent() {
                 val retainedCameraSource = finishNativeJournalTransferRestore()
                 super.onRestoreFinished()
                 retryAccountRecovery()
-                if (retainedCameraSource && scheduleRetainedJournalReconciliationSafely()) {
+                if ((retainedCameraSource || completedReplay.hasInputs()) && scheduleRetainedJournalReconciliationSafely()) {
                     retainedNativeCameraReconciliationScheduled()
                 }
                 return
@@ -198,7 +198,7 @@ open class NativeBackupAgent : BackupAgent() {
         } catch (_: Exception) {
             Napier.w("Background native account recovery remains pending")
         }
-        if (retainedCameraSource && scheduleRetainedJournalReconciliationSafely()) {
+        if ((retainedCameraSource || completedReplay.hasInputs()) && scheduleRetainedJournalReconciliationSafely()) {
             retainedNativeCameraReconciliationScheduled()
         }
     }
@@ -273,7 +273,7 @@ open class NativeBackupAgent : BackupAgent() {
                     scheduleRetainedJournalReconciliationSafely()
                     return@synchronized
                 }
-                if (NativeJournalRestoreAuthority(this).completedReceipt() != null || completedReplay.hasInputs()) {
+                if (NativeJournalRestoreAuthority(this).completedReceipt() != null || completedReplay.hasJournalInputs()) {
                     if (fileType == TYPE_DIRECTORY) return@synchronized
                     if (fileType != TYPE_FILE) throw IOException("Native replay must contain regular files")
                     ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.dup(data.fileDescriptor)).use { input ->
@@ -306,6 +306,14 @@ open class NativeBackupAgent : BackupAgent() {
             scheduleRetainedJournalReconciliationSafely()
             return
         }
+        if (retainSelectedNativeOriginal(fileType, { retainedNativeDestination(this, destination) }) { incomingPath ->
+                ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.dup(data.fileDescriptor)).use { input ->
+                    completedReplay.capture(incomingPath, size, input)
+                }
+            }
+        ) {
+            return
+        }
         val frameworkDatabase =
             listOf("logdate", "logdate-wal", "logdate-shm", "logdate-journal")
                 .any { destination.canonicalFile == getDatabasePath(it).canonicalFile }
@@ -324,7 +332,7 @@ open class NativeBackupAgent : BackupAgent() {
                 size,
                 { readNativePreferencePayload(data, size) },
                 { bytes -> restoreNativePreferencePayload(this, bytes) { restore(it, destination) } },
-                { drainDuplicatePreference(data, size) },
+                { drainDuplicateNativePreference(data, size) },
             )
         if (!preferenceDelivered && destination.canonicalFile == File(filesDir, "logdate.preferences_pb").canonicalFile) {
             restoreMainPreferences(this, data, size) { descriptor -> restore(descriptor, destination) }
@@ -350,21 +358,6 @@ open class NativeBackupAgent : BackupAgent() {
         restoreNativePreferencePayload(this, bytes) { descriptor ->
             val privateMode = (OsConstants.S_IRUSR or OsConstants.S_IWUSR).toLong()
             super.onRestoreFile(descriptor, bytes.size.toLong(), destination, TYPE_FILE, privateMode, 0L)
-        }
-    }
-
-    private fun drainDuplicatePreference(
-        data: ParcelFileDescriptor,
-        size: Long,
-    ) {
-        ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.dup(data.fileDescriptor)).use { input ->
-            val buffer = ByteArray(8192)
-            var remaining = size
-            while (remaining > 0) {
-                val count = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
-                if (count < 0) throw IOException("Duplicate native preference delivery ended before its declared size")
-                remaining -= count
-            }
         }
     }
 

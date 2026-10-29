@@ -61,6 +61,23 @@ class NativeIncomingJournal(
             }
         }
 
+    /** Routing metadata is not payload authority; import must still call [verified]. */
+    internal fun recordedPathsForRouting(id: String): Set<String> =
+        synchronized(lock) {
+            recordDirectories(cohort(id)).mapTo(mutableSetOf()) { record ->
+                val header = Json.decodeFromString<Entry>(readBounded(File(record, "header.json")).decodeToString())
+                validatePath(header.path)
+                check(header.expectedSize >= 0)
+                val committed = File(record, "entry.json")
+                if (committed.exists()) {
+                    val entry = Json.decodeFromString<Entry>(readBounded(committed).decodeToString())
+                    check(entry.path == header.path && entry.expectedSize == header.expectedSize)
+                    check(entry.size in 0..entry.expectedSize && entry.sha256.matches(Regex("[a-f0-9]{64}")))
+                }
+                header.path
+            }
+        }
+
     /** Ambiguous revisions stay in custody; they never select an arbitrary database/WAL pair. */
     fun coherentVerified(
         id: String,

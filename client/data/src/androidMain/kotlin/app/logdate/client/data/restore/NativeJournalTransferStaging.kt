@@ -52,7 +52,7 @@ internal class NativeJournalTransferStaging(
             resume(readIntent())
             return true
         }
-        if (!custody.hasInputs()) return false
+        if (!custody.hasJournalInputs()) return false
         // Every revision is sealed and verified; source admission remains the reconciliation worker's job.
         custody.sealedPayloads()
         return true
