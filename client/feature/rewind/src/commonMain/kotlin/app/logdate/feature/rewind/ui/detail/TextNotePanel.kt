@@ -3,14 +3,11 @@
 package app.logdate.feature.rewind.ui.detail
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -24,8 +21,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 
 /**
@@ -55,59 +52,41 @@ fun TextNotePanel(
     modifier: Modifier = Modifier,
     memoryId: String = "text-memory",
 ) {
-    RewindMemoryFrame(memoryId, RewindMemoryLoadState.Ready, modifier.fillMaxSize()) {
-        // Background
-        if (backgroundImageUri != null) {
-            AsyncImage(
-                model = backgroundImageUri,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
-        } else {
-            Box(Modifier.fillMaxSize().background(backgroundColor))
-        }
-
-        // Content container
-        Column(
-            modifier =
+    RewindMemoryStage(modifier) { availableHeight ->
+        RewindMemoryFrame(
+            memoryId,
+            RewindMemoryLoadState.Ready,
+            Modifier
+                .widthIn(max = RewindReadingMaxWidth)
+                .fillMaxWidth()
+                .heightIn(min = minOf(240.dp, availableHeight), max = availableHeight),
+            backgroundColor = backgroundColor,
+        ) {
+            if (backgroundImageUri != null) {
+                AsyncImage(backgroundImageUri, null, Modifier.matchParentSize(), contentScale = ContentScale.Crop)
+            }
+            Column(
                 Modifier
-                    .widthIn(max = RewindReadingMaxWidth)
                     .fillMaxWidth()
-                    .fillMaxHeight(0.7f)
                     .verticalScroll(rememberScrollState())
                     .background(if (backgroundImageUri != null) Color.Black.copy(alpha = 0.6f) else Color.Transparent)
                     .padding(RewindMemoryContentPadding)
                     .testTag("rewind-reading-content"),
-            horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            // Quote marks for styling
-            Text(
-                text = "\u201C",
-                style = MaterialTheme.typography.displaySmall,
-                color = Color.White.copy(alpha = 0.5f),
-                fontWeight = FontWeight.Bold,
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Main journal content
-            RewindRichMemoryText(
-                content = content,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.2f),
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Date information
-            Text(
-                text = dateFormatted,
-                style = MaterialTheme.typography.labelMedium,
-                color = Color.White.copy(alpha = 0.7f),
-                fontStyle = FontStyle.Italic,
-            )
+                horizontalAlignment = Alignment.Start,
+            ) {
+                RewindRichMemoryText(
+                    content = content,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 20.sp, lineHeight = 25.sp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    dateFormatted,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontStyle = FontStyle.Italic,
+                )
+            }
         }
     }
 }

@@ -4,6 +4,9 @@ package app.logdate.feature.rewind.ui.detail
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -15,6 +18,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.feature.rewind.ui.AudioPanelPlaybackUiState
 import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
@@ -285,7 +289,18 @@ fun RewindDetailScreenContent(
  */
 @Composable
 fun RewindLoadingScreen(modifier: Modifier = Modifier) {
-    RewindMemoryFrame("rewind-story", RewindMemoryLoadState.Loading, modifier.fillMaxSize()) { }
+    RewindMemoryStage(modifier) { availableHeight ->
+        RewindMemoryFrame(
+            "rewind-story",
+            RewindMemoryLoadState.Loading,
+            Modifier
+                .widthIn(
+                    max = RewindReadingMaxWidth,
+                ).fillMaxWidth()
+                .heightIn(min = minOf(240.dp, availableHeight), max = availableHeight),
+        ) {
+        }
+    }
 }
 
 /**
@@ -304,10 +319,16 @@ fun RewindErrorScreen(
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    RewindMemoryFrame(
-        "rewind-story",
-        RewindMemoryLoadState.Unavailable,
-        modifier.fillMaxSize().clickable { onExit() },
-        errorMessage = message,
-    ) { }
+    RewindMemoryStage(modifier.clickable { onExit() }) { availableHeight ->
+        RewindMemoryFrame(
+            "rewind-story",
+            RewindMemoryLoadState.Unavailable,
+            Modifier
+                .widthIn(
+                    max = RewindReadingMaxWidth,
+                ).fillMaxWidth()
+                .heightIn(min = minOf(240.dp, availableHeight), max = availableHeight),
+            errorMessage = message,
+        ) { }
+    }
 }

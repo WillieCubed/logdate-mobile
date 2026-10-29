@@ -9,3 +9,6 @@ internal val RewindMediaMaxWidth = 760.dp
 internal val RewindMemoryContentPadding = 24.dp
 
 internal val LocalRewindChromeHeight = staticCompositionLocalOf { 0.dp }
+
+// Short mobile windows must fit the bitmap instead of collapsing the caption column.
+internal val RewindMinimumReadableWidth = 240.dp

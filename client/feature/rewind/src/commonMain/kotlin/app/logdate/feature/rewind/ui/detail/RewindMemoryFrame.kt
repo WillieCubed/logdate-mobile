@@ -5,6 +5,7 @@ package app.logdate.feature.rewind.ui.detail
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -15,6 +16,7 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
@@ -43,6 +45,7 @@ fun RewindMemoryFrame(
     loadState: RewindMemoryLoadState,
     modifier: Modifier = Modifier,
     errorMessage: String? = null,
+    backgroundColor: Color = Color(0xFF1A1A1A),
     content: @Composable BoxScope.() -> Unit,
 ) {
     val description =
@@ -52,13 +55,21 @@ fun RewindMemoryFrame(
             RewindMemoryLoadState.Unavailable -> errorMessage ?: stringResource(Res.string.rewind_media_unavailable)
         }
     key(memoryId) {
-        Box(modifier.background(Color.Black).testTag("rewind_memory_$memoryId").semantics { stateDescription = description }) {
+        Box(
+            modifier.clipToBounds().background(backgroundColor).testTag("rewind_memory_$memoryId").semantics {
+                stateDescription =
+                    description
+            },
+            contentAlignment = Alignment.Center,
+            propagateMinConstraints = true,
+        ) {
             Box(
                 Modifier
-                    .matchParentSize()
+                    .fillMaxWidth()
                     .alpha(if (loadState == RewindMemoryLoadState.Ready) 1f else 0f)
                     .semantics { if (loadState != RewindMemoryLoadState.Ready) hideFromAccessibility() },
-                contentAlignment = Alignment.Center,
+                contentAlignment = Alignment.TopStart,
+                propagateMinConstraints = true,
                 content = content,
             )
             val statusInput =
