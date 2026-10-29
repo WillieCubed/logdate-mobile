@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,15 +56,23 @@ internal actual fun NativeHistoryMap(
     modifier: Modifier,
     onInteraction: () -> Unit,
     historyKey: String?,
+    showStatus: Boolean,
+    onReadyChanged: (Boolean) -> Unit,
 ) {
     val geometry = remember(items) { historyMapGeometry(items) }
     val enabled = rememberGoogleMapsEnabled()
+    var loaded by remember(enabled) { mutableStateOf(false) }
+    SideEffect { onReadyChanged(enabled && loaded) }
     if (!enabled) {
-        PanelHeader(
-            stringResource(Res.string.history_map_unavailable),
-            modifier,
-            stringResource(Res.string.history_map_unavailable_body),
-        )
+        if (showStatus) {
+            PanelHeader(
+                stringResource(Res.string.history_map_unavailable),
+                modifier,
+                stringResource(Res.string.history_map_unavailable_body),
+            )
+        } else {
+            Box(modifier)
+        }
         return
     }
     val first = geometry.coordinates.firstOrNull()?.toLatLng() ?: LatLng(36.17, -115.14)
@@ -72,7 +81,6 @@ internal actual fun NativeHistoryMap(
     val reduceMotion by rememberSystemReduceMotion()
     val dayKey = historyKey ?: items.firstOrNull()?.id
     var fitted by rememberSaveable(dayKey) { mutableStateOf(false) }
-    var loaded by remember { mutableStateOf(false) }
     var timedOut by remember { mutableStateOf(false) }
     var previousSelection by remember { mutableStateOf(selectedId) }
     LaunchedEffect(loaded) {
@@ -169,7 +177,7 @@ internal actual fun NativeHistoryMap(
                 )
             }
         }
-        if (timedOut) {
+        if (timedOut && showStatus) {
             PanelHeader(
                 stringResource(Res.string.history_map_slow),
                 subtitle = stringResource(Res.string.history_map_slow_body),

@@ -92,6 +92,7 @@ fun HumanLocationHistoryScreen(
         completeDayEnabled &&
             access.ready &&
             (access.captureStatus == LocationCaptureStatus.Stopped || access.captureStatus == LocationCaptureStatus.Failed)
+    var mapReady by remember { mutableStateOf(false) }
     var calendar by remember { mutableStateOf(false) }
     var recording by remember { mutableStateOf(false) }
     var edit by remember { mutableStateOf<Pair<String?, HistoryEditAction>?>(null) }
@@ -207,6 +208,7 @@ fun HumanLocationHistoryScreen(
                     }
                 }
             },
+            mapAvailable = !workspace || state.tab != HistoryTab.Places || mapReady,
             mapContent = { mapModifier ->
                 val mapItems =
                     if (state.tab == HistoryTab.Places) {
@@ -240,6 +242,8 @@ fun HumanLocationHistoryScreen(
                     mapModifier,
                     viewModel::pauseReplay,
                     historyKey = mapSnapshot?.first,
+                    showStatus = !workspace || state.tab != HistoryTab.Places,
+                    onReadyChanged = { mapReady = it },
                 )
             },
         )

@@ -135,11 +135,14 @@ fun HumanHistoryMap(
     modifier: Modifier,
     onInteraction: () -> Unit,
     historyKey: String? = null,
+    showStatus: Boolean = true,
+    onReadyChanged: (Boolean) -> Unit = {},
 ) {
     if (LocalWorkspaceEnabled.current && !LocalInspectionMode.current) {
-        NativeHistoryMap(items, selectedId, onSelect, modifier, onInteraction, historyKey)
+        NativeHistoryMap(items, selectedId, onSelect, modifier, onInteraction, historyKey, showStatus, onReadyChanged)
         return
     }
+    androidx.compose.runtime.SideEffect { onReadyChanged(true) }
     val geometry = remember(items) { historyMapGeometry(items) }
     val colors = MaterialTheme.colorScheme
     val mapDescription = stringResource(Res.string.history_map_overview_description)
@@ -222,4 +225,6 @@ internal expect fun NativeHistoryMap(
     modifier: Modifier,
     onInteraction: () -> Unit,
     historyKey: String?,
+    showStatus: Boolean,
+    onReadyChanged: (Boolean) -> Unit,
 )

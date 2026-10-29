@@ -107,6 +107,7 @@ internal fun HistoryPlaces(
 private fun HistoryPlaceSearch(
     state: HumanLocationHistoryState,
     actions: HumanLocationHistoryActions,
+    mapAvailable: Boolean = true,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (!LocalWorkspaceEnabled.current) {
@@ -122,20 +123,22 @@ private fun HistoryPlaceSearch(
             )
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = !state.placesMapVisible, onClick = {
-                actions.onPlacesMapVisible(false)
-            }, label = {
-                Text(
-                    stringResource(Res.string.history_list),
-                )
-            }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.ViewList, null, Modifier.size(18.dp)) })
-            FilterChip(selected = state.placesMapVisible, onClick = {
-                actions.onPlacesMapVisible(true)
-            }, label = {
-                Text(
-                    stringResource(Res.string.history_map),
-                )
-            }, leadingIcon = { Icon(Icons.Default.Map, null, Modifier.size(18.dp)) })
+            if (mapAvailable) {
+                FilterChip(selected = !state.placesMapVisible, onClick = {
+                    actions.onPlacesMapVisible(false)
+                }, label = {
+                    Text(
+                        stringResource(Res.string.history_list),
+                    )
+                }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.ViewList, null, Modifier.size(18.dp)) })
+                FilterChip(selected = state.placesMapVisible, onClick = {
+                    actions.onPlacesMapVisible(true)
+                }, label = {
+                    Text(
+                        stringResource(Res.string.history_map),
+                    )
+                }, leadingIcon = { Icon(Icons.Default.Map, null, Modifier.size(18.dp)) })
+            }
             FilterChip(selected = true, onClick = actions.onPlacesFilter, label = {
                 Text(
                     state.placesFilterLabel?.asString() ?: stringResource(Res.string.history_filter),
@@ -202,15 +205,18 @@ internal fun HistoryPlacesList(
     listState: androidx.compose.foundation.lazy.LazyListState =
         androidx.compose.foundation.lazy
             .rememberLazyListState(),
+    modifier: Modifier = Modifier,
+    mapAvailable: Boolean = true,
     header: @Composable () -> Unit = {},
 ) {
     LazyColumn(
+        modifier = modifier.fillMaxSize(),
         state = listState,
         contentPadding = PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         item { header() }
-        item { HistoryPlaceSearch(state, actions) }
+        item { HistoryPlaceSearch(state, actions, mapAvailable) }
         val places = state.filteredPlaces()
         if (places.isEmpty()) {
             item {
