@@ -27,19 +27,24 @@ import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
 import app.logdate.shared.model.Event
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -63,6 +68,168 @@ import kotlin.uuid.Uuid
 class GetStreamingTimelineUseCaseTest {
     private lateinit var mockNotesRepository: MockJournalNotesRepository
     private lateinit var useCase: GetStreamingTimelineUseCase
+
+    @Test
+    fun `calendar refresh never removes an available summary`() =
+        runTest {
+            val note = createTestNote("A retained day", Instant.parse("2026-10-28T12:00:00Z"))
+            mockNotesRepository.recentNotes = listOf(note)
+            mockNotesRepository.allNotes = listOf(note)
+            val events = MutableSharedFlow<List<Event>>(replay = 1)
+            events.emit(emptyList())
+            val repository =
+                object : EventRepository by StreamingNoOpEventRepository {
+                    override fun observeAllEvents(): Flow<List<Event>> = events
+                }
+            val timeline = GetStreamingTimelineUseCase(mockNotesRepository, buildTimelineDayUseCase(), calendarDateGrouper(), repository)
+            val observed = mutableListOf<Timeline>()
+            val loaded = CompletableDeferred<Unit>()
+            backgroundScope.launch {
+                timeline().collect {
+                    observed += it
+                    if (it.days.singleOrNull()?.tldr == "Test summary") loaded.complete(Unit)
+                }
+            }
+            loaded.await()
+            assertEquals(
+                "Test summary",
+                observed
+                    .last()
+                    .days
+                    .single()
+                    .tldr,
+            )
+            val countBeforeRefresh = observed.size
+
+            events.emit(emptyList())
+            runCurrent()
+
+            assertTrue(observed.drop(countBeforeRefresh).all { it.days.single().tldr == "Test summary" })
+        }
+
+    @Test
+    fun `place enrichment never clears a summary for unchanged text`() =
+        runTest {
+            val note = createTestNote("A retained day", Instant.parse("2026-10-28T12:00:00Z"))
+            val notes = MutableStateFlow<List<JournalNote>>(listOf(note))
+            val repository =
+                object : JournalNotesRepository by mockNotesRepository {
+                    override val allNotesObserved: Flow<List<JournalNote>> = notes
+
+                    override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = notes
+                }
+            val timeline =
+                GetStreamingTimelineUseCase(repository, buildTimelineDayUseCase(), calendarDateGrouper(), StreamingNoOpEventRepository)
+            val observed = mutableListOf<Timeline>()
+            val loaded = CompletableDeferred<Unit>()
+            backgroundScope.launch {
+                timeline().collect {
+                    observed += it
+                    if (it.days.singleOrNull()?.tldr == "Test summary") loaded.complete(Unit)
+                }
+            }
+            loaded.await()
+            assertEquals(
+                "Test summary",
+                observed
+                    .last()
+                    .days
+                    .single()
+                    .tldr,
+            )
+            val countBeforeRefresh = observed.size
+
+            notes.value = listOf(note.copy(location = NoteLocation(coordinates = NoteCoordinates(32.0, -96.0))))
+            runCurrent()
+
+            assertTrue(observed.drop(countBeforeRefresh).all { it.days.single().tldr == "Test summary" })
+        }
+
+    @Test
+    fun `local entries do not wait for calendar history or marked moments`() =
+        runTest {
+            val corpus =
+                List(827) { index ->
+                    createTestNote("Saved entry $index", Instant.fromEpochMilliseconds(index * 60_000L))
+                }
+            val recent = corpus.takeLast(50)
+            val localNotes =
+                object : JournalNotesRepository by mockNotesRepository {
+                    override val allNotesObserved: Flow<List<JournalNote>> = flow { awaitCancellation() }
+
+                    override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = flowOf(recent.takeLast(limit))
+                }
+            val delayedCalendar =
+                object : EventRepository by StreamingNoOpEventRepository {
+                    override fun observeAllEvents(): Flow<List<Event>> = flow { awaitCancellation() }
+                }
+            val localTimeline =
+                GetStreamingTimelineUseCase(
+                    notesRepository = localNotes,
+                    getTimelineDayUseCase = buildTimelineDayUseCase(),
+                    groupNotesByDayBoundsUseCase = calendarDateGrouper(),
+                    eventRepository = delayedCalendar,
+                    marks = flow { awaitCancellation() },
+                )
+            val observed = mutableListOf<Timeline>()
+            backgroundScope.launch { localTimeline().collect { observed += it } }
+
+            runCurrent()
+
+            assertEquals(
+                recent.map { it.uid }.toSet(),
+                observed
+                    .lastOrNull()
+                    ?.days
+                    ?.flatMap { it.entries }
+                    ?.map { it.uid }
+                    ?.toSet(),
+            )
+        }
+
+    @Test
+    fun `calendar updates preserve entries while the full history is unavailable`() =
+        runTest {
+            val note = createTestNote("Saved offline", Instant.parse("2026-10-28T12:00:00Z"))
+            val localNotes =
+                object : JournalNotesRepository by mockNotesRepository {
+                    override val allNotesObserved: Flow<List<JournalNote>> = flow { awaitCancellation() }
+
+                    override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = flowOf(listOf(note))
+                }
+            val calendar = MutableSharedFlow<List<Event>>()
+            val delayedCalendar =
+                object : EventRepository by StreamingNoOpEventRepository {
+                    override fun observeAllEvents(): Flow<List<Event>> = calendar
+                }
+            val localTimeline = GetStreamingTimelineUseCase(localNotes, buildTimelineDayUseCase(), calendarDateGrouper(), delayedCalendar)
+            val observed = mutableListOf<Timeline>()
+            backgroundScope.launch { localTimeline().collect { observed += it } }
+            runCurrent()
+            assertEquals(
+                note.uid,
+                observed
+                    .lastOrNull()
+                    ?.days
+                    ?.single()
+                    ?.entries
+                    ?.single()
+                    ?.uid,
+            )
+
+            calendar.emit(emptyList())
+            runCurrent()
+
+            assertTrue(
+                observed.all { timeline ->
+                    timeline.days
+                        .single()
+                        .entries
+                        .single()
+                        .uid == note.uid
+                },
+            )
+        }
 
     @BeforeTest
     fun setUp() {

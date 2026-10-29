@@ -7,7 +7,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -101,80 +100,23 @@ internal fun TimelineAppendErrorItem(
 }
 
 @Composable
-internal fun TimelineDaySkeleton(
-    layout: TimelineDayCardLayout,
-    modifier: Modifier = Modifier,
-) {
+internal fun TimelineDaySkeleton(modifier: Modifier = Modifier) {
     Column(
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = Spacing.lg),
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md)
+                .padding(bottom = Spacing.xl),
     ) {
-        PlaceholderLine(width = 96.dp, height = 14.dp)
-        PlaceholderLine(width = 280.dp, height = 28.dp)
-        when (layout) {
-            TimelineDayCardLayout.MEDIA_LED -> PlaceholderBlock(height = 280.dp)
-            TimelineDayCardLayout.VOICE_LED -> PlaceholderBlock(height = 120.dp)
-            TimelineDayCardLayout.PLACE_LED -> PlaceholderBlock(height = 132.dp)
-            TimelineDayCardLayout.STORY_LED -> PlaceholderBlock(height = 160.dp)
-        }
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            PlaceholderPill(width = 116.dp)
-            PlaceholderPill(width = 140.dp)
-            PlaceholderPill(width = 96.dp)
-        }
+        Surface(
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+            shape = RoundedCornerShape(4.dp),
+            modifier = Modifier.width(96.dp).height(14.dp),
+        ) {}
+        TimelineMemoryTextBlock(text = null, emphasized = true)
+        TimelineMemoryTextBlock(text = null)
     }
-}
-
-@Composable
-internal fun PlaceholderBlock(
-    height: Dp,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        shape = RoundedCornerShape(28.dp),
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .height(height),
-    ) {}
-}
-
-@Composable
-internal fun PlaceholderLine(
-    width: Dp,
-    modifier: Modifier = Modifier,
-    height: Dp = 18.dp,
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        shape = RoundedCornerShape(8.dp),
-        modifier =
-            modifier
-                .width(width)
-                .height(height),
-    ) {}
-}
-
-@Composable
-internal fun PlaceholderPill(
-    modifier: Modifier = Modifier,
-    width: Dp = 84.dp,
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        shape = RoundedCornerShape(18.dp),
-        modifier =
-            modifier
-                .width(width)
-                .height(32.dp),
-    ) {}
 }
 
 @Composable

@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -122,6 +123,7 @@ internal class JournalNoteQueries(
     fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> =
         notePlaceResolver
             .observeAll()
+            .onStart { emit(emptyMap()) }
             .combine(
                 observeNoteBuckets(
                     textFlow = textNoteDao.getRecentNotes(limit),
@@ -134,10 +136,10 @@ internal class JournalNoteQueries(
                     .toNotes(placeLookup)
                     .sortedByDescending { it.creationTimestamp }
                     .take(limit)
-            }.combine(mediaCaptionDao.observeAll()) { notes, captions ->
+            }.combine(mediaCaptionDao.observeAll().onStart { emit(emptyList()) }) { notes, captions ->
                 val captionMap = captions.associate { it.noteId to it.caption }
                 notes.map { note -> note.withCaption(captionMap) }
-            }.withTranscripts(transcriptionRepository)
+            }.withTranscripts(transcriptionRepository, waitForInitialTranscripts = false)
 
     fun observeRecentAudioNotes(limit: Int): Flow<List<JournalNote.Audio>> =
         notePlaceResolver

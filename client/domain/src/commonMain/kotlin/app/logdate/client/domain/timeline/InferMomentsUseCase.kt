@@ -145,9 +145,9 @@ private fun List<ExtractedMoment>.toMoments(
     val entriesById = allEntries.associateBy { it.uid.toString() }
     val timezone = TimeZone.currentSystemDefault()
 
-    return mapNotNull { extracted ->
+    return mapIndexedNotNull { index, extracted ->
         val sourceNotes = extracted.sourceNoteIds.mapNotNull { entriesById[it] }
-        if (sourceNotes.isEmpty()) return@mapNotNull null
+        if (sourceNotes.isEmpty()) return@mapIndexedNotNull null
 
         val startInstant =
             LocalDateTime(
@@ -181,7 +181,7 @@ private fun List<ExtractedMoment>.toMoments(
                 }.distinctBy { it.id }
 
         Moment(
-            id = Uuid.random(),
+            id = sourceNotes.first().uid.toMomentId(startInstant, index),
             label = extracted.label,
             estimatedStart = startInstant,
             estimatedEnd = if (endInstant > startInstant) endInstant else startInstant,
@@ -204,6 +204,14 @@ private fun List<ExtractedMoment>.toMoments(
     }
 }
 
+private fun Uuid.toMomentId(
+    start: Instant,
+    index: Int,
+): Uuid =
+    toLongs { high, low ->
+        Uuid.fromLongs(high xor start.toEpochMilliseconds(), low xor index.toLong())
+    }
+
 private fun buildMomentFromNotes(
     labelPlace: TimelinePlaceVisit?,
     notes: List<JournalNote>,
@@ -218,7 +226,7 @@ private fun buildMomentFromNotes(
     val audio = notes.flatMap { it.toMomentAudio() }
 
     return Moment(
-        id = Uuid.random(),
+        id = notes.minBy { it.creationTimestamp }.uid,
         label = "",
         estimatedStart = notes.minOf { it.creationTimestamp },
         estimatedEnd = notes.maxOf { it.creationTimestamp },

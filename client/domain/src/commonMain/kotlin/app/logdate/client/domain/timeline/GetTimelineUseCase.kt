@@ -122,6 +122,11 @@ data class TimelineDay(
      * Why the day has no summary, or null when it has one or one is still being made.
      */
     val summaryUnavailableReason: TimelineSummaryUnavailableReason? = null,
+    /** A recent page is a provisional subset of a day, rather than an authoritative full-day snapshot. */
+    internal val isRecentWindow: Boolean = false,
+    /** In-memory source provenance for retained derived content; never persisted or synchronized. */
+    internal val retainedSummarySources: List<JournalNote>? = null,
+    internal val retainedMomentSources: List<JournalNote>? = null,
 ) {
     /** True while the summary has not been made yet and nothing says it cannot be. */
     val isSummaryPending: Boolean

@@ -59,6 +59,7 @@ private val sampleTimelineDays =
                 listOf(
                     MomentUiState(
                         id = "moment-2026-05-04-mission-studio",
+                        sourceNoteIds = setOf(Uuid.parse("00000000-0000-0000-0000-000000000201")),
                         label = "At Mission Studio",
                         timeOfDay = DaylightPeriod.MIDDAY,
                         media = listOf(MomentMediaUiState(uri = SYNC_PREVIEW_IMAGE_URI)),
@@ -67,6 +68,7 @@ private val sampleTimelineDays =
                     ),
                     MomentUiState(
                         id = "moment-2026-05-04-tartine",
+                        sourceNoteIds = setOf(Uuid.parse("00000000-0000-0000-0000-000000000202")),
                         label = "At Tartine",
                         timeOfDay = DaylightPeriod.AFTERNOON,
                         textSnippet = "The crew loved the new card; we kept the photo lockup and tightened the title size.",
@@ -95,6 +97,7 @@ private val sampleTimelineDays =
                 listOf(
                     MomentUiState(
                         id = "moment-2026-05-03-bridge",
+                        sourceNoteIds = setOf(bridgeAudioNoteId),
                         label = "",
                         timeOfDay = DaylightPeriod.GOLDEN_HOUR,
                         audio =
@@ -110,6 +113,7 @@ private val sampleTimelineDays =
                     ),
                     MomentUiState(
                         id = "moment-2026-05-03-home",
+                        sourceNoteIds = setOf(Uuid.parse("00000000-0000-0000-0000-000000000204")),
                         label = "At Home",
                         timeOfDay = DaylightPeriod.NIGHT,
                         textSnippet = "Bridge wind made the audio crackle; clipping it tomorrow morning.",

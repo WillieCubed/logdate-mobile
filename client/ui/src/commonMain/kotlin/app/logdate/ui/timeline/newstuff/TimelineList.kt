@@ -267,11 +267,11 @@ fun TimelineList(
 
             if (items.isEmpty() && loadingState != TimelineLoadingState.Loaded) {
                 items(
-                    items = placeholderLayouts,
-                    key = { layout -> layout.name },
+                    items = listOf("loading-day-0", "loading-day-1", "loading-day-2"),
+                    key = { it },
                     contentType = { TimelineListContentType.SKELETON },
-                ) { layout ->
-                    TimelineDaySkeleton(layout = layout)
+                ) {
+                    TimelineDaySkeleton()
                 }
             } else if (items.isEmpty() && loadingState == TimelineLoadingState.Loaded) {
                 item(
@@ -293,7 +293,7 @@ fun TimelineList(
             } else {
                 items.forEachIndexed { index, item ->
                     stickyHeader(key = "header-${item.date}") {
-                        TimelineDayHeaderBar(item = item)
+                        TimelineDayHeaderBar(item = item, onOpenDay = onOpenDay)
                     }
 
                     item(

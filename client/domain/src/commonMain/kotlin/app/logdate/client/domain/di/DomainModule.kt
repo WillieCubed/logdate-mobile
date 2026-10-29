@@ -254,7 +254,7 @@ val domainModule: Module =
         factory {
             GetStreamingTimelineUseCase(
                 get(),
-                get(),
+                get<GetTimelineDayUseCase>(),
                 get(),
                 get(),
                 get<app.logdate.client.domain.moments.ObserveTimelineMarksUseCase>()(),

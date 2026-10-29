@@ -15,6 +15,7 @@ import app.logdate.client.domain.timeline.Timeline
 import app.logdate.client.domain.timeline.TimelineDay
 import app.logdate.client.domain.timeline.TimelinePage
 import app.logdate.client.domain.timeline.TimelinePageRequest
+import app.logdate.client.domain.timeline.retainAvailableTimelineSummaries
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.transcription.TranscriptionData
@@ -27,14 +28,17 @@ import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelineLoadingState
 import app.logdate.ui.timeline.TimelineSuggestionBlock
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onEach
@@ -84,7 +88,7 @@ class HomeViewModel(
                 StreamingTimelineRequest.RecentTimeline(
                     pageSize = RECENT_TIMELINE_PAGE_SIZE,
                 ),
-            ),
+            ).flowOn(Dispatchers.Default),
         loadTimelinePage = { request -> getTimelinePageUseCase(request) },
         notesRepository = notesRepository,
         getHomeRecommendation = getHomeRecommendation,
@@ -153,6 +157,7 @@ class HomeViewModel(
 
     private val recentTimelineState: StateFlow<Timeline> =
         recentTimelineFlow
+            .map(::retainRecentSnapshot)
             .onEach { hasLoadedRecentTimeline.value = true }
             .stateIn(
                 viewModelScope,
@@ -169,19 +174,6 @@ class HomeViewModel(
             emptyList(),
         )
 
-    private val timelineItems: StateFlow<List<TimelineDayUiState>> =
-        timelineFeedDays
-            .flatMapLatest { timelineDays ->
-                val noteIds = timelineDays.flatMap { day -> day.entries.map(JournalNote::uid) }.toSet()
-                getJournalMembership(noteIds).map { membershipMap ->
-                    timelineDays.map { timelineDay -> timelineDay.toHomeTimelineUiState(membershipMap = membershipMap) }
-                }
-            }.stateIn(
-                viewModelScope,
-                SharingStarted.WhileSubscribed(5_000),
-                emptyList(),
-            )
-
     private val selectedItemUiState: StateFlow<TimelineDaySelection> =
         selectedDayFlow
             .map { selectedDay ->
@@ -192,42 +184,51 @@ class HomeViewModel(
                 TimelineDaySelection.NotSelected,
             )
 
-    private val selectedDayNotes: StateFlow<List<JournalNote>> =
+    private val selectedDayNotes: StateFlow<SelectedDayNotes?> =
         selectedDayFlow
             .flatMapLatest { selectedDay ->
-                selectedDay?.let(notesRepository::observeNotesForDay) ?: flowOf(emptyList())
+                if (selectedDay == null) {
+                    flowOf(null)
+                } else {
+                    notesRepository.observeNotesForDay(selectedDay).map { notes -> SelectedDayNotes(selectedDay, notes) }
+                }
             }.stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5_000),
-                emptyList(),
+                null,
             )
+
+    private val journalMembership: StateFlow<Map<Uuid, List<app.logdate.shared.model.Journal>>> by lazy {
+        combine(timelineFeedDays, selectedDayNotes) { days, selected ->
+            (days.flatMap { it.entries } + selected?.notes.orEmpty()).map(JournalNote::uid).toSet()
+        }.distinctUntilChanged()
+            .flatMapLatest(getJournalMembership::invoke)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+    }
+
+    private val timelineItems: StateFlow<List<TimelineDayUiState>> =
+        combine(timelineFeedDays, journalMembership) { timelineDays, membershipMap ->
+            timelineDays.map { timelineDay -> timelineDay.toHomeTimelineUiState(membershipMap = membershipMap) }
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            emptyList(),
+        )
 
     private val selectedDayUiState: StateFlow<TimelineDayUiState?> =
         combine(
             selectedDayFlow,
             selectedDayNotes,
             timelineFeedDays,
-        ) { selectedDayDate, selectedNotes, timelineDays ->
+            journalMembership,
+        ) { selectedDayDate, selectedNotes, timelineDays, membershipMap ->
             val day = selectedDayDate ?: return@combine null
             val timelineDay = timelineDays.find { timelineEntry -> timelineEntry.date == day } ?: return@combine null
-            val notes = if (selectedNotes.isEmpty()) timelineDay.entries else selectedNotes
-
-            SelectedTimelineDayData(
-                timelineDay = timelineDay,
-                notes = notes,
+            val notes = selectedNotes?.takeIf { it.date == day }?.notes ?: timelineDay.entries
+            timelineDay.toHomeTimelineUiState(
+                overrideNotes = notes,
+                membershipMap = membershipMap,
             )
-        }.flatMapLatest { selectedData ->
-            if (selectedData == null) {
-                flowOf(null)
-            } else {
-                val noteIds = selectedData.notes.map(JournalNote::uid).toSet()
-                getJournalMembership(noteIds).map { membershipMap ->
-                    selectedData.timelineDay.toHomeTimelineUiState(
-                        overrideNotes = selectedData.notes,
-                        membershipMap = membershipMap,
-                    )
-                }
-            }
         }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5_000),
@@ -297,7 +298,14 @@ class HomeViewModel(
             HomeTimelineUiState(
                 items = visualState.items,
                 selectedItem = visualState.selection,
-                selectedDay = visualState.selectedDay,
+                selectedDay =
+                    visualState.selectedDay?.takeIf { selected ->
+                        when (val selection = visualState.selection) {
+                            is TimelineDaySelection.DateSelected -> selected.date == selection.date
+                            is TimelineDaySelection.Selected -> selected.date == selection.day
+                            TimelineDaySelection.NotSelected -> false
+                        }
+                    },
                 showEmptyState = loadingState.hasLoadedRecentTimeline && visualState.items.isEmpty(),
                 timelineSuggestion = visualState.suggestion,
                 isLoading = showInitialLoading,
@@ -314,6 +322,8 @@ class HomeViewModel(
                 loadingState = TimelineLoadingState.InitialLoading,
             ),
         )
+
+    private fun retainRecentSnapshot(incoming: Timeline): Timeline = retainAvailableTimelineSummaries(recentTimelineState.value, incoming)
 
     /**
      * Selects a timeline day for detailed viewing.
@@ -483,8 +493,8 @@ private data class HomeTimelineVisualState(
     val suggestion: TimelineSuggestionBlock?,
 )
 
-private data class SelectedTimelineDayData(
-    val timelineDay: TimelineDay,
+private data class SelectedDayNotes(
+    val date: LocalDate,
     val notes: List<JournalNote>,
 )
 

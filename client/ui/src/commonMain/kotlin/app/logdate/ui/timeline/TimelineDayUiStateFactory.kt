@@ -97,7 +97,7 @@ private fun List<MomentUiState>.toDayCardLayout(placesVisited: List<PlaceUiState
  * describe. Carries no label: there is no inferred context to report, and a label naming the
  * medium would say only what the content already shows.
  */
-private fun synthesizeMoment(
+internal fun synthesizeMoment(
     date: LocalDate,
     sortedNotes: List<NoteUiState>,
     placesVisited: List<PlaceUiState>,
@@ -110,6 +110,7 @@ private fun synthesizeMoment(
 
     return MomentUiState(
         id = "synthesized-$date",
+        sourceNoteIds = sortedNotes.map { it.noteId }.toSet(),
         capturedAt = sortedNotes.minOfOrNull { it.timestamp() },
         label = "",
         textSnippet =
@@ -121,7 +122,7 @@ private fun synthesizeMoment(
         textNoteId = sortedNotes.filterIsInstance<TextNoteUiState>().firstOrNull()?.noteId,
         media =
             sortedNotes.visualNotes().map { visual ->
-                MomentMediaUiState(uri = visual.uri, isVideo = visual.isVideo)
+                MomentMediaUiState(uri = visual.uri, isVideo = visual.isVideo, noteId = visual.noteId)
             },
         audio =
             audioNote?.let { note ->
@@ -129,9 +130,11 @@ private fun synthesizeMoment(
                     uri = note.uri,
                     durationMs = note.duration,
                     noteId = note.noteId,
+                    recordedAt = note.timestamp,
                 )
             },
         places = placesVisited,
+        handwriting = sortedNotes.filterIsInstance<HandwritingNoteUiState>(),
         isHero = true,
         capturedOnWatch = sortedNotes.isNotEmpty() && sortedNotes.all { it.capturedOnWatch },
         capturedDuring = sortedNotes.map { it.capturedDuring }.distinct().singleOrNull(),
@@ -159,6 +162,7 @@ private fun String.toSnippet(): String =
         }
 
 private data class VisualNoteUiState(
+    val noteId: kotlin.uuid.Uuid,
     val uri: String,
     val timestamp: Instant,
     val isVideo: Boolean,
@@ -167,6 +171,7 @@ private data class VisualNoteUiState(
 private val ImageNoteUiState.asVisual: VisualNoteUiState
     get() =
         VisualNoteUiState(
+            noteId = noteId,
             uri = uri,
             timestamp = timestamp,
             isVideo = false,
@@ -175,6 +180,7 @@ private val ImageNoteUiState.asVisual: VisualNoteUiState
 private val VideoNoteUiState.asVisual: VisualNoteUiState
     get() =
         VisualNoteUiState(
+            noteId = noteId,
             uri = thumbnailUri ?: uri,
             timestamp = timestamp,
             isVideo = true,

@@ -1,7 +1,6 @@
 package app.logdate.feature.journals.navigation
 
 import androidx.navigation3.runtime.EntryProviderScope
-import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.journals.ui.detail.NoteViewerScreen
 import app.logdate.ui.adaptive.ActivityRouteFrame
@@ -21,8 +20,11 @@ data class NoteDetailRoute(
 }
 
 /** Pushes the note viewer for the given note id. */
-fun NavBackStack<NavKey>.navigateToNoteDetail(noteId: Uuid) {
-    add(NoteDetailRoute(noteId))
+fun MutableList<NavKey>.navigateToNoteDetail(noteId: Uuid) = navigateToNoteDetail(noteId.toString())
+
+fun MutableList<NavKey>.navigateToNoteDetail(noteId: String) {
+    val target = NoteDetailRoute(noteId)
+    if (lastOrNull() != target) add(target)
 }
 
 /** Registers the note viewer entry. */

@@ -1,0 +1,7 @@
+<resources>
+    <plurals name="timeline_show_more_entries">
+        <item quantity="one">Show %1$d more entry</item>
+        <item quantity="other">Show %1$d more entries</item>
+    </plurals>
+    <string name="timeline_show_fewer_entries">Show fewer entries</string>
+</resources>

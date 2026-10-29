@@ -75,6 +75,7 @@ import app.logdate.feature.journals.navigation.NoteDetailRoute
 import app.logdate.feature.journals.navigation.ShareJournalRoute
 import app.logdate.feature.journals.navigation.completeJournalMerge
 import app.logdate.feature.journals.navigation.journalEntries
+import app.logdate.feature.journals.navigation.navigateToNoteDetail
 import app.logdate.feature.journals.navigation.redirectJournalDetail
 import app.logdate.feature.journals.navigation.replaceNoteDetail
 import app.logdate.feature.journals.navigation.selectJournal
@@ -284,7 +285,7 @@ fun LogDateNavDisplay(
                                             onOpenWatch = { backStack.add(WatchSettingsRoute) },
                                             onOpenSyncIssues = { backStack.add(SyncIssuesRoute) },
                                             onOpenDay = { date -> backStack.add(TimelineDetailRoute(date.toString())) },
-                                            onOpenTextNote = { backStack.add(NoteDetailRoute(it)) },
+                                            onOpenTextNote = { backStack.navigateToNoteDetail(it) },
                                             onOpenStreak = { backStack.add(StreakSettingsRoute) },
                                             libraryContent = { modifier ->
                                                 LibraryScreen(
@@ -306,7 +307,7 @@ fun LogDateNavDisplay(
                                             locationContent = { modifier ->
                                                 LocationTimelineScreen(
                                                     onAddMemory = { backStack.add(EntryEditorRoute(visitContext = it)) },
-                                                    onOpenNote = { backStack.add(NoteDetailRoute(it)) },
+                                                    onOpenNote = { backStack.navigateToNoteDetail(it) },
                                                     modifier = modifier,
                                                     embeddedInHome = true,
                                                 )
@@ -409,7 +410,7 @@ fun LogDateNavDisplay(
                                         },
                                         onOpenPlayback = { id ->
                                             backStack.removeLastOrNull()
-                                            backStack.add(NoteDetailRoute(id))
+                                            backStack.navigateToNoteDetail(id)
                                         },
                                         onBack = { backStack.removeLastOrNull() },
                                     )
@@ -460,7 +461,7 @@ fun LogDateNavDisplay(
                                         if (placesEnabled == true) {
                                             LocationTimelineScreen(
                                                 onAddMemory = { backStack.add(EntryEditorRoute(visitContext = it)) },
-                                                onOpenNote = { backStack.add(NoteDetailRoute(it)) },
+                                                onOpenNote = { backStack.navigateToNoteDetail(it) },
                                             )
                                         }
                                     }
@@ -474,7 +475,7 @@ fun LogDateNavDisplay(
                                             onClose = { backStack.removeLastOrNull() },
                                             onOpenLocations = placesLocationAction(placesEnabled, backStack),
                                             onOpenEvent = { backStack.add(EventDetailRoute(it)) },
-                                            onOpenNote = { backStack.add(NoteDetailRoute(it)) },
+                                            onOpenNote = { backStack.navigateToNoteDetail(it) },
                                         )
                                     }
                                 },
