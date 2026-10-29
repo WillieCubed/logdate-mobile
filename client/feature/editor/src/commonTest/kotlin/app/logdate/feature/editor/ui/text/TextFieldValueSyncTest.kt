@@ -9,6 +9,21 @@ import kotlin.test.assertTrue
 
 class TextFieldValueSyncTest {
     @Test
+    fun `older echo preserves newer composing edit and selection`() {
+        val current = TextFieldValue("A quiet", TextRange(7), TextRange(2, 7))
+        assertEquals(current, mergeAcknowledgedText(current, "A qu", 1, 2))
+    }
+
+    @Test
+    fun `repeated text cannot mistake an old acknowledgement for the latest edit`() {
+        val current = TextFieldValue("a", TextRange(1), TextRange(0, 1))
+        assertEquals(current, mergeAcknowledgedText(current, "a", 1, 3))
+        assertEquals(current, mergeAcknowledgedText(current, "ab", 2, 3))
+        assertEquals(current, mergeAcknowledgedText(current, "a", 3, 3))
+        assertEquals("External", mergeAcknowledgedText(current, "External", 4, 3).text)
+    }
+
+    @Test
     fun `selection and composition only changes do not propagate text`() {
         val previous = TextFieldValue(text = "draft", selection = TextRange(5))
         val next =

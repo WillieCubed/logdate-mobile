@@ -25,3 +25,10 @@ internal fun mergeExternalText(
         composition = null,
     )
 }
+
+internal fun mergeAcknowledgedText(
+    current: TextFieldValue,
+    externalText: String,
+    externalRevision: Long,
+    acceptedLocalRevision: Long,
+): TextFieldValue = if (externalRevision < acceptedLocalRevision) current else mergeExternalText(current, externalText)
