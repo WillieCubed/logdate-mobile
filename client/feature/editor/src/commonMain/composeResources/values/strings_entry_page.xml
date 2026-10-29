@@ -21,4 +21,8 @@
     <string name="entry_page_block_focus">Block focus</string>
     <string name="entry_page_return_to_entry">Return to entry</string>
     <string name="entry_page_drafts_count">Drafts (%1$d)</string>
+    <string name="entry_page_editing_memory">Editing memory</string>
+    <string name="entry_page_draft_saving">Saving draft…</string>
+    <string name="entry_page_draft_saved">Draft saved</string>
+    <string name="entry_page_draft_error">Draft not saved</string>
 </resources>
