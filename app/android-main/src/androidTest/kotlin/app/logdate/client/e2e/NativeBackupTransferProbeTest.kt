@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assume.assumeTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.core.context.GlobalContext
@@ -44,9 +45,13 @@ import kotlin.uuid.Uuid
 /** Native-transport probe; only runs when the host explicitly selects its disposable fixture. */
 @RunWith(AndroidJUnit4::class)
 class NativeBackupTransferProbeTest {
+    @get:Rule
+    internal val trace = NativeTransferProbeTraceRule()
+
     @Test
     fun nativeJournalTransfer(): Unit =
         runBlocking {
+            trace.bindCurrentProbeThread()
             val instrumentation = InstrumentationRegistry.getInstrumentation()
             val mode = InstrumentationRegistry.getArguments().getString("nativeBackupMode")
             assumeTrue(
@@ -99,8 +104,10 @@ class NativeBackupTransferProbeTest {
                 return@runBlocking
             }
             ensureLogDateApplicationStarted(context.applicationContext as android.app.Application)
+            nativeTransferPhase("application_started")
             val koin = GlobalContext.get()
             koin.get<LogDateConfigDataSource>().awaitConfigurationLoaded()
+            nativeTransferPhase("configuration_loaded")
             if (mode == "source-account-session") {
                 val sessions = koin.get<SessionStorage>()
                 assertNull(sessions.getSession(), "Data-only acceptance requires a signed-out synthetic source")
@@ -252,7 +259,9 @@ class NativeBackupTransferProbeTest {
                 )
                 return@runBlocking
             }
+            nativeTransferPhase("before_graph_resolution")
             val fixture = NativeJournalFixture(koin.get(), koin.get(), koin.get(), koin.get(), koin.get())
+            nativeTransferPhase("graph_resolved")
             if (mode == "post-backup-mutation") {
                 val fixtureFile =
                     assertNotNull(
@@ -304,7 +313,9 @@ class NativeBackupTransferProbeTest {
                 if (accountIdentity) {
                     val owner = koin.get<CanonicalOwnerProvider>()
                     val accountId = owner.getCanonicalOwnerId()
+                    nativeTransferPhase("before_owner_adoption")
                     assertTrue(owner.adoptRemoteOwnerIfUninitialized(accountId))
+                    nativeTransferPhase("owner_adopted")
                     if (legacyAccount) {
                         // Model an enrolled build predating portable account and media key backups.
                         val secure = koin.get<SecureStorage>()
@@ -319,6 +330,7 @@ class NativeBackupTransferProbeTest {
                 } else {
                     identity.ensureIdentityKey()
                 }
+                nativeTransferPhase("identity_ready")
                 val mediaKey = sourceMediaKey ?: koin.get<MediaPayloadKeyProvider>().getOrCreateKey()
                 val mediaNonce = crypto.generateRandomBytes(12)
                 val mediaCiphertext =
@@ -328,12 +340,15 @@ class NativeBackupTransferProbeTest {
                         "native-transfer".encodeToByteArray(),
                         "cloud media payload".encodeToByteArray(),
                     )
+                nativeTransferPhase("media_encryption_ready")
                 fixture.seed(
                     context,
                     includePendingCameraDraft = InstrumentationRegistry.getArguments().getString("pendingCameraDraftFixture") == "true",
                 )
+                nativeTransferPhase("journal_fixture_ready")
                 val installationTrust = InstrumentationRegistry.getArguments().getString("nativeInstallationTrustFixture") == "true"
                 if (installationTrust) NativeInstallationTrustFixture(koin).seed()
+                nativeTransferPhase("installation_trust_ready")
                 koin.get<UserStateRepository>().setIsOnboardingComplete(true)
                 val metadata =
                     JSONObject()
@@ -351,6 +366,7 @@ class NativeBackupTransferProbeTest {
                         .put("recordingTransferFixture", true)
                         .put("installationTrustFixture", installationTrust)
                 File(instrumentation.targetContext.noBackupFilesDir, "native-backup-fixture.json").writeText(metadata.toString())
+                nativeTransferPhase("source_fixture_persisted")
                 if (legacyAccount) {
                     assertFalse(
                         AndroidIdentityKeyBackupStore(instrumentation.targetContext).hasBackup(),

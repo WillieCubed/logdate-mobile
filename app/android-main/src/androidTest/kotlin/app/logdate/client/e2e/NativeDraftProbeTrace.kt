@@ -5,9 +5,10 @@ import java.io.Closeable
 import java.util.Timer
 import java.util.TimerTask
 
-/** Bounded stack evidence before the host's unchanged 180-second probe deadline. */
+/** Bounded thread evidence; callers retain their original probe deadlines. */
 internal class NativeDraftProbeTrace(
     private val probeThread: Thread,
+    private val tag: String = TAG,
 ) : Closeable {
     private val timer = Timer("native-draft-probe-trace", true)
 
@@ -22,10 +23,10 @@ internal class NativeDraftProbeTrace(
                             .filter { (thread, _) -> thread === probeThread || thread.name == "main" }
                             .sortedBy { (thread, _) -> thread.name }
                             .forEach { (thread, stack) ->
-                                Log.i(TAG, "thread=${thread.name} state=${thread.state}")
-                                stack.take(64).forEach { Log.i(TAG, it.toString()) }
+                                Log.i(tag, "thread=${thread.name} state=${thread.state}")
+                                stack.take(64).forEach { Log.i(tag, it.toString()) }
                             }
-                    }.onFailure { Log.w(TAG, "Stack capture unavailable: ${it.javaClass.name}") }
+                    }.onFailure { Log.w(tag, "Stack capture unavailable: ${it.javaClass.name}") }
                 }
             },
             90_000L,
@@ -34,8 +35,8 @@ internal class NativeDraftProbeTrace(
 
     fun reportFailure(failure: Throwable) {
         runCatching {
-            Log.e(TAG, "Probe body failed before activity teardown: ${failure.javaClass.name}")
-            failure.stackTrace.take(64).forEach { Log.e(TAG, it.toString()) }
+            Log.e(tag, "Probe body failed: ${failure.javaClass.name}")
+            failure.stackTrace.take(64).forEach { Log.e(tag, it.toString()) }
         }
     }
 
