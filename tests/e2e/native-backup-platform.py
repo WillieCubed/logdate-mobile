@@ -136,7 +136,9 @@ def enable_backup(h, serial, attempts=3):
     )
 
 
-def backup_source(h, serial, output, *, verify_after_backup=None):
+def backup_source(
+    h, serial, output, *, verify_after_backup=None, prepare_for_snapshot=None
+):
     """Back up a retained fixture and prove Android's backup did not change it."""
     launch = h.adb(
         serial,
@@ -152,6 +154,8 @@ def backup_source(h, serial, output, *, verify_after_backup=None):
         if b"Status: timeout" not in launch:
             raise RuntimeError("The source app did not start before native backup")
         h.wait_for_timeline(serial, output.parent, timeout_seconds=120, prefix="source")
+    if prepare_for_snapshot is not None:
+        prepare_for_snapshot()
     before = h.package_file_snapshot(serial)
     archive_before = h.capture_archive_records(serial, before)
     preference_path = "files/logdate.preferences_pb"
