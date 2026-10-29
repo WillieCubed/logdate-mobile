@@ -6,6 +6,7 @@ import app.logdate.client.device.restore.NativeJournalRestoreAuthority
 import app.logdate.client.device.restore.NativeRestoreDeliveryGate
 import app.logdate.client.device.restore.NativeRestorePrivacyGuard
 import app.logdate.client.device.restore.PostRestoreDetector
+import app.logdate.client.device.restore.resumeNativePrivacyRepairUnderDeliveryLock
 import app.logdate.client.device.restore.retainedJournalPassphraseFile
 import app.logdate.client.device.restore.retainedJournalWorkingKeyName
 import app.logdate.client.device.restore.retainedJournalWorkspace
@@ -42,6 +43,7 @@ actual val databaseModule: Module =
                         deliveryGate = get<NativeRestoreDeliveryGate>(),
                         restoreInProgress = { !PostRestoreDetector(context).isNativeRestoreDeliveryComplete() },
                     ) {
+                        runBlocking { resumeNativePrivacyRepairUnderDeliveryLock(context) }
                         val workspace = retainedJournalWorkspace(context).resume()
                         if (workspace != null && !context.getDatabasePath(DATABASE_NAME).exists()) {
                             PostRestoreDetector(context).recordRetainedJournalRecovery(workspace.id)

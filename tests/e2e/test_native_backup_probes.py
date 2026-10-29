@@ -108,6 +108,84 @@ class NativeProbeDiagnosticsTest(unittest.TestCase):
                 adb.call_args_list[-1],
             )
 
+    def test_failed_privacy_ui_probe_keeps_screen_evidence_and_still_fails(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(
+                harness,
+                "adb",
+                side_effect=[
+                    b"FAILURES!!!\n",
+                    b"\x89PNG\r\n\x1a\nsynthetic",
+                    b"<hierarchy/>",
+                ],
+            ) as adb,
+        ):
+            output = Path(directory) / "privacy.log"
+            with self.assertRaisesRegex(
+                RuntimeError, "native privacy blocked probe failed"
+            ):
+                harness.privacy_probe("emulator-5554", "blocked", output)
+            self.assertEqual(
+                b"\x89PNG\r\n\x1a\nsynthetic", output.with_suffix(".png").read_bytes()
+            )
+            self.assertEqual(b"<hierarchy/>", output.with_suffix(".xml").read_bytes())
+            self.assertTrue(
+                all(call.kwargs.get("timeout") == 20 for call in adb.call_args_list[1:])
+            )
+            self.assertEqual(0o600, output.with_suffix(".png").stat().st_mode & 0o777)
+
+    def test_privacy_failure_retains_callback_and_delivery_diagnostics(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+
+        def response(serial, *args, **kwargs):
+            if "instrument" in args:
+                return b"FAILURES!!!\n"
+            if "logcat" in args:
+                return b"synthetic callback failure\n"
+            return b"synthetic private metadata\n"
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(harness, "adb", side_effect=response),
+        ):
+            output = Path(directory) / "resolved.log"
+            with self.assertRaisesRegex(
+                RuntimeError, "native privacy resolved probe failed"
+            ):
+                harness.privacy_probe("emulator-5554", "resolved", output)
+            self.assertEqual(
+                b"synthetic callback failure\n",
+                output.with_suffix(".callbacks.log").read_bytes(),
+            )
+            self.assertEqual(
+                b"synthetic private metadata\n",
+                output.with_suffix(".custody.log").read_bytes(),
+            )
+            self.assertEqual(
+                b"synthetic private metadata\n",
+                output.with_suffix(".delivery.log").read_bytes(),
+            )
+
+    def test_unavailable_screen_output_is_not_mislabeled_as_an_image(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+
+        def response(serial, *args, **kwargs):
+            return b"FAILURES!!!\n" if "instrument" in args else b"cat: no such file\n"
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(harness, "adb", side_effect=response),
+        ):
+            output = Path(directory) / "unavailable.log"
+            with self.assertRaisesRegex(
+                RuntimeError, "native privacy resolved probe failed"
+            ):
+                harness.privacy_probe("emulator-5554", "resolved", output)
+            self.assertFalse(output.with_suffix(".png").exists())
+            self.assertFalse(output.with_suffix(".xml").exists())
+
 
 class RecordingTransferProbeContractTest(unittest.TestCase):
     def test_cloud_and_d2d_probes_pass_distinct_recording_expectations(self):

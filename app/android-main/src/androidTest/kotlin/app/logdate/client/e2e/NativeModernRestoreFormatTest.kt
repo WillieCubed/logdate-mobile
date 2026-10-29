@@ -19,6 +19,7 @@ import app.logdate.client.device.crypto.AccountIdentityBackup
 import app.logdate.client.device.crypto.AndroidIdentityKeyBackupStore
 import app.logdate.client.device.crypto.MediaIdentityBackup
 import app.logdate.client.device.restore.NativeBackupAgent
+import app.logdate.client.device.restore.NativeJournalReplayCustody
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.restore.PostRestoreType
 import kotlinx.coroutines.flow.first
@@ -30,6 +31,7 @@ import java.io.IOException
 import java.lang.reflect.InvocationTargetException
 import java.security.MessageDigest
 import kotlin.io.encoding.Base64
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -96,7 +98,7 @@ class NativeModernRestoreFormatTest {
         }
 
     @Test
-    fun explicitNativeTransportFlagsRecoverOnANewAgent() {
+    fun explicitNativeTransportFlagsRetainAnAlreadyAcceptedJournal() {
         for (flags in listOf(0, 1, 2, 3)) {
             withFixture {
                 val rejected = agent()
@@ -105,16 +107,21 @@ class NativeModernRestoreFormatTest {
                 rejected.onDestroy()
                 val updated = File(folder, "updated-journal")
                 createJournal(updated, "Accepted native journal")
+                val identity = assertNotNull(PostRestoreDetector(context).capturePrivacyRepairIdentity())
                 val native = agent()
                 deliverModern(native, database, updated, flags, "")
                 deliverModern(native, preferencesFile, incoming, flags, "")
                 native.onRestoreFinished()
-                verifyRetainedJournal("Accepted native journal")
+                verifyRetainedJournal()
                 assertEquals(PostRestoreType.CONTENT_RESTORED, PostRestoreDetector(context).detect(true))
-                assertEquals(1, accountRecoveries)
+                assertEquals(identity, PostRestoreDetector(context).capturePrivacyRepairIdentity())
+                assertEquals(0, accountRecoveries)
+                val retained = NativeJournalReplayCustody(context).sealedPayloads()
+                assertContentEquals(updated.readBytes(), retained.single { it.path == "database/logdate" }.file.readBytes())
+                assertContentEquals(incoming.readBytes(), retained.single { it.path == "files/logdate.preferences_pb" }.file.readBytes())
                 runBlocking {
                     assertEquals("BIOMETRIC", createAndroidMainDataStore(context).data.first()[stringPreferencesKey("security_level")])
-                    assertEquals(null, createAndroidMainDataStore(context).data.first()[stringPreferencesKey("device.id")])
+                    assertEquals("destination-device", createAndroidMainDataStore(context).data.first()[stringPreferencesKey("device.id")])
                 }
             }
         }
@@ -131,11 +138,19 @@ class NativeModernRestoreFormatTest {
                 rejectLegacy(recreated, database)
                 assertEquals(before, retainedState())
                 assertEquals(0, accountRecoveries)
+                val identity = assertNotNull(PostRestoreDetector(context).capturePrivacyRepairIdentity())
                 val native = agent()
                 deliverModern(native, preferencesFile, incoming, 2, "")
                 native.onRestoreFinished()
                 verifyRetainedJournal()
-                assertEquals(1, accountRecoveries)
+                assertEquals(identity, PostRestoreDetector(context).capturePrivacyRepairIdentity())
+                assertEquals(0, accountRecoveries)
+                assertContentEquals(
+                    incoming.readBytes(),
+                    NativeJournalReplayCustody(
+                        context,
+                    ).sealedPayloads().single { it.path == "files/logdate.preferences_pb" }.file.readBytes(),
+                )
             }
         }
         withFixture {
@@ -178,7 +193,7 @@ class NativeModernRestoreFormatTest {
             native.onRestoreFinished()
             assertEquals(installationId, installation.readText())
             verifyRetainedJournal()
-            assertEquals(2, accountRecoveries)
+            assertEquals(1, accountRecoveries)
         }
     }
 
@@ -232,33 +247,54 @@ class NativeModernRestoreFormatTest {
 
         init {
             System.loadLibrary("sqlcipher")
-            createJournal(database, "Retained encrypted journal")
-            PassphraseBackupStore(context).write(originalKey)
+            val sourceRoot = File(folder, "seed-source")
+            val source =
+                object : ContextWrapper(context) {
+                    override fun getFilesDir(): File = File(sourceRoot, "files").apply { mkdirs() }
+
+                    override fun getDatabasePath(name: String): File = File(sourceRoot, "databases/$name")
+                }
+            createJournal(source.getDatabasePath("logdate"), "Retained encrypted journal")
+            PassphraseBackupStore(source).write(originalKey)
             runBlocking {
-                AndroidIdentityKeyBackupStore(context).writeAccountIdentity(
+                AndroidIdentityKeyBackupStore(source).writeAccountIdentity(
                     AccountIdentityBackup("native-test-owner", identityKey, mediaKey),
                 )
-                AndroidIdentityKeyBackupStore(context).writeMediaIdentity(
+                AndroidIdentityKeyBackupStore(source).writeMediaIdentity(
                     MediaIdentityBackup(identityBinding, mediaKey),
                 )
-                createAndroidMainDataStore(context).edit {
+                createAndroidMainDataStore(source).edit {
                     it[stringPreferencesKey("identity.canonical_owner_id")] = "native-test-owner"
                     it[stringPreferencesKey("identity.canonical_owner_bound")] = "true"
                     it[stringPreferencesKey("security_level")] = "BIOMETRIC"
                 }
             }
-            File(context.filesDir, "media/retained-original").apply {
-                parentFile?.mkdirs()
-                writeText("Retained original media")
-            }
+            val seedFiles =
+                mapOf(database to source.getDatabasePath("logdate")) +
+                    source.filesDir
+                        .walkTopDown()
+                        .filter { it.isFile }
+                        .associate { File(context.filesDir, it.relativeTo(source.filesDir).path) to it }
             if (completeDelivery) {
                 val seed = object : NativeBackupAgent() {}
                 attach(seed)
+                seedFiles.forEach { (destination, payload) -> deliverModern(seed, destination, payload, 2, "") }
                 seed.onRestoreFinished()
                 seed.onDestroy()
-                assertNotNull(PostRestoreDetector(context).pendingContentRecoveryId())
+                val identity = assertNotNull(PostRestoreDetector(context).capturePrivacyRepairIdentity())
+                assertEquals(identity.accountDeliveryId, identity.contentDeliveryId)
+                assertEquals(PostRestoreType.CONTENT_RESTORED, PostRestoreDetector(context).detect(true))
                 assertNotNull(PostRestoreDetector(context).pendingAccountRecoveryId())
                 assertNotNull(PostRestoreDetector(context).pendingMediaQuarantineId())
+            } else {
+                seedFiles.forEach { (destination, payload) ->
+                    destination.parentFile!!.mkdirs()
+                    payload.copyTo(destination)
+                }
+            }
+            File(context.filesDir, "media/retained-original").apply {
+                parentFile?.mkdirs()
+                writeText("Retained original media")
             }
             runBlocking {
                 createAndroidMainDataStore(context).edit { it[stringPreferencesKey("device.id")] = "destination-device" }

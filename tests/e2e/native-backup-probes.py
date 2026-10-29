@@ -4,6 +4,7 @@ import base64
 import re
 import shlex
 import uuid
+import xml.etree.ElementTree as ET
 
 
 def probe(
@@ -92,6 +93,29 @@ def probe(
 
 def _capture_recovery_failure(h, serial, output, failure):
     commands = (
+        (
+            "callbacks",
+            (
+                "logcat",
+                "-d",
+                "-v",
+                "threadtime",
+                "-s",
+                "BackupServiceBinder:D",
+                "AndroidRuntime:E",
+            ),
+        ),
+        (
+            "delivery",
+            (
+                "exec-out",
+                "run-as",
+                h.PACKAGE,
+                "cat",
+                "no_backup/.logdate_native_restore_privacy_received",
+                "no_backup/.logdate_native_restore_pending",
+            ),
+        ),
         ("jobs", ("shell", "dumpsys", "jobscheduler")),
         (
             "custody",
@@ -198,7 +222,33 @@ def privacy_probe(h, serial, mode, output):
     )
     h.private_file(output, result)
     if not h.instrumentation_passed(result):
-        raise RuntimeError(f"native privacy {mode} probe failed; inspect {output}")
+        failure = RuntimeError(f"native privacy {mode} probe failed; inspect {output}")
+        for suffix in ("png", "xml"):
+            try:
+                captured = h.adb(
+                    serial,
+                    "exec-out",
+                    "run-as",
+                    h.PACKAGE,
+                    "cat",
+                    "no_backup/native-privacy-failure." + suffix,
+                    timeout=20,
+                )
+                valid = (
+                    captured.startswith(b"\x89PNG\r\n\x1a\n")
+                    if suffix == "png"
+                    else ET.fromstring(captured).tag == "hierarchy"
+                )
+                if not valid:
+                    raise ValueError("Native privacy screen capture is unavailable")
+                h.private_file(output.with_suffix("." + suffix), captured)
+            except Exception as error:
+                h.add_failure_note(
+                    failure,
+                    f"Privacy {suffix} diagnostics unavailable: {type(error).__name__}",
+                )
+        _capture_recovery_failure(h, serial, output, failure)
+        raise failure
 
 
 def verify_privacy_backup_refusal(h, result, diagnostics, started_at):
@@ -412,8 +462,17 @@ def verify_privacy_recovery(
     h.privacy_probe(
         destination, "resolved", output / "destination-privacy-resolved.log"
     )
+    backup = h.adb(destination, "shell", "bmgr", "backupnow", h.PACKAGE)
+    h.private_file(output / "destination-privacy-backup-after-repair.log", backup)
+    if f"Package {h.PACKAGE} with result: Success" not in backup.decode().splitlines():
+        raise RuntimeError("Native backup is still refused after privacy repair")
+    h.privacy_probe(
+        destination,
+        "resolved",
+        output / "destination-privacy-after-successful-backup.log",
+    )
     print(
-        "Original native preferences restored journal access without replacing its key",
+        "Original native preferences restored journal access and native backup without replacing its key",
         flush=True,
     )
     return

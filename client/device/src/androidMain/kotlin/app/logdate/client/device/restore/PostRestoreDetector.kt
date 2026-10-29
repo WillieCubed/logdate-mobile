@@ -16,6 +16,14 @@ import kotlin.uuid.Uuid
 class PostRestoreDetector(
     private val context: Context,
 ) {
+    /** Identity only; the caller must separately prove the completed incoming policy and protected bytes. */
+    fun capturePrivacyRepairIdentity(): NativePrivacyRepairIdentity? =
+        synchronized(lock) { readNativePrivacyRepairIdentity(context.noBackupFilesDir) }
+
+    /** Caller holds the delivery gate and has durably committed only the proven privacy fields. */
+    fun acknowledgePrivacyRepair(expected: NativePrivacyRepairIdentity): Boolean =
+        synchronized(lock) { acknowledgeNativePrivacyRepair(context.noBackupFilesDir, expected) }
+
     /** Even damaged retained delivery receipts prevent portable legacy state becoming local authority. */
     fun hasNativeRestoreHistory(): Boolean =
         synchronized(lock) {

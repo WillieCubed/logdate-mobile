@@ -200,6 +200,16 @@ class MissingPrivacyBackupFilterTest(unittest.TestCase):
                 ("editor_drafts_anonymous", "unfinished"),
             ]
         )
+        generation = harness.length_delimited_field(
+            1,
+            harness.length_delimited_field(
+                1, b"android_platform_search_index_generation"
+            )
+            + harness.length_delimited_field(
+                2, harness.write_varint(4 << 3) + harness.write_varint(7)
+            ),
+        )
+        preferences += generation
         entries = [
             (prefix + "/_manifest", b"manifest"),
             (prefix + "/f/logdate.preferences_pb", preferences),
@@ -227,6 +237,11 @@ class MissingPrivacyBackupFilterTest(unittest.TestCase):
                         self.assertNotIn(b"security_level", actual)
                         self.assertIn(b"native-test-owner", actual)
                         self.assertIn(b"unfinished", actual)
+                        self.assertIn(
+                            generation,
+                            actual,
+                            "Only privacy fields may be removed from the original wire payload",
+                        )
                     else:
                         self.assertEqual(data, actual)
 
