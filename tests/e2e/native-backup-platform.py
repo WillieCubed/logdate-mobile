@@ -153,6 +153,7 @@ def backup_source(h, serial, output, *, verify_after_backup=None):
             raise RuntimeError("The source app did not start before native backup")
         h.wait_for_timeline(serial, output.parent, timeout_seconds=120, prefix="source")
     before = h.package_file_snapshot(serial)
+    archive_before = h.capture_archive_records(serial, before)
     preference_path = "files/logdate.preferences_pb"
     original_preferences = (
         h.adb(serial, "exec-out", "run-as", h.PACKAGE, "cat", preference_path)
@@ -175,10 +176,13 @@ def backup_source(h, serial, output, *, verify_after_backup=None):
             diagnostics = f"Backup service diagnostics unavailable: {type(error).__name__}".encode()
         diagnostic_path = output.with_name("backup-platform-diagnostics.log")
         h.private_file(diagnostic_path, diagnostics)
-        raise RuntimeError(
+        failure = RuntimeError(
             f"Android did not complete the native backup; inspect {diagnostic_path}"
         )
+        h.capture_backup_failure(serial, output, failure)
+        raise failure
     after = h.package_file_snapshot(serial)
+    archive_after = h.capture_archive_records(serial, after)
     h.private_file(
         output.with_name("source-files-before-native-backup.json"),
         json.dumps(before, indent=2).encode(),
@@ -208,15 +212,28 @@ def backup_source(h, serial, output, *, verify_after_backup=None):
     if verify_after_backup is not None:
         h.adb(serial, "shell", "am", "force-stop", h.PACKAGE)
         verify_after_backup()
-    h.assert_snapshot_preserved(
-        before,
-        after,
-        # SQLCipher may checkpoint the live WAL while the agent selects an encrypted database
-        # snapshot. The post-backup probe verifies the source journal and original media logically.
-        ignored_paths={"shared_prefs/logdate_secure_storage.xml", "databases/logdate"}
-        if verify_after_backup is not None
-        else (),
-    )
+    try:
+        h.assert_snapshot_preserved(
+            before,
+            after,
+            # SQLCipher may checkpoint the live WAL while the agent selects an encrypted database
+            # snapshot. The post-backup probe verifies the source journal and original media logically.
+            ignored_paths={
+                "shared_prefs/logdate_secure_storage.xml",
+                "databases/logdate",
+            }
+            if verify_after_backup is not None
+            else (),
+        )
+    except Exception as failure:
+        try:
+            h.record_archive_changes(output, archive_before, archive_after)
+        except Exception as error:
+            h.add_failure_note(
+                failure,
+                "Archive checkpoint diagnostics unavailable: " + type(error).__name__,
+            )
+        raise
     return backup, before
 
 

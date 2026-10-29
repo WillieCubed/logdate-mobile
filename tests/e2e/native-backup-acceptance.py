@@ -75,6 +75,7 @@ for _concern in (
     "probes",
     "source",
     "sequences",
+    "diagnostics",
 ):
     _helpers = runpy.run_path(
         str(Path(__file__).with_name(f"native-backup-{_concern}.py"))
