@@ -4,6 +4,8 @@ import android.app.backup.FullBackupDataOutput
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import app.logdate.client.data.account.NativeRestoreAccountPolicy
+import app.logdate.client.database.openRetainedDatabaseCopy
+import app.logdate.client.database.readRetainedDatabasePassphrases
 import app.logdate.client.database.requirePortableCloudBackupKey
 import app.logdate.client.device.restore.NativeBackupAgent
 import app.logdate.client.device.restore.PostRestoreDetector
@@ -16,6 +18,22 @@ import java.io.File
 class NativeAccountBackupAgent : NativeBackupAgent() {
     private val journalTransfer by lazy { NativeJournalTransferSnapshot(this) }
     private val journalRestore by lazy { NativeJournalTransferRestore(this, ::restoreNativeJournalPreferences) }
+
+    override fun inspectNativePrivacyRepairCopy(files: Map<String, File>) {
+        val databaseFiles = files.filterKeys { it.startsWith("database/") }.mapKeys { it.key.removePrefix("database/") }
+        if (databaseFiles.isEmpty()) return
+        val keys =
+            readRetainedDatabasePassphrases(
+                listOfNotNull(files["files/db_recovery/passphrase_backup"], files["files/db_recovery/working_passphrase_backup"]),
+            )
+        try {
+            checkNotNull(openRetainedDatabaseCopy(this, databaseFiles, keys, File(noBackupFilesDir, "privacy-repair-validation"))) {
+                "Incoming native privacy metadata cannot validate the retained encrypted journal"
+            }.use { }
+        } finally {
+            keys.forEach { it.fill(0) }
+        }
+    }
 
     override val retainedPreferenceNames: Set<String> = setOf("logdate_widget_instances")
 

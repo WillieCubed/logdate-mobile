@@ -31,7 +31,13 @@ class NativeRecoveryFailureDiagnosticsTest(unittest.TestCase):
             output = Path(directory) / "destination.log"
             with self.assertRaisesRegex(RuntimeError, "native data-only probe failed"):
                 HARNESS.probe("emulator-5554", "data-only", output)
-            for suffix in (".jobs.log", ".custody.log", ".recovery-state.log"):
+            for suffix in (
+                ".callbacks.log",
+                ".delivery.log",
+                ".jobs.log",
+                ".custody.log",
+                ".recovery-state.log",
+            ):
                 evidence = output.with_suffix(suffix)
                 self.assertTrue(evidence.is_file(), suffix)
                 self.assertEqual(
@@ -40,10 +46,29 @@ class NativeRecoveryFailureDiagnosticsTest(unittest.TestCase):
                 self.assertEqual(0o600, evidence.stat().st_mode & 0o777)
             self.assertIn(b"FAILURES", output.read_bytes())
         diagnostic_calls = calls[2:]
-        self.assertEqual(3, len(diagnostic_calls))
+        self.assertEqual(5, len(diagnostic_calls))
         self.assertTrue(all(kwargs["timeout"] == 20 for _, kwargs in diagnostic_calls))
         self.assertFalse(any("payload" in args for args, _ in diagnostic_calls))
-        self.assertIn("entry.json", diagnostic_calls[1][0])
+        self.assertEqual(
+            (
+                "logcat",
+                "-d",
+                "-v",
+                "threadtime",
+                "-s",
+                "BackupServiceBinder:D",
+                "AndroidRuntime:E",
+            ),
+            diagnostic_calls[0][0],
+        )
+        self.assertEqual(
+            (
+                "no_backup/.logdate_native_restore_privacy_received",
+                "no_backup/.logdate_native_restore_pending",
+            ),
+            diagnostic_calls[1][0][-2:],
+        )
+        self.assertIn("entry.json", diagnostic_calls[3][0])
 
     def test_collection_failure_cannot_turn_failed_acceptance_into_success(self):
         def adb(serial, *args, **kwargs):

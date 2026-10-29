@@ -55,6 +55,25 @@ class NativeJournalReplayCustody(
         return journal.verified(id, journal.finish(id))
     }
 
+    internal fun sealCohort(id: String): String {
+        requireRepairCohort(id)
+        return journal.finish(id)
+    }
+
+    internal fun verifiedCohort(
+        id: String,
+        manifestSha256: String,
+    ): List<NativeIncomingJournal.Payload> {
+        requireRepairCohort(id)
+        return journal.verified(id, manifestSha256)
+    }
+
+    private fun requireRepairCohort(id: String) {
+        check(Uuid.parse(id).toString() == id)
+        check(Files.isDirectory(root.toPath(), LinkOption.NOFOLLOW_LINKS))
+        check(Files.isDirectory(File(root, id).toPath(), LinkOption.NOFOLLOW_LINKS))
+    }
+
     fun isPendingCohort(id: String): Boolean {
         check(Uuid.parse(id).toString() == id)
         return id in journal.pending()
@@ -158,15 +177,20 @@ class NativeJournalReplayCustody(
         }
     }
 
+    private fun unaccountedSources(): List<File> =
+        root.listFiles().orEmpty().filter { directory ->
+            !directory.name.startsWith('.') && !isAccountedNativePrivacyRepairCohort(directory)
+        }
+
     fun hasInputs(): Boolean {
         cleanupConsumed()
-        return root.listFiles().orEmpty().any { it.isDirectory && !it.name.startsWith('.') }
+        return unaccountedSources().any { it.isDirectory }
     }
 
     /** Media-only custody cannot turn a fresh snapshot callback into an occupied-journal replay. */
     fun hasJournalInputs(): Boolean {
         cleanupConsumed()
-        return root.listFiles().orEmpty().filter { !it.name.startsWith('.') }.any { directory ->
+        return unaccountedSources().any { directory ->
             check(Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS))
             val marker = File(directory, "media-only")
             if (!Files.isRegularFile(marker.toPath(), LinkOption.NOFOLLOW_LINKS) || retainedJournalReadBounded(marker, 16) != "v1") {
@@ -179,7 +203,7 @@ class NativeJournalReplayCustody(
     }
 
     fun sealedPayloads(): List<NativeIncomingJournal.Payload> =
-        root.listFiles().orEmpty().filter { !it.name.startsWith('.') }.flatMap { directory ->
+        unaccountedSources().flatMap { directory ->
             check(
                 Uuid.parse(directory.name).toString() == directory.name && Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS),
             )
@@ -190,7 +214,7 @@ class NativeJournalReplayCustody(
     fun finish(): Boolean {
         cleanupConsumed()
         var pending = false
-        root.listFiles().orEmpty().filter { !it.name.startsWith('.') }.forEach { directory ->
+        unaccountedSources().forEach { directory ->
             val id = directory.name
             check(Uuid.parse(id).toString() == id && Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS))
             val hash = journal.finish(id)
@@ -208,7 +232,7 @@ class NativeJournalReplayCustody(
     /** Caller has verified durable canonical objects and resolved any captured reference CAS before acknowledging these payloads. */
     fun acknowledgeRecoveredMedia(verifiedFiles: Set<String>) {
         cleanupConsumed()
-        root.listFiles().orEmpty().filter { !it.name.startsWith('.') }.forEach { directory ->
+        unaccountedSources().forEach { directory ->
             val id = directory.name
             check(Uuid.parse(id).toString() == id && Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS))
             val payloads = journal.verified(id, journal.finish(id))
@@ -238,7 +262,7 @@ class NativeJournalReplayCustody(
             acceptedSourceHashes.filterKeys { path ->
                 path == NATIVE_SOURCE_RECEIPT_PATH || path == "files/logdate.preferences_pb" || path.startsWith("database/")
             }
-        root.listFiles().orEmpty().filter { !it.name.startsWith('.') }.forEach { directory ->
+        unaccountedSources().forEach { directory ->
             val id = directory.name
             check(Uuid.parse(id).toString() == id && Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS))
             val payloads = journal.verified(id, journal.finish(id))
@@ -298,7 +322,7 @@ class NativeJournalReplayCustody(
                 .filterKeys { path ->
                     path == NATIVE_SOURCE_RECEIPT_PATH || path == "files/logdate.preferences_pb" || path.startsWith("database/")
                 }
-        root.listFiles().orEmpty().filter { !it.name.startsWith('.') }.forEach { directory ->
+        unaccountedSources().forEach { directory ->
             val id = directory.name
             check(Uuid.parse(id).toString() == id && Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS))
             val payloads = journal.verified(id, journal.finish(id))

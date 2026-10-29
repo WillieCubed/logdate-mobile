@@ -116,9 +116,19 @@ def without_privacy_metadata(h, payload):
             preferences = archive.extractfile(preference_path)
             if preferences is None:
                 raise RuntimeError("native fixture is missing privacy metadata")
-            original = h.canonical_preferences(preferences.read())
-            filtered = h.canonical_preferences(
-                original, excluded_names={"is_onboarded", "security_level"}
+            original = preferences.read()
+            h.canonical_preferences(
+                original
+            )  # Validate without dropping installation-local wire fields.
+            filtered = b"".join(
+                encoded
+                for _, _, encoded, entry in h.protobuf_fields(original)
+                if next(
+                    value.decode()
+                    for number, wire, _, value in h.protobuf_fields(entry)
+                    if number == 1 and wire == 2
+                )
+                not in {"is_onboarded", "security_level"}
             )
             if filtered == original:
                 raise RuntimeError("native fixture never contained privacy metadata")

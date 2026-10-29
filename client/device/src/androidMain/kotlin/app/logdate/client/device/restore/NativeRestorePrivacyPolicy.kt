@@ -5,7 +5,9 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 
-class NativeRestorePrivacyMetadataRequiredException : IllegalStateException("Journal privacy settings have not been restored")
+class NativeRestorePrivacyMetadataRequiredException(
+    cause: Throwable? = null,
+) : IllegalStateException("Journal privacy settings have not been restored", cause)
 
 object NativeRestorePrivacyPolicy {
     suspend fun verifyBeforeContent(
@@ -35,7 +37,7 @@ object NativeRestorePrivacyPolicy {
         }
     }
 
-    private fun hasKnownPrivacyMetadata(preferences: Preferences): Boolean {
+    internal fun hasKnownPrivacyMetadata(preferences: Preferences): Boolean {
         val onboarded = preferences.asMap()[LogdatePreferencesDataSource.IS_ONBOARDED]
         val security = preferences.asMap()[LogdatePreferencesDataSource.SECURITY_LEVEL]
         return (onboarded is Boolean || security is String) &&

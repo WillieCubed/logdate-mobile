@@ -91,6 +91,7 @@ class NativeRestoreTransportSelectionTest(unittest.TestCase):
         partial=False,
         camera=False,
         snapshot_failure=None,
+        post_repair_backup_succeeded=True,
     ):
         metadata = {
             "owner": "synthetic",
@@ -101,7 +102,17 @@ class NativeRestoreTransportSelectionTest(unittest.TestCase):
             "recordingTransferFixture": True,
         }
 
+        backup_attempts = []
+
         def adb(serial, *arguments, **kwargs):
+            if arguments[:3] == ("shell", "bmgr", "backupnow"):
+                backup_attempts.append(arguments)
+                result = (
+                    "Success"
+                    if len(backup_attempts) > 1 and post_repair_backup_succeeded
+                    else "Transport rejected package because it wasn't able to process it at the time"
+                )
+                return f"Package {HARNESS.PACKAGE} with result: {result}\n".encode()
             if arguments[:2] == ("exec-out", "cat"):
                 return json.dumps(metadata).encode()
             if arguments[:2] == ("shell", "date"):
@@ -170,6 +181,25 @@ class NativeRestoreTransportSelectionTest(unittest.TestCase):
             [call.args[1] for call in self.last_mocks["privacy_probe"].call_args_list],
         )
 
+    def test_repaired_privacy_must_also_allow_the_next_native_backup(self):
+        mocks = self.transfer_probes(privacy=True)
+        backups = [
+            item
+            for item in mocks["adb"].call_args_list
+            if item.args[1:4] == ("shell", "bmgr", "backupnow")
+        ]
+        self.assertEqual(
+            2,
+            len(backups),
+            "Test both blocked backup and post-repair backup completion",
+        )
+
+    def test_post_repair_backup_refusal_remains_a_failed_acceptance(self):
+        with self.assertRaisesRegex(
+            RuntimeError, "Native backup is still refused after privacy repair"
+        ):
+            self.transfer_probes(privacy=True, post_repair_backup_succeeded=False)
+
     def test_device_transfer_verifies_originals_both_before_and_after_restart(self):
         mocks = self.transfer_probes()
         calls = [
@@ -230,7 +260,7 @@ class NativeRestoreTransportSelectionTest(unittest.TestCase):
         )
         mocks["assert_cloud_backup_contents"].assert_called_once()
         self.assertEqual(
-            ["blocked", "blocked", "resolved"],
+            ["blocked", "blocked", "resolved", "resolved"],
             [call.args[1] for call in mocks["privacy_probe"].call_args_list],
         )
         mocks["verify_privacy_backup_refusal"].assert_called_once()

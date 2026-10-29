@@ -390,11 +390,17 @@ class NativeBackgroundCredentialCallbackTest {
             val live =
                 app.logdate.client.datastore
                     .createAndroidMainDataStore(context)
-            live.edit { it[stringPreferencesKey("security_level")] = "NONE" }
+            val cached =
+                app.logdate.client.datastore
+                    .LogdatePreferencesDataSource(live)
+                    .userData
+            assertEquals("NONE", cached.first().securityLevel.name)
+            assertTrue(!File(context.filesDir, "logdate.preferences_pb").exists(), "Default observation must not occupy the destination")
             val agent = object : NativeBackupAgent() {}.also { it.initialize(context) }
             deliverPreferences(agent, incomingPreferences("BIOMETRIC"))
             agent.onRestoreFinished()
             assertEquals("BIOMETRIC", live.data.first()[stringPreferencesKey("security_level")])
+            assertEquals("BIOMETRIC", cached.first().securityLevel.name)
             assertTrue(!PostRestoreDetector(context).hasMissingNativePrivacyPayload())
         }
 
@@ -413,9 +419,13 @@ class NativeBackgroundCredentialCallbackTest {
             assertFailsWith<NativeRestorePrivacyMetadataRequiredException> {
                 guard.verifyBeforeContent { true }
             }
+            val detector = PostRestoreDetector(context)
+            val identity = assertNotNull(detector.capturePrivacyRepairIdentity())
             deliverPreferences(agent, incomingPreferences("BIOMETRIC"))
+            assertEquals(identity, detector.capturePrivacyRepairIdentity(), "Receiving bytes is not policy completion")
             agent.onRestoreFinished()
             guard.verifyBeforeContent { true }
+            assertEquals(identity.copy(privacyReceived = true), detector.capturePrivacyRepairIdentity())
             assertEquals("BIOMETRIC", live.data.first()[stringPreferencesKey("security_level")])
         }
 

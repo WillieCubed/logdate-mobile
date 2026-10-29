@@ -26,6 +26,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.core.context.GlobalContext
+import java.io.File
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -67,24 +68,36 @@ class NativeRestorePrivacyRuntimeTest {
                     val startup = startupInstance(context)
                     val state = startupState(startup)
                     awaitPrivacyFailure(state)
-                    assertTrue(device.wait(Until.hasObject(By.textContains("privacy settings weren’t restored")), 15_000))
+                    requirePrivacyScreen(context, device)
                     assertFalse(device.hasObject(By.text("Write your first entry")))
                     val previous = state.value
                     withRetryDelay(startup) {
                         device.findObject(By.text("Try again")).click()
                         awaitPrivacyFailure(state, previous)
-                        assertTrue(device.wait(Until.hasObject(By.textContains("privacy settings weren’t restored")), 15_000))
+                        requirePrivacyScreen(context, device)
                     }
                     val beforeRecreate = state.value
                     activity.recreate()
                     awaitPrivacyFailure(state, beforeRecreate)
-                    assertTrue(device.wait(Until.hasObject(By.textContains("privacy settings weren’t restored")), 15_000))
+                    requirePrivacyScreen(context, device)
                     assertFalse(device.hasObject(By.text("Write your first entry")))
                 }
             }
             assertTrue(databaseFile.isFile && databaseFile.length() > 0)
             assertContentEquals(key, keyStore.read(), "Privacy recovery must retain the journal key")
         }
+
+    private fun requirePrivacyScreen(
+        context: Context,
+        device: UiDevice,
+    ) {
+        val visible = device.wait(Until.hasObject(By.textContains("privacy settings weren’t restored")), 15_000)
+        if (!visible) {
+            runCatching { device.takeScreenshot(File(context.noBackupFilesDir, "native-privacy-failure.png")) }
+            runCatching { device.dumpWindowHierarchy(File(context.noBackupFilesDir, "native-privacy-failure.xml")) }
+        }
+        assertTrue(visible, "Protected privacy recovery state must be visible and reachable")
+    }
 
     private suspend fun awaitPrivacyFailure(
         state: StateFlow<*>,

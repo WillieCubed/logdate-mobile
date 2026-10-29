@@ -1,16 +1,25 @@
 package app.logdate.client.data.restore
 
 import android.app.Application
+import android.app.backup.BackupAgent
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.pm.ApplicationInfo
+import android.os.ParcelFileDescriptor
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
+import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.createAndroidMainDataStore
 import app.logdate.client.device.restore.NativeBackupAgent
 import app.logdate.client.device.restore.PostRestoreDetector
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.runner.RunWith
@@ -29,11 +38,21 @@ import kotlin.test.assertTrue
 @Config(manifest = Config.NONE, sdk = [34], application = Application::class)
 class NativeAccountRecoveryCallbackTest {
     @Test
-    fun `callback retains the request before installation reset and distinguishes duplicate completion`() {
+    fun `known policy callback retains the request before reset and retries duplicate completion`() =
+        verifyCompletionPrivacy(knownPrivacy = true)
+
+    @Test
+    fun `unknown policy duplicate cannot retry account work or reset accepted delivery`() = verifyCompletionPrivacy(knownPrivacy = false)
+
+    private fun verifyCompletionPrivacy(knownPrivacy: Boolean) {
         val directory = Files.createTempDirectory("native-account-callback").toFile()
         try {
             val context =
                 object : ContextWrapper(ApplicationProvider.getApplicationContext<Application>()) {
+                    override fun getApplicationContext(): Context = this
+
+                    override fun getApplicationInfo() = ApplicationInfo(super.getApplicationInfo()).apply { dataDir = directory.path }
+
                     override fun getFilesDir() = File(directory, "files").apply { mkdirs() }
 
                     override fun getNoBackupFilesDir() = File(directory, "private").apply { mkdirs() }
@@ -63,12 +82,42 @@ class NativeAccountRecoveryCallbackTest {
                     Context::class.java,
                 ).apply { isAccessible = true }
                 .invoke(agent, context)
-            runBlocking { createAndroidMainDataStore(context).edit { it[device] = "source-device" } }
+            deliverPreferences(agent, context, directory, knownPrivacy)
             agent.onRestoreFinished()
+            val detector = PostRestoreDetector(context)
+            val accepted = assertNotNull(detector.capturePrivacyRepairIdentity())
+            assertFalse(detector.hasMissingNativePrivacyPayload(), "The real preference callback must be received")
             agent.onRestoreFinished()
-            assertEquals(listOf(true, false), requests)
+            assertEquals(accepted, detector.capturePrivacyRepairIdentity())
+            assertEquals(if (knownPrivacy) listOf(true, false) else listOf(true), requests)
+            val retained = runBlocking { createAndroidMainDataStore(context).data.first() }
+            assertEquals(if (knownPrivacy) "BIOMETRIC" else null, retained[LogdatePreferencesDataSource.SECURITY_LEVEL])
+            assertEquals(null, retained[device])
         } finally {
             directory.deleteRecursively()
+        }
+    }
+
+    private fun deliverPreferences(
+        agent: NativeBackupAgent,
+        context: Context,
+        directory: File,
+        knownPrivacy: Boolean,
+    ) {
+        val source = File(directory, "incoming.preferences_pb")
+        val owner = SupervisorJob()
+        runBlocking {
+            try {
+                PreferenceDataStoreFactory.create(scope = CoroutineScope(owner + Dispatchers.IO)) { source }.edit {
+                    it[stringPreferencesKey("device.id")] = "source-device"
+                    if (knownPrivacy) it[LogdatePreferencesDataSource.SECURITY_LEVEL] = "BIOMETRIC"
+                }
+            } finally {
+                owner.cancelAndJoin()
+            }
+        }
+        ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY).use {
+            agent.onRestoreFile(it, source.length(), File(context.filesDir, "logdate.preferences_pb"), BackupAgent.TYPE_FILE, 384L, 0L)
         }
     }
 

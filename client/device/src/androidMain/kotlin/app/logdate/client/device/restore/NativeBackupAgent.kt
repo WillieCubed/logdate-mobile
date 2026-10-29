@@ -46,6 +46,8 @@ open class NativeBackupAgent : BackupAgent() {
         }
     private val callbackLock = Any()
     private val completedReplay by lazy { NativeJournalReplayCustody(this) }
+    private val completedRawReplay by lazy { NativeCompletedRestoreReplay(this, completedReplay) }
+    private val privacyRepair by lazy { nativePrivacyRepairDelivery(this, ::inspectNativePrivacyRepairCopy) }
     private val restoreFormat = NativeRestoreFormatGuard { noBackupFilesDir }
     private var restoreCompletionRecorded = false
     private var installationStateReset = false
@@ -117,10 +119,7 @@ open class NativeBackupAgent : BackupAgent() {
                 super.onRestoreFinished()
                 return
             }
-            finishCompletedNativeJournalCleanup()
-            if (finishRetainedNativeDelivery()) {
-                // A late delivery must not reset the accepted working installation or its account.
-                scheduleRetainedJournalReconciliationSafely()
+            if (finishProtectedNativeDelivery()) {
                 super.onRestoreFinished()
                 return
             }
@@ -203,11 +202,19 @@ open class NativeBackupAgent : BackupAgent() {
         }
     }
 
-    private fun finishRetainedNativeDelivery(): Boolean =
-        synchronized(callbackLock) {
-            val workspace = retainedJournalWorkspace(this)
-            workspace.prepareNativeDelivery().also { if (it) workspace.finishIncomingDelivery() }
+    private fun finishProtectedNativeDelivery(): Boolean {
+        if (privacyRepair.finishIfRequired()) {
+            if (completedReplay.hasInputs()) scheduleRetainedJournalReconciliationSafely()
+            return true
         }
+        finishCompletedNativeJournalCleanup()
+        if (finishRetainedNativeDelivery(this, callbackLock)) {
+            // A late delivery must not reset the accepted working installation or its account.
+            scheduleRetainedJournalReconciliationSafely()
+            return true
+        }
+        return completedRawReplay.finishIfRequired(::scheduleRetainedJournalReconciliationSafely)
+    }
 
     private fun finishStagedNativeJournalTransfer() {
         super.onRestoreFinished()
@@ -258,6 +265,14 @@ open class NativeBackupAgent : BackupAgent() {
         try {
             synchronized(callbackLock) {
                 restoreFormat.requireNativeFile(nativeFormat)
+                if (privacyRepair.captureIfRequired(fileType, { retainedNativeDestination(this, destination) }) { cohort, path ->
+                        ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.dup(data.fileDescriptor)).use { input ->
+                            completedReplay.captureInCohort(cohort, path, size, input)
+                        }
+                    }
+                ) {
+                    return@synchronized
+                }
                 finishCompletedNativeJournalCleanup()
                 restoreCompletionRecorded = false
                 installationStateReset = false
@@ -273,7 +288,10 @@ open class NativeBackupAgent : BackupAgent() {
                     scheduleRetainedJournalReconciliationSafely()
                     return@synchronized
                 }
-                if (NativeJournalRestoreAuthority(this).completedReceipt() != null || completedReplay.hasJournalInputs()) {
+                if (completedRawReplay.shouldCapture() ||
+                    NativeJournalRestoreAuthority(this).completedReceipt() != null ||
+                    completedReplay.hasJournalInputs()
+                ) {
                     if (fileType == TYPE_DIRECTORY) return@synchronized
                     if (fileType != TYPE_FILE) throw IOException("Native replay must contain regular files")
                     ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.dup(data.fileDescriptor)).use { input ->
@@ -408,13 +426,12 @@ open class NativeBackupAgent : BackupAgent() {
         synchronized(callbackLock) { installationStateReset = true }
     }
 
-    private fun scheduleRetainedJournalReconciliationSafely(): Boolean {
-        try {
-            return scheduleRetainedJournalReconciliation()
-        } catch (_: Exception) {
-            Napier.w("Retained journal reconciliation remains pending")
-            return false
-        }
+    private fun scheduleRetainedJournalReconciliationSafely(): Boolean =
+        scheduleRetainedNativeJournalSafely(::scheduleRetainedJournalReconciliation)
+
+    /** Phone agents must validate the retained SQLCipher copy without opening their application graph. */
+    protected open fun inspectNativePrivacyRepairCopy(files: Map<String, File>) {
+        check(files.keys.none { it.startsWith("database/") }) { "Native privacy repair has no encrypted journal validator" }
     }
 
     protected open fun scheduleRetainedJournalReconciliation(): Boolean = false

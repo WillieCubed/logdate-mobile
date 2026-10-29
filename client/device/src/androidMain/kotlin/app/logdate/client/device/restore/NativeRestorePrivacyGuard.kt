@@ -13,6 +13,7 @@ class NativeRestorePrivacyGuard(
     private val preferences: DataStore<Preferences>,
 ) {
     suspend fun verifyBeforeContent(hasRetainedContent: suspend () -> Boolean) {
+        if (hasPendingNativePrivacyRepair(context)) throw NativeRestorePrivacyMetadataRequiredException()
         val detector = PostRestoreDetector(context)
         if (!detector.shouldValidatePrivacyMetadata()) return
         val snapshot = preferences.data.first()
