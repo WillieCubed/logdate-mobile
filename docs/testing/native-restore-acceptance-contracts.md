@@ -34,6 +34,19 @@ selected recording transport to every initial, camera, partial-media, trust-repl
 and cold-restart probe. Verify the existing offline edit before a mutating verifier
 could recreate it.
 
+The committed-recording fixture is a live saved audio note containing valid audio, not
+an orphan file or plaintext with an audio suffix. Recovery may import a verified legacy
+original into immutable canonical storage and update the note's reference. Verify exact
+original bytes through that current reference, with a bounded recovery deadline, rather
+than requiring the obsolete raw filename. Source and in-place checks still preserve
+their actual bytes; cloud absence and unfinished raw/remux exclusions remain strict.
+
+Complete legacy audio, user media, and authenticated library staging in replay custody
+must wake reconciliation even after canonical payloads have been acknowledged. This does
+not make legacy files independent canonical/database candidates or authorize an import.
+The existing completed source receipt, inventory digest, owner/backend scope, current
+reference, media-header validation, and reference CAS still control admission.
+
 ## Installation-local publication state
 
 Watch links, sessions, keys, and delivery revisions belong to the installation. A source

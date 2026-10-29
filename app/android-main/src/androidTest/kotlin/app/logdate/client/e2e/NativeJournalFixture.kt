@@ -10,6 +10,7 @@ import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
 import app.logdate.client.media.audio.CrashSafeRecording
+import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.media.storage.UnavailableMediaReferences
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.JournalContentRepository
@@ -131,6 +132,16 @@ internal class NativeJournalFixture(
         val audio = save("proof.wav", "audio/wav")
         val video = save("proof.mp4", "video/mp4")
         seedRecordingTransferFixture(context)
+        // D2D selects live journal references; an orphan file is deliberately not a selected original.
+        val recording = File(context.filesDir, "audio_notes/transfer-recording.m4a").toURI().toString()
+        notes.create(
+            JournalNote.Audio(uid = id(15), creationTimestamp = now, lastUpdated = now, mediaRef = recording, durationMs = 500L),
+            id(2),
+        )
+        assertEquals(
+            GlobalContext.get().get<StoredMediaReferences>().storedReference(recording),
+            assertIs<JournalNote.Audio>(notes.getNoteById(id(15))).mediaRef,
+        )
         notes.create(JournalNote.Image(id(4), now, now, image, caption = "Original photo"), id(1))
         notes.create(JournalNote.Audio(uid = id(5), creationTimestamp = now, lastUpdated = now, mediaRef = audio, durationMs = 500L), id(2))
         notes.create(JournalNote.Video(id(6), now, now, video, caption = "Original video"), id(1))
@@ -191,7 +202,7 @@ internal class NativeJournalFixture(
         val final = File(context.filesDir, "audio_notes/transfer-recording.m4a")
         check(final.parentFile?.mkdirs() == true || final.parentFile?.isDirectory == true)
         check(final.createNewFile()) { "Recording transfer fixture already exists" }
-        final.writeBytes("committed recording".encodeToByteArray())
+        final.writeBytes(asset("completed-recording.m4a"))
         val inFlight = CrashSafeRecording.inFlightFile(final, isolateForBackup = true)
         inFlight.writeBytes("unfinished raw recording".encodeToByteArray())
         val remux = CrashSafeRecording.remuxStagingFile(inFlight, final)
@@ -231,6 +242,9 @@ internal class NativeJournalFixture(
         val image = assertNotNull(notes.getNoteById(id(4)) as? JournalNote.Image)
         val audio = assertNotNull(notes.getNoteById(id(5)) as? JournalNote.Audio)
         val video = assertNotNull(notes.getNoteById(id(6)) as? JournalNote.Video)
+        val recording = assertIs<JournalNote.Audio>(notes.getNoteById(id(15)))
+        assertEquals(500L, recording.durationMs)
+        assertTrue(links.observeJournalsForContent(id(15)).first().any { it.id == id(2) })
         val draft = assertNotNull(journals.getDraft(id(10)))
         assertEquals(listOf(id(1), id(2)), draft.selectedJournalIds)
         assertEquals("Unfinished native-transfer draft", (draft.blocks[0] as? SerializableTextBlock)?.content)

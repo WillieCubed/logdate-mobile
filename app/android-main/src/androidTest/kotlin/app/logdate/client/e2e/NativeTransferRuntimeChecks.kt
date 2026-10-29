@@ -19,19 +19,24 @@ import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.restore.PostRestoreType
 import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.ensureLogDateApplicationStarted
+import app.logdate.client.media.MediaManager
 import app.logdate.client.media.audio.AndroidRecordingServiceController
 import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.media.audio.RecordingSessionOptions
+import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalNotesRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
+import org.koin.core.context.GlobalContext
 import java.io.File
 import java.security.MessageDigest
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -178,7 +183,7 @@ internal enum class RecordingTransferExpectation {
     DEVICE_TRANSFER,
 }
 
-internal fun verifyRecordingTransferFixture(
+internal suspend fun verifyRecordingTransferFixture(
     context: android.content.Context,
     inPlace: Boolean,
     expectation: RecordingTransferExpectation,
@@ -189,17 +194,33 @@ internal fun verifyRecordingTransferFixture(
     if (expectation == RecordingTransferExpectation.CLOUD_TARGET) {
         require(!inPlace) { "A cloud target cannot retain source-only recording bytes" }
         assertFalse(final.exists(), "Cloud backup unexpectedly delivered an original recording")
+        val koin = GlobalContext.get()
+        val note = assertIs<JournalNote.Audio>(koin.get<JournalNotesRepository>().getNoteById(nativeRecordingFixtureId))
+        assertFalse(koin.get<MediaManager>().exists(note.mediaRef), "Cloud backup unexpectedly delivered the recording's original")
     } else {
-        assertTrue(final.isFile, "Native device transfer did not retain the recording")
         val expectedRecording =
             if (inPlace && expectation == RecordingTransferExpectation.DEVICE_TRANSFER) {
-                "Changed after native D2D backup"
+                "Changed after native D2D backup".encodeToByteArray()
             } else {
-                "committed recording"
+                nativeRecordingTransferBytes()
+            }
+        val actual =
+            if (inPlace || expectation == RecordingTransferExpectation.SOURCE) {
+                assertTrue(final.isFile, "The source lost its finalized recording")
+                final.readBytes()
+            } else {
+                // Accepted legacy originals migrate to canonical storage; their old filename is not retained.
+                val koin = GlobalContext.get()
+                val notes = koin.get<JournalNotesRepository>()
+                val media = koin.get<MediaManager>()
+                withTimeout(30_000) {
+                    while (!media.exists(assertIs<JournalNote.Audio>(notes.getNoteById(nativeRecordingFixtureId)).mediaRef)) delay(50)
+                }
+                media.readMedia(assertIs<JournalNote.Audio>(notes.getNoteById(nativeRecordingFixtureId)).mediaRef).data
             }
         assertContentEquals(
-            expectedRecording.encodeToByteArray(),
-            final.readBytes(),
+            expectedRecording,
+            actual,
             "Native device transfer did not preserve the expected recording",
         )
     }
@@ -221,3 +242,12 @@ internal fun verifyRecordingTransferFixture(
         assertFalse(remux.exists(), "An unfinished remux temporary must not transfer")
     }
 }
+
+internal val nativeRecordingFixtureId = Uuid.parse("00000000-0000-0000-0000-000000000015")
+
+internal fun nativeRecordingTransferBytes(): ByteArray =
+    InstrumentationRegistry
+        .getInstrumentation()
+        .context.assets
+        .open("recovery/completed-recording.m4a")
+        .use { it.readBytes() }
