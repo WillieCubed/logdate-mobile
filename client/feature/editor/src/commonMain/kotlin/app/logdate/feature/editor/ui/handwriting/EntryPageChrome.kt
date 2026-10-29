@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +45,8 @@ import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import app.logdate.client.datastore.EntryStartMode
+import app.logdate.feature.editor.ui.EditorInputFocusBookmarks
+import app.logdate.feature.editor.ui.LocalEditorInputFocusBookmarks
 import app.logdate.feature.editor.ui.editor.EditorState
 import app.logdate.feature.editor.ui.editor.isEmptyCreationBlock
 import app.logdate.feature.editor.ui.layout.EditorContentLayer
@@ -57,6 +60,8 @@ import app.logdate.feature.editor.ui.layout.LocalEntryCreationReserve
 import app.logdate.feature.editor.ui.layout.LocalEntryHeaderReserve
 import app.logdate.feature.editor.ui.layout.editorFocus
 import app.logdate.feature.editor.ui.layout.editorFocusPresentation
+import app.logdate.ui.creation.LocalEntryCreationProgress
+import app.logdate.ui.creation.entryCreationBarProgress
 import app.logdate.ui.foldable.FoldableSplitLayout
 import app.logdate.ui.foldable.calculateFoldableSplitLayout
 import app.logdate.ui.foldable.relativeTo
@@ -87,6 +92,7 @@ internal fun EntryPageChrome(
     onAddMemory: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
+    val focusBookmarks = remember { EditorInputFocusBookmarks() }
     val returnToWriting = stringResource(Res.string.entry_page_return_to_writing)
     val density = LocalDensity.current
     val direction = LocalLayoutDirection.current
@@ -96,7 +102,8 @@ internal fun EntryPageChrome(
     val block = editor.blocks.firstOrNull { it.id == editor.expandedBlockId }
     val journal = editor.availableJournals.firstOrNull()
     val creationAllowed =
-        !editor.isEditingLocked &&
+        !editor.isLoading &&
+            !editor.isEditingLocked &&
             !editor.isSaving &&
             !editor.shouldExit &&
             !editor.isRecordingAudio &&
@@ -106,8 +113,11 @@ internal fun EntryPageChrome(
     val showModes = creationAllowed && !overview.earlierExpanded && (block?.isEmptyCreationBlock() == true || editor.blocks.isEmpty())
     val showAdd = creationAllowed && !overview.earlierExpanded && !focused && editor.blocks.isNotEmpty()
     val reduceMotion = rememberSystemReduceMotion().value
-    val modeProgress = rememberCreationProgress(showModes, reduceMotion)
-    val addProgress = rememberCreationProgress(showAdd, reduceMotion)
+    val routeProgress = LocalEntryCreationProgress.current
+    val routeReady = routeProgress >= 0.999f
+    val routeReveal = entryCreationBarProgress(routeProgress)
+    val modeProgress = rememberCreationProgress(showModes, reduceMotion) * routeReveal
+    val addProgress = rememberCreationProgress(showAdd, reduceMotion) * routeReveal
     val dockProgress = maxOf(modeProgress, addProgress)
     val defaultCapture =
         when (defaultMode) {
@@ -164,6 +174,7 @@ internal fun EntryPageChrome(
         val barAlpha = (1f - overview.browsingProgress) * dockProgress
         val pullProgress = (-overview.pull / with(density) { 112.dp.toPx() }).coerceIn(0f, 1f)
         CompositionLocalProvider(
+            LocalEditorInputFocusBookmarks provides focusBookmarks,
             LocalEntryChromeHeight provides chromeHeight,
             LocalEntryHeaderReserve provides chromeHeight,
             LocalEntryContentInsets provides safeInsets,
@@ -240,8 +251,8 @@ internal fun EntryPageChrome(
                 mode = captureModeForBlock(block) ?: defaultCapture,
                 onMode = onCapture,
                 onAddMemory = { onAddMemory?.invoke() ?: onCapture(defaultCapture) },
-                modeEligible = showModes && overview.browsingProgress == 0f,
-                addEligible = showAdd && overview.browsingProgress == 0f,
+                modeEligible = showModes && routeReady && overview.browsingProgress == 0f,
+                addEligible = showAdd && routeReady && overview.browsingProgress == 0f,
                 modeProgress = modeProgress,
                 addProgress = addProgress,
                 chromeHeight = chromeHeight,
@@ -252,9 +263,9 @@ internal fun EntryPageChrome(
                         .width(barWidth)
                         .height(chromeHeight * dockProgress)
                         .padding(horizontal = Spacing.lg)
-                        .captureBarPullGestures(overview, enabled = !focused && !overview.earlierExpanded)
+                        .captureBarPullGestures(overview, enabled = routeReady && !focused && !overview.earlierExpanded)
                         .then(
-                            if (showModes && modeProgress >= 0.99f && overview.browsingProgress == 0f) {
+                            if (showModes && routeReady && modeProgress >= 0.99f && overview.browsingProgress == 0f) {
                                 Modifier.captureModeSwipes(
                                     captureModeForBlock(block) ?: defaultCapture,
                                     onCapture,

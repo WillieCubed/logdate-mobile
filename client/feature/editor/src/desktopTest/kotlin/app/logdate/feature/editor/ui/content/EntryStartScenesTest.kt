@@ -10,7 +10,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
@@ -110,7 +109,6 @@ class EntryStartScenesTest(
                 ) {
                     LogDateTheme(darkTheme = name.contains("dark"), dynamicColor = false) {
                         var journalExpanded by remember { mutableStateOf(false) }
-                        var defaultPickerOpen by remember { mutableStateOf(name.contains("default-picker")) }
                         val presentations =
                             rememberHandwritingBlockPresentations(
                                 state,
@@ -151,7 +149,6 @@ class EntryStartScenesTest(
                                     onSave = {},
                                     onCaptureMode = {},
                                     onJournalSelection = {},
-                                    onChooseDefaultMode = { defaultPickerOpen = true },
                                 )
                             },
                             editorContent = {
@@ -164,9 +161,6 @@ class EntryStartScenesTest(
                                     defaultStartMode = defaultMode,
                                     entryContext = entryDayContext(state, true),
                                 )
-                                if (defaultPickerOpen) {
-                                    EntryStartModeDialog(defaultMode, true, {}) { defaultPickerOpen = false }
-                                }
                             },
                             bottomContent = {
                                 EntryEditorCaptureControls(state, true, journalExpanded, { journalExpanded = it }, {}, {})
@@ -176,7 +170,7 @@ class EntryStartScenesTest(
                 }
             }
             waitForIdle()
-            val root = if (name.contains("default-picker")) onNode(isDialog()) else onRoot()
+            val root = onRoot()
             File("build/reports/entry-start/$name.png").apply {
                 parentFile.mkdirs()
                 writeBytes(Image.makeFromBitmap(root.captureToImage().asSkiaBitmap()).encodeToData()!!.bytes)
@@ -200,7 +194,6 @@ class EntryStartScenesTest(
                 arrayOf("phone-camera-return", 360, 800),
                 arrayOf("phone-audio-return", 360, 800),
                 arrayOf("phone-gallery-return", 360, 800),
-                arrayOf("phone-default-picker", 360, 800),
                 arrayOf("phone-overview", 360, 800),
                 arrayOf("tablet-overview", 1280, 800),
                 arrayOf("phone-text-focus", 360, 800),

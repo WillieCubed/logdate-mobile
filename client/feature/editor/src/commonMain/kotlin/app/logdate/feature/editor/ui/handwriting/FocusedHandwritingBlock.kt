@@ -50,6 +50,7 @@ import app.logdate.feature.editor.ui.LocalSharedTransitionScope
 import app.logdate.feature.editor.ui.blocks.EntryContextPreview
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.layout.EditorBlockCornerRadius
+import app.logdate.feature.editor.ui.layout.LocalEntryChromeHeight
 import app.logdate.feature.postcards.model.CanvasElement
 import app.logdate.feature.postcards.model.InkTool
 import kotlinx.coroutines.flow.first
@@ -199,8 +200,13 @@ internal fun FocusedHandwritingBlock(
                             .onSizeChanged { tools.topControlsHeight = with(density) { it.height.toDp() } }
                             .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
                             .statusBarsPadding()
-                            .padding(16.dp)
-                            .then(controlsModifier),
+                            .padding(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top =
+                                    16.dp + if (keepInkBelowControls) LocalEntryChromeHeight.current else 0.dp,
+                                bottom = 16.dp,
+                            ).then(controlsModifier),
                     ) {
                         HandwritingHistoryTools(
                             history,

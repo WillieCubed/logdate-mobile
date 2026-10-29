@@ -2,11 +2,7 @@
 
 package app.logdate.feature.editor.navigation
 
-import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -21,7 +17,10 @@ import app.logdate.feature.editor.ui.editor.DraftState
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.shared.model.location.VisitMemoryContext
 import app.logdate.ui.LocalSharedTransitionScope
-import app.logdate.ui.common.transitions.TransitionKeys
+import app.logdate.ui.creation.EntryCreationShape
+import app.logdate.ui.creation.LocalEntryCreationProgress
+import app.logdate.ui.creation.entryCreationBounds
+import app.logdate.ui.creation.rememberEntryCreationVisibilityProgress
 import app.logdate.ui.navigation.ViewModelsPerVisit
 import app.logdate.ui.navigation.taggedEntry
 import kotlinx.serialization.Serializable
@@ -29,11 +28,6 @@ import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 import app.logdate.feature.editor.ui.LocalAnimatedVisibilityScope as EditorLocalAnimatedVisibilityScope
 import app.logdate.feature.editor.ui.LocalSharedTransitionScope as EditorLocalSharedTransitionScope
-
-private val FabEditorBoundsTransform =
-    BoundsTransform { _, _ ->
-        tween(durationMillis = 350, easing = FastOutSlowInEasing)
-    }
 
 /**
  * Typed route for the entry editor. Carries optional context so the screen can resume an
@@ -60,6 +54,8 @@ data class EntryEditorRoute(
     val initialText: String? = null,
     val markId: String? = null,
     val resumeRecording: Boolean = false,
+    val creationTransitionId: String? = null,
+    val creationTransitionShape: EntryCreationShape = EntryCreationShape.Large,
 ) : NavKey
 
 /** Pushes the editor onto the back stack with optional entry / draft / journal context. */
@@ -99,21 +95,16 @@ fun EntryProviderScope<NavKey>.editorEntry(
         }
         val navigationScope = LocalSharedTransitionScope.current
         val animatedContentScope = LocalNavAnimatedContentScope.current
+        val creationProgress = if (route.creationTransitionId == null) 1f else rememberEntryCreationVisibilityProgress()
         val sharedBoundsModifier =
-            if (navigationScope != null) {
-                with(navigationScope) {
-                    Modifier.sharedBounds(
-                        rememberSharedContentState(key = TransitionKeys.FAB_TO_EDITOR_TRANSITION),
-                        animatedVisibilityScope = animatedContentScope,
-                        boundsTransform = FabEditorBoundsTransform,
-                        clipInOverlayDuringTransition = OverlayClip(MaterialTheme.shapes.large),
-                    )
-                }
-            } else {
-                Modifier
-            }
+            Modifier.entryCreationBounds(
+                route.creationTransitionId,
+                destination = true,
+                sourceShape = route.creationTransitionShape,
+            )
 
         CompositionLocalProvider(
+            LocalEntryCreationProgress provides creationProgress,
             EditorLocalSharedTransitionScope provides navigationScope,
             EditorLocalAnimatedVisibilityScope provides animatedContentScope,
         ) {

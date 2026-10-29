@@ -14,10 +14,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.autoSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -34,6 +36,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.editor.ui.LocalEditorInputFocusBookmarks
+import app.logdate.feature.editor.ui.editor.LocalEditorInputTokens
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.ui.common.handwritingDelegate
 import app.logdate.ui.theme.Spacing
@@ -66,15 +70,27 @@ fun TextBlockContent(
     minEditorHeight: Dp = 0.dp,
 ) {
     val focusRequester = remember { FocusRequester() }
+    val inputToken = LocalEditorInputTokens.current[block.id]
+    val textSession = LocalEditorTextInputSession.current
+    val ownerKey = "${textSession?.runtimeId}:${block.id}:$inputToken"
+    var acceptedLocalRevision by rememberSaveable(ownerKey, stateSaver = ownedTextInputSaver(ownerKey, autoSaver<Long>(), Long.MIN_VALUE)) {
+        mutableStateOf(Long.MIN_VALUE)
+    }
+    val initialValue = TextFieldValue(text = block.content, selection = TextRange(block.content.length))
     var fieldValue by
-        rememberSaveable(block.id.toString(), stateSaver = TextFieldValue.Saver) {
-            mutableStateOf(
-                TextFieldValue(
-                    text = block.content,
-                    selection = TextRange(block.content.length),
-                ),
-            )
+        rememberSaveable(ownerKey, stateSaver = ownedTextInputSaver(ownerKey, TextFieldValue.Saver, initialValue)) {
+            mutableStateOf(initialValue)
         }
+    var lastFocusedValue by rememberSaveable(ownerKey, stateSaver = ownedTextInputSaver(ownerKey, TextFieldValue.Saver, fieldValue)) {
+        mutableStateOf(fieldValue)
+    }
+    var hasEditingFocus by remember { mutableStateOf(false) }
+    val focusBookmarks = LocalEditorInputFocusBookmarks.current
+    DisposableEffect(focusBookmarks, block.id, inputToken) {
+        val owner = Any()
+        focusBookmarks?.attach(block.id, owner) { lastFocusedValue = fieldValue }
+        onDispose { focusBookmarks?.detach(block.id, owner) }
+    }
     val typography = MaterialTheme.typography
     val colors = MaterialTheme.colorScheme
     val markdownTransformation = rememberInlineMarkdownVisualTransformation()
@@ -101,9 +117,15 @@ fun TextBlockContent(
             value = fieldValue,
             onValueChange = { newValue ->
                 val shouldPropagate = shouldPropagateTextChange(fieldValue, newValue)
-                fieldValue = newValue
-                if (shouldPropagate) {
-                    onTextChanged(newValue.text)
+                if (!shouldPropagate || textSession == null) {
+                    fieldValue = newValue
+                    if (shouldPropagate) onTextChanged(newValue.text)
+                } else {
+                    val accepted = textSession.commit(block.id, inputToken, newValue.text)
+                    if (accepted != null) {
+                        acceptedLocalRevision = accepted
+                        fieldValue = newValue
+                    }
                 }
             },
             modifier =
@@ -114,7 +136,10 @@ fun TextBlockContent(
                     .testTag(LOGDATE_EDITOR_TEXT_INPUT_TAG)
                     .handwritingDelegate()
                     .focusRequester(focusRequester)
-                    .onFocusChanged { if (it.isFocused) onFocused() },
+                    .onFocusChanged {
+                        hasEditingFocus = it.isFocused
+                        if (it.isFocused) onFocused()
+                    },
             textStyle = typography.bodyLarge.copy(color = colors.onSurface),
             visualTransformation = markdownTransformation,
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
@@ -141,15 +166,24 @@ fun TextBlockContent(
         )
     }
 
-    LaunchedEffect(block.content) {
-        fieldValue = mergeExternalText(fieldValue, block.content)
+    LaunchedEffect(block.id, inputToken, block.content, textSession?.renderedRevision) {
+        fieldValue =
+            if (textSession == null) {
+                mergeExternalText(fieldValue, block.content)
+            } else {
+                mergeAcknowledgedText(fieldValue, block.content, textSession.renderedRevision, acceptedLocalRevision)
+            }
     }
 
     // Request focus when specified
-    LaunchedEffect(block.id, requestEditingFocus, focusRequestKey) {
+    LaunchedEffect(block.id, inputToken, requestEditingFocus, focusRequestKey) {
         if (requestEditingFocus && !readOnly) {
             try {
+                // Done hides the keyboard; returning through the surface should restore selection.
+                // A direct tap into an already focused inline field keeps its new cursor instead.
+                val restoreSelection = !hasEditingFocus && lastFocusedValue.text == fieldValue.text
                 focusRequester.requestFocus()
+                if (restoreSelection) fieldValue = fieldValue.copy(selection = lastFocusedValue.selection)
                 onFocused()
             } catch (e: Exception) {
                 Napier.e("Failed to request focus: ${e.message}", e)

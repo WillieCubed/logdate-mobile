@@ -1,5 +1,34 @@
 # Entry editor explorations
 
+## Current editor continuity contract
+
+The production entry page keeps one attached surface and input owner for each memory while moving
+between overview and focus. The actual surface bounds, foreground safe spacing and corners follow
+one interruptible focus clock. Predictive Back starts from the currently displayed position; cancelling
+restores focus, while committing returns the memory to the overview. A gesture invalidated by a new
+input owner cannot dismiss its successor. Text selection, scroll bookmarks and memory identity stay
+with the input rather than being recreated in a second presentation tree.
+
+**Done** returns from a focused memory and retains its content in the entry. **Save entry** commits the
+entry. Draft status reports the real draft-persistence state. The default capture preference belongs
+in Settings > Memories; choosing a tool in the current entry does not change that preference. The
+mode bar is available only for an empty, unowned input. Existing content and capture ownership
+prevent silent type replacement.
+
+Home creation sources carry a per-visit identity and their actual shape into the editor transition.
+A leading Timeline pull previews the New entry source; retreat cancels, and an armed release creates
+one editor visit. No editor or capture is created during the preview. The committed route visibility
+also drives the mode bar's reveal and interaction eligibility. This is a local pull preview followed
+by the supported navigation transition, not an externally seeked editor before commitment.
+
+`EntryDocumentContinuityTest`, `RetainedEditorFocusMotionTest`, `WorkspaceEntryPullTest`,
+`WorkspaceEntryPullInterruptionTest` and `HomeEntryCreationAdmissionTest` cover attachment, intermediate
+bounds, interruption and source admission. Native `EditorEntrySwitchVideoTest` separately checks input
+semantics through real touches. `EditorHomePullVideoTest` captures the pull and mode flow using the
+native frame clock and public accessibility, including the IME and resized emulator windows. Those windows do not
+establish physical hinge or foldable-hardware behavior. The explorations below retain historical
+prototype context and are not current production acceptance claims.
+
 ## Compose entry page study
 
 `EntryPagePreviews.kt` contains interactive Android Studio previews built from `EntryStartPrototype`,

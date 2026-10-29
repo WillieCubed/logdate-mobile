@@ -25,7 +25,8 @@ internal fun EntryBlockUiState.creationType(): BlockType =
     }
 
 private fun EditorState.canMutateCreation(): Boolean =
-    !isEditingLocked &&
+    !isLoading &&
+        !isEditingLocked &&
         !isSaving &&
         !shouldExit &&
         !isRecordingAudio &&
@@ -36,15 +37,16 @@ private fun EditorState.canMutateCreation(): Boolean =
 internal fun EditorState.replaceEmptyCreationBlock(
     targetId: Uuid,
     type: BlockType,
-    replacementId: Uuid,
+    inputToken: Uuid,
 ): EditorState {
-    if (!canMutateCreation() || expandedBlockId != targetId || isReadOnly(targetId) || blocks.any { it.id == replacementId }) return this
+    if (!canMutateCreation() || expandedBlockId != targetId || isReadOnly(targetId) || blocks.any { it.id == inputToken }) return this
     val target = blocks.firstOrNull { it.id == targetId } ?: return this
     if (!target.isEmptyCreationBlock() || target.creationType() == type) return this
-    val replacement = emptyCreationBlock(type, replacementId, target)
+    val replacement = emptyCreationBlock(type, target.id, target)
     return copy(
         blocks = blocks.map { if (it.id == targetId) replacement else it },
-        expandedBlockId = replacement.id,
+        expandedBlockId = target.id,
+        creationInputTokens = creationInputTokens + (target.id to inputToken),
         isModified = true,
     )
 }

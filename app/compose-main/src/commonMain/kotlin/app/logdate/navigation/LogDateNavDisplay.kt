@@ -97,6 +97,8 @@ import app.logdate.navigation.scenes.RelatedContentSceneStrategy
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.audio.AudioPlaybackProvider
+import app.logdate.ui.creation.EntryCreationLauncher
+import app.logdate.ui.creation.LocalEntryCreationLauncher
 import app.logdate.ui.keyboard.AppKeyboardShortcut
 import app.logdate.ui.keyboard.AppShortcutScope
 import app.logdate.ui.navigation.ActivityPresentation
@@ -134,6 +136,7 @@ fun LogDateNavDisplay(
     sceneStrategy: SceneStrategy<NavKey> = rememberRelatedContentSceneStrategy(),
     shortcutRequests: AppShortcutRequests? = null,
 ) {
+    val creationLauncher = remember { EntryCreationLauncher() }
     val workspaceFlags: FeatureFlagStore = koinInject()
     val workspaceEnabled by remember(workspaceFlags) { workspaceFlags.observe(FeatureFlag.HOME_WORKSPACE_V2) }
         .collectAsState(initial = FeatureFlag.HOME_WORKSPACE_V2.defaultEnabled)
@@ -223,6 +226,7 @@ fun LogDateNavDisplay(
         SharedTransitionLayout {
             CompositionLocalProvider(
                 LocalSharedTransitionScope provides this,
+                LocalEntryCreationLauncher provides creationLauncher,
                 LocalWorkspaceEnabled provides workspaceEnabled,
                 LocalWatchProvenanceVisible provides watchExperienceEnabled,
                 LocalActivityContextVisible provides activityAwarenessEnabled,
@@ -261,7 +265,7 @@ fun LogDateNavDisplay(
                                     taggedEntry<BaseRoute> { /* loading placeholder */ }
                                     taggedEntry<HomeRoute>(metadata = ActivityPresentation.Home.asMetadata()) {
                                         HomeScreen(
-                                            onNewEntry = { backStack.add(EntryEditorRoute()) },
+                                            onNewEntry = backStack.homeEntryCreation(creationLauncher),
                                             onWriteMark = { backStack.add(EntryEditorRoute(markId = it.toString())) },
                                             onRecordVoice = { backStack.add(EntryEditorRoute(launchMode = EditorLaunchMode.Voice)) },
                                             onOpenJournal = { backStack.add(JournalDetailsRoute(it)) },

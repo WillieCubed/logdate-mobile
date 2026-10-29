@@ -10,7 +10,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
-import kotlin.test.assertNotEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Instant
@@ -64,7 +63,7 @@ class EntryBlockCreationTest {
     }
 
     @Test
-    fun replacingAnEmptyTargetIsOneStateChangeAtTheSameIndexWithFreshIdentity() {
+    fun replacingAnEmptyTargetRetainsMemoryIdentityAndPosition() {
         val before = TextBlockUiState(content = "Earlier retained text")
         val target = TextBlockUiState(timestamp = Instant.parse("2026-10-28T00:00:00Z"), timeZoneId = "Europe/London")
         val after = ImageBlockUiState(uri = "content://retained/image")
@@ -75,11 +74,24 @@ class EntryBlockCreationTest {
         assertSame(before, changed.blocks[0])
         assertSame(after, changed.blocks[2])
         val replaced = assertIs<HandwritingBlockUiState>(changed.blocks[1])
-        assertEquals(replacementId, replaced.id)
-        assertNotEquals(target.id, replaced.id, "A type change must not retrieve a retained audio session by old ID")
+        assertEquals(target.id, replaced.id, "Changing an empty memory's input mode must preserve its identity")
         assertEquals(target.timestamp, replaced.timestamp)
         assertEquals(target.timeZoneId, replaced.timeZoneId)
-        assertEquals(replacementId, changed.expandedBlockId)
+        assertEquals(target.id, changed.expandedBlockId)
+    }
+
+    @Test
+    fun rapidModeReversalKeepsOneFocusedMemoryAndItsCaptureMetadata() {
+        val target = TextBlockUiState(timestamp = Instant.parse("2026-10-28T00:00:00Z"), timeZoneId = "Europe/London")
+        var state = EditorState(blocks = listOf(target), expandedBlockId = target.id)
+        for (type in listOf(BlockType.AUDIO, BlockType.HANDWRITING, BlockType.TEXT, BlockType.CAMERA, BlockType.TEXT)) {
+            state = state.replaceEmptyCreationBlock(target.id, type, Uuid.random())
+            assertEquals(type, state.blocks.single().creationType())
+            assertEquals(target.id, state.blocks.single().id)
+            assertEquals(target.id, state.expandedBlockId)
+            assertEquals(target.timestamp, state.blocks.single().timestamp)
+            assertEquals(target.timeZoneId, state.blocks.single().timeZoneId)
+        }
     }
 
     @Test
@@ -89,6 +101,7 @@ class EntryBlockCreationTest {
         for (state in listOf(
             focused.copy(blocks = listOf(target.copy(content = "Arrived since the frame rendered"))),
             focused.copy(isSaving = true),
+            focused.copy(isLoading = true),
             focused.copy(isEditingLocked = true),
             focused.copy(shouldExit = true),
             focused.copy(readOnlyBlocks = mapOf(target.id to true)),
@@ -124,6 +137,7 @@ class EntryBlockCreationTest {
         assertSame(state, state.beginEmptyCreationBlock(BlockType.IMAGE, id, onlyEmptyEntry = true))
         for (blocked in listOf(
             state.copy(isSaving = true),
+            state.copy(isLoading = true),
             state.copy(isEditingLocked = true),
             state.copy(shouldExit = true),
             state.copy(expandedBlockId = retained.id),

@@ -19,15 +19,20 @@ internal val LocalAudioCaptureStartGate = staticCompositionLocalOf<AudioCaptureS
 
 internal class EditorAudioCaptureStartGate(
     private val state: MutableStateFlow<EditorState>,
+    private val inputTokens: Map<Uuid, Uuid>? = null,
     private val observed: () -> EditorState = { state.value },
 ) : AudioCaptureStartGate {
-    constructor(viewModel: EntryEditorViewModel) : this(viewModel.mutableEditorState, { viewModel.editorState.value })
+    constructor(viewModel: EntryEditorViewModel, inputTokens: Map<Uuid, Uuid>? = null) : this(
+        viewModel.mutableEditorState,
+        inputTokens,
+        { viewModel.editorState.value },
+    )
 
     fun runWhenIdle(action: () -> Unit) {
         if (state.value.audioCaptureStartReservations.isEmpty()) action()
     }
 
-    override fun claim(blockId: Uuid): Uuid? = state.claimAudioCaptureStart(blockId, observed)
+    override fun claim(blockId: Uuid): Uuid? = state.claimAudioCaptureStart(blockId, observed, inputTokens)
 
     override fun release(
         blockId: Uuid,
@@ -36,7 +41,7 @@ internal class EditorAudioCaptureStartGate(
 }
 
 internal fun EntryEditorViewModel.claimAudioCaptureStart(blockId: Uuid): Uuid? =
-    mutableEditorState.claimAudioCaptureStart(blockId) { editorState.value }
+    mutableEditorState.claimAudioCaptureStart(blockId, observed = { editorState.value })
 
 internal fun EntryEditorViewModel.releaseAudioCaptureStart(
     blockId: Uuid,
@@ -46,13 +51,16 @@ internal fun EntryEditorViewModel.releaseAudioCaptureStart(
 private fun MutableStateFlow<EditorState>.claimAudioCaptureStart(
     blockId: Uuid,
     observed: () -> EditorState,
+    inputTokens: Map<Uuid, Uuid>? = null,
 ): Uuid? {
     val token = Uuid.random()
     while (true) {
         val visible = observed()
         if (visible.isLoading || visible.isReadOnly(blockId)) return null
         val current = value
-        if (current.isSaving ||
+        if (inputTokens != null && inputTokens[blockId] != current.creationInputTokens[blockId]) return null
+        if (current.isLoading ||
+            current.isSaving ||
             current.isEditingLocked ||
             current.shouldExit ||
             current.isReadOnly(blockId) ||

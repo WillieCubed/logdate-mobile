@@ -29,7 +29,6 @@ internal fun EntryEditorTopBar(
     onSave: () -> Unit,
     onCaptureMode: (StoryCaptureMode) -> Unit,
     onJournalSelection: (List<Uuid>) -> Unit,
-    onChooseDefaultMode: (() -> Unit)? = null,
     floating: Boolean = false,
 ) {
     val recording = state.editorFocus() is EditorFocus.Recording
@@ -54,11 +53,10 @@ internal fun EntryEditorTopBar(
             onShowDrafts = onShowDrafts,
             floating = floating,
             draftCount = state.availableDrafts.size,
-            onChooseDefaultMode = onChooseDefaultMode,
+            autoSaveStatus = autoSaveStatus,
         )
     } else {
         NoteEditorToolbar(
-            onChooseDefaultMode = onChooseDefaultMode,
             modifier = Modifier.testTag("entry_mode_overview"),
             onBack = onBack,
             onSave = onSave,

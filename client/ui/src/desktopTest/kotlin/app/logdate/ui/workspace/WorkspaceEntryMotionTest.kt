@@ -21,9 +21,12 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
-import app.logdate.ui.common.transitions.TransitionKeys
+import app.logdate.ui.creation.EntryCreationLauncher
+import app.logdate.ui.creation.LocalEntryCreationLauncher
+import app.logdate.ui.creation.entryCreationKey
 import app.logdate.ui.theme.LogDateTheme
 import kotlin.test.Test
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
@@ -40,6 +43,8 @@ class WorkspaceEntryMotionTest {
     private fun verifyCreateMotion(size: Size) =
         runSkikoComposeUiTest(size = size) {
             var editor by mutableStateOf(false)
+            val launcher = EntryCreationLauncher()
+            var launchId: String? = null
             var active = false
             mainClock.autoAdvance = false
             setContent {
@@ -47,14 +52,14 @@ class WorkspaceEntryMotionTest {
                     SharedTransitionLayout {
                         active = isTransitionActive
                         val shared = this
-                        CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+                        CompositionLocalProvider(LocalSharedTransitionScope provides this, LocalEntryCreationLauncher provides launcher) {
                             AnimatedContent(editor) { destination ->
                                 CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
                                     if (destination) {
                                         with(shared) {
                                             Surface(
                                                 Modifier.fillMaxSize().sharedBounds(
-                                                    rememberSharedContentState(TransitionKeys.FAB_TO_EDITOR_TRANSITION),
+                                                    rememberSharedContentState(entryCreationKey(launchId ?: "missing-source")),
                                                     this@AnimatedContent,
                                                 ),
                                             ) { Box(Modifier.fillMaxSize()) }
@@ -64,7 +69,10 @@ class WorkspaceEntryMotionTest {
                                             destinations = listOf(WorkspaceDestination("home", "Timeline", Icons.Default.Home)),
                                             selectedKey = "home",
                                             onSelect = {},
-                                            onCreate = { editor = true },
+                                            onCreate = {
+                                                launchId = launcher.currentSourceId
+                                                editor = true
+                                            },
                                             content = {},
                                         )
                                     }
@@ -76,6 +84,7 @@ class WorkspaceEntryMotionTest {
             }
             waitForIdle()
             onNodeWithContentDescription("Add a memory").performClick()
+            assertNotNull(launchId, "Home must synchronously pass its actual source identity into navigation")
             mainClock.advanceTimeBy(80)
             waitForIdle()
             assertTrue(active, "The Home create surface has no matching shared element at $size")

@@ -148,12 +148,15 @@ internal fun EntryEditorViewModel.createNewBlockImpl(
 internal fun EntryEditorViewModel.updateBlockImpl(
     updatedBlock: EntryBlockUiState,
     baseBlock: EntryBlockUiState? = null,
+    inputToken: Uuid? = null,
+    fromInput: Boolean = false,
 ) {
     if (editorState.value.isReadOnly(updatedBlock.id)) {
         mutableEditorState.update { it.copy(errorMessage = Res.string.editor_error_block_saved_cannot_change.toUiText()) }
         return
     }
     mutateEditorContent { currentState ->
+        if (fromInput && currentState.creationInputTokens[updatedBlock.id] != inputToken) return@mutateEditorContent currentState
         if (currentState.isReadOnly(updatedBlock.id)) {
             currentState
         } else {

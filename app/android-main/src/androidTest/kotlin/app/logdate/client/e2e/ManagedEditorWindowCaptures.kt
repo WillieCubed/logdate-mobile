@@ -9,7 +9,9 @@ import android.view.ViewGroup
 import androidx.camera.view.PreviewView
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.ComposeTestRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -65,6 +67,26 @@ internal class ManagedEditorWindowCaptures(
             }
             compose.onNodeWithText("Retake").assertIsDisplayed().assertIsEnabled()
             compose.onNodeWithText("Use Photo").assertIsDisplayed().assertIsEnabled()
+        }
+
+    fun captureWritingSizes() =
+        captureSizes("writing", {
+            compose.onNodeWithTag("editor_text_input").assertIsDisplayed().assertTextContains("A quiet moment.")
+        }) {
+            assertEquals(1, compose.onAllNodesWithTag("editor_text_input").fetchSemanticsNodes().size)
+            val field = compose.onNodeWithTag("editor_text_input").fetchSemanticsNode().boundsInWindow
+            compose.onNodeWithContentDescription("Return to entry").assertIsDisplayed().assertIsEnabled()
+            compose.onNodeWithContentDescription("Save entry").assertIsDisplayed().assertIsEnabled()
+            scenario.onActivity {
+                val view = it.window.decorView
+                val safe =
+                    WindowInsetsCompat
+                        .toWindowInsetsCompat(view.rootWindowInsets)
+                        .getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+                assertTrue(field.top >= safe.top, "Writing must remain below system controls")
+                assertTrue(field.bottom <= view.height - safe.bottom + 1f, "Writing must remain above system controls")
+                assertEquals((view.width + safe.left - safe.right) / 2f, field.center.x, 1f)
+            }
         }
 
     fun awaitReviewImage() {
@@ -124,7 +146,7 @@ internal class ManagedEditorWindowCaptures(
                 check(device.takeScreenshot(File(output, "$label-$stage-window-${width}x800.png")))
                 File(output, "$label-$stage-window.txt").writeText(
                     "Native app on API34 managed emulator, resized ${width}x800px at density160. " +
-                        "Synthetic emulated camera. No physical foldable/hinge behavior claimed.\n",
+                        "Synthetic editor content. No physical foldable/hinge behavior claimed.\n",
                 )
             }
         } finally {
@@ -158,7 +180,7 @@ internal class ManagedEditorWindowCaptures(
                         .getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
                 val density = it.resources.displayMetrics.density
                 expectedCenter = (width + safe.left - safe.right) / 2f
-                expectedRail = min(width.toFloat() - safe.left - safe.right, 640 * density) - 32 * density
+                expectedRail = min(width.toFloat() - safe.left - safe.right, 640 * density) - if (stage == "writing") 0f else 32 * density
                 findPreview(decor)?.let { preview ->
                     val origin = IntArray(2)
                     preview.getLocationInWindow(origin)
@@ -168,8 +190,13 @@ internal class ManagedEditorWindowCaptures(
             val root = compose.onNodeWithTag("stories_editor").fetchSemanticsNode().boundsInWindow
             val target =
                 compose
-                    .onNodeWithTag(if (stage == "camera") "entry_creation_actions" else "camera_review_surface")
-                    .fetchSemanticsNode()
+                    .onNodeWithTag(
+                        when (stage) {
+                            "camera" -> "entry_creation_actions"
+                            "writing" -> "editor_text_input"
+                            else -> "camera_review_surface"
+                        },
+                    ).fetchSemanticsNode()
                     .boundsInWindow
             val current = "root=$root rail=$target previewCenter=$previewCenter expectedRail=$expectedRail expectedCenter=$expectedCenter"
             stable = if (current == previous) stable + 1 else 0

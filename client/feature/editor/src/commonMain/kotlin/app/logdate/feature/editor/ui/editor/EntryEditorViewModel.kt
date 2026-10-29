@@ -17,7 +17,6 @@ import app.logdate.feature.editor.ui.editor.delegate.PendingAudioRecoverer
 import app.logdate.feature.editor.ui.mapper.toDomainBlock
 import app.logdate.shared.model.location.VisitMemoryContext
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -72,29 +71,12 @@ class EntryEditorViewModel(
     /** Draft identity restored before launch-mode effects, so process recreation cannot start another take. */
     val recoverableDraftId: Uuid? get() = savedStateHandle.get<String>("editor.draftId")?.let { runCatching { Uuid.parse(it) }.getOrNull() }
 
-    private val entryModeWriteFailure = MutableStateFlow(false)
-    val defaultEntryModeWriteFailed: StateFlow<Boolean> = entryModeWriteFailure
-
     val defaultEntryMode: StateFlow<EntryStartMode> =
         (preferences?.observeEntryStartMode() ?: flowOf(EntryStartMode.TEXT))
             .catch { error ->
                 Napier.e("Could not read default entry mode", error)
                 emit(EntryStartMode.TEXT)
             }.stateIn(viewModelScope, SharingStarted.Eagerly, EntryStartMode.TEXT)
-
-    fun setDefaultEntryMode(mode: EntryStartMode) {
-        viewModelScope.launch {
-            entryModeWriteFailure.value = false
-            try {
-                checkNotNull(preferences).setEntryStartMode(mode)
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (error: Exception) {
-                Napier.e("Could not save default entry mode", error)
-                entryModeWriteFailure.value = true
-            }
-        }
-    }
 
     internal var preferredEntryInitialized = false
 
@@ -113,11 +95,13 @@ class EntryEditorViewModel(
      */
     internal val audioBlockFinalizers = mutableMapOf<Uuid, AudioBlockFinalizer>()
 
+    internal val textInputRuntimeId = Uuid.random()
+
     // Internal mutable state that can be modified by UI
     internal val mutableEditorState =
         MutableStateFlow(
             EditorState(
-                isLoading = true,
+                isLoading = false,
                 disableEmptyBlockCreation = false,
             ),
         )
@@ -225,7 +209,7 @@ class EntryEditorViewModel(
                 availableDrafts = data.allDrafts,
                 todayNotes = data.todayNotes.filter { it.uid != currentState.entryEditBase?.targetId },
                 isLoadingDrafts = false,
-                isLoading = false,
+                isLoading = currentState.isLoading,
             )
         }.stateIn(
             viewModelScope,
@@ -251,6 +235,12 @@ class EntryEditorViewModel(
         updatedBlock: EntryBlockUiState,
         baseBlock: EntryBlockUiState? = null,
     ) = updateBlockImpl(updatedBlock, baseBlock)
+
+    internal fun updateBlockFromInput(
+        updatedBlock: EntryBlockUiState,
+        baseBlock: EntryBlockUiState?,
+        inputToken: Uuid?,
+    ) = updateBlockImpl(updatedBlock, baseBlock, inputToken, fromInput = true)
 
     fun chooseCreationType(
         targetId: Uuid?,
