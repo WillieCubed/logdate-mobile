@@ -68,6 +68,7 @@ kotlin {
         findByName("androidHostTest")?.dependencies {
             implementation(libs.kotlin.test.junit)
             implementation(libs.mockk)
+            implementation(libs.androidx.datastore.preferences)
         }
         findByName("androidDeviceTest")?.dependencies {
             implementation(libs.kotlin.test.junit)

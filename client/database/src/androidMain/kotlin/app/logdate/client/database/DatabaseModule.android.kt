@@ -48,6 +48,7 @@ actual val databaseModule: Module =
                         }
                         val passphraseProvider = get<DatabasePassphraseProvider>()
                         val candidates = runBlocking { passphraseProvider.getPassphraseCandidates() }
+                        runBlocking { verifyNativePrivacyBeforeDatabaseOpen(context, candidates, get<NativeRestorePrivacyGuard>()) }
                         migratePlaintextDatabaseIfNeeded(context, candidates.first())
                         val opened =
                             openDatabaseWithPassphraseCandidates(candidates) { passphrase ->

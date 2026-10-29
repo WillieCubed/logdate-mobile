@@ -20,6 +20,12 @@ mutation rejects such a payload; the profile selects cloud backup instead.
 The host records exception types and startup-state types when database refusal fails.
 It must not print journal text, credentials, or preference values as diagnostics.
 
+Unknown privacy is checked against an owned, isolated database copy before canonical
+migrations, writable Room callbacks, or key confirmation. Known policies avoid that
+inspection. Fresh storage and previously created databases proven empty can continue;
+unreadable copies, failed queries, cancellation, and orphaned sidecars never establish
+emptiness. Existing retained-draft checks still apply without a database.
+
 ## Originals and recording files
 
 Device transfer carries committed originals. Cloud backup excludes them. Signed-out
