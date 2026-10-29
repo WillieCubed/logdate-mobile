@@ -1,14 +1,9 @@
 package app.logdate.client.e2e
 
-import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
-import android.os.Bundle
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.app.ActivityOptionsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.Data
@@ -26,39 +21,28 @@ import app.logdate.client.domain.export.ExportSchemaVersion
 import app.logdate.client.domain.export.ExportStats
 import app.logdate.client.ensureLogDateApplicationStarted
 import app.logdate.client.media.MediaManager
-import app.logdate.client.repository.journals.JournalContentRepository
+import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.repository.journals.JournalNote
-import app.logdate.client.repository.journals.JournalNotesRepository
-import app.logdate.client.repository.journals.JournalRepository
-import app.logdate.feature.core.restore.AndroidRestoreLauncher
 import app.logdate.feature.core.restore.ArchiveMediaRecoveryWorker
-import app.logdate.feature.core.restore.RestoreLauncher
 import app.logdate.feature.core.restore.RestoreSummary
 import app.logdate.feature.core.restore.RestoreWorker
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.SerializableVideoBlock
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import org.json.JSONObject
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.koin.core.context.GlobalContext
 import org.koin.core.context.loadKoinModules
 import org.koin.dsl.module
 import java.io.File
 import java.io.IOException
-import java.security.MessageDigest
-import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.test.assertContentEquals
@@ -73,21 +57,7 @@ import kotlin.uuid.Uuid
 
 /** Run seed, repair, and verify in separate instrumentation processes, with force-stop between them. */
 @RunWith(AndroidJUnit4::class)
-class ArchiveMediaRecoveryE2ETest {
-    private val instrumentation = InstrumentationRegistry.getInstrumentation()
-    private val context get() = instrumentation.targetContext
-    private val fixture get(): File {
-        val label = InstrumentationRegistry.getArguments().getString("archiveRecoveryFixtureLabel")
-        require(label == null || label.matches(Regex("[a-z0-9-]+")))
-        return context.noBackupFilesDir.resolve("archive-media-recovery-${label ?: "acceptance"}.json")
-    }
-    private val koin get() = GlobalContext.get()
-    private val notes get() = koin.get<JournalNotesRepository>()
-    private val journals get() = koin.get<JournalRepository>()
-    private val links get() = koin.get<JournalContentRepository>()
-    private val media get() = koin.get<MediaManager>()
-    private val json = Json { ignoreUnknownKeys = true }
-
+class ArchiveMediaRecoveryE2ETest : ArchiveRecoveryCancellationFixture() {
     @Test
     fun archiveRecoveryAcrossProcessRestart(): Unit =
         runBlocking {
@@ -135,255 +105,6 @@ class ArchiveMediaRecoveryE2ETest {
                 }
                 else -> error("Choose seed, repair, or verify for the owned emulator")
             }
-        }
-
-    /** Controlled save latency leaves the real worker at an accepted, persisted media checkpoint. */
-    private suspend fun cancelRunningRecovery() {
-        val state = JSONObject(fixture.readText())
-        verifyEdits(state)
-        val launcher = assertIs<AndroidRestoreLauncher>(koin.get<RestoreLauncher>())
-        val manager = WorkManager.getInstance(context)
-        val bindings = RestoreWorkerTestBindings()
-        val delegate = media
-        val reachedSecondOriginal = CompletableDeferred<Unit>()
-        val cancellationObserved = CompletableDeferred<Unit>()
-        val gated =
-            object : MediaManager by delegate {
-                override suspend fun saveMediaFromFile(
-                    sourceFilePath: String,
-                    fileName: String,
-                    mimeType: String,
-                ): String {
-                    if (fileName == "replacement-video.mp4") {
-                        reachedSecondOriginal.complete(Unit)
-                        try {
-                            awaitCancellation()
-                        } finally {
-                            cancellationObserved.complete(Unit)
-                        }
-                    }
-                    return delegate.saveMediaFromFile(sourceFilePath, fileName, mimeType)
-                }
-            }
-        val workName = "archive_media_recovery_${state.getString("recoveryId")}"
-        val previousWork =
-            manager
-                .getWorkInfosForUniqueWork(workName)
-                .get()
-                .map { it.id }
-                .toSet()
-        val pickerLaunches = trapDocumentPicker(launcher)
-        var workId: UUID? = null
-        var cancellationCompleted = false
-        try {
-            loadKoinModules(module { single<MediaManager> { gated } })
-            launcher.selectArchiveForMediaRecovery(state.getString("recoveryId"))
-            workId = awaitNewMediaWork(manager, workName, previousWork, pickerLaunches)
-            assertEquals(WorkInfo.State.ENQUEUED, manager.getWorkInfoById(workId).get()?.state)
-            instrumentation.sendStatus(0, Bundle().apply { putString("archiveCancellation", "RESTORE_CANCELLATION_READY") })
-            withTimeout(30_000) { reachedSecondOriginal.await() }
-            assertEquals(WorkInfo.State.RUNNING, manager.getWorkInfoById(workId).get()?.state)
-            val progress = recoveryRecord(state).getJSONObject("summary")
-            assertEquals(1, progress.getInt("mediaRecoveryChecked"))
-            assertEquals(2, progress.getInt("mediaRecoveryTotal"))
-            assertEquals(1, progress.getInt("unavailableOriginals"))
-            assertTrue(progress.getBoolean("recoveringMedia"), "A blocked original must never be reported complete")
-            val photo = assertIs<JournalNote.Image>(notes.getNoteById(state.id("note")))
-            assertContentEquals(asset("proof.png"), delegate.readMedia(photo.mediaRef).data)
-            state.put("acceptedPhotoReference", photo.mediaRef)
-            state.put("acceptedPhotoHash", checksum(delegate.readMedia(photo.mediaRef).data))
-            state.put("cancelledWorkId", workId.toString())
-            state.put("retainedSourceHash", checksum(recoverySource(state).readBytes()))
-            state.put(
-                "noteIds",
-                notes.allNotesObserved
-                    .first()
-                    .map { it.uid.toString() }
-                    .sorted()
-                    .joinToString(","),
-            )
-            state.put(
-                "draftIds",
-                journals
-                    .getAllDrafts()
-                    .map { it.id.toString() }
-                    .sorted()
-                    .joinToString(","),
-            )
-            fixture.writeText(state.toString())
-            launcher.cancelRestore()
-            withTimeout(15_000) { cancellationObserved.await() }
-            awaitWorkFinished(workId)
-            assertEquals(WorkInfo.State.CANCELLED, manager.getWorkInfoById(workId).get()?.state)
-            assertTrue(recoveryRecord(state).getBoolean("pausedByUser"))
-            assertTrue(context.filesDir.resolve("archive_recovery/records/${state.getString("recoveryId")}.paused").isFile)
-            verifyCancelledAfterRestart()
-            cancellationCompleted = true
-        } finally {
-            if (!cancellationCompleted) {
-                launcher.cancelRestore()
-                workId?.let { manager.cancelWorkById(it).result.get() }
-            }
-            bindings.restore()
-        }
-    }
-
-    private suspend fun verifyCancelledAfterRestart() {
-        val state = JSONObject(fixture.readText())
-        val record = recoveryRecord(state)
-        assertTrue(record.getBoolean("pausedByUser"), "Restart must retain the user's pause")
-        assertTrue(record.getBoolean("metadataApplied"))
-        assertEquals(1, record.getJSONArray("pending").length())
-        val summary = record.getJSONObject("summary")
-        assertEquals(1, summary.getInt("unavailableOriginals"))
-        assertEquals(1, summary.getInt("mediaRecoveryChecked"))
-        assertEquals(2, summary.getInt("mediaRecoveryTotal"))
-        assertEquals(state.getString("retainedSourceHash"), checksum(recoverySource(state).readBytes()))
-        val work = WorkManager.getInstance(context).getWorkInfoById(UUID.fromString(state.getString("cancelledWorkId"))).get()
-        assertEquals(WorkInfo.State.CANCELLED, assertNotNull(work).state)
-        verifyAcceptedCheckpoint(state)
-    }
-
-    private suspend fun resumeCancelledRecovery() {
-        verifyCancelledAfterRestart()
-        val state = JSONObject(fixture.readText())
-        val launcher = assertIs<AndroidRestoreLauncher>(koin.get<RestoreLauncher>())
-        val manager = WorkManager.getInstance(context)
-        val workName = "archive_media_recovery_${state.getString("recoveryId")}"
-        val previousWork =
-            manager
-                .getWorkInfosForUniqueWork(workName)
-                .get()
-                .map { it.id }
-                .toSet()
-        val pickerLaunches = trapDocumentPicker(launcher)
-        launcher.selectArchiveForMediaRecovery(state.getString("recoveryId"))
-        val id = awaitNewMediaWork(manager, workName, previousWork, pickerLaunches)
-        assertTrue(id.toString() != state.getString("cancelledWorkId"))
-        state.put("resumedWorkId", id.toString())
-        fixture.writeText(state.toString())
-        awaitWorkFinished(id)
-        assertEquals(
-            WorkInfo.State.SUCCEEDED,
-            WorkManager
-                .getInstance(context)
-                .getWorkInfoById(id)
-                .get()
-                ?.state,
-        )
-        verifyCancelledCompletion()
-    }
-
-    private fun trapDocumentPicker(launcher: AndroidRestoreLauncher): AtomicInteger {
-        val launches = AtomicInteger()
-        launcher.setupActivityResultLauncher(
-            object : ActivityResultLauncher<Intent>() {
-                override fun launch(
-                    input: Intent,
-                    options: ActivityOptionsCompat?,
-                ) {
-                    launches.incrementAndGet()
-                }
-
-                override fun unregister() = Unit
-
-                override val contract = ActivityResultContracts.StartActivityForResult()
-            },
-        )
-        return launches
-    }
-
-    private suspend fun awaitNewMediaWork(
-        manager: WorkManager,
-        name: String,
-        previous: Set<UUID>,
-        pickerLaunches: AtomicInteger,
-    ): UUID =
-        withTimeout(15_000) {
-            var resumed: UUID? = null
-            while (resumed == null) {
-                assertEquals(0, pickerLaunches.get(), "An intact retained archive must resume without selecting another document")
-                resumed =
-                    manager
-                        .getWorkInfosForUniqueWork(name)
-                        .get()
-                        .firstOrNull { it.id !in previous }
-                        ?.id
-                if (resumed == null) delay(100)
-            }
-            assertEquals(0, pickerLaunches.get())
-            resumed
-        }
-
-    private suspend fun verifyCancelledCompletion() {
-        val state = JSONObject(fixture.readText())
-        verifyAcceptedCheckpoint(state)
-        verifyOriginals(state)
-        val record = recoveryRecord(state)
-        assertFalse(record.optBoolean("pausedByUser"))
-        assertEquals(0, record.optJSONArray("pending")?.length() ?: 0)
-        val summary = record.getJSONObject("summary")
-        assertEquals(0, summary.optInt("unavailableOriginals"))
-        assertEquals(0, summary.optInt("unavailablePreviews"))
-        assertFalse(summary.optBoolean("recoveringMedia"))
-        assertEquals(1, summary.getInt("notesImported"))
-        assertEquals(1, summary.getInt("draftsImported"))
-        assertEquals(3, summary.getInt("mediaImported"))
-        val manager = WorkManager.getInstance(context)
-        assertEquals(WorkInfo.State.SUCCEEDED, manager.getWorkInfoById(UUID.fromString(state.getString("resumedWorkId"))).get()?.state)
-        val cancelledState = manager.getWorkInfoById(UUID.fromString(state.getString("cancelledWorkId"))).get()?.state
-        assertTrue(cancelledState == null || cancelledState == WorkInfo.State.CANCELLED, "Replaced work must stay cancelled or be pruned")
-    }
-
-    private suspend fun verifyAcceptedCheckpoint(state: JSONObject) {
-        verifyEdits(state)
-        val photo = assertIs<JournalNote.Image>(notes.getNoteById(state.id("note")))
-        assertEquals(state.getString("acceptedPhotoReference"), photo.mediaRef)
-        assertEquals(state.getString("acceptedPhotoHash"), checksum(media.readMedia(photo.mediaRef).data))
-        assertEquals(
-            state.getString("noteIds"),
-            notes.allNotesObserved
-                .first()
-                .map { it.uid.toString() }
-                .sorted()
-                .joinToString(","),
-        )
-        assertEquals(
-            state.getString("draftIds"),
-            journals
-                .getAllDrafts()
-                .map { it.id.toString() }
-                .sorted()
-                .joinToString(","),
-        )
-    }
-
-    private suspend fun awaitWorkFinished(id: UUID) =
-        withTimeout(60_000) {
-            val manager = WorkManager.getInstance(context)
-            while (manager
-                    .getWorkInfoById(id)
-                    .get()
-                    ?.state
-                    ?.isFinished != true
-            ) {
-                delay(100)
-            }
-        }
-
-    private fun recoveryRecord(state: JSONObject) =
-        JSONObject(
-            context.filesDir.resolve("archive_recovery/records/${state.getString("recoveryId")}.json").readText(),
-        )
-
-    private fun recoverySource(state: JSONObject): File {
-        val record = recoveryRecord(state)
-        return context.filesDir.resolve("archive_recovery/sources/${record.getString("id")}.${record.getString("sourceGeneration")}.zip")
-    }
-
-    private fun checksum(bytes: ByteArray) =
-        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") {
-            (it.toInt() and 0xff).toString(16).padStart(2, '0')
         }
 
     private fun cleanupRejectedFixture() {
@@ -608,14 +329,18 @@ class ArchiveMediaRecoveryE2ETest {
             .map { it.relativeTo(context.filesDir).invariantSeparatorsPath }
             .toSet()
 
-    private suspend fun verifyEdits(state: JSONObject) {
+    override suspend fun verifyEdits(state: JSONObject) {
         val note = assertIs<JournalNote.Image>(notes.getNoteById(state.id("note")))
         assertEquals("Edited after partial recovery", note.caption)
         val draft = assertNotNull(journals.getDraftForRestore(state.id("draft")))
         assertEquals(listOf(state.id("video"), state.id("text")), draft.blocks.map { it.id })
         val video = assertIs<SerializableVideoBlock>(draft.blocks.first())
         assertEquals("Edited video caption", video.caption)
-        assertEquals(state.getString("thumbnail"), video.thumbnailUri)
+        val thumbnail = assertNotNull(video.thumbnailUri)
+        val references = koin.get<StoredMediaReferences>()
+        assertEquals(references.storedReference(state.getString("thumbnail")), references.storedReference(thumbnail))
+        assertTrue(media.exists(thumbnail), "The retained preview must resolve on this installation")
+        assertContentEquals(asset("proof.png"), media.readMedia(thumbnail).data)
         assertEquals("New text after recovery", assertIs<SerializableTextBlock>(draft.blocks[1]).content)
         val memberships =
             links
@@ -626,7 +351,7 @@ class ArchiveMediaRecoveryE2ETest {
         assertEquals(setOf(state.id("journal"), state.id("extraJournal")), memberships)
     }
 
-    private suspend fun verifyOriginals(state: JSONObject) {
+    override suspend fun verifyOriginals(state: JSONObject) {
         val photo = assertIs<JournalNote.Image>(notes.getNoteById(state.id("note")))
         val bytes = media.readMedia(photo.mediaRef).data
         assertContentEquals(asset("proof.png"), bytes)
@@ -761,10 +486,8 @@ class ArchiveMediaRecoveryE2ETest {
         }
     }
 
-    private fun asset(name: String): ByteArray =
+    override fun asset(name: String): ByteArray =
         instrumentation.context.assets
             .open("recovery/$name")
             .use { it.readBytes() }
-
-    private fun JSONObject.id(key: String): Uuid = Uuid.parse(getString(key))
 }
