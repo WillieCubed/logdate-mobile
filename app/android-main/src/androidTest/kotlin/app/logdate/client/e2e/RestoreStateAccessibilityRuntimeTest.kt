@@ -140,11 +140,10 @@ class RestoreStateAccessibilityRuntimeTest {
                 compose.onNodeWithText("Checked 1 of 3 media items.").performScrollTo().assertIsDisplayed()
             }
             assertTrue(device.takeScreenshot(File(output, "${next.name}-content.png")))
-            compose
-                .onNodeWithText(next.action)
-                .performScrollTo()
-                .assertIsDisplayed()
-                .assertHasClickAction()
+            val action = compose.onNodeWithText(next.action)
+            // Preview actions live in the fixed footer outside the scrolling sheet body.
+            if (next.name != "preview") action.performScrollTo()
+            action.assertIsDisplayed().assertHasClickAction()
             assertTrue(device.takeScreenshot(File(output, "${next.name}-action.png")))
             val before = clicks.size
             compose.onNodeWithText(next.action).performClick()
