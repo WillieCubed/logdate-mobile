@@ -3,10 +3,7 @@
 
 package app.logdate.feature.core.main
 
-import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
@@ -52,11 +49,11 @@ import app.logdate.feature.journals.ui.JournalListItemUiState
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
 import app.logdate.feature.journals.ui.JournalsOverviewViewModel
 import app.logdate.feature.rewind.ui.RewindOverviewScreen
-import app.logdate.ui.LocalNavAnimatedVisibilityScope
-import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.audio.TranscriptionProvider
 import app.logdate.ui.common.applyScreenStyles
-import app.logdate.ui.common.transitions.TransitionKeys
+import app.logdate.ui.creation.LocalEntryCreationLauncher
+import app.logdate.ui.creation.entryCreationBounds
+import app.logdate.ui.creation.rememberEntryCreationSource
 import app.logdate.ui.keyboard.AppKeyboardShortcut
 import app.logdate.ui.keyboard.AppShortcutScope
 import app.logdate.ui.platform.PlatformIcons
@@ -78,11 +75,6 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
-
-private val FabEditorBoundsTransform =
-    BoundsTransform { _, _ ->
-        tween(durationMillis = 350, easing = FastOutSlowInEasing)
-    }
 
 @Composable
 fun HomeScreen(
@@ -202,6 +194,7 @@ fun HomeScreen(
                     },
                 ),
             createEntryTransition = currentDestination != HomeRouteDestination.Journals,
+            createOnPull = currentDestination == HomeRouteDestination.Timeline,
             onSearch = onOpenSearch,
             actions = {
                 HomeWorkspaceAccountAction(
@@ -295,6 +288,9 @@ fun HomeScreen(
         }
         return
     }
+    val legacyCreateSource = rememberEntryCreationSource()
+    val legacySourceId = legacyCreateSource.id
+    val creationLauncher = LocalEntryCreationLauncher.current
     val adaptiveInfo = currentWindowAdaptiveInfoV2()
     val navLayoutType =
         when {
@@ -364,8 +360,6 @@ fun HomeScreen(
                 // Keep the FAB inside NavigationSuiteScaffold's content slot. The adaptive
                 // navigation surface then measures and reserves its own bottom-bar or rail
                 // space, so the create action remains responsive without a hardcoded offset.
-                val sharedTransitionScope = LocalSharedTransitionScope.current
-                val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
                 Scaffold(
                     containerColor = Color.Transparent,
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -377,21 +371,16 @@ fun HomeScreen(
                                 onClick = {
                                     when (currentDestination) {
                                         HomeRouteDestination.Journals -> onCreateJournal()
-                                        else -> onNewEntry()
+                                        else -> legacyCreateSource.launch(legacySourceId, creationLauncher, onNewEntry)
                                     }
                                 },
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier =
-                                    if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                                        with(sharedTransitionScope) {
-                                            Modifier.sharedBounds(
-                                                rememberSharedContentState(TransitionKeys.FAB_TO_EDITOR_TRANSITION),
-                                                animatedVisibilityScope = animatedVisibilityScope,
-                                                boundsTransform = FabEditorBoundsTransform,
-                                                clipInOverlayDuringTransition = OverlayClip(MaterialTheme.shapes.large),
-                                            )
-                                        }
+                                    if (currentDestination !=
+                                        HomeRouteDestination.Journals
+                                    ) {
+                                        Modifier.entryCreationBounds(legacySourceId)
                                     } else {
                                         Modifier
                                     },

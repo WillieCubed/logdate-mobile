@@ -39,6 +39,7 @@ internal fun rememberEditorDisplayBack(
     onProgress: (Float) -> Unit,
     onCommit: () -> Unit,
     onCancel: () -> Unit,
+    onPrepareToLeave: () -> Unit = {},
 ): EditorDisplayBackState {
     val scope = rememberCoroutineScope()
     val back = remember { EditorDisplayBackState() }
@@ -53,6 +54,7 @@ internal fun rememberEditorDisplayBack(
         enabled = display is EditorDisplay.Expanded,
         onProgress = { fraction ->
             if (back.origin == null) {
+                onPrepareToLeave()
                 back.origin = display
                 back.surfaceProgressAtStart = surfaceProgress()
             }
@@ -61,11 +63,12 @@ internal fun rememberEditorDisplayBack(
             onProgress(value)
         },
         onBack = {
+            if (back.origin == null) onPrepareToLeave()
             back.origin = null
             scope.launch {
                 progress.value = null
                 onCommit()
-                transition.animateTo(destination)
+                if (reduceMotion) transition.snapTo(destination) else transition.animateTo(destination)
                 onDismiss()
             }
         },
@@ -75,7 +78,7 @@ internal fun rememberEditorDisplayBack(
             scope.launch {
                 progress.value = null
                 onCancel()
-                transition.animateTo(restore)
+                if (reduceMotion) transition.snapTo(restore) else transition.animateTo(restore)
             }
         },
     )

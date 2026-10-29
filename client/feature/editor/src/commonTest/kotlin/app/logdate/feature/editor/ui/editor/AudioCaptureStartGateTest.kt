@@ -23,6 +23,20 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalCoroutinesApi::class)
 class AudioCaptureStartGateTest {
     @Test
+    fun oldAudioInputCannotStartAfterSameMemoryChangesAwayAndBack() {
+        val audio = AudioBlockUiState()
+        val previousInput = Uuid.random()
+        val state = MutableStateFlow(EditorState(blocks = listOf(audio), creationInputTokens = mapOf(audio.id to previousInput)))
+        val oldGate = EditorAudioCaptureStartGate(state, inputTokens = state.value.creationInputTokens)
+        state.value = state.value.copy(creationInputTokens = mapOf(audio.id to Uuid.random()))
+        assertNull(oldGate.claim(audio.id), "A delayed Record event belongs to the disposed input, not the new Audio mode")
+        val currentGate = EditorAudioCaptureStartGate(state, inputTokens = state.value.creationInputTokens)
+        val reservation = assertNotNull(currentGate.claim(audio.id))
+        currentGate.release(audio.id, reservation)
+        assertTrue(state.value.audioCaptureStartReservations.isEmpty())
+    }
+
+    @Test
     fun backBoundaryUsesTheSynchronousOwnerBeforeCombinedUiStateEmits() {
         val audio = AudioBlockUiState()
         val rendered = EditorState(blocks = listOf(audio, TextBlockUiState()))
@@ -135,15 +149,17 @@ class AudioCaptureStartGateTest {
     }
 
     @Test
-    fun combinedLoadingAndReadOnlyStateAreUsedWithoutTrustingTheStaleMutableLoadingFlag() {
+    fun combinedReadOnlyAndLatestMutableLoadingBothPreventAdmission() {
         val block = AudioBlockUiState()
         val state = MutableStateFlow(EditorState(blocks = listOf(block), isLoading = true))
         var observed = state.value.copy(isLoading = false, readOnlyBlocks = mapOf(block.id to true))
         val gate = EditorAudioCaptureStartGate(state) { observed }
         assertNull(gate.claim(block.id))
         observed = observed.copy(readOnlyBlocks = emptyMap())
+        assertNull(gate.claim(block.id), "A pending load cannot be bypassed by a lagging combined state")
+        state.value = state.value.copy(isLoading = false)
         assertNotNull(gate.claim(block.id))
-        assertTrue(state.value.isLoading, "Reservation must not rewrite observed-data loading policy")
+        assertFalse(state.value.isLoading)
     }
 
     @Test

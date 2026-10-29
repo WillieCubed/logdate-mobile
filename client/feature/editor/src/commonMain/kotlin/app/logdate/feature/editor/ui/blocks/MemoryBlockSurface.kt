@@ -2,6 +2,7 @@ package app.logdate.feature.editor.ui.blocks
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,11 +27,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.editor.ui.EditorFocusInsets
 import app.logdate.feature.editor.ui.LocalBlockFocusId
 import app.logdate.feature.editor.ui.LocalBlockFocusProgress
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
@@ -40,6 +46,7 @@ import app.logdate.feature.editor.ui.editor.HandwritingBlockUiState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
+import app.logdate.feature.editor.ui.editorFocusPadding
 import app.logdate.feature.editor.ui.handwriting.handwritingSharedElement
 import app.logdate.feature.editor.ui.layout.EditorBlockCornerRadius
 import app.logdate.feature.editor.ui.layout.EditorBlockMinHeight
@@ -77,6 +84,8 @@ internal fun MemoryBlockSurface(
     showFocusAction: Boolean = false,
     focusTransitionProgress: Float = 0f,
     morphSurface: Boolean = false,
+    expanded: Boolean = false,
+    retainedSurface: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -84,13 +93,13 @@ internal fun MemoryBlockSurface(
     LaunchedEffect(recordingActive) {
         if (recordingActive) menuOpen = false
     }
-    val framed = block is ImageBlockUiState && block.presentation == PhotoPresentation.Framed
+    val framed = block is ImageBlockUiState && block.presentation == PhotoPresentation.Framed && !expanded
     val progress = if (LocalBlockFocusId.current == block.id) LocalBlockFocusProgress.current ?: focusTransitionProgress else 0f
-    val sharedPaper = customPresentation && block is HandwritingBlockUiState
+    val sharedPaper = customPresentation && block is HandwritingBlockUiState && !retainedSurface
     val surfaceColor by animateColorAsState(
         if (framed) {
             Color.White
-        } else if (isSelected) {
+        } else if (isSelected && !expanded) {
             MaterialTheme.colorScheme.surfaceContainerHigh
         } else {
             MaterialTheme.colorScheme.surfaceContainerLow
@@ -98,8 +107,8 @@ internal fun MemoryBlockSurface(
         label = "memorySurfaceColor",
     )
     val photoTopInset by animateDpAsState(if (framed) 12.dp else 0.dp, label = "photoTopInset")
+    val surfaceShape = RoundedCornerShape(EditorBlockCornerRadius * (if (sharedPaper || morphSurface) 1f - progress else 1f))
     Surface(
-        onClick = onSelect,
         modifier =
             modifier
                 .fillMaxWidth()
@@ -107,8 +116,10 @@ internal fun MemoryBlockSurface(
                 .then(if (sharedPaper) Modifier.handwritingSharedElement(block.id, progress) else Modifier)
                 .testTag(
                     "memory_block_${block.id}",
-                ).semantics { selected = isSelected },
-        shape = RoundedCornerShape(EditorBlockCornerRadius * (if (sharedPaper || morphSurface) 1f - progress else 1f)),
+                ).semantics { selected = isSelected }
+                .clip(surfaceShape)
+                .then(if (expanded) Modifier else Modifier.clickable(onClick = onSelect)),
+        shape = surfaceShape,
         color =
             if (sharedPaper) {
                 MaterialTheme.colorScheme.surfaceContainerLow
@@ -126,10 +137,24 @@ internal fun MemoryBlockSurface(
                         is TextBlockUiState ->
                             if (recordingActive) {
                                 Modifier
-                            } else {
-                                Modifier.padding(
-                                    end = if (showFocusAction) 96.dp else 48.dp,
+                            } else if (retainedSurface) {
+                                val reserve = with(LocalDensity.current) { (if (showFocusAction) 96.dp else 48.dp).roundToPx() }
+                                Modifier.editorFocusPadding(
+                                    inline =
+                                        if (LocalLayoutDirection.current ==
+                                            LayoutDirection.Ltr
+                                        ) {
+                                            EditorFocusInsets(right = reserve)
+                                        } else {
+                                            EditorFocusInsets(left = reserve)
+                                        },
+                                    expanded = expanded,
+                                    progress = progress,
                                 )
+                            } else if (expanded) {
+                                Modifier
+                            } else {
+                                Modifier.padding(end = if (showFocusAction) 96.dp else 48.dp)
                             }
                         is ImageBlockUiState -> Modifier.padding(top = photoTopInset)
                         else -> Modifier
@@ -140,7 +165,7 @@ internal fun MemoryBlockSurface(
                     if (block is TextBlockUiState || block is AudioBlockUiState) Modifier.clipEntryContentToSafeWindow() else Modifier,
                 ),
             ) { content() }
-            if (!recordingActive) {
+            if (!recordingActive && !expanded) {
                 val menuTopInset =
                     if (block is AudioBlockUiState && block.uri != null) {
                         if (isSelected) 8.dp else 4.dp

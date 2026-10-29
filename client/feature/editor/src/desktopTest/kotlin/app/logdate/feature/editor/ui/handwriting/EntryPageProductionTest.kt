@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
@@ -23,10 +24,9 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class EntryPageProductionTest {
     @Test
-    fun productionHeaderSavesAndRetainsDefaultAndDraftActionsAtLargeText() =
+    fun productionHeaderSavesAndRetainsDraftActionsAtLargeText() =
         runDesktopComposeUiTest(width = 360, height = 800) {
             var saves = 0
-            var defaults = 0
             val journal = Journal(title = "A journal with a long personal title")
             val state =
                 EditorState(
@@ -56,7 +56,6 @@ class EntryPageProductionTest {
                                     { saves++ },
                                     {},
                                     {},
-                                    { defaults++ },
                                     floating = true,
                                 )
                             },
@@ -68,6 +67,7 @@ class EntryPageProductionTest {
             assertEquals(1, saves)
             onNodeWithContentDescription("Entry options").performClick()
             onNodeWithTag("entry_open_drafts").assertExists()
+            onNodeWithText("Default capture mode").assertDoesNotExist()
         }
 
     @Test

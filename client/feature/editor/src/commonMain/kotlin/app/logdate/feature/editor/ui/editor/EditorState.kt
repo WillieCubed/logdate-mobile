@@ -44,6 +44,8 @@ class EditorState(
     val readOnlyBlocks: Map<Uuid, Boolean> = emptyMap(),
     /** Transient attempts awaiting recorder admission; never persisted as captured audio. */
     val audioCaptureStartReservations: Map<Uuid, Uuid> = emptyMap(),
+    /** Transient input generation; callbacks from a replaced input mode cannot edit its successor. */
+    val creationInputTokens: Map<Uuid, Uuid> = emptyMap(),
     val entryEditBase: EntryEditBase? = null,
     val entryEditConflict: Boolean = false,
     val availableJournals: List<Journal> = emptyList(),
@@ -128,6 +130,7 @@ class EditorState(
         expandedBlockId: Uuid? = this.expandedBlockId,
         readOnlyBlocks: Map<Uuid, Boolean> = this.readOnlyBlocks,
         audioCaptureStartReservations: Map<Uuid, Uuid> = this.audioCaptureStartReservations,
+        creationInputTokens: Map<Uuid, Uuid> = this.creationInputTokens,
         entryEditBase: EntryEditBase? = this.entryEditBase,
         entryEditConflict: Boolean = this.entryEditConflict,
         availableJournals: List<Journal> = this.availableJournals,
@@ -155,6 +158,7 @@ class EditorState(
             expandedBlockId = expandedBlockId,
             readOnlyBlocks = readOnlyBlocks,
             audioCaptureStartReservations = audioCaptureStartReservations,
+            creationInputTokens = creationInputTokens,
             entryEditBase = entryEditBase,
             entryEditConflict = entryEditConflict,
             availableJournals = availableJournals,
@@ -186,6 +190,7 @@ class EditorState(
         if (expandedBlockId != other.expandedBlockId) return false
         if (readOnlyBlocks != other.readOnlyBlocks) return false
         if (audioCaptureStartReservations != other.audioCaptureStartReservations) return false
+        if (creationInputTokens != other.creationInputTokens) return false
         if (entryEditBase != other.entryEditBase) return false
         if (entryEditConflict != other.entryEditConflict) return false
         if (availableJournals != other.availableJournals) return false
@@ -218,6 +223,7 @@ class EditorState(
         result = 31 * result + (expandedBlockId?.hashCode() ?: 0)
         result = 31 * result + readOnlyBlocks.hashCode()
         result = 31 * result + audioCaptureStartReservations.hashCode()
+        result = 31 * result + creationInputTokens.hashCode()
         result = 31 * result + (entryEditBase?.hashCode() ?: 0)
         result = 31 * result + entryEditConflict.hashCode()
         result = 31 * result + availableJournals.hashCode()

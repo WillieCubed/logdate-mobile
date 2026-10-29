@@ -30,6 +30,7 @@ fun HomeWorkspaceComposition(
     status: @Composable () -> Unit = {},
     snackbarHost: @Composable () -> Unit = {},
     journals: WorkspaceRailJournals? = null,
+    createOnPull: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     WorkspaceScaffold(
@@ -45,6 +46,7 @@ fun HomeWorkspaceComposition(
         status,
         snackbarHost = snackbarHost,
         journals = journals,
+        createOnPull = createOnPull,
     ) {
         if (selectedKey == HomeRouteDestination.LocationHistory.name) {
             content()

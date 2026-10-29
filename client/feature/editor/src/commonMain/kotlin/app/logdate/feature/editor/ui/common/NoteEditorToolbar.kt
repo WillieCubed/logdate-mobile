@@ -38,7 +38,6 @@ import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.changes_saved
-import logdate.client.feature.editor.generated.resources.entry_start_default_mode
 import logdate.client.feature.editor.generated.resources.error_saving
 import logdate.client.feature.editor.generated.resources.load_drafts
 import logdate.client.feature.editor.generated.resources.manage_drafts
@@ -73,7 +72,6 @@ fun NoteEditorToolbar(
     optionsVisible: Boolean = true,
     saveEnabled: Boolean = true,
     saveLabel: String? = null,
-    onChooseDefaultMode: (() -> Unit)? = null,
 ) {
     val saveDescription = saveLabel ?: stringResource(Res.string.save_entry)
     var showMenu by remember { mutableStateOf(false) }
@@ -177,16 +175,6 @@ fun NoteEditorToolbar(
                                         onShowDrafts()
                                     },
                                 )
-                                onChooseDefaultMode?.let { chooseMode ->
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(Res.string.entry_start_default_mode)) },
-                                        enabled = actionsEnabled,
-                                        onClick = {
-                                            showMenu = false
-                                            chooseMode()
-                                        },
-                                    )
-                                }
                             }
                         }
                     }

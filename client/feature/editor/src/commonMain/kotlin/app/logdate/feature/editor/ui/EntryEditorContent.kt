@@ -46,7 +46,6 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.text.resolve
 import app.logdate.feature.editor.ui.content.blockType
 import app.logdate.feature.editor.ui.content.entryDayContext
-import app.logdate.feature.editor.ui.content.rememberEntryStartPreferences
 import app.logdate.feature.editor.ui.dialog.DraftsBottomSheet
 import app.logdate.feature.editor.ui.dialog.alert.ConfirmEntryExitDialog
 import app.logdate.feature.editor.ui.drop.EntryKeyboardContentReceiver
@@ -55,13 +54,13 @@ import app.logdate.feature.editor.ui.drop.entryPasteTarget
 import app.logdate.feature.editor.ui.editor.EditorAudioCaptureStartGate
 import app.logdate.feature.editor.ui.editor.EditorBackgroundSaveEffect
 import app.logdate.feature.editor.ui.editor.EditorExitReason
-import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.LocalAudioCaptureStartGate
+import app.logdate.feature.editor.ui.editor.LocalEditorInputTokens
 import app.logdate.feature.editor.ui.editor.delegate.DefaultAudioBlockFinalizer
+import app.logdate.feature.editor.ui.editor.dismissOwnedEditorFocus
 import app.logdate.feature.editor.ui.editor.rememberEditorAutoSave
 import app.logdate.feature.editor.ui.handwriting.EntryPageOverview
-import app.logdate.feature.editor.ui.handwriting.EntryPageScrollAnchor
 import app.logdate.feature.editor.ui.handwriting.StoryCaptureMode
 import app.logdate.feature.editor.ui.handwriting.blockType
 import app.logdate.feature.editor.ui.handwriting.rememberEntryPageState
@@ -70,6 +69,8 @@ import app.logdate.feature.editor.ui.layout.EditorFocus
 import app.logdate.feature.editor.ui.layout.LocalEditorContextControlsVisible
 import app.logdate.feature.editor.ui.layout.editorFocus
 import app.logdate.feature.editor.ui.state.rememberBlocksUiState
+import app.logdate.feature.editor.ui.text.LocalEditorTextInputSession
+import app.logdate.feature.editor.ui.text.editorTextInputSession
 import app.logdate.ui.platform.rememberLogDateHaptics
 import app.logdate.ui.provenance.CapturedOnWatchBanner
 import app.logdate.ui.provenance.showsWatchProvenance
@@ -83,14 +84,6 @@ import org.koin.compose.viewmodel.koinViewModel
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
 val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
 
-internal fun blockUpdateCallback(
-    renderedBlocks: List<EntryBlockUiState>,
-    update: (EntryBlockUiState, EntryBlockUiState?) -> Unit,
-): (EntryBlockUiState) -> Unit =
-    { updated ->
-        update(updated, renderedBlocks.firstOrNull { it.id == updated.id })
-    }
-
 @Suppress("ktlint:standard:function-naming")
 @Composable
 fun EntryEditorContent(
@@ -102,8 +95,12 @@ fun EntryEditorContent(
     blockFocusEnabled: Boolean = false,
 ) {
     val editorState by viewModel.editorState.collectAsState()
-    val audioCaptureStartGate = remember(viewModel) { EditorAudioCaptureStartGate(viewModel) }
-    val startPreferences = rememberEntryStartPreferences(viewModel, blockFocusEnabled, handwritingEnabled)
+    val renderedInputTokens = editorState.creationInputTokens
+    val audioCaptureStartGate =
+        remember(viewModel, renderedInputTokens) {
+            EditorAudioCaptureStartGate(viewModel, renderedInputTokens)
+        }
+    val defaultStartMode by viewModel.defaultEntryMode.collectAsState()
     val focus = editorState.editorFocus()
     val page = rememberEntryPageState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -117,7 +114,11 @@ fun EntryEditorContent(
     val density = LocalDensity.current
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
-    val updateBlock = blockUpdateCallback(editorState.blocks, viewModel::updateBlock)
+    val updateBlock = blockUpdateCallback(editorState.blocks, renderedInputTokens, viewModel::updateBlockFromInput)
+    val bindAudioResolver =
+        audioResolverCallback(renderedInputTokens, { viewModel.mutableEditorState.value }) { id, resolver ->
+            viewModel.bindAudioBlockFinalizer(id, DefaultAudioBlockFinalizer(resolver))
+        }
     val handwritingPresentations =
         rememberHandwritingBlockPresentations(
             editorState,
@@ -311,29 +312,18 @@ fun EntryEditorContent(
     }
 
     var dropActive by remember { mutableStateOf(false) }
-    val canSave =
-        focus !is EditorFocus.Recording &&
-            !editorState.isEditingLocked &&
-            !editorState.isSaving &&
-            !editorState.shouldExit &&
-            editorState.audioCaptureStartReservations.isEmpty()
+    val canSave = editorState.canSaveFocusedEntry(focus)
     val onMediaImport = entryMediaImportHandler(viewModel, snackbarHostState, scope)
     val focusedBlock = editorState.blocks.firstOrNull { it.id == editorState.expandedBlockId }
-    val returnToEntry: () -> Unit = {
-        audioCaptureStartGate.runWhenIdle {
-            editorState.expandedBlockId?.let { id ->
-                page.focusedAnchor =
-                    EntryPageScrollAnchor(
-                        id,
-                        page.blockPositions[id] ?: page.focusedAnchor?.takeIf { it.blockId == id }?.top ?: page.viewportTop + 88f,
-                        page.viewportWidth,
-                    )
-            }
-            focusManager.clearFocus()
-            keyboard?.hide()
-            viewModel.dismissExpandedBlockOrClearSingleEmpty()
-        }
-    }
+    val returnToEntry =
+        editorReturnToEntry(
+            { viewModel.editorState.value },
+            page,
+            audioCaptureStartGate,
+            focusManager,
+            keyboard,
+            dismiss = focusDismissCallback(focusedBlock?.id, renderedInputTokens, viewModel::dismissOwnedEditorFocus),
+        )
     val chooseCapture: (StoryCaptureMode) -> Unit = { mode ->
         viewModel.chooseCreationType(focusedBlock?.id, mode.blockType())
     }
@@ -341,18 +331,20 @@ fun EntryEditorContent(
         CompositionLocalProvider(
             LocalSharedTransitionScope provides this,
             LocalAudioCaptureStartGate provides audioCaptureStartGate,
+            LocalEditorInputTokens provides renderedInputTokens,
+            LocalEditorTextInputSession provides editorTextInputSession(viewModel, editorState.contentRevision),
         ) {
             EntryKeyboardContentReceiver(onMediaImported = onMediaImport) {
                 EntryEditorFrame(
                     state = editorState,
                     page = page,
-                    defaultMode = startPreferences.mode,
+                    defaultMode = defaultStartMode,
                     blockFocusEnabled = blockFocusEnabled,
                     focusProgress = handwritingProgress,
-                    onReturn = returnToEntry,
+                    onReturn = { returnToEntry() },
                     onExit = handleEditorBack,
                     onCapture = chooseCapture,
-                    onAddMemory = { viewModel.beginBlockCreation(startPreferences.mode.blockType()) },
+                    onAddMemory = { viewModel.beginBlockCreation(defaultStartMode.blockType()) },
                     modifier =
                         modifier
                             .then(exitBackModifier)
@@ -385,7 +377,7 @@ fun EntryEditorContent(
                     drawingBackdrop = if (blockFocusEnabled) MaterialTheme.colorScheme.surfaceDim else Color.White,
                     bottomContentTopPadding = if (blockFocusEnabled) 0.dp else 24.dp,
                     hasJournalSelection = uiState.availableJournals.any { it.id in uiState.selectedJournalIds },
-                    entryLocked = editorState.isSaving || editorState.shouldExit || editorState.isEditingLocked,
+                    entryLocked = editorState.isLoading || editorState.isSaving || editorState.shouldExit || editorState.isEditingLocked,
                     immersiveExitProgress =
                         if (handwritingMotion) {
                             if (handwritingTarget) 0f else 1f
@@ -400,14 +392,13 @@ fun EntryEditorContent(
                             autoSaveState.status,
                             floating = blockFocusEnabled,
                             onBack = handleEditorBack,
-                            onReturnToEntry = returnToEntry,
+                            onReturnToEntry = { returnToEntry() },
                             onShowDrafts = { showDraftsDialog = true },
                             onSave = {
                                 viewModel.saveEntry(viewModel.editorState.value)
                             },
                             onCaptureMode = chooseCapture,
                             onJournalSelection = viewModel::setSelectedJournals,
-                            onChooseDefaultMode = startPreferences.onShow,
                         )
                     },
                     editorContent = {
@@ -432,13 +423,8 @@ fun EntryEditorContent(
                                                         blocks,
                                                         editorState.todayNotes,
                                                         page,
-                                                        startPreferences.mode,
-                                                        onAudioResolverReady = {
-                                                            id,
-                                                            resolver,
-                                                            ->
-                                                            viewModel.bindAudioBlockFinalizer(id, DefaultAudioBlockFinalizer(resolver))
-                                                        },
+                                                        defaultStartMode,
+                                                        onAudioResolverReady = bindAudioResolver,
                                                     )
                                                 }
                                             )
@@ -446,7 +432,7 @@ fun EntryEditorContent(
                                             null
                                         },
                                     expandAnySelectedBlock = blockFocusEnabled,
-                                    defaultStartMode = startPreferences.mode,
+                                    defaultStartMode = defaultStartMode,
                                     todayNotes = editorState.todayNotes,
                                     entryContext = entryDayContext(editorState, blockFocusEnabled),
                                     onOpenEntry = { viewModel.loadExistingEntry(it) },
@@ -454,7 +440,8 @@ fun EntryEditorContent(
                                     uiState = uiState,
                                     focusState = focus,
                                     shouldReturnToPickerOnBack = shouldReturnToPickerOnBack,
-                                    onDismissExpanded = returnToEntry,
+                                    onDismissExpanded = { returnToEntry() },
+                                    onDismissFocusedInput = returnToEntry,
                                     onBlockFocusTransitionProgress = { handwritingProgress = it },
                                     onBlockFocusTargetChanged = { expanded -> handwritingTarget = expanded && activeHandwriting },
                                     onBackProgress = { p ->
@@ -480,9 +467,7 @@ fun EntryEditorContent(
                                             }
                                         }
                                     },
-                                    onAudioResolverReady = { blockId, resolver ->
-                                        viewModel.bindAudioBlockFinalizer(blockId, DefaultAudioBlockFinalizer(resolver))
-                                    },
+                                    onAudioResolverReady = bindAudioResolver,
                                 )
                             }
                         }

@@ -150,50 +150,36 @@ internal fun EntryEditorViewModel.loadExistingEntryImpl(
     entryId: Uuid,
     journalId: Uuid? = null,
 ) {
-    val request = LoadRequest.Existing(entryId, journalId)
-    if (activeLoadRequest == request) return
-    if (mutableEditorState.value.isEditingLocked || mutableEditorState.value.shouldExit) return
-    activeLoadRequest = request
-    val generation = ++loadGeneration
-    val requestedContentRevision = mutableEditorState.value.contentRevision
+    val load = beginEditorContentLoad(LoadRequest.Existing(entryId, journalId)) ?: return
     viewModelScope.launch {
-        mutableEditorState.update { it.copy(isLoading = true) }
-
-        contentLoader.loadEntry(entryId).fold(
-            onSuccess = { loaded ->
-                mutableEditorState.update { currentState ->
-                    if (generation != loadGeneration ||
-                        currentState.contentRevision != requestedContentRevision ||
-                        currentState.isEditingLocked ||
-                        currentState.shouldExit
-                    ) {
-                        return@update currentState
-                    }
-                    currentState.copy(
-                        contentRevision = currentState.contentRevision + 1,
-                        expandedBlockId = null,
-                        blocks = listOf(loaded.block),
-                        entryEditBase = loaded.editBase,
-                        capturedOnWatch = loaded.capturedOnWatch,
-                        selectedJournalIds = journalId?.let(::listOf) ?: currentState.selectedJournalIds,
-                        hasJournalSelectionChanges = false,
-                        isLoading = false,
-                        isModified = false,
-                        errorMessage = null,
-                    )
-                }
-            },
-            onFailure = { e ->
-                if (generation != loadGeneration || mutableEditorState.value.contentRevision != requestedContentRevision) return@fold
-                if (activeLoadRequest == request) activeLoadRequest = null
-                Napier.e("Failed to load existing entry: $entryId", e)
-                mutableEditorState.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = Res.string.editor_error_load_entry_failed.toUiText(e.message.toString()),
-                    )
-                }
-            },
-        )
+        var accepted = false
+        try {
+            contentLoader.loadEntry(entryId).fold(
+                onSuccess = { loaded ->
+                    accepted =
+                        acceptEditorContentLoad(load) { current ->
+                            current.copy(
+                                expandedBlockId = null,
+                                blocks = listOf(loaded.block),
+                                entryEditBase = loaded.editBase,
+                                capturedOnWatch = loaded.capturedOnWatch,
+                                selectedJournalIds = journalId?.let(::listOf) ?: current.selectedJournalIds,
+                                hasJournalSelectionChanges = false,
+                                isModified = false,
+                                errorMessage = null,
+                            )
+                        }
+                },
+                onFailure = { error ->
+                    if (error is CancellationException) throw error
+                    Napier.e("Failed to load existing entry: $entryId", error)
+                    finishRejectedEditorContentLoad(load, Res.string.editor_error_load_entry_failed.toUiText(error.message.toString()))
+                },
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } finally {
+            if (!accepted) finishRejectedEditorContentLoad(load)
+        }
     }
 }

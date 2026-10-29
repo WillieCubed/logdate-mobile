@@ -61,15 +61,20 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import app.logdate.client.datastore.EntryStartMode
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.feature.editor.ui.LocalAnimatedVisibilityScope
 import app.logdate.feature.editor.ui.LocalBlockFocusProgress
+import app.logdate.feature.editor.ui.LocalEditorBlockContinuity
 import app.logdate.feature.editor.ui.LocalSharedTransitionScope
+import app.logdate.feature.editor.ui.RetainedEditorDocument
 import app.logdate.feature.editor.ui.blocks.MemoryBlockContent
 import app.logdate.feature.editor.ui.blocks.MemoryBlockSurface
 import app.logdate.feature.editor.ui.content.EarlierEntryContext
@@ -124,6 +129,7 @@ class EntryPageOverviewState internal constructor(
     internal var viewportWidth = 0
     internal var viewportTop = 0f
     internal var focusedAnchor: EntryPageScrollAnchor? = null
+    internal var focusScrollBookmark: Int? = null
     internal val blockPositions = mutableMapOf<Uuid, Float>()
 }
 
@@ -135,6 +141,7 @@ internal fun EntryPageOverview(
     defaultMode: EntryStartMode = EntryStartMode.TEXT,
     onAudioResolverReady: (Uuid, PendingAudioResolver) -> Unit = { _, _ -> },
 ) {
+    val continuity = LocalEditorBlockContinuity.current
     val safeInsets = LocalEntryContentInsets.current.asPaddingValues()
     val contentTop = 88.dp + safeInsets.calculateTopPadding()
     val scroll = state.scroll
@@ -163,7 +170,8 @@ internal fun EntryPageOverview(
         return released != 0f
     }
     SideEffect {
-        state.captureDrag = { delta ->
+        state.captureDrag = drag@{ delta ->
+            if (currentUiState.expandedBlockId != null) return@drag
             var remaining = delta
             if (pull != 0f) {
                 val previous = pull
@@ -187,7 +195,13 @@ internal fun EntryPageOverview(
                     available: Offset,
                     source: NestedScrollSource,
                 ): Offset {
-                    if (state.earlierExpanded || source != NestedScrollSource.UserInput || pull == 0f) return Offset.Zero
+                    if (currentUiState.expandedBlockId != null ||
+                        state.earlierExpanded ||
+                        source != NestedScrollSource.UserInput ||
+                        pull == 0f
+                    ) {
+                        return Offset.Zero
+                    }
                     if (pull * available.y >= 0f) {
                         pull = (pull + available.y * 0.6f).coerceIn(-threshold * 1.4f, threshold * 1.4f)
                         return available
@@ -202,7 +216,12 @@ internal fun EntryPageOverview(
                     available: Offset,
                     source: NestedScrollSource,
                 ): Offset {
-                    if (state.earlierExpanded || source != NestedScrollSource.UserInput) return Offset.Zero
+                    if (currentUiState.expandedBlockId != null ||
+                        state.earlierExpanded ||
+                        source != NestedScrollSource.UserInput
+                    ) {
+                        return Offset.Zero
+                    }
                     if (consumed.y != 0f) state.focusedAnchor = null
                     if ((!scroll.canScrollBackward && available.y > 0f) || (!scroll.canScrollForward && available.y < 0f)) {
                         pull = (pull + available.y * 0.6f).coerceIn(-threshold * 1.4f, threshold * 1.4f)
@@ -219,14 +238,23 @@ internal fun EntryPageOverview(
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            .windowInsetsPadding(LocalEntryContentInsets.current.only(WindowInsetsSides.Horizontal))
-            .then(trackOrigin)
+            .then(
+                if (continuity ==
+                    null
+                ) {
+                    Modifier.windowInsetsPadding(LocalEntryContentInsets.current.only(WindowInsetsSides.Horizontal))
+                } else {
+                    Modifier
+                },
+            ).then(trackOrigin)
             .onGloballyPositioned { state.viewportTop = it.positionInWindow().y }
             .clipToBounds()
             .nestedScroll(connection)
             .testTag("study_edge_pull")
             .semantics {
-                progressBarRangeInfo = ProgressBarRangeInfo((kotlin.math.abs(pull) / threshold).coerceIn(0f, 1f), 0f..1f)
+                if (uiState.expandedBlockId == null) {
+                    progressBarRangeInfo = ProgressBarRangeInfo((kotlin.math.abs(pull) / threshold).coerceIn(0f, 1f), 0f..1f)
+                }
             },
     ) {
         val viewportWidthPx = constraints.maxWidth
@@ -282,42 +310,80 @@ internal fun EntryPageOverview(
                 Modifier.padding(top = contentTop, start = 16.dp).graphicsLayer { alpha = (pull / threshold).coerceIn(0f, 1f) },
             )
         }
-        browsing.AnimatedContent(
-            transitionSpec = {
-                (slideInVertically(tween(420)) { if (targetState) -it / 3 else it / 3 } + fadeIn(tween(180))) togetherWith
-                    (slideOutVertically(tween(420)) { if (targetState) it / 3 else -it / 3 } + fadeOut(tween(220)))
-            },
-        ) { browsing ->
-            if (browsing) {
-                EarlierDayBrowser(notes, state.historyScroll)
-            } else {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { translationY = if (pull > 0f) pull else pull * 0.35f }
-                        .background(MaterialTheme.colorScheme.surfaceDim)
-                        .verticalScroll(scroll)
-                        .testTag("entry_page_scroll"),
-                    contentAlignment = Alignment.TopCenter,
-                ) {
-                    if (book != null) {
-                        Row(Modifier.fillMaxWidth().padding(top = contentTop)) {
-                            Box(
-                                Modifier.width(book.leftPane.width).padding(
-                                    end = Spacing.lg,
-                                    bottom = Spacing.lg + safeInsets.calculateBottomPadding(),
-                                ),
-                            ) { reading() }
-                            Box(Modifier.width(book.hingeBounds.width))
-                            Box(Modifier.width(book.rightPane.width).padding(start = 16.dp)) { writing() }
-                        }
-                    } else {
-                        Column(
-                            Modifier.widthIn(max = EntryPageRailMaxWidth).fillMaxWidth().padding(top = contentTop),
-                            verticalArrangement = Arrangement.spacedBy(24.dp),
-                        ) {
-                            reading()
-                            writing()
+        if (continuity != null) {
+            RetainedEditorDocument(
+                uiState,
+                continuity,
+                state,
+                IntSize(viewportWidthPx, viewportHeightPx),
+                with(LocalDensity.current) { contentTop.roundToPx() },
+                book,
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { translationY = if (pull > 0f) pull else pull * 0.35f }
+                    .verticalScroll(scroll, enabled = uiState.expandedBlockId == null && !earlierExpanded)
+                    .testTag("entry_page_scroll")
+                    .then(if (earlierExpanded) Modifier.clearAndSetSemantics { hideFromAccessibility() } else Modifier),
+                reading = reading,
+                heading = {
+                    Text(
+                        stringResource(Res.string.entry_page_now),
+                        Modifier.padding(horizontal = 16.dp),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+                dock = {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(LocalEntryChromeHeight.current + Spacing.lg + safeInsets.calculateBottomPadding())
+                            .testTag("entry_page_creation")
+                            .onGloballyPositioned {
+                                state.captureBounds = Rect(it.positionInWindow(), Size(it.size.width.toFloat(), it.size.height.toFloat()))
+                            },
+                    )
+                },
+            )
+            if (earlierExpanded) EarlierDayBrowser(notes, state.historyScroll)
+        } else {
+            browsing.AnimatedContent(
+                transitionSpec = {
+                    (slideInVertically(tween(420)) { if (targetState) -it / 3 else it / 3 } + fadeIn(tween(180))) togetherWith
+                        (slideOutVertically(tween(420)) { if (targetState) it / 3 else -it / 3 } + fadeOut(tween(220)))
+                },
+            ) { browsing ->
+                if (browsing) {
+                    EarlierDayBrowser(notes, state.historyScroll)
+                } else {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { translationY = if (pull > 0f) pull else pull * 0.35f }
+                            .background(MaterialTheme.colorScheme.surfaceDim)
+                            .verticalScroll(scroll)
+                            .testTag("entry_page_scroll"),
+                        contentAlignment = Alignment.TopCenter,
+                    ) {
+                        if (book != null) {
+                            Row(Modifier.fillMaxWidth().padding(top = contentTop)) {
+                                Box(
+                                    Modifier.width(book.leftPane.width).padding(
+                                        end = Spacing.lg,
+                                        bottom = Spacing.lg + safeInsets.calculateBottomPadding(),
+                                    ),
+                                ) { reading() }
+                                Box(Modifier.width(book.hingeBounds.width))
+                                Box(Modifier.width(book.rightPane.width).padding(start = 16.dp)) { writing() }
+                            }
+                        } else {
+                            Column(
+                                Modifier.widthIn(max = EntryPageRailMaxWidth).fillMaxWidth().padding(top = contentTop),
+                                verticalArrangement = Arrangement.spacedBy(24.dp),
+                            ) {
+                                reading()
+                                writing()
+                            }
                         }
                     }
                 }

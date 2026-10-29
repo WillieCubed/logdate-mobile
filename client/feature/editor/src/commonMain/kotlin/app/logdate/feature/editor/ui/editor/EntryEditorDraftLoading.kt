@@ -6,6 +6,7 @@ import app.logdate.client.text.toUiText
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel.LoadRequest
 import app.logdate.feature.editor.ui.editor.delegate.AudioBlockFinalizer
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -53,13 +54,13 @@ internal fun EntryEditorViewModel.audioBlockFinalizerFor(blockId: Uuid): AudioBl
  *
  * @return true if the editor was reset to the empty picker, false otherwise
  */
-internal fun EntryEditorViewModel.clearSingleEmptyBlockImpl(): Boolean {
+internal fun EntryEditorViewModel.clearSingleEmptyBlockImpl(owner: EditorInputOwner? = null): Boolean {
     val currentState = mutableEditorState.value
-    if (!currentState.shouldReturnToPickerOnBack()) {
+    if (!currentState.shouldReturnToPickerOnBack() || !currentState.matchesFocusOwner(owner)) {
         return false
     }
     return mutateEditorContent {
-        if (it.shouldReturnToPickerOnBack()) {
+        if (it.shouldReturnToPickerOnBack() && it.matchesFocusOwner(owner)) {
             it.copy(
                 blocks = emptyList(),
                 expandedBlockId = null,
@@ -77,10 +78,15 @@ internal fun EntryEditorViewModel.clearSingleEmptyBlockImpl(): Boolean {
  *
  * @return true if a block was dismissed, false if no block was expanded
  */
-internal fun EntryEditorViewModel.dismissExpandedBlockImpl(): Boolean {
+internal fun EntryEditorViewModel.dismissExpandedBlockImpl(owner: EditorInputOwner? = null): Boolean {
     while (true) {
         val current = mutableEditorState.value
-        if (current.expandedBlockId == null || current.audioCaptureStartReservations.isNotEmpty()) return false
+        if (current.expandedBlockId == null ||
+            current.audioCaptureStartReservations.isNotEmpty() ||
+            !current.matchesFocusOwner(owner)
+        ) {
+            return false
+        }
         if (mutableEditorState.compareAndSet(current, current.copy(expandedBlockId = null))) return true
     }
 }
@@ -89,12 +95,12 @@ internal fun EntryEditorViewModel.dismissExpandedBlockImpl(): Boolean {
  * Handles back from an expanded block, preferring to restore the empty picker when
  * the editor only contains a single untouched block.
  */
-internal fun EntryEditorViewModel.dismissExpandedBlockOrClearSingleEmptyImpl(): Boolean {
-    if (clearSingleEmptyBlock()) {
+internal fun EntryEditorViewModel.dismissExpandedBlockOrClearSingleEmptyImpl(owner: EditorInputOwner? = null): Boolean {
+    if (clearSingleEmptyBlockImpl(owner)) {
         return true
     }
 
-    return dismissExpandedBlock()
+    return dismissExpandedBlockImpl(owner)
 }
 
 /**
@@ -118,55 +124,45 @@ internal fun EntryEditorViewModel.resumeFirstEntryDraftImpl(openPreferredIfEmpty
 }
 
 internal fun EntryEditorViewModel.loadDraftImpl(draftId: Uuid) {
-    val request = LoadRequest.Draft(draftId)
-    if (activeLoadRequest == request) return
-    if (mutableEditorState.value.isEditingLocked || mutableEditorState.value.shouldExit) return
-    activeLoadRequest = request
-    val generation = ++loadGeneration
-    val requestedContentRevision = mutableEditorState.value.contentRevision
+    val load = beginEditorContentLoad(LoadRequest.Draft(draftId)) ?: return
     viewModelScope.launch {
-        draftPersistenceMutex.withLock {
-            draftManager.loadDraft(draftId).fold(
-                onSuccess = { loaded ->
-                    val recoveredBlocks = recoverPendingAudio(loaded.blocks)
-                    if (generation != loadGeneration || mutableEditorState.value.contentRevision != requestedContentRevision) {
-                        return@withLock
-                    }
-                    savedStateHandle["editor.draftId"] = loaded.draftId.toString()
-                    mutateEditorContent { currentState ->
-                        if (generation != loadGeneration || currentState.contentRevision != requestedContentRevision) {
-                            currentState
-                        } else {
-                            currentState.copy(
-                                blocks = recoveredBlocks,
-                                expandedBlockId =
-                                    recoveredBlocks
-                                        .filterIsInstance<AudioBlockUiState>()
-                                        .firstOrNull {
-                                            it.captureState is AudioCaptureState.Recording ||
-                                                it.captureState is AudioCaptureState.Failed
-                                        }?.id,
-                                entryEditBase = loaded.editBase,
-                                selectedJournalIds = loaded.selectedJournalIds,
-                                visitContext = loaded.visitContext,
-                                markId = loaded.markId,
-                                hasJournalSelectionChanges = false,
-                                draftState = DraftState.Active(loaded.draftId),
-                                isModified = true,
-                                errorMessage = null,
-                            )
-                        }
-                    }
-                },
-                onFailure = { e ->
-                    if (generation != loadGeneration) return@withLock
-                    if (activeLoadRequest == request) activeLoadRequest = null
-                    Napier.e("Failed to load draft: ${e.message}", e)
-                    mutableEditorState.update {
-                        it.copy(errorMessage = Res.string.editor_error_load_draft_failed.toUiText(e.message.toString()))
-                    }
-                },
-            )
+        var accepted = false
+        try {
+            draftPersistenceMutex.withLock {
+                draftManager.loadDraft(draftId).fold(
+                    onSuccess = { loaded ->
+                        val recoveredBlocks = recoverPendingAudio(loaded.blocks)
+                        val focusedAudio =
+                            recoveredBlocks.filterIsInstance<AudioBlockUiState>().firstOrNull {
+                                it.captureState is AudioCaptureState.Recording || it.captureState is AudioCaptureState.Failed
+                            }
+                        accepted =
+                            acceptEditorContentLoad(load) { current ->
+                                current.copy(
+                                    blocks = recoveredBlocks,
+                                    expandedBlockId = focusedAudio?.id,
+                                    entryEditBase = loaded.editBase,
+                                    selectedJournalIds = loaded.selectedJournalIds,
+                                    visitContext = loaded.visitContext,
+                                    markId = loaded.markId,
+                                    hasJournalSelectionChanges = false,
+                                    draftState = DraftState.Active(loaded.draftId),
+                                    isModified = true,
+                                    errorMessage = null,
+                                )
+                            }
+                        if (accepted) savedStateHandle["editor.draftId"] = loaded.draftId.toString()
+                    },
+                    onFailure = { error -> throw error },
+                )
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Napier.e("Failed to load draft: $draftId", error)
+            finishRejectedEditorContentLoad(load, Res.string.editor_error_load_draft_failed.toUiText(error.message.toString()))
+        } finally {
+            if (!accepted) finishRejectedEditorContentLoad(load)
         }
     }
 }

@@ -6,17 +6,21 @@ import android.content.pm.ActivityInfo
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.printToString
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
@@ -52,6 +56,9 @@ class EditorEntrySwitchVideoTest {
         val previousMode = runBlocking { preferences.observeEntryStartMode().first() }
         val previousTouches = device.executeShellCommand("settings get system show_touches").trim()
         val previousIme = device.executeShellCommand("settings get secure show_ime_with_hard_keyboard").trim()
+        val previousBack = device.executeShellCommand("settings get global enable_back_animation").trim()
+        val motionKeys = listOf("animator_duration_scale", "transition_animation_scale", "window_animation_scale")
+        val previousMotion = motionKeys.associateWith { device.executeShellCommand("settings get global $it").trim() }
         val output = File(checkNotNull(InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")), "editor-entry-switch")
         output.mkdirs()
         val token = Uuid.random().toString()
@@ -61,6 +68,14 @@ class EditorEntrySwitchVideoTest {
         try {
             device.executeShellCommand("settings put system show_touches 1")
             device.executeShellCommand("settings put secure show_ime_with_hard_keyboard 1")
+            check(device.executeShellCommand("settings get secure navigation_mode").trim() == "2") {
+                "This physical predictive gesture requires the configured gestural managed device"
+            }
+            device.executeShellCommand("settings put global enable_back_animation 1")
+            motionKeys.forEach { key ->
+                device.executeShellCommand("settings put global $key 1")
+                check(device.executeShellCommand("settings get global $key").trim().toFloat() == 1f)
+            }
             runBlocking { preferences.setEntryStartMode(EntryStartMode.TEXT) }
             val intent = Intent(context, MainActivity::class.java).putExtra(DEBUG_SKIP_ONBOARDING_EXTRA, true)
             ActivityScenario.launch<MainActivity>(intent).use { scenario ->
@@ -112,7 +127,53 @@ class EditorEntrySwitchVideoTest {
                     tap(device, compose.onNodeWithContentDescription("Return to entry"))
                     compose.waitUntil(10_000) { compose.onAllNodesWithTag("entry_journal_chooser").fetchSemanticsNodes().isNotEmpty() }
                     compose.onNodeWithTag("entry_add_memory").assertIsDisplayed()
-                    SystemClock.sleep(2_000)
+                    SystemClock.sleep(500)
+                    tap(device, compose.onNodeWithTag("editor_text_input"))
+                    waitForIme(scenario, true)
+                    device.pressBack()
+                    waitForIme(scenario, false)
+                    tap(device, compose.onNodeWithText("Text")) // Dismiss any insertion-handle popup before targeting editor back.
+                    val fieldId = compose.onNodeWithTag("editor_text_input").fetchSemanticsNode().id
+
+                    fun focusProgress(): Float =
+                        compose
+                            .onAllNodes(
+                                SemanticsMatcher("editor surface progress") { node ->
+                                    node.config.any { it.key.name == "BlockFocusProgress" }
+                                },
+                            ).fetchSemanticsNodes()
+                            .single()
+                            .config
+                            .first { it.key.name == "BlockFocusProgress" }
+                            .value as Float
+
+                    fun semanticsTrees(): String {
+                        val roots = compose.onAllNodes(isRoot(), useUnmergedTree = true)
+                        return roots.fetchSemanticsNodes().indices.joinToString("\n") { index ->
+                            "Root $index\n" + roots[index].printToString()
+                        }
+                    }
+                    val back = ManagedEditorBackGesture(device)
+                    File(output, "predictive-before.txt").writeText(
+                        "progress=${focusProgress()}\n" + semanticsTrees(),
+                    )
+                    check(device.takeScreenshot(File(output, "predictive-before.png")))
+                    back.perform(cancel = true) {
+                        File(output, "predictive-partial.txt").writeText(
+                            "progress=${focusProgress()}\n" + semanticsTrees(),
+                        )
+                        check(device.takeScreenshot(File(output, "predictive-partial-observed.png")))
+                        compose.waitUntil(5_000) { focusProgress() in 0.01f..0.99f }
+                        check(device.takeScreenshot(File(output, "predictive-back-partial.png")))
+                    }
+                    compose.waitUntil(5_000) { focusProgress() >= 0.99f }
+                    check(compose.onNodeWithTag("editor_text_input").fetchSemanticsNode().id == fieldId)
+                    compose.onNodeWithTag("editor_text_input").assertTextContains("A quiet moment.")
+                    back.perform(cancel = false) {
+                        compose.waitUntil(5_000) { focusProgress() in 0.01f..0.99f }
+                    }
+                    compose.waitUntil(10_000) { compose.onAllNodesWithTag("entry_journal_chooser").fetchSemanticsNodes().isNotEmpty() }
+                    compose.onNodeWithTag("editor_text_input").assertTextContains("A quiet moment.")
                     assertTrue(!reader.isDone, "The full journey must finish within the bounded normal-speed recording")
                     val remaining = 12_000 - (SystemClock.elapsedRealtime() - startedAt)
                     if (remaining > 0) SystemClock.sleep(remaining)
@@ -129,11 +190,64 @@ class EditorEntrySwitchVideoTest {
                     device.executeShellCommand("rm -f $remoteVideo $remotePid")
                 }
                 assertTrue(video.isFile && video.length() > 10_000, "Screen recording was not retained")
+                tap(device, compose.onNodeWithTag("editor_text_input"))
+                compose.waitUntil(10_000) { compose.onAllNodesWithTag("entry_mode_focus").fetchSemanticsNodes().isNotEmpty() }
+                compose.waitUntil(10_000) {
+                    var keyboard = false
+                    scenario.onActivity {
+                        keyboard =
+                            androidx.core.view.WindowInsetsCompat
+                                .toWindowInsetsCompat(it.window.decorView.rootWindowInsets)
+                                .isVisible(
+                                    androidx.core.view.WindowInsetsCompat.Type
+                                        .ime(),
+                                )
+                    }
+                    keyboard
+                }
+                device.pressBack() // Close the real IME before comparing viewport geometry.
+                compose.waitUntil(10_000) {
+                    var keyboard = true
+                    scenario.onActivity {
+                        keyboard =
+                            androidx.core.view.WindowInsetsCompat
+                                .toWindowInsetsCompat(it.window.decorView.rootWindowInsets)
+                                .isVisible(
+                                    androidx.core.view.WindowInsetsCompat.Type
+                                        .ime(),
+                                )
+                    }
+                    !keyboard
+                }
+                compose.waitForIdle()
+                check(device.takeScreenshot(File(output, "normal-mobile-focused-writing.png")))
+                ManagedEditorWindowCaptures(device, compose, scenario, output) {}.captureWritingSizes()
             }
         } finally {
             runBlocking { preferences.setEntryStartMode(previousMode) }
             restoreSetting(device, "system", "show_touches", previousTouches)
             restoreSetting(device, "secure", "show_ime_with_hard_keyboard", previousIme)
+            restoreSetting(device, "global", "enable_back_animation", previousBack)
+            previousMotion.forEach { (key, value) -> restoreSetting(device, "global", key, value) }
+        }
+    }
+
+    private fun waitForIme(
+        scenario: ActivityScenario<MainActivity>,
+        visible: Boolean,
+    ) {
+        compose.waitUntil(10_000) {
+            var actual = !visible
+            scenario.onActivity {
+                actual =
+                    androidx.core.view.WindowInsetsCompat
+                        .toWindowInsetsCompat(it.window.decorView.rootWindowInsets)
+                        .isVisible(
+                            androidx.core.view.WindowInsetsCompat.Type
+                                .ime(),
+                        )
+            }
+            actual == visible
         }
     }
 

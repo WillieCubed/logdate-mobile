@@ -59,7 +59,6 @@ import logdate.client.feature.editor.generated.resources.entry_page_drafts_count
 import logdate.client.feature.editor.generated.resources.entry_page_entry
 import logdate.client.feature.editor.generated.resources.entry_page_options
 import logdate.client.feature.editor.generated.resources.entry_page_save
-import logdate.client.feature.editor.generated.resources.entry_start_default_mode
 import logdate.client.feature.editor.generated.resources.save_entry
 import logdate.client.feature.editor.generated.resources.saving
 import org.jetbrains.compose.resources.stringResource
@@ -77,7 +76,6 @@ internal fun EntryJournalHeader(
     saveInProgress: Boolean,
     onShowDrafts: (() -> Unit)?,
     draftCount: Int,
-    onChooseDefaultMode: (() -> Unit)?,
     floating: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -185,15 +183,6 @@ internal fun EntryJournalHeader(
                                 Icon(Icons.Outlined.MoreVert, stringResource(Res.string.entry_page_options))
                             }
                             DropdownMenu(optionsOpen, { optionsOpen = false }) {
-                                onChooseDefaultMode?.let { chooseDefault ->
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(Res.string.entry_start_default_mode)) },
-                                        onClick = {
-                                            optionsOpen = false
-                                            chooseDefault()
-                                        },
-                                    )
-                                }
                                 DropdownMenuItem(
                                     text = { Text(stringResource(Res.string.entry_page_drafts_count, draftCount)) },
                                     enabled = draftCount > 0,

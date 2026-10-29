@@ -4,7 +4,6 @@
 package app.logdate.ui.workspace
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -39,8 +38,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.MenuOpen
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -68,13 +65,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import app.logdate.ui.LocalNavAnimatedVisibilityScope
-import app.logdate.ui.LocalSharedTransitionScope
-import app.logdate.ui.common.transitions.TransitionKeys
+import app.logdate.ui.creation.rememberEntryCreationSource
 import app.logdate.ui.foldable.rememberFoldableLayoutInfo
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.rememberSystemReduceMotion
@@ -145,10 +139,12 @@ fun WorkspaceScaffold(
     snackbarHost: @Composable () -> Unit = {},
     bottomEdge: WorkspaceBottomEdge? = null,
     journals: WorkspaceRailJournals? = null,
+    createOnPull: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val selected = destinations.firstOrNull { it.key == selectedKey } ?: destinations.firstOrNull() ?: return
     val holder = rememberSaveableStateHolder()
+    val entryCreateSource = rememberEntryCreationSource()
     val posture = rememberFoldableLayoutInfo().posture
     BoxWithConstraints(modifier.fillMaxSize()) {
         val navigation = workspaceNavigationMode(maxWidth, maxHeight, posture)
@@ -174,7 +170,7 @@ fun WorkspaceScaffold(
                     enter = fadeIn(navigationMotion(reduceMotion)) + expandHorizontally(navigationMotion(reduceMotion)),
                     exit = fadeOut(navigationMotion(reduceMotion)) + shrinkHorizontally(navigationMotion(reduceMotion)),
                 ) {
-                    WorkspaceCreateAction(it, createLabel, createEntryTransition && headerCreate)
+                    WorkspaceCreateAction(it, createLabel, createEntryTransition, entryCreateSource, active = headerCreate)
                 }
             }
             actions()
@@ -182,7 +178,7 @@ fun WorkspaceScaffold(
         val railCreate: (@Composable (Boolean) -> Unit)? =
             onCreate?.let { create ->
                 { extended ->
-                    WorkspaceCreateAction(create, createLabel, createEntryTransition && rail, extended = extended)
+                    WorkspaceCreateAction(create, createLabel, createEntryTransition, entryCreateSource, extended = extended, active = rail)
                 }
             }
         Scaffold(
@@ -261,8 +257,15 @@ fun WorkspaceScaffold(
                             }
                             status()
                             Box(Modifier.fillMaxWidth().weight(1f).nestedScroll(edge.connection)) {
-                                CompositionLocalProvider(LocalWorkspaceEnabled provides true, LocalWorkspaceHosted provides true) {
-                                    holder.SaveableStateProvider(selected.key) { content() }
+                                val viewport: @Composable () -> Unit = {
+                                    CompositionLocalProvider(LocalWorkspaceEnabled provides true, LocalWorkspaceHosted provides true) {
+                                        holder.SaveableStateProvider(selected.key) { content() }
+                                    }
+                                }
+                                if (createOnPull && createEntryTransition && onCreate != null) {
+                                    WorkspaceEntryPull(onCreate, content = viewport)
+                                } else {
+                                    viewport()
                                 }
                             }
                         }
@@ -275,46 +278,6 @@ fun WorkspaceScaffold(
 
 /** A caption bar shorter than this cannot hold the search field and account button. */
 private val MIN_CAPTION_APP_BAR_HEIGHT = 40.dp
-
-@Composable
-private fun WorkspaceCreateAction(
-    onClick: () -> Unit,
-    label: String,
-    createEntryTransition: Boolean,
-    extended: Boolean? = null,
-) {
-    val sharedScope = LocalSharedTransitionScope.current
-    val visibilityScope = LocalNavAnimatedVisibilityScope.current
-    val transitionModifier =
-        if (createEntryTransition && sharedScope != null && visibilityScope != null) {
-            with(sharedScope) {
-                Modifier.sharedBounds(
-                    rememberSharedContentState(TransitionKeys.FAB_TO_EDITOR_TRANSITION),
-                    animatedVisibilityScope = visibilityScope,
-                    boundsTransform = BoundsTransform { _, _ -> tween(350, easing = FastOutSlowInEasing) },
-                    clipInOverlayDuringTransition = OverlayClip(MaterialTheme.shapes.large),
-                )
-            }
-        } else {
-            Modifier
-        }
-    if (extended != null) {
-        ExtendedFloatingActionButton(
-            text = { Text(label, Modifier.clearAndSetSemantics {}) },
-            icon = { Icon(PlatformIcons.newEntry(), label) },
-            onClick = onClick,
-            expanded = extended,
-            modifier = transitionModifier,
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        )
-    } else {
-        // Docked in the app bar, not floating over the content.
-        FilledTonalIconButton(onClick = onClick, modifier = transitionModifier) {
-            Icon(PlatformIcons.newEntry(), label)
-        }
-    }
-}
 
 /**
  * The wide rail with the menu button Material puts in its header. It starts expanded on wide windows and

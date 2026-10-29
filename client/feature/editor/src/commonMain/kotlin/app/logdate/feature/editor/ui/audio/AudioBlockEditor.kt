@@ -24,7 +24,9 @@ import app.logdate.feature.editor.audio.formatAudioLabel
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.AudioCaptureState
 import app.logdate.feature.editor.ui.editor.LocalAudioCaptureStartGate
+import app.logdate.feature.editor.ui.editor.LocalEditorInputTokens
 import app.logdate.feature.editor.ui.editor.RecordingState
+import app.logdate.feature.editor.ui.editor.audioInputRuntimeKey
 import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
 import app.logdate.feature.editor.ui.editor.startReservedAudioCapture
 import app.logdate.feature.editor.ui.layout.EditorBlockCornerRadius
@@ -87,7 +89,8 @@ fun AudioBlockEditor(
     // instance instead of sharing one -- a shared instance can only track one in-flight recording
     // (lastTargetNoteId) at a time, so a second block's recording would silently steal ownership
     // from the first.
-    val audioViewModel: AudioViewModel = koinViewModel(key = block.id.toString())
+    val inputToken = LocalEditorInputTokens.current[block.id]
+    val audioViewModel: AudioViewModel = koinViewModel(key = audioInputRuntimeKey(block.id, inputToken))
     val captureStartGate = LocalAudioCaptureStartGate.current
     LaunchedEffect(audioViewModel, block.id) {
         audioViewModel.attachToRecording(block.id, (block.captureState as? AudioCaptureState.Recording)?.fallbackFilePath)
