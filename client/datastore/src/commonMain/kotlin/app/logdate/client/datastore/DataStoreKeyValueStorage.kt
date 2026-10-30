@@ -1,6 +1,7 @@
 package app.logdate.client.datastore
 
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -79,28 +80,10 @@ class DataStoreKeyValueStorage(
         }
     }
 
-    override fun getStringSync(key: String): String? {
-        // In the common implementation, we can't actually provide a truly sync implementation
-        // So we return a default value. Platform-specific implementations should override this.
-        Napier.w("getStringSync is not properly implemented for this platform. Returning null.")
-        return null
-    }
-
     override suspend fun putString(
         key: String,
         value: String,
-    ) {
-        val prefKey = stringPreferencesKey(key)
-        try {
-            dataStore.edit { preferences ->
-                preferences[prefKey] = value
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Napier.e("Failed to put string for key: $key", e)
-        }
-    }
+    ) = write("put string for key: $key") { it[stringPreferencesKey(key)] = value }
 
     override suspend fun getBoolean(
         key: String,
@@ -121,18 +104,7 @@ class DataStoreKeyValueStorage(
     override suspend fun putBoolean(
         key: String,
         value: Boolean,
-    ) {
-        val prefKey = booleanPreferencesKey(key)
-        try {
-            dataStore.edit { preferences ->
-                preferences[prefKey] = value
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Napier.e("Failed to put boolean for key: $key", e)
-        }
-    }
+    ) = write("put boolean for key: $key") { it[booleanPreferencesKey(key)] = value }
 
     override suspend fun getInt(
         key: String,
@@ -153,18 +125,7 @@ class DataStoreKeyValueStorage(
     override suspend fun putInt(
         key: String,
         value: Int,
-    ) {
-        val prefKey = intPreferencesKey(key)
-        try {
-            dataStore.edit { preferences ->
-                preferences[prefKey] = value
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Napier.e("Failed to put int for key: $key", e)
-        }
-    }
+    ) = write("put int for key: $key") { it[intPreferencesKey(key)] = value }
 
     override suspend fun getLong(
         key: String,
@@ -185,18 +146,7 @@ class DataStoreKeyValueStorage(
     override suspend fun putLong(
         key: String,
         value: Long,
-    ) {
-        val prefKey = longPreferencesKey(key)
-        try {
-            dataStore.edit { preferences ->
-                preferences[prefKey] = value
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Napier.e("Failed to put long for key: $key", e)
-        }
-    }
+    ) = write("put long for key: $key") { it[longPreferencesKey(key)] = value }
 
     override suspend fun getFloat(
         key: String,
@@ -217,36 +167,16 @@ class DataStoreKeyValueStorage(
     override suspend fun putFloat(
         key: String,
         value: Float,
-    ) {
-        val prefKey = floatPreferencesKey(key)
-        try {
-            dataStore.edit { preferences ->
-                preferences[prefKey] = value
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Napier.e("Failed to put float for key: $key", e)
-        }
-    }
+    ) = write("put float for key: $key") { it[floatPreferencesKey(key)] = value }
 
-    override suspend fun remove(key: String) {
-        try {
-            dataStore.edit { preferences ->
-                val keysToRemove =
-                    preferences
-                        .asMap()
-                        .keys
-                        .filter { it.name == key }
-
-                keysToRemove.forEach { preferences.remove(it) }
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Napier.e("Failed to remove key: $key", e)
+    override suspend fun remove(key: String) =
+        write("remove key: $key") { preferences ->
+            preferences
+                .asMap()
+                .keys
+                .filter { it.name == key }
+                .forEach { preferences.remove(it) }
         }
-    }
 
     override suspend fun contains(key: String): Boolean =
         try {
@@ -259,15 +189,20 @@ class DataStoreKeyValueStorage(
             false
         }
 
-    override suspend fun clear() {
+    override suspend fun clear() = write("clear preferences") { it.clear() }
+
+    /** Applies [change] and rethrows a failed save so a caller never treats unsaved data as stored. */
+    private suspend fun write(
+        description: String,
+        change: (MutablePreferences) -> Unit,
+    ) {
         try {
-            dataStore.edit { preferences ->
-                preferences.clear()
-            }
+            dataStore.edit { change(it) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Napier.e("Failed to clear preferences", e)
+            Napier.e("Failed to $description", e)
+            throw e
         }
     }
 

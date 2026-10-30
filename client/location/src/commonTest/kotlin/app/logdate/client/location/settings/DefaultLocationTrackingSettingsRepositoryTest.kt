@@ -143,8 +143,6 @@ private class InMemoryKeyValueStorage : KeyValueStorage {
 
     override suspend fun getString(key: String): String? = values[key] as? String
 
-    override fun getStringSync(key: String): String? = values[key] as? String
-
     override suspend fun putString(
         key: String,
         value: String,

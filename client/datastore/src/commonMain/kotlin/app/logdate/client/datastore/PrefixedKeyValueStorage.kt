@@ -39,8 +39,6 @@ class PrefixedKeyValueStorage(
         value: String,
     ) = delegate.putStringOrThrow(prefix + key, value)
 
-    override fun getStringSync(key: String): String? = delegate.getStringSync(prefix + key)
-
     override suspend fun putString(
         key: String,
         value: String,

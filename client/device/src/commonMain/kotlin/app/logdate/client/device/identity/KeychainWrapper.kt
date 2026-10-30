@@ -11,7 +11,7 @@ interface KeychainWrapper {
      * @param key The key to retrieve
      * @return The stored string, or null if not found
      */
-    fun getString(key: String): String?
+    suspend fun getString(key: String): String?
 
     /**
      * Stores a string value in the keychain.

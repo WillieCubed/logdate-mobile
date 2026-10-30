@@ -182,8 +182,6 @@ private class StringStorage : KeyValueStorage {
         return values[key]
     }
 
-    override fun getStringSync(key: String): String? = values[key]
-
     override suspend fun putString(
         key: String,
         value: String,

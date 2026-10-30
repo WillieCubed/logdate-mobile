@@ -160,10 +160,11 @@ class AndroidWatchRemovalAccess(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val associations = platform.myAssociations
             if (associations.isEmpty()) return true
+            val boundAssociationId = this.associations.current()[target.context.watchNode]?.associationId
             val exact =
                 associations
                     .filter { association ->
-                        this.associations.current()[target.context.watchNode]?.associationId == association.id ||
+                        boundAssociationId == association.id ||
                             association.deviceMacAddress?.toString()?.let { nodeForAddress(it) } == target.context.watchNode
                     }.singleOrNull() ?: return false
             platform.disassociate(exact.id)

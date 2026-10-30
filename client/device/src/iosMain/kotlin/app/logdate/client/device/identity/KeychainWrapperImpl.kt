@@ -17,13 +17,7 @@ class KeychainWrapperImpl(
 
     private fun createKey(key: String): String = "keychain_${serviceName}_$key"
 
-    override fun getString(key: String): String? {
-        val storageKey = createKey(key)
-        return runCatching {
-            // Use non-suspend version for sync calls
-            storage.getStringSync(storageKey)
-        }.getOrNull()
-    }
+    override suspend fun getString(key: String): String? = storage.getString(createKey(key))
 
     override suspend fun set(
         value: String,

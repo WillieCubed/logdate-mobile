@@ -36,8 +36,8 @@ class DesktopDeviceIdProviderTest {
             val deviceId = provider.getDeviceId().first()
 
             // Then
-            assertTrue(storage.getStringSync("device.id") != null, "Device ID should be persisted")
-            assertTrue(storage.getStringSync("device.id")!!.isNotBlank(), "Stored device ID should not be empty")
+            assertTrue(storage.getString("device.id") != null, "Device ID should be persisted")
+            assertTrue(storage.getString("device.id")!!.isNotBlank(), "Stored device ID should not be empty")
             assertTrue(deviceId.toString().isNotBlank(), "Device ID should not be blank")
         }
 
@@ -84,8 +84,6 @@ class DesktopDeviceIdProviderTest {
         private val values = mutableMapOf<String, Any?>()
 
         override suspend fun getString(key: String): String? = values[key] as? String
-
-        override fun getStringSync(key: String): String? = values[key] as? String
 
         override suspend fun putString(
             key: String,

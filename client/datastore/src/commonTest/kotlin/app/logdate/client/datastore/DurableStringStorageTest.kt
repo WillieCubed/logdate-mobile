@@ -35,4 +35,25 @@ class DurableStringStorageTest {
                 }
             assertFailsWith<IllegalStateException> { DataStoreKeyValueStorage(store).putStringOrThrow("editor_drafts", "retained") }
         }
+
+    @Test
+    fun `every write reports a failed save instead of acknowledging it`() =
+        runTest {
+            val store =
+                object : DataStore<Preferences> {
+                    override val data: Flow<Preferences> = flow { emit(emptyPreferences()) }
+
+                    override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
+                        throw IllegalStateException("Preferences write failed")
+                }
+            val storage = DataStoreKeyValueStorage(store)
+
+            assertFailsWith<IllegalStateException> { storage.putString("device.id", "retained") }
+            assertFailsWith<IllegalStateException> { storage.putBoolean("enabled", true) }
+            assertFailsWith<IllegalStateException> { storage.putInt("count", 1) }
+            assertFailsWith<IllegalStateException> { storage.putLong("since", 1L) }
+            assertFailsWith<IllegalStateException> { storage.putFloat("scale", 1f) }
+            assertFailsWith<IllegalStateException> { storage.remove("device.id") }
+            assertFailsWith<IllegalStateException> { storage.clear() }
+        }
 }

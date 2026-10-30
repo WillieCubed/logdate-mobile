@@ -17,8 +17,6 @@ class MemoryKeyValueStorage : KeyValueStorage {
 
     override suspend fun getString(key: String): String? = strings.value[key]
 
-    override fun getStringSync(key: String): String? = strings.value[key]
-
     override suspend fun putString(
         key: String,
         value: String,
