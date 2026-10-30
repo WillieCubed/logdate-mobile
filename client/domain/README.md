@@ -34,7 +34,6 @@ Domain Module
 ### Important Use Cases
 
 - `AddNoteUseCase`: Creates and stores journal notes
-- `GetTimelineUseCase`: Retrieves timeline data with proper formatting
 - `GetStreamingTimelineUseCase`: Streaming timeline with fast first paint (used by HomeViewModel)
 - `SummarizeJournalEntriesUseCase`: Generates summaries of journal content
 - `GetRewindUseCase`: Creates retrospective content from past entries
@@ -102,13 +101,10 @@ Domain Module
 ### Standard Use Case Pattern
 
 ```kotlin
-class GetTimelineUseCase(
-    private val journalRepository: JournalRepository,
-    private val intelligenceClient: IntelligenceClient
+class GetJournalByIdUseCase(
+    private val repository: JournalRepository,
 ) {
-    suspend operator fun invoke(params: TimelineParams): Flow<List<TimelineItem>> {
-        // Business logic implementation
-    }
+    operator fun invoke(journalId: Uuid): Flow<Journal> = repository.observeJournalById(journalId)
 }
 ```
 
@@ -116,11 +112,11 @@ class GetTimelineUseCase(
 
 ```kotlin
 // In DomainModule.kt
-factory { GetTimelineUseCase(get(), get()) }
+factory { GetJournalByIdUseCase(get()) }
 
 // In ViewModel
-class TimelineViewModel(
-    private val getTimelineUseCase: GetTimelineUseCase
+class JournalViewModel(
+    private val getJournalById: GetJournalByIdUseCase
 ) : ViewModel() {
     // Use the use case
 }
@@ -138,6 +134,7 @@ The domain module includes comprehensive testing:
 ## TODOs
 
 ### Core Improvements
+
 - [ ] Add comprehensive unit testing for all use cases
 - [ ] Implement result wrapper for all use cases
 - [ ] Add proper error handling and recovery strategies
@@ -145,6 +142,7 @@ The domain module includes comprehensive testing:
 - [ ] Add validation for all input parameters
 
 ### Intelligence Enhancements
+
 - [ ] Expand entity recognition capabilities
 - [ ] Improve summarization quality and customization
 - [ ] Add sentiment analysis for emotional insights
@@ -153,6 +151,7 @@ The domain module includes comprehensive testing:
 - [ ] Improve context-aware processing
 
 ### Advanced Features
+
 - [ ] Implement offline-first business logic
 - [ ] Add domain-level analytics tracking
 - [ ] Define strategies for handling large datasets
@@ -160,6 +159,7 @@ The domain module includes comprehensive testing:
 - [ ] Implement business-rule based retry policies
 
 ### Domain Logic Refinements
+
 - [ ] Refine business rules for data integrity
 - [ ] Improve error classification and handling
 - [ ] Enhance domain model structure and relationships

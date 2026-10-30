@@ -3,59 +3,15 @@ package app.logdate.client.domain.timeline
 import app.logdate.client.domain.entities.ExtractPeopleUseCase
 import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.MAX_AI_INPUT_CHARACTERS
-import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.JournalNote
-import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.shared.model.Event
 import app.logdate.shared.model.Person
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.round
 import kotlin.time.Instant
-
-/**
- * A use case to get the timeline of timeline events.
- *
- * This produces a timeline that aggregates written notes, media, and other data into a single
- * stream of events.
- */
-class GetTimelineUseCase(
-    private val notesRepository: JournalNotesRepository,
-    private val getTimelineDayUseCase: GetTimelineDayUseCase,
-    private val groupNotesByDayBoundsUseCase: GroupNotesByDayBoundsUseCase,
-    private val eventRepository: EventRepository,
-) {
-    operator fun invoke(sortOrder: TimelineSortOrder = TimelineSortOrder.REVERSE_CHRONOLOGICAL): Flow<Timeline> =
-        combine(
-            notesRepository.allNotesObserved,
-            eventRepository.observeAllEvents(),
-        ) { allNotes, allEvents ->
-            val notesByDay = groupNotesByDayBoundsUseCase(allNotes)
-
-            val timelineDays =
-                notesByDay.map { (date, entries) ->
-                    val dayStart = entries.minOf { it.creationTimestamp }
-                    val dayEnd = entries.maxOf { it.creationTimestamp }
-                    val dayEvents =
-                        allEvents.filter { event ->
-                            event.startTime < dayEnd && (event.endTime ?: event.startTime) >= dayStart
-                        }
-                    getTimelineDayUseCase(date, entries, dayEvents)
-                }
-
-            val sortedDays =
-                when (sortOrder) {
-                    TimelineSortOrder.CHRONOLOGICAL -> timelineDays.sortedBy { it.date }
-                    TimelineSortOrder.REVERSE_CHRONOLOGICAL -> timelineDays.sortedByDescending { it.date }
-                }
-
-            Timeline(sortedDays)
-        }
-}
 
 data class Timeline(
     /**

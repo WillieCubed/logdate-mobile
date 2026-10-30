@@ -22,7 +22,7 @@ actual val dataModule: Module = module {
     single<LocationHistoryRepository> { OfflineFirstLocationHistoryRepository(get()) }
 }
 
-// desktopMain - Desktop implementation with stubs  
+// desktopMain - Desktop implementation with stubs
 actual val dataModule: Module = module {
     factory<RemoteJournalDataSource> { StubJournalDataSource }
     single<LocationHistoryRepository> { StubLocationHistoryRepository() }
@@ -35,10 +35,10 @@ actual val dataModule: Module = module {
 
 ```kotlin
 // ✅ CORRECT - Features depend on interfaces
-viewModel { 
+viewModel {
     EntryEditorViewModel(
         fetchTodayNotes = get(),                    // Use case interface
-        addNoteUseCase = get(),                     // Use case interface  
+        addNoteUseCase = get(),                     // Use case interface
         getCurrentUserJournals = get(),             // Use case interface
         journalContentRepository = get(),           // Repository interface
         updateEntryDraft = get()                    // Use case interface
@@ -61,7 +61,7 @@ Our DI structure reflects clean architecture layers with strict dependency flow:
 ```
 Feature Layer (ViewModels, UI)
     ↓ (depends on interfaces only)
-Domain Layer (Use Cases, Business Logic)  
+Domain Layer (Use Cases, Business Logic)
     ↓ (depends on repository interfaces)
 Data Layer (Repository Implementations)
     ↓ (depends on data source interfaces)
@@ -73,6 +73,7 @@ Infrastructure Layer (Concrete Implementations)
 ### App Module (`/app/compose-main/src/*/di/AppModule.kt`)
 
 **Common Module Definition**
+
 ```kotlin
 expect val appModule: Module
 
@@ -92,12 +93,13 @@ internal val defaultModules: Set<Module> = setOf(
 Feature modules define ViewModels and UI-layer dependencies. **Critical: Features must only inject interfaces.**
 
 **Editor Feature Module Example**
+
 ```kotlin
 val editorFeatureModule: Module = module {
     includes(domainModule)  // Provides use case interfaces
     includes(mediaModule)   // Provides media service interfaces
 
-    viewModel { 
+    viewModel {
         EntryEditorViewModel(
             // ✅ All dependencies are interfaces/use cases
             fetchTodayNotes = get(),                    // Use case
@@ -118,15 +120,16 @@ val editorFeatureModule: Module = module {
 
 **Core Feature Module - Platform-Specific Abstractions**
 
-*Android Implementation:*
+_Android Implementation:_
+
 ```kotlin
 actual val coreFeatureModule: Module = module {
     includes(domainModule)  // Provides business logic interfaces
-    
+
     // Platform-specific implementations bound to interfaces
     single<BiometricGatekeeper> { AndroidBiometricGatekeeper() }
     single<ExportLauncher> { AndroidExportLauncher(get()) }
-    
+
     // ViewModels depend only on use cases and interfaces
     viewModel { AppViewModel(get(), get(), get()) }
     viewModel { SettingsOverviewViewModel(get(), get(), get()) }
@@ -138,15 +141,16 @@ actual val coreFeatureModule: Module = module {
 }
 ```
 
-*Desktop Implementation:*
+_Desktop Implementation:_
+
 ```kotlin
 actual val coreFeatureModule: Module = module {
     includes(domainModule)
-    
+
     // Stub implementations for desktop
     single<BiometricGatekeeper> { StubBiometricGatekeeper() }
     single<ExportLauncher> { StubExportLauncher() }
-    
+
     viewModel { AppViewModel(get(), get(), get()) }
     viewModel { SettingsOverviewViewModel(get(), get(), get()) }
     viewModel { PrivacySettingsViewModel(get(), get(), get(), get(), get()) }
@@ -165,23 +169,22 @@ Domain layer provides use cases that depend only on repository interfaces:
 val domainModule: Module = module {
     includes(intelligenceModule)  // Infrastructure services
     includes(locationModule)      // Infrastructure services
-    
+
     // ✅ Use cases depend only on repository interfaces
     factory { AddNoteUseCase(get(), get(), get(), get()) }  // Repository interfaces
     factory { RemoveNoteUseCase(get()) }                    // Repository interface
-    factory { GetTimelineUseCase(get(), get()) }            // Repository interfaces
     factory { GetStreamingTimelineUseCase(get(), get()) }  // Streaming timeline (fast first paint)
     factory { SummarizeJournalEntriesUseCase(get(), get()) }// Repository interfaces
-    
+
     // Account management
     factory { CreatePasskeyAccountUseCase(get()) }          // Repository interface
     factory { GetCurrentAccountUseCase(get()) }             // Repository interface
-    
+
     // Draft management
     factory { CreateEntryDraftUseCase(get()) }              // Repository interface
     factory { UpdateEntryDraftUseCase(get()) }              // Repository interface
     factory { FetchMostRecentDraftUseCase(get()) }          // Repository interface
-    
+
     // Location services
     factory { GetLocationHistoryUseCase(get()) }            // Repository interface
     single { LocationRetryWorker(get()) }                   // Service interface
@@ -193,17 +196,18 @@ val domainModule: Module = module {
 Data modules provide repository implementations. **This is where concrete implementations are bound to interfaces.**
 
 **Android Implementation (Real Services)**
+
 ```kotlin
 actual val dataModule: Module = module {
     includes(databaseModule, deviceInstanceModule, datastoreModule, syncModule)
-    
+
     // ✅ Bind concrete implementations to interfaces
     factory<RemoteJournalDataSource> { NoOpJournalDataSource }
     single<JournalRepository> { OfflineFirstJournalRepository(get(), get(), get()) }
     single<LocationHistoryRepository> { OfflineFirstLocationHistoryRepository(get()) }
     single<EntryDraftRepository> { OfflineFirstEntryDraftRepository(get(), get()) }
     factory<LocalEntryDraftStore> { AndroidLocalEntryDraftStore(get()) }
-    
+
     // Networking and account services
     single { PasskeyApiClient(httpClient, get(), get()) }
     single<PasskeyAccountRepository> { DefaultPasskeyAccountRepository(get(), get(), get(), get(), get()) }
@@ -211,17 +215,18 @@ actual val dataModule: Module = module {
 ```
 
 **Desktop Implementation (Stub Services)**
+
 ```kotlin
 actual val dataModule: Module = module {
     includes(deviceInstanceModule, datastoreModule, databaseModule)
-    
+
     // ✅ Bind stub implementations to same interfaces
     factory<RemoteJournalDataSource> { StubJournalDataSource }
     single<JournalRepository> { OfflineFirstJournalRepository(get(), get(), get()) }
     single<LocationHistoryRepository> { OfflineFirstLocationHistoryRepository(get()) }
     single<EntryDraftRepository> { OfflineFirstEntryDraftRepository(get(), get()) }
     factory<LocalEntryDraftStore> { DesktopLocalEntryDraftStore() }
-    
+
     // User services (stubs)
     single<UserDeviceRepository> { StubUserDeviceRepository }
 }
@@ -232,9 +237,10 @@ actual val dataModule: Module = module {
 ### 1. Interface-Only Dependencies in Features
 
 **✅ CORRECT Pattern:**
+
 ```kotlin
 // Features inject use cases and repository interfaces
-viewModel { 
+viewModel {
     JournalDetailViewModel(
         getJournal = get(),                    // Use case
         updateJournal = get(),                 // Use case
@@ -244,7 +250,7 @@ viewModel {
 }
 
 // Use cases inject repository interfaces
-factory { 
+factory {
     AddNoteUseCase(
         journalNotesRepository = get(),        // Repository interface
         locationRepository = get(),            // Repository interface
@@ -255,6 +261,7 @@ factory {
 ```
 
 **❌ WRONG Pattern:**
+
 ```kotlin
 // Never inject concrete implementations in features
 viewModel {
@@ -332,6 +339,7 @@ single<ExportLauncher> { StubExportLauncher() }          // Desktop
 ## DI Initialization
 
 ### Android
+
 ```kotlin
 class LogDateApplication : Application(), KoinComponent {
     override fun onCreate() {
@@ -352,6 +360,7 @@ internal fun Application.initializeKoin() {
 ```
 
 ### Desktop
+
 ```kotlin
 fun main() = application {
     KoinApplication(application = {
@@ -368,18 +377,21 @@ fun main() = application {
 ### Scope Management
 
 **`single`** - For stateful services and repositories
+
 ```kotlin
 single<JournalRepository> { OfflineFirstJournalRepository(get(), get(), get()) }
 single<LocationRetryWorker> { LocationRetryWorker(get()) }
 ```
 
 **`factory`** - For stateless objects and use cases
+
 ```kotlin
 factory { AddNoteUseCase(get(), get(), get(), get()) }
 factory<RemoteJournalDataSource> { NoOpJournalDataSource }
 ```
 
 **`viewModel`** - Platform-specific ViewModel scoping
+
 ```kotlin
 viewModel { JournalDetailViewModel(get(), get()) }
 ```
@@ -390,7 +402,7 @@ viewModel { JournalDetailViewModel(get(), get()) }
 val featureModule: Module = module {
     includes(domainModule)  // Provides use case interfaces
     includes(mediaModule)   // Provides media service interfaces
-    
+
     // Feature-specific bindings
     viewModel { /* ViewModels with interface dependencies */ }
 }
@@ -415,7 +427,7 @@ fun `test use case with fake repository`() {
     val koinApp = koinApplication {
         modules(testModule)
     }
-    
+
     val useCase = koinApp.koin.get<AddNoteUseCase>()
     // Test with fake repository
 }
@@ -424,6 +436,7 @@ fun `test use case with fake repository`() {
 ## Architecture Violations to Avoid
 
 ### ❌ Direct Implementation Dependencies
+
 ```kotlin
 // NEVER do this in feature modules
 viewModel {
@@ -436,6 +449,7 @@ viewModel {
 ```
 
 ### ❌ Bypassing Use Cases
+
 ```kotlin
 // NEVER inject repositories directly into ViewModels
 viewModel {
@@ -447,15 +461,17 @@ viewModel {
 ```
 
 ### ❌ Platform Conditional Logic
+
 ```kotlin
 // NEVER use conditional injection - use expect/actual instead
 single<LocationProvider> {
-    if (Platform.isAndroid) AndroidLocationProvider(get()) 
+    if (Platform.isAndroid) AndroidLocationProvider(get())
     else StubLocationProvider
 }
 ```
 
 ### ✅ Correct Architecture
+
 ```kotlin
 // Features depend on use cases
 viewModel {
@@ -481,7 +497,7 @@ single<NotesRepository> { OfflineFirstNotesRepository(get(), get()) }
 ## Best Practices Summary
 
 1. **Features must only depend on use cases and service interfaces**
-2. **Use cases must only depend on repository and service interfaces**  
+2. **Use cases must only depend on repository and service interfaces**
 3. **Repository implementations are bound in the data layer**
 4. **Use expect/actual for platform-specific implementations**
 5. **Never inject concrete implementations in feature or domain layers**
