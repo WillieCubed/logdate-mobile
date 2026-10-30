@@ -13,7 +13,6 @@ import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import kotlinx.serialization.json.Json
-import java.net.ServerSocket
 import java.net.URI
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
@@ -50,10 +49,9 @@ suspend fun <T> withServerClientHarness(
             }
 
         require(serverPort == null || serverPort in 1..65535) { "serverPort must be between 1 and 65535" }
-        val port = serverPort ?: ServerSocket(0).use { it.localPort }
         val host = "127.0.0.1"
         val engine =
-            embeddedServer(Netty, host = host, port = port) {
+            embeddedServer(Netty, host = host, port = serverPort ?: 0) {
                 intercept(ApplicationCallPipeline.Setup) { beforeRequest(call) }
                 module(isDatabaseAvailable = databaseAvailable)
             }
@@ -61,6 +59,11 @@ suspend fun <T> withServerClientHarness(
         var harness: ServerClientE2EHarness? = null
         try {
             engine.start(wait = false)
+            val port =
+                engine.engine
+                    .resolvedConnectors()
+                    .single()
+                    .port
             waitForServerStartup(host, port)
 
             val configRepository = DefaultLogDateConfigRepository(initialBackendUrl = "http://$host:$port")
