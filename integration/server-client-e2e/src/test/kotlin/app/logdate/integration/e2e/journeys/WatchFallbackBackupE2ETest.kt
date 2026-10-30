@@ -16,6 +16,7 @@ import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.sync.CreateCollision
 import app.logdate.client.sync.CreateCollisionPolicy
 import app.logdate.client.sync.DefaultSyncManager
+import app.logdate.client.sync.InMemorySyncRouteStore
 import app.logdate.client.sync.RoomSyncTransactionManager
 import app.logdate.client.sync.cloud.CloudRequestLocation
 import app.logdate.client.sync.cloud.CloudRequestLocationProvider
@@ -26,6 +27,10 @@ import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
 import app.logdate.client.sync.cloud.LogDateCloudApiClient
 import app.logdate.client.sync.metadata.DatabaseSyncMetadataService
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.InMemoryFirstSyncEnqueueStore
+import app.logdate.client.sync.metadata.InMemoryIdentityRecoveryNeededStore
+import app.logdate.client.sync.metadata.InMemoryLastSyncErrorStore
+import app.logdate.client.sync.metadata.InMemoryUnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.client.sync.recovery.DownloadInbox
@@ -229,6 +234,11 @@ class WatchFallbackBackupE2ETest {
                 }
             val manager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(DurableCloudApiClient(pair.client, inbox)),
                     cloudJournalDataSource = mockk(relaxed = true),
                     cloudAssociationDataSource = mockk(relaxed = true),

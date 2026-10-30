@@ -10,6 +10,10 @@ import app.logdate.client.sync.cloud.JournalChange
 import app.logdate.client.sync.cloud.JournalChangesResponse
 import app.logdate.client.sync.cloud.JournalDeletion
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.InMemoryFirstSyncEnqueueStore
+import app.logdate.client.sync.metadata.InMemoryIdentityRecoveryNeededStore
+import app.logdate.client.sync.metadata.InMemoryLastSyncErrorStore
+import app.logdate.client.sync.metadata.InMemoryUnreadableCloudRecordStore
 import app.logdate.client.sync.test.FakeJournalContentRepository
 import app.logdate.client.sync.test.FakeJournalNotesRepository
 import app.logdate.client.sync.test.FakeJournalRepository
@@ -79,6 +83,11 @@ class JournalDownloadIntegrationTest {
 
             val syncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(mockApiClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(mockApiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(mockApiClient),
@@ -148,6 +157,11 @@ class JournalDownloadIntegrationTest {
 
             val syncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(mockApiClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(mockApiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(mockApiClient),
@@ -197,6 +211,11 @@ class JournalDownloadIntegrationTest {
 
             val syncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(mockApiClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(mockApiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(mockApiClient),

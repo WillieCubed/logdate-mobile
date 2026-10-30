@@ -14,6 +14,7 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.sync.CreateCollisionPolicy
 import app.logdate.client.sync.DefaultSyncManager
+import app.logdate.client.sync.InMemorySyncRouteStore
 import app.logdate.client.sync.SyncMediaTransfer
 import app.logdate.client.sync.SyncProfile
 import app.logdate.client.sync.SyncResult
@@ -182,6 +183,7 @@ fun testDefaultSyncManager(
 ): DefaultSyncManager =
     if (syncScope == null) {
         DefaultSyncManager(
+            syncRouteStore = InMemorySyncRouteStore(),
             cloudContentDataSource = cloudContentDataSource,
             cloudJournalDataSource = cloudJournalDataSource,
             cloudAssociationDataSource = cloudAssociationDataSource,
@@ -225,6 +227,7 @@ fun testDefaultSyncManager(
         )
     } else {
         DefaultSyncManager(
+            syncRouteStore = InMemorySyncRouteStore(),
             cloudContentDataSource = cloudContentDataSource,
             cloudJournalDataSource = cloudJournalDataSource,
             cloudAssociationDataSource = cloudAssociationDataSource,

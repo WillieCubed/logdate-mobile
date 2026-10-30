@@ -7,6 +7,10 @@ import app.logdate.client.sync.cloud.DefaultCloudDraftDataSource
 import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
 import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.InMemoryFirstSyncEnqueueStore
+import app.logdate.client.sync.metadata.InMemoryIdentityRecoveryNeededStore
+import app.logdate.client.sync.metadata.InMemoryLastSyncErrorStore
+import app.logdate.client.sync.metadata.InMemoryUnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.test.FakeCloudApiClient
 import app.logdate.client.sync.test.InMemoryMediaSyncRefStore
@@ -52,6 +56,11 @@ class SyncProductionScenariosTest {
 
             val syncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(apiClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
@@ -106,6 +115,11 @@ class SyncProductionScenariosTest {
 
             val syncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(apiClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
@@ -164,6 +178,11 @@ class SyncProductionScenariosTest {
 
             val syncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(apiClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
@@ -221,6 +240,11 @@ class SyncProductionScenariosTest {
 
             val offlineSyncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(offlineClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(offlineClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(offlineClient),
@@ -259,6 +283,11 @@ class SyncProductionScenariosTest {
 
             val onlineSyncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(fakeCloudApiClient()),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(fakeCloudApiClient()),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(fakeCloudApiClient()),
@@ -298,6 +327,11 @@ class SyncProductionScenariosTest {
 
             val syncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(apiClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
@@ -348,6 +382,11 @@ class SyncProductionScenariosTest {
 
             val syncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(apiClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
@@ -399,6 +438,11 @@ class SyncProductionScenariosTest {
             // Create successful sync scenario
             val syncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(apiClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
@@ -438,6 +482,11 @@ class SyncProductionScenariosTest {
 
             val syncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(apiClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
@@ -486,6 +535,11 @@ class SyncProductionScenariosTest {
             // Use successful client from the start
             val syncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(apiClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
@@ -526,6 +580,11 @@ class SyncProductionScenariosTest {
             // Start with authenticated manager
             val syncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(apiClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
@@ -565,6 +624,11 @@ class SyncProductionScenariosTest {
 
             val syncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(apiClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),
@@ -602,6 +666,11 @@ class SyncProductionScenariosTest {
 
             val syncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(apiClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(apiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(apiClient),

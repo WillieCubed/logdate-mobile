@@ -14,6 +14,10 @@ import app.logdate.client.sync.conflict.KeyValueSyncConflictStore
 import app.logdate.client.sync.conflict.SyncConflictRecord
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.InMemoryFirstSyncEnqueueStore
+import app.logdate.client.sync.metadata.InMemoryIdentityRecoveryNeededStore
+import app.logdate.client.sync.metadata.InMemoryLastSyncErrorStore
+import app.logdate.client.sync.metadata.InMemoryUnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.test.FailingJournalNotesRepository
 import app.logdate.client.sync.test.FakeJournalContentRepository
@@ -83,6 +87,11 @@ class ContentDownloadReconciliationTest {
 
             val syncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(mockApiClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(mockApiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(mockApiClient),
@@ -140,6 +149,11 @@ class ContentDownloadReconciliationTest {
 
             val syncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(mockApiClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(mockApiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(mockApiClient),
@@ -254,6 +268,11 @@ class ContentDownloadReconciliationTest {
 
             val syncManager =
                 DefaultSyncManager(
+                    lastErrorStore = InMemoryLastSyncErrorStore(),
+                    firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                    identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                    unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                    syncRouteStore = InMemorySyncRouteStore(),
                     cloudContentDataSource = DefaultCloudContentDataSource(mockApiClient),
                     cloudJournalDataSource = DefaultCloudJournalDataSource(mockApiClient),
                     cloudAssociationDataSource = DefaultCloudAssociationDataSource(mockApiClient),
