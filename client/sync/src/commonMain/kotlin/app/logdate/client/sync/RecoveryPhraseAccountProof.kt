@@ -30,7 +30,8 @@ enum class RecoveryPhraseVerificationReason { MISMATCH, UNAVAILABLE, NO_PROOF }
 
 class RecoveryPhraseVerificationException(
     val reason: RecoveryPhraseVerificationReason = RecoveryPhraseVerificationReason.MISMATCH,
-) : Exception("Recovery phrase account verification failed: $reason")
+    cause: Throwable? = null,
+) : Exception("Recovery phrase account verification failed: $reason", cause)
 
 @OptIn(ExperimentalEncodingApi::class)
 class CloudRecoveryPhraseAccountProof(
@@ -58,8 +59,8 @@ class CloudRecoveryPhraseAccountProof(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                throw RecoveryPhraseVerificationException(RecoveryPhraseVerificationReason.UNAVAILABLE)
+            } catch (error: Exception) {
+                throw RecoveryPhraseVerificationException(RecoveryPhraseVerificationReason.UNAVAILABLE, error)
             }
         when (cloud) {
             CloudProof.MATCH -> Unit

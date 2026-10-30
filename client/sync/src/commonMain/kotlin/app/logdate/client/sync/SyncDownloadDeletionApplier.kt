@@ -65,8 +65,8 @@ internal class SyncDownloadDeletionApplier(
                 diagnostics.failed(row, attemptId, context.source)
                 context.failedIds += id.toString()
                 if (strategy.settle != null) strategy.settleFailed(id)
-                errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to apply remote deletion")
-                Napier.e("Failed to apply remote deletion")
+                errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to apply remote deletion", cause = error)
+                Napier.e("Failed to apply remote deletion: ${error::class.simpleName}")
             }
         }
         return BatchResult(downloaded, conflicts, errors)

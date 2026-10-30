@@ -76,9 +76,9 @@ class KeyValueSyncConflictStore(
             storage.putString(CONFLICT_KEY, encoded)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (error: Exception) {
             throw app.logdate.client.sync
-                .SyncStorageUnavailableException()
+                .SyncStorageUnavailableException(error)
         }
     }
 

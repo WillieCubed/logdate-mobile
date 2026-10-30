@@ -152,7 +152,7 @@ internal suspend fun LogDateCloudApiClient.requestUploadDraft(
     } catch (e: Exception) {
         if (e is CancellationException) throw e
         Napier.e("Failed to upload draft")
-        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to upload draft"))
+        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to upload draft", cause = e))
     }
 
 internal suspend fun LogDateCloudApiClient.requestGetDraftChanges(
@@ -176,7 +176,7 @@ internal suspend fun LogDateCloudApiClient.requestGetDraftChanges(
     } catch (e: Exception) {
         if (e is CancellationException) throw e
         Napier.e("Failed to get draft changes")
-        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to get draft changes"))
+        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to get draft changes", cause = e))
     }
 
 internal suspend fun LogDateCloudApiClient.requestDeleteDraft(
@@ -196,5 +196,5 @@ internal suspend fun LogDateCloudApiClient.requestDeleteDraft(
     } catch (e: Exception) {
         if (e is CancellationException) throw e
         Napier.e("Failed to delete draft")
-        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to delete draft"))
+        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to delete draft", cause = e))
     }

@@ -151,8 +151,8 @@ internal suspend fun LogDateCloudApiClient.requestUploadBackupFile(
         if (response.status == HttpStatusCode.Created) Result.success(response.body()) else handleApiError(response)
     } catch (cancelled: CancellationException) {
         throw cancelled
-    } catch (_: Exception) {
-        Result.failure(CloudApiException("NETWORK_ERROR", "Backup upload failed"))
+    } catch (error: Exception) {
+        Result.failure(CloudApiException("NETWORK_ERROR", "Backup upload failed", cause = error))
     }
 
 internal suspend fun LogDateCloudApiClient.requestDownloadBackupToFile(
@@ -190,8 +190,8 @@ internal suspend fun LogDateCloudApiClient.requestDownloadBackupToFile(
         }
     } catch (cancelled: CancellationException) {
         throw cancelled
-    } catch (_: Exception) {
-        return Result.failure(CloudApiException("NETWORK_ERROR", "Backup download failed"))
+    } catch (error: Exception) {
+        return Result.failure(CloudApiException("NETWORK_ERROR", "Backup download failed", cause = error))
     } finally {
         if (!complete) runCatching { SystemFileSystem.delete(destination) }
     }
@@ -232,7 +232,7 @@ internal suspend fun LogDateCloudApiClient.requestUploadBackup(
     } catch (e: Exception) {
         if (e is CancellationException) throw e
         Napier.e("Failed to upload backup")
-        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to upload backup"))
+        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to upload backup", cause = e))
     }
 
 internal suspend fun LogDateCloudApiClient.requestListBackups(accessToken: String): Result<BackupListResponse> =
@@ -248,7 +248,7 @@ internal suspend fun LogDateCloudApiClient.requestListBackups(accessToken: Strin
     } catch (e: Exception) {
         if (e is CancellationException) throw e
         Napier.e("Failed to list backups")
-        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to list backups"))
+        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to list backups", cause = e))
     }
 
 internal suspend fun LogDateCloudApiClient.requestGetBackup(
@@ -267,7 +267,7 @@ internal suspend fun LogDateCloudApiClient.requestGetBackup(
     } catch (e: Exception) {
         if (e is CancellationException) throw e
         Napier.e("Failed to get backup metadata")
-        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to get backup metadata"))
+        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to get backup metadata", cause = e))
     }
 
 internal suspend fun LogDateCloudApiClient.requestDownloadBackup(
@@ -297,7 +297,7 @@ internal suspend fun LogDateCloudApiClient.requestDownloadBackup(
     } catch (e: Exception) {
         if (e is CancellationException) throw e
         Napier.e("Failed to download backup")
-        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to download backup"))
+        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to download backup", cause = e))
     }
 
 internal suspend fun LogDateCloudApiClient.requestDeleteBackup(
@@ -316,7 +316,7 @@ internal suspend fun LogDateCloudApiClient.requestDeleteBackup(
     } catch (e: Exception) {
         if (e is CancellationException) throw e
         Napier.e("Failed to delete backup")
-        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to delete backup"))
+        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to delete backup", cause = e))
     }
 
 internal suspend fun LogDateCloudApiClient.requestMediaUploadReceipt(

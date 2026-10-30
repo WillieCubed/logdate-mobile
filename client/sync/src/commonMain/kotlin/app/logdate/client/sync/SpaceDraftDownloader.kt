@@ -118,8 +118,8 @@ internal class SpaceDraftDownloader(
         } catch (error: Exception) {
             throwIfDeviceBlocked(error)
             staged.settleFailed(id)
-            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to apply remote draft")
-            Napier.e("Failed to apply draft change")
+            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to apply remote draft", cause = error)
+            Napier.e("Failed to apply a remote draft: ${error::class.simpleName}")
         }
     }
 
@@ -162,8 +162,8 @@ internal class SpaceDraftDownloader(
         } catch (error: Exception) {
             throwIfDeviceBlocked(error)
             staged.settleFailed(id)
-            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to delete remote draft")
-            Napier.e("Failed to delete draft")
+            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to delete remote draft", cause = error)
+            Napier.e("Failed to delete a remote draft: ${error::class.simpleName}")
         }
     }
 

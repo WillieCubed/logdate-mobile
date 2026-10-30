@@ -112,7 +112,7 @@ class AndroidLogDateSyncWorker(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Napier.w("Could not show backup progress in the notification")
+            Napier.w("Could not show backup progress in the notification: ${e::class.simpleName}")
             false
         }
 

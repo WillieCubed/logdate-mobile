@@ -66,7 +66,9 @@ fun deviceBlockReason(error: Throwable): SyncPausedReason? {
     return null
 }
 
-class SyncStorageUnavailableException : Exception("Local storage is unavailable")
+class SyncStorageUnavailableException(
+    cause: Throwable? = null,
+) : Exception("Local storage is unavailable", cause)
 
 internal fun throwIfDeviceBlocked(error: Throwable) {
     if (deviceBlockReason(error) != null) throw error

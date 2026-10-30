@@ -10,6 +10,7 @@ import app.logdate.client.sync.MediaHydrationResult
 import app.logdate.client.sync.SyncMediaTransfer
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.shared.model.diagnostics.DiagnosticReason
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlin.uuid.Uuid
 
@@ -35,7 +36,8 @@ internal class NativeEntryDraftMediaRecovery(
                 recoverRow(accessToken, row, scope)
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                Napier.e("Draft media recovery failed: ${error::class.simpleName}")
                 inbox.failed(TYPE, row.entityId, DiagnosticReason.LOCAL_STORAGE.name, row.version, scope)
             }
         }
