@@ -36,6 +36,13 @@ internal object RestoreArchiveTestFixtures {
 
         override suspend fun getJournalById(id: Uuid): Journal? = existingJournals[id]
 
+        var batchReads = 0
+
+        override suspend fun getJournalsByIds(ids: Set<Uuid>): Map<Uuid, Journal> {
+            batchReads++
+            return existingJournals.filterKeys { it in ids }
+        }
+
         override suspend fun create(journal: Journal): Uuid {
             created.add(journal)
             existingJournals[journal.id] = journal
@@ -93,7 +100,18 @@ internal object RestoreArchiveTestFixtures {
 
         override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = flowOf(emptyList())
 
-        override suspend fun getNoteById(noteId: Uuid): JournalNote? = existingNotes[noteId]
+        var singleReads = 0
+        var batchReads = 0
+
+        override suspend fun getNoteById(noteId: Uuid): JournalNote? {
+            singleReads++
+            return existingNotes[noteId]
+        }
+
+        override suspend fun getNotesByIds(noteIds: Set<Uuid>): Map<Uuid, JournalNote> {
+            batchReads++
+            return existingNotes.filterKeys { it in noteIds }
+        }
 
         override suspend fun create(note: JournalNote): Uuid {
             if (created.size >= throwAfterCreates) {
@@ -192,6 +210,7 @@ internal object RestoreArchiveTestFixtures {
     class FakeJournalContentRepository : JournalContentRepository {
         val links = mutableListOf<Pair<Uuid, Uuid>>()
         val removedLinks = mutableListOf<Pair<Uuid, Uuid>>()
+        var linkFailure: Throwable? = null
 
         override fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>> = flowOf(emptyList())
 
@@ -201,6 +220,7 @@ internal object RestoreArchiveTestFixtures {
             contentId: Uuid,
             journalId: Uuid,
         ) {
+            linkFailure?.let { throw it }
             links.add(contentId to journalId)
         }
 
