@@ -125,7 +125,7 @@ class DurableDownloadIntegrationTest {
                                 )
                             }
                         },
-                        localItems = { local.toMap() },
+                        localItem = { id -> local[id] },
                         idOf = { it.id },
                         syncVersionOf = { it.syncVersion },
                         lastUpdatedOf = { it.lastUpdated },
@@ -196,7 +196,7 @@ class DurableDownloadIntegrationTest {
                         ->
                         Result.success(ChangesPage(listOf(remote), emptyList(), Instant.fromEpochMilliseconds(2), false))
                     },
-                    localItems = { local.toMap() },
+                    localItem = { id -> local[id] },
                     idOf = { it.id },
                     syncVersionOf = { it.syncVersion },
                     lastUpdatedOf = { it.lastUpdated },
@@ -251,7 +251,7 @@ class DurableDownloadIntegrationTest {
                         ->
                         Result.success(ChangesPage(listOf(remote), emptyList(), Instant.fromEpochMilliseconds(10), false))
                     },
-                    localItems = { local.toMap() },
+                    localItem = { id -> local[id] },
                     idOf = { it.id },
                     syncVersionOf = { it.syncVersion },
                     lastUpdatedOf = { it.lastUpdated },
@@ -304,7 +304,7 @@ class DurableDownloadIntegrationTest {
                         metadata.enqueuePending(id.toString(), EntityType.JOURNAL, app.logdate.client.sync.metadata.PendingOperation.DELETE)
                         Result.success(ChangesPage(listOf(remote), emptyList(), Instant.fromEpochMilliseconds(10), false))
                     },
-                    localItems = { local.toMap() },
+                    localItem = { id -> local[id] },
                     idOf = { it.id },
                     syncVersionOf = { it.syncVersion },
                     lastUpdatedOf = { it.lastUpdated },
@@ -358,7 +358,7 @@ class DurableDownloadIntegrationTest {
                         ->
                         Result.success(ChangesPage(emptyList<Journal>(), listOf(id), Instant.fromEpochMilliseconds(10), false))
                     },
-                    localItems = { local.toMap() },
+                    localItem = { id -> local[id] },
                     idOf = { it.id },
                     syncVersionOf = { it.syncVersion },
                     lastUpdatedOf = { it.lastUpdated },
@@ -433,7 +433,7 @@ class DurableDownloadIntegrationTest {
                         ->
                         Result.success(ChangesPage(listOf(current), emptyList(), Instant.fromEpochMilliseconds(20), false))
                     },
-                    localItems = { local.toMap() },
+                    localItem = { id -> local[id] },
                     idOf = { it.id },
                     syncVersionOf = { it.syncVersion },
                     lastUpdatedOf = { it.lastUpdated },
@@ -504,7 +504,7 @@ class DurableDownloadIntegrationTest {
                         ->
                         Result.success(ChangesPage(listOf(remote), emptyList(), Instant.fromEpochMilliseconds(20), false))
                     },
-                    localItems = { local.toMap() },
+                    localItem = { id -> local[id] },
                     idOf = { it.id },
                     syncVersionOf = { it.syncVersion },
                     lastUpdatedOf = { it.lastUpdated },

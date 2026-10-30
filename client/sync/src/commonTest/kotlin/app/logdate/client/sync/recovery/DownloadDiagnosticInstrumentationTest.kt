@@ -158,7 +158,7 @@ class DownloadDiagnosticInstrumentationTest {
                         ->
                         Result.success(ChangesPage(listOf(remote), emptyList(), Instant.fromEpochMilliseconds(2), false))
                     },
-                    localItems = { local.toMap() },
+                    localItem = { id -> local[id] },
                     idOf = { it.id },
                     syncVersionOf = { it.syncVersion },
                     lastUpdatedOf = { it.lastUpdated },

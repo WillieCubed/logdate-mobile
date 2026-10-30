@@ -24,7 +24,6 @@ import app.logdate.client.sync.space.SpaceSync
 import app.logdate.client.sync.space.mappers.SpaceDraft
 import app.logdate.client.sync.space.mappers.SpaceJournal
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.flow.first
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -185,11 +184,6 @@ internal class SyncUploader(
             }
 
             val syncableRepository = journalNotesRepository as? SyncableJournalNotesRepository
-            val notesById =
-                journalNotesRepository.allNotesObserved
-                    .first()
-                    .associateBy { it.uid.toString() }
-
             for (pending in pendingUploads) {
                 val noteId = runCatching { Uuid.parse(pending.entityId) }.getOrNull()
                 if (noteId == null) {
@@ -246,7 +240,7 @@ internal class SyncUploader(
                             Napier.d("Leaving an entry edit for the phone to relay")
                             continue
                         }
-                        val note = notesById[pending.entityId]
+                        val note = journalNotesRepository.getNoteById(noteId)
                         if (note == null) {
                             errors.add(retryCoordinator.recordUnavailableOutboxEntry(EntityType.NOTE, pending))
                             continue
