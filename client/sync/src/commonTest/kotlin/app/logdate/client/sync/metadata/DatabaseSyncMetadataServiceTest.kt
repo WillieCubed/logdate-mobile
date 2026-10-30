@@ -248,6 +248,18 @@ class DatabaseSyncMetadataServiceTest {
             assertEquals(newer, dao.getPending("owner", legacy.serverOrigin, "NOTE", "note"))
         }
 
+    @Test
+    fun `queueing many changes never reads every queued row of their type`() =
+        runTest {
+            val dao = InMemorySyncMetadataDao()
+            val metadata = service(dao, "owner", "https://sync.example")
+
+            repeat(LARGE_QUEUE) { metadata.enqueuePending("note-$it", EntityType.NOTE, PendingOperation.UPDATE) }
+
+            assertEquals(LARGE_QUEUE, dao.pendingRows.size)
+            assertEquals(0, dao.typeReads)
+        }
+
     private fun service(
         dao: SyncMetadataDao,
         ownerId: String,
@@ -263,6 +275,10 @@ class DatabaseSyncMetadataServiceTest {
                     override suspend fun hasBoundOwner(): Boolean = true
                 },
         )
+
+    private companion object {
+        const val LARGE_QUEUE = 1_000
+    }
 
     private class InMemorySyncMetadataDao : SyncMetadataDao {
         val pendingRows = mutableListOf<PendingUploadEntity>()
@@ -308,12 +324,22 @@ class DatabaseSyncMetadataServiceTest {
             cursors.removeAll { it.ownerId.isEmpty() && it.serverOrigin == serverOrigin && it.entityType == entityType }
         }
 
+        var typeReads = 0
+
         override suspend fun getPendingByType(
             ownerId: String,
             serverOrigin: String,
             entityType: String,
-        ): List<PendingUploadEntity> =
-            pendingRows.filter { it.ownerId == ownerId && it.serverOrigin == serverOrigin && it.entityType == entityType }
+        ): List<PendingUploadEntity> {
+            if (ownerId.isNotEmpty()) typeReads++
+            return pendingRows.filter { it.ownerId == ownerId && it.serverOrigin == serverOrigin && it.entityType == entityType }
+        }
+
+        override suspend fun hasPendingOfType(
+            ownerId: String,
+            serverOrigin: String,
+            entityType: String,
+        ): Boolean = pendingRows.any { it.ownerId == ownerId && it.serverOrigin == serverOrigin && it.entityType == entityType }
 
         override suspend fun getLegacyPendingByType(
             serverOrigin: String,
