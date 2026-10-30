@@ -179,7 +179,7 @@ class WindowedDownloadTest {
         entityType = entityType,
         logLabel = "journal",
         fetchChanges = { _, _ -> Result.success(page) },
-        localItems = { local },
+        localItem = { id -> local[id] },
         idOf = { it.id },
         syncVersionOf = { it.syncVersion },
         lastUpdatedOf = { it.lastUpdated },

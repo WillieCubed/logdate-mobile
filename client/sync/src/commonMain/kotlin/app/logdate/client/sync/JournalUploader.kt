@@ -11,7 +11,6 @@ import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.shared.model.Journal
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.flow.first
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -33,7 +32,6 @@ internal class JournalUploader(
         val errors = mutableListOf<SyncError>()
         val pendingUploads = syncMetadataService.getPendingUploads(EntityType.JOURNAL).dueNow(EntityType.JOURNAL, retryCoordinator)
         if (pendingUploads.isEmpty()) return SyncResult(success = true, uploadedItems = 0)
-        val journalsById = journalRepository.allJournalsObserved.first().associateBy { it.id.toString() }
         for (pending in pendingUploads) {
             val journalId = runCatching { Uuid.parse(pending.entityId) }.getOrNull()
             if (journalId == null) {
@@ -52,7 +50,7 @@ internal class JournalUploader(
                 Napier.d("Leaving a journal edit for the phone to relay")
                 continue
             }
-            val journal = journalsById[pending.entityId]
+            val journal = journalRepository.getJournalById(journalId)
             if (journal == null) {
                 errors.add(retryCoordinator.recordUnavailableOutboxEntry(EntityType.JOURNAL, pending))
                 continue

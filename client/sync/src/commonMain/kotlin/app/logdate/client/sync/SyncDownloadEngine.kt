@@ -106,7 +106,6 @@ internal class SyncDownloadEngine(
             val source = recordDiagnostics.captureSource(diagnosticSource, downloadScope)
             // Promote legacy pending rows before entering any Room apply transaction.
             val pendingById = syncMetadataService.getPendingUploads(strategy.entityType).associateBy { it.entityId }
-            val localById = strategy.localItems().toMutableMap()
 
             var cursor = downloadInbox?.cursor(strategy.entityType.name)?.let(Instant::fromEpochMilliseconds) ?: since
             var hasMore = true
@@ -176,7 +175,6 @@ internal class SyncDownloadEngine(
                             val diagnosticRow = rows[recordId.toString()]
                             val attemptId = if (diagnosticRow != null) Uuid.random().toString() else null
                             recordDiagnostics.started(diagnosticRow, attemptId, source)
-                            val previous = localById[recordId]
                             val downloadedBefore = downloadedCount
                             val conflictsBefore = conflictsResolved
                             try {
@@ -198,7 +196,6 @@ internal class SyncDownloadEngine(
                                                 syncMetadataService,
                                             )
                                         ) {
-                                            localById[id] = strategy.localItem(id) ?: existing
                                             return@record
                                         }
 
@@ -241,7 +238,6 @@ internal class SyncDownloadEngine(
 
                                             if (strategy.appliesRemoteOverUnchangedLocal) {
                                                 strategy.applyReplace(existing, item)
-                                                localById[id] = item
                                                 downloadedCount++
                                                 return@record
                                             }
@@ -263,7 +259,6 @@ internal class SyncDownloadEngine(
                                             when (resolution) {
                                                 is ConflictResolution.KeepRemote -> {
                                                     strategy.applyReplace(existing, resolution.value)
-                                                    localById[id] = resolution.value
                                                     conflictsResolved++
                                                     Napier.d("Conflict resolved using remote version")
                                                 }
@@ -291,7 +286,6 @@ internal class SyncDownloadEngine(
                                                         entityType = strategy.entityType,
                                                         operation = PendingOperation.UPDATE,
                                                     )
-                                                    localById[id] = resolution.merged
                                                     conflictsResolved++
                                                     Napier.d("Conflict resolved by merging")
                                                 }
@@ -314,7 +308,6 @@ internal class SyncDownloadEngine(
                                             }
                                         } else {
                                             strategy.applyCreate(item)
-                                            localById[id] = item
                                             downloadedCount++
                                             Napier.d("Remote record applied")
                                         }
@@ -339,7 +332,6 @@ internal class SyncDownloadEngine(
                                 recordDiagnostics.completed(diagnosticRow, attemptId, source, recordId.toString() in skippedIds)
                             } catch (e: Exception) {
                                 throwIfDeviceBlocked(e)
-                                if (previous == null) localById.remove(recordId) else localById[recordId] = previous
                                 downloadedCount = downloadedBefore
                                 conflictsResolved = conflictsBefore
                                 if (e is CancellationException) {
@@ -364,7 +356,6 @@ internal class SyncDownloadEngine(
                             deletionApplier.apply(
                                 strategy,
                                 page.deletions,
-                                localById,
                                 DownloadDeletionContext(rows, downloadScope, source, appliedIds, skippedIds, failedIds),
                             )
                         downloadedCount += deletionResult.downloadedCount
@@ -381,7 +372,7 @@ internal class SyncDownloadEngine(
                     strategy.entityType,
                     strategy.logLabel,
                     page.unreadable,
-                    localById.keys,
+                    page.unreadable.filterTo(mutableSetOf()) { strategy.localItem(it) != null },
                     downloadScope,
                     page.unreadableVersions,
                 )

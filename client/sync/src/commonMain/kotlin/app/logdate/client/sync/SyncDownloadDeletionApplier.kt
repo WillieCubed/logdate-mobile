@@ -35,7 +35,6 @@ internal class SyncDownloadDeletionApplier(
     suspend fun <T : Any> apply(
         strategy: DownloadStrategy<T>,
         ids: List<Uuid>,
-        localById: MutableMap<Uuid, T>,
         context: DownloadDeletionContext,
     ): BatchResult {
         var downloaded = 0
@@ -45,17 +44,15 @@ internal class SyncDownloadDeletionApplier(
             val row = context.rows[id.toString()]
             val attemptId = if (row != null) Uuid.random().toString() else null
             diagnostics.started(row, attemptId, context.source)
-            val previous = localById[id]
             val downloadedBefore = downloaded
             val conflictsBefore = conflicts
             try {
-                if (applyDeletion(strategy, id, localById, context)) conflicts++
+                if (applyDeletion(strategy, id, context)) conflicts++
                 downloaded++
                 context.appliedIds += id.toString()
                 diagnostics.completed(row, attemptId, context.source, id.toString() in context.skippedIds)
             } catch (error: Exception) {
                 throwIfDeviceBlocked(error)
-                if (previous == null) localById.remove(id) else localById[id] = previous
                 downloaded = downloadedBefore
                 conflicts = conflictsBefore
                 if (error is CancellationException) {
@@ -75,7 +72,6 @@ internal class SyncDownloadDeletionApplier(
     private suspend fun <T : Any> applyDeletion(
         strategy: DownloadStrategy<T>,
         id: Uuid,
-        localById: MutableMap<Uuid, T>,
         context: DownloadDeletionContext,
     ): Boolean =
         transactions.withTransaction {
@@ -102,7 +98,6 @@ internal class SyncDownloadDeletionApplier(
             }
             strategy.applyDelete(id)
             strategy.afterDelete(id)
-            localById.remove(id)
             Napier.d("Remote deletion applied")
             ensureScope(context.scope)
             strategy.settle?.invoke(id, RemoteOutcome.DELETED)

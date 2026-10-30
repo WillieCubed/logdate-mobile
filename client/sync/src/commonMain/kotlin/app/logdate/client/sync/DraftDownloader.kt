@@ -146,7 +146,7 @@ internal class DraftDownloader(
             EntityType.DRAFT,
             "draft",
             result.unreadable,
-            journalRepository.getAllDraftsForSync().map { it.id }.toSet(),
+            if (result.unreadable.isEmpty()) emptySet() else journalRepository.getAllDraftsForSync().map { it.id }.toSet(),
             downloadScope,
             result.unreadableVersions,
         )

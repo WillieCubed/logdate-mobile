@@ -27,7 +27,6 @@ import app.logdate.client.sync.space.SpaceSync
 import app.logdate.client.sync.space.mappers.SpaceJournal
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.first
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -110,7 +109,6 @@ internal class SyncDownloader(
                         entityType = EntityType.JOURNAL,
                         logLabel = "journal",
                         fetchChanges = { _, cursor -> spaceRead?.page() ?: fetchJournalChanges(cursor, requestScope, downloadScope) },
-                        localItems = { journalRepository.allJournalsObserved.first().associateBy { it.id } },
                         localItem = journalRepository::getJournalById,
                         idOf = { it.id },
                         syncVersionOf = { it.syncVersion },
@@ -302,7 +300,6 @@ internal class SyncDownloader(
                     entityType = EntityType.NOTE,
                     logLabel = "note",
                     fetchChanges = spaceRead?.let { read -> { _, _ -> read.page() } } ?: { _, cursor -> fetchContentChanges(cursor) },
-                    localItems = { journalNotesRepository.allNotesObserved.first().associateBy { it.uid } },
                     localItem = journalNotesRepository::getNoteById,
                     idOf = { it.uid },
                     syncVersionOf = { it.syncVersion },
