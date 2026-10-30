@@ -24,13 +24,16 @@ expect val httpClient: HttpClient
  * Implementers should call this function in their platform-specific client implementations.
  */
 internal fun <T : HttpClientEngineConfig> HttpClientConfig<T>.configureClientDefaults() {
-    // No default limits, since uploads can run long; requests that need one (sign-in, server
-    // checks) set their own, so a stalled server gets a clear answer instead of a spinner.
-    install(HttpTimeout)
+    // No overall request limit, since uploads can run long. A server that never accepts the
+    // connection, or a transfer that stops moving, fails instead of leaving a spinner; requests
+    // that need a tighter answer (sign-in, server checks) set their own limits.
+    install(HttpTimeout) {
+        connectTimeoutMillis = CONNECT_TIMEOUT_MILLIS
+        socketTimeoutMillis = SOCKET_TIMEOUT_MILLIS
+    }
     install(ContentNegotiation) {
         json(
             Json {
-                prettyPrint = true
                 ignoreUnknownKeys = true
                 serializersModule =
                     SerializersModule {
@@ -42,3 +45,6 @@ internal fun <T : HttpClientEngineConfig> HttpClientConfig<T>.configureClientDef
     // Ktor's general logger includes private origins, resource IDs, cookies and query values.
     // Operation diagnostics are emitted separately through an allowlisted event contract.
 }
+
+private const val CONNECT_TIMEOUT_MILLIS = 15_000L
+private const val SOCKET_TIMEOUT_MILLIS = 60_000L
