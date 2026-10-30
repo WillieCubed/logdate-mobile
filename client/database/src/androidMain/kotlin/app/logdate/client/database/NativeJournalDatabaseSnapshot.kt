@@ -13,33 +13,34 @@ fun <T> captureNativeJournalDatabaseSnapshot(
     key: ByteArray,
     target: File,
     capturePreferences: ((NativeJournalSnapshotScope) -> Unit) -> T,
-): T {
-    require(key.size == 32)
-    check(Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS))
-    check(!target.exists() && Files.isDirectory(checkNotNull(target.parentFile).toPath(), LinkOption.NOFOLLOW_LINKS))
-    System.loadLibrary("sqlcipher")
-    val captured =
-        openSnapshotSourceWhenAvailable(source, key).use { database ->
-            database.execSQL("ATTACH DATABASE ? AS native_journal KEY ?", arrayOf<Any>(target.absolutePath, key))
-            try {
-                database.beginTransactionNonExclusive()
+): T =
+    withNativeJournalDatabaseFence(source) {
+        require(key.size == 32)
+        check(Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS))
+        check(!target.exists() && Files.isDirectory(checkNotNull(target.parentFile).toPath(), LinkOption.NOFOLLOW_LINKS))
+        System.loadLibrary("sqlcipher")
+        val captured =
+            openSnapshotSourceWhenAvailable(source, key).use { database ->
+                database.execSQL("ATTACH DATABASE ? AS native_journal KEY ?", arrayOf<Any>(target.absolutePath, key))
                 try {
-                    requireNativeJournalDatabaseIntegrity(database)
-                    database.rawQuery("SELECT sqlcipher_export('native_journal')", emptyArray<String>()).use { check(it.moveToFirst()) }
-                    database.execSQL("PRAGMA native_journal.user_version = $DATABASE_VERSION")
-                    val result = capturePreferences { scope -> writeNativeJournalSnapshotScope(database, scope) }
-                    database.setTransactionSuccessful()
-                    result
+                    database.beginTransactionNonExclusive()
+                    try {
+                        requireNativeJournalDatabaseIntegrity(database)
+                        database.rawQuery("SELECT sqlcipher_export('native_journal')", emptyArray<String>()).use { check(it.moveToFirst()) }
+                        database.execSQL("PRAGMA native_journal.user_version = $DATABASE_VERSION")
+                        val result = capturePreferences { scope -> writeNativeJournalSnapshotScope(database, scope) }
+                        database.setTransactionSuccessful()
+                        result
+                    } finally {
+                        database.endTransaction()
+                    }
                 } finally {
-                    database.endTransaction()
+                    database.execSQL("DETACH DATABASE native_journal")
                 }
-            } finally {
-                database.execSQL("DETACH DATABASE native_journal")
             }
-        }
-    verifyNativeJournalDatabaseSnapshot(target, key)
-    return captured
-}
+        verifyNativeJournalDatabaseSnapshot(target, key)
+        captured
+    }
 
 private fun openSnapshotSourceWhenAvailable(
     source: File,

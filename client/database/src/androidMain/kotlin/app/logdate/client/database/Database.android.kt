@@ -61,13 +61,13 @@ fun getDatabaseBuilder(
             } else {
                 null
             }
-        builder.openHelperFactory(
+        val sqlCipherFactory =
             if (migrationHook != null) {
                 SupportOpenHelperFactory(passphrase, migrationHook, false)
             } else {
                 SupportOpenHelperFactory(passphrase)
-            },
-        )
+            }
+        builder.openHelperFactory(nativeJournalOpenHelperFactory(dbFile, sqlCipherFactory))
     }
 
     if (needsLegacyHook) {

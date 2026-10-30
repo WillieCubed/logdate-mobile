@@ -26,5 +26,13 @@
   "app.logdate.client.e2e.TransferredInstallationTrustTest": [
     "copied_watch_record_requires_new_local_trust_and_preserves_forget_choice",
     "backup_first_read_removes_legacy_credentials_for_every_server"
+  ],
+  "app.logdate.client.e2e.NativeJournalSnapshotContentionTest": [
+    "snapshotSerializesNewRoomWriteWithoutChangingExport",
+    "snapshotWaitsForSuspendingRoomTransactionCommit",
+    "backupWaitsForWriterThenExportsConsistentSnapshot",
+    "snapshotWaitsForSuspendingRoomTransactionRollback",
+    "snapshotDoesNotFailNewRoomObservation",
+    "anOpenRoomOwnershipCheckDoesNotBlockMainBehindAnotherTransaction"
   ]
 }
