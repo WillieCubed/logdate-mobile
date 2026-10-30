@@ -17,6 +17,7 @@ import kotlin.uuid.Uuid
     tableName = "indexed_media_images",
     indices = [
         Index(value = ["uri"], unique = true),
+        Index("timestamp"),
     ],
 )
 data class IndexedImageEntity(

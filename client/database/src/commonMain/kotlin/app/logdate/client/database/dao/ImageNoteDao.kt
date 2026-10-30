@@ -27,6 +27,15 @@ interface ImageNoteDao {
     @Query("SELECT * FROM image_notes WHERE uid = :uid")
     suspend fun findNoteOneOff(uid: Uuid): ImageNoteEntity?
 
+    @Query("SELECT * FROM image_notes WHERE uid IN (:uids)")
+    suspend fun findNotesByIds(uids: List<Uuid>): List<ImageNoteEntity>
+
+    @Query("SELECT * FROM image_notes WHERE uid = :uid")
+    fun observeNoteById(uid: Uuid): Flow<ImageNoteEntity?>
+
+    @Query("SELECT * FROM image_notes WHERE uid IN (:uids) ORDER BY created DESC")
+    fun observeNotesByIds(uids: List<Uuid>): Flow<List<ImageNoteEntity>>
+
     /**
      * Returns a flow of all [ImageNoteEntity]s.
      */

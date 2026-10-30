@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.transformLatest
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
@@ -39,8 +40,8 @@ sealed interface StreamingTimelineRequest {
 }
 
 /**
- * A streaming version of GetTimelineUseCase that loads notes incrementally
- * instead of waiting for all notes to be available.
+ * Builds the timeline incrementally: the newest entries appear first, then their days are enriched,
+ * instead of waiting for every note to load.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class GetStreamingTimelineUseCase(
@@ -95,8 +96,13 @@ class GetStreamingTimelineUseCase(
                 }
 
                 val recentDates = basicTimeline.days.map(TimelineDay::date).toSet()
+                // Only the recent days, widened by a day each side for journaling-day boundaries,
+                // can change these cards, so watch that window instead of every note ever written.
+                val timeZone = TimeZone.currentSystemDefault()
+                val windowStart = recentDates.min().minus(1, DateTimeUnit.DAY).atStartOfDayIn(timeZone)
+                val windowEnd = recentDates.max().plus(2, DateTimeUnit.DAY).atStartOfDayIn(timeZone)
                 emitAll(
-                    notesRepository.allNotesObserved.mapLatest { allNotes ->
+                    notesRepository.observeNotesInRange(windowStart, windowEnd).mapLatest { allNotes ->
                         createEnrichedTimeline(
                             recentDates = recentDates,
                             allNotes = allNotes,

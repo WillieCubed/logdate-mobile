@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlin.uuid.Uuid
 
 /**
@@ -25,16 +26,32 @@ class FakeTextNoteDao : TextNoteDao {
 
     override suspend fun findNoteOneOff(uid: Uuid): TextNoteEntity? = notes[uid]
 
-    override fun getAllNotes(): Flow<List<TextNoteEntity>> = notesFlow
+    override suspend fun findNotesByIds(uids: List<Uuid>): List<TextNoteEntity> = uids.mapNotNull { notes[it] }
+
+    override fun observeNoteById(uid: Uuid): Flow<TextNoteEntity?> = notesFlow.map { notes -> notes.find { it.uid == uid } }
+
+    override fun observeNotesByIds(uids: List<Uuid>): Flow<List<TextNoteEntity>> =
+        notesFlow.map { notes -> notes.filter { it.uid in uids }.sortedByDescending { it.created } }
+
+    /** How many times a caller collected the whole table. */
+    var wholeTableReads = 0
+        private set
+
+    /** The row limits callers asked [getRecentNotes] for. */
+    val recentLimits = mutableListOf<Int>()
+
+    override fun getAllNotes(): Flow<List<TextNoteEntity>> = notesFlow.onStart { wholeTableReads++ }
 
     override fun observeCreatedTimestamps(): Flow<List<Long>> = notesFlow.map { notes -> notes.map { it.created.toEpochMilliseconds() } }
 
     override suspend fun getAll(): List<TextNoteEntity> = notes.values.toList()
 
-    override fun getRecentNotes(limit: Int): Flow<List<TextNoteEntity>> =
-        notesFlow.map { notes ->
+    override fun getRecentNotes(limit: Int): Flow<List<TextNoteEntity>> {
+        recentLimits += limit
+        return notesFlow.map { notes ->
             notes.sortedByDescending { it.created }.take(limit)
         }
+    }
 
     override suspend fun getRecentNotesBefore(
         beforeTimestamp: Long,

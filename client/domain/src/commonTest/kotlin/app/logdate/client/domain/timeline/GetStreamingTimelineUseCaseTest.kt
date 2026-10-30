@@ -114,7 +114,10 @@ class GetStreamingTimelineUseCaseTest {
             val notes = MutableStateFlow<List<JournalNote>>(listOf(note))
             val repository =
                 object : JournalNotesRepository by mockNotesRepository {
-                    override val allNotesObserved: Flow<List<JournalNote>> = notes
+                    override fun observeNotesInRange(
+                        start: Instant,
+                        end: Instant,
+                    ): Flow<List<JournalNote>> = notes
 
                     override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = notes
                 }
@@ -155,7 +158,10 @@ class GetStreamingTimelineUseCaseTest {
             val recent = corpus.takeLast(50)
             val localNotes =
                 object : JournalNotesRepository by mockNotesRepository {
-                    override val allNotesObserved: Flow<List<JournalNote>> = flow { awaitCancellation() }
+                    override fun observeNotesInRange(
+                        start: Instant,
+                        end: Instant,
+                    ): Flow<List<JournalNote>> = flow { awaitCancellation() }
 
                     override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = flowOf(recent.takeLast(limit))
                 }
@@ -193,7 +199,10 @@ class GetStreamingTimelineUseCaseTest {
             val note = createTestNote("Saved offline", Instant.parse("2026-10-28T12:00:00Z"))
             val localNotes =
                 object : JournalNotesRepository by mockNotesRepository {
-                    override val allNotesObserved: Flow<List<JournalNote>> = flow { awaitCancellation() }
+                    override fun observeNotesInRange(
+                        start: Instant,
+                        end: Instant,
+                    ): Flow<List<JournalNote>> = flow { awaitCancellation() }
 
                     override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = flowOf(listOf(note))
                 }
@@ -676,6 +685,24 @@ class GetStreamingTimelineUseCaseTest {
         }
 
     @Test
+    fun `recent days are enriched from a window around them instead of every note`() =
+        runTest {
+            val recent = createTestNote("Today", Instant.parse("2025-01-15T12:20:00Z"))
+            val sameDayOlder = createTestNote("Earlier today", Instant.parse("2025-01-15T12:10:00Z"))
+            val yearAgo = createTestNote("Last year", Instant.parse("2024-01-15T10:00:00Z"))
+            mockNotesRepository.recentNotes = listOf(recent)
+            mockNotesRepository.allNotes = listOf(recent, sameDayOlder, yearAgo)
+
+            val enriched = useCase(StreamingTimelineRequest.RecentTimeline(pageSize = 1)).take(2).toList().last()
+
+            val shown = enriched.days.flatMap { it.entries }.map { it.uid }
+            assertEquals(setOf(recent.uid, sameDayOlder.uid), shown.toSet())
+            val (start, end) = mockNotesRepository.observeNotesInRangeCalls.single()
+            assertTrue(start in (recent.creationTimestamp - 48.hours)..(recent.creationTimestamp - 24.hours), "window starts at $start")
+            assertTrue(end in (recent.creationTimestamp + 24.hours)..(recent.creationTimestamp + 48.hours), "window ends at $end")
+        }
+
+    @Test
     fun `streaming flow should re-emit when underlying data changes`() =
         runTest {
             // Given - a mutable flow that simulates database updates
@@ -835,7 +862,7 @@ class GetStreamingTimelineUseCaseTest {
         val observeNotesInRangeCalls = mutableListOf<Pair<Instant, Instant>>()
 
         override val allNotesObserved: Flow<List<JournalNote>>
-            get() = flowOf(allNotes)
+            get() = flow { error("The streaming timeline must not read every note") }
 
         override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> {
             lastRecentNotesLimit = limit
@@ -847,7 +874,7 @@ class GetStreamingTimelineUseCaseTest {
             end: Instant,
         ): Flow<List<JournalNote>> {
             observeNotesInRangeCalls.add(Pair(start, end))
-            return flowOf(notesInRange)
+            return flowOf((notesInRange + allNotes).filter { it.creationTimestamp in start..end })
         }
 
         override fun observeNotesInJournal(journalId: Uuid) = flowOf(emptyList<JournalNote>())

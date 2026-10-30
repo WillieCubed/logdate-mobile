@@ -107,6 +107,8 @@ class OfflineFirstJournalNotesRepository(
 
     override fun observeNotesStream(pageSize: Int): Flow<List<JournalNote>> = queries.observeNotesStream(pageSize)
 
+    override fun observeNoteById(noteId: Uuid): Flow<JournalNote?> = queries.observeNoteById(noteId)
+
     override fun observeEntryTimestamps(): Flow<List<Instant>> = queries.observeEntryTimestamps()
 
     override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = queries.observeRecentNotes(limit)
@@ -144,6 +146,8 @@ class OfflineFirstJournalNotesRepository(
     }
 
     override suspend fun getNoteById(noteId: Uuid): JournalNote? = queries.getNoteById(noteId)
+
+    override suspend fun getNotesByIds(noteIds: Set<Uuid>): Map<Uuid, JournalNote> = queries.getNotesByIds(noteIds)
 
     override suspend fun create(note: JournalNote): Uuid =
         mediaClaimFence.withClaim {

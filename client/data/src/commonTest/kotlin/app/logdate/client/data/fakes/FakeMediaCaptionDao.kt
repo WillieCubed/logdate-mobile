@@ -4,6 +4,7 @@ import app.logdate.client.database.dao.MediaCaptionDao
 import app.logdate.client.database.entities.MediaCaptionEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlin.uuid.Uuid
 
 class FakeMediaCaptionDao : MediaCaptionDao {
@@ -13,6 +14,13 @@ class FakeMediaCaptionDao : MediaCaptionDao {
     override fun observeAll(): Flow<List<MediaCaptionEntity>> = captionsFlow
 
     override suspend fun getCaption(noteId: Uuid): MediaCaptionEntity? = captions[noteId]
+
+    override suspend fun getCaptions(noteIds: List<Uuid>): List<MediaCaptionEntity> = noteIds.mapNotNull { captions[it] }
+
+    override fun observeCaption(noteId: Uuid): Flow<MediaCaptionEntity?> = captionsFlow.map { all -> all.find { it.noteId == noteId } }
+
+    override fun observeCaptions(noteIds: List<Uuid>): Flow<List<MediaCaptionEntity>> =
+        captionsFlow.map { all -> all.filter { it.noteId in noteIds } }
 
     override suspend fun upsertCaption(entity: MediaCaptionEntity) {
         captions[entity.noteId] = entity

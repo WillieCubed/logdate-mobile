@@ -26,6 +26,15 @@ interface TextNoteDao {
     @Query("SELECT * FROM text_notes WHERE uid = :uid")
     suspend fun findNoteOneOff(uid: Uuid): TextNoteEntity?
 
+    @Query("SELECT * FROM text_notes WHERE uid IN (:uids)")
+    suspend fun findNotesByIds(uids: List<Uuid>): List<TextNoteEntity>
+
+    @Query("SELECT * FROM text_notes WHERE uid = :uid")
+    fun observeNoteById(uid: Uuid): Flow<TextNoteEntity?>
+
+    @Query("SELECT * FROM text_notes WHERE uid IN (:uids) ORDER BY created DESC")
+    fun observeNotesByIds(uids: List<Uuid>): Flow<List<TextNoteEntity>>
+
     /**
      * Returns a flow of all [TextNoteEntity]s optimized for timeline display.
      */

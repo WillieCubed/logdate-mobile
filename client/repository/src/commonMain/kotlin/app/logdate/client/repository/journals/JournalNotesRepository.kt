@@ -7,6 +7,7 @@ import app.logdate.shared.model.HandwritingDocument
 import app.logdate.shared.model.PhotoPresentation
 import app.logdate.util.UuidSerializer
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.DateTimeUnit
@@ -39,7 +40,15 @@ interface JournalNotesRepository {
     ): Flow<List<JournalNote>>
 
     /**
-     * Observes notes in pages for efficient loading.
+     * Observes one note, emitting null while it does not exist.
+     *
+     * Prefer this to filtering [allNotesObserved]: it reads only that note and changes only when it does.
+     */
+    fun observeNoteById(noteId: Uuid): Flow<JournalNote?> =
+        allNotesObserved.map { notes -> notes.firstOrNull { it.uid == noteId } }.distinctUntilChanged()
+
+    /**
+     * Observes one page of notes, newest first: the [pageSize] notes after the newest [offset].
      */
     fun observeNotesPage(
         pageSize: Int,
@@ -47,7 +56,7 @@ interface JournalNotesRepository {
     ): Flow<List<JournalNote>>
 
     /**
-     * Observes notes in a streaming fashion, emitting results as they become available.
+     * Observes the newest [pageSize] notes, emitting again whenever any of them changes.
      */
     fun observeNotesStream(pageSize: Int = 50): Flow<List<JournalNote>>
 
@@ -160,6 +169,10 @@ interface JournalNotesRepository {
      * @return The note if found, null otherwise
      */
     suspend fun getNoteById(noteId: Uuid): JournalNote?
+
+    /** Fetches several notes at once. IDs without a note are absent from the result. */
+    suspend fun getNotesByIds(noteIds: Set<Uuid>): Map<Uuid, JournalNote> =
+        noteIds.mapNotNull { id -> getNoteById(id)?.let { id to it } }.toMap()
 
     /** Fills missing audio metadata only while the same live note still owns [mediaRef]. */
     suspend fun updateAudioDurationIfUnknown(

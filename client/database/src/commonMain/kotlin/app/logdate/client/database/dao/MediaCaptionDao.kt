@@ -23,6 +23,15 @@ interface MediaCaptionDao {
     @Query("SELECT * FROM media_captions WHERE noteId = :noteId")
     suspend fun getCaption(noteId: Uuid): MediaCaptionEntity?
 
+    @Query("SELECT * FROM media_captions WHERE noteId IN (:noteIds)")
+    suspend fun getCaptions(noteIds: List<Uuid>): List<MediaCaptionEntity>
+
+    @Query("SELECT * FROM media_captions WHERE noteId = :noteId")
+    fun observeCaption(noteId: Uuid): Flow<MediaCaptionEntity?>
+
+    @Query("SELECT * FROM media_captions WHERE noteId IN (:noteIds)")
+    fun observeCaptions(noteIds: List<Uuid>): Flow<List<MediaCaptionEntity>>
+
     /**
      * Inserts or replaces the caption for a note.
      */

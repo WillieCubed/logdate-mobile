@@ -26,6 +26,13 @@ class FakeAudioNoteDao : AudioNoteDao {
 
     override suspend fun findNoteOneOff(uid: Uuid): AudioNoteEntity? = notes[uid]
 
+    override suspend fun findNotesByIds(uids: List<Uuid>): List<AudioNoteEntity> = uids.mapNotNull { notes[it] }
+
+    override fun observeNoteById(uid: Uuid): Flow<AudioNoteEntity?> = notesFlow.map { notes -> notes.find { it.uid == uid } }
+
+    override fun observeNotesByIds(uids: List<Uuid>): Flow<List<AudioNoteEntity>> =
+        notesFlow.map { notes -> notes.filter { it.uid in uids }.sortedByDescending { it.created } }
+
     override fun getAllNotes(): Flow<List<AudioNoteEntity>> = notesFlow
 
     override fun observeCreatedTimestamps(): Flow<List<Long>> = notesFlow.map { notes -> notes.map { it.created.toEpochMilliseconds() } }

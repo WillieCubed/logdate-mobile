@@ -19,6 +19,9 @@ interface JournalRepository {
      */
     suspend fun getJournalById(id: Uuid): Journal?
 
+    /** Fetches several journals at once. IDs without a journal are absent from the result. */
+    suspend fun getJournalsByIds(ids: Set<Uuid>): Map<Uuid, Journal> = ids.mapNotNull { id -> getJournalById(id)?.let { id to it } }.toMap()
+
     suspend fun getJournalRecoveryScope(): JournalMergeScope? = null
 
     suspend fun compareAndSetJournalForRestore(
