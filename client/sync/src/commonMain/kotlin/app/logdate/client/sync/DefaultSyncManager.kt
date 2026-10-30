@@ -47,7 +47,6 @@ import app.logdate.client.sync.space.SpaceSyncDependencies
 import app.logdate.client.sync.space.migration.JournalStorageMove
 import app.logdate.client.sync.space.migration.SpaceJournalMigration
 import app.logdate.client.sync.space.migration.SpaceMigrationDependencies
-import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.CloudQuotaManager
 import app.logdate.shared.model.Journal
@@ -98,7 +97,7 @@ class DefaultSyncManager(
     private val mediaPayloadKeyProvider: MediaPayloadKeyProvider? = null,
     private val cloudQuotaManager: CloudQuotaManager? = null,
     private val backoff: SyncBackoff = SyncBackoff(),
-    private val syncScope: CoroutineScope = CoroutineScope(platformIODispatcher),
+    private val syncScope: CoroutineScope = backgroundSyncScope(),
     private val lastErrorStore: LastSyncErrorStore = InMemoryLastSyncErrorStore(),
     internal val firstSyncEnqueueStore: FirstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
     /**
@@ -256,8 +255,12 @@ class DefaultSyncManager(
     override fun sync(startNow: Boolean) {
         if (startNow) {
             syncScope.launch {
-                releaseUploadBackoff()
-                SyncPassLoop(runPass = { fullSync() }).runUntilSettled()
+                try {
+                    releaseUploadBackoff()
+                    SyncPassLoop(runPass = { fullSync() }).runUntilSettled()
+                } catch (failure: Exception) {
+                    statusPublisher.handleSyncException(failure, "Background sync")
+                }
             }
         }
     }

@@ -100,10 +100,14 @@ internal class SyncStatusPublisher(
         // a backgrounded app freely -- so after each restart a sync that kept failing looked like
         // a calm backlog. Restore it unless this run already has one, then save every change.
         syncScope.launch {
-            val saved = runCatching { lastErrorStore.load() }.onFailure { Napier.e("Could not read the last sync error") }.getOrNull()
+            val saved =
+                runCatchingUnlessCancelled { lastErrorStore.load() }
+                    .onFailure { Napier.e("Could not read the last sync error: ${it::class.simpleName}") }
+                    .getOrNull()
             if (saved != null) lastErrorFlow.compareAndSet(null, saved)
             lastErrorFlow.collect { error ->
-                runCatching { lastErrorStore.save(error) }.onFailure { Napier.e("Could not save the last sync error") }
+                runCatchingUnlessCancelled { lastErrorStore.save(error) }
+                    .onFailure { Napier.e("Could not save the last sync error: ${it::class.simpleName}") }
             }
         }
         // Republish status on each internal state/error transition so observers don't have to poll.
@@ -152,10 +156,10 @@ internal class SyncStatusPublisher(
         publicationMutex.withLock {
             val authenticated = sessionStorage.getSession() != null
             val pendingCountResult =
-                runCatching { syncMetadataService.getPendingCount() }
-                    .onFailure { Napier.e("Could not read the pending upload count") }
-            val recovery = runCatching { pendingRecoveryCount() }
-            val attention = runCatching { attentionRecoveryCount() }.getOrDefault(0)
+                runCatchingUnlessCancelled { syncMetadataService.getPendingCount() }
+                    .onFailure { Napier.e("Could not read the pending upload count: ${it::class.simpleName}") }
+            val recovery = runCatchingUnlessCancelled { pendingRecoveryCount() }
+            val attention = runCatchingUnlessCancelled { attentionRecoveryCount() }.getOrDefault(0)
             _syncStatusFlow.value =
                 SyncStatus(
                     isEnabled = authenticated && isEnabled(),
@@ -171,12 +175,12 @@ internal class SyncStatusPublisher(
                     totalForRun = runTotal,
                     completedInRun = runCompleted,
                     conflictCount = currentConflictCount(),
-                    unreadableCloudCount = runCatching { unreadableCloudRecordStore.count() }.getOrDefault(0),
+                    unreadableCloudCount = runCatchingUnlessCancelled { unreadableCloudRecordStore.count() }.getOrDefault(0),
                 )
         }
 
     private suspend fun currentConflictCount(): Int =
-        runCatching {
+        runCatchingUnlessCancelled {
             val scope =
                 sessionStorage.getOriginBoundSession()?.let {
                     app.logdate.client.sync.metadata.UploadScope(
@@ -208,7 +212,7 @@ internal class SyncStatusPublisher(
 
     /** [beginRun] scoped to how many of [entityType] are currently pending. */
     suspend fun beginRunForPending(entityType: EntityType) {
-        beginRun(runCatching { syncMetadataService.getPendingUploads(entityType).size }.getOrNull()?.takeIf { it > 0 })
+        beginRun(runCatchingUnlessCancelled { syncMetadataService.getPendingUploads(entityType).size }.getOrNull()?.takeIf { it > 0 })
     }
 
     /**
@@ -257,7 +261,7 @@ internal class SyncStatusPublisher(
         if (linkedDevice && (identityKeyMissing() || identityRecoveryNeededStore.isNeeded())) return SyncPausedReason.NEEDS_DEVICE_LINK
         if (identityRecoveryNeededStore.isNeeded()) return SyncPausedReason.NEEDS_RECOVERY_PHRASE
         readinessGate.reason.value?.let { return it }
-        val restriction = runCatching { dataUsagePolicy.currentRestriction() }.getOrNull()
+        val restriction = runCatchingUnlessCancelled { dataUsagePolicy.currentRestriction() }.getOrNull()
         return when (restriction) {
             DataRestriction.OFFLINE -> {
                 SyncPausedReason.OFFLINE
@@ -274,15 +278,15 @@ internal class SyncStatusPublisher(
     }
 
     suspend fun backgroundWorkLimited(): Boolean =
-        runCatching { dataUsagePolicy.currentRestriction() == DataRestriction.BACKGROUND_DATA_BLOCKED }
+        runCatchingUnlessCancelled { dataUsagePolicy.currentRestriction() == DataRestriction.BACKGROUND_DATA_BLOCKED }
             .getOrDefault(false)
 
     fun isQueueObservationHealthy(): Boolean = !queueObservationFailed.value
 
     suspend fun refreshObservedQuotaFromServer(reason: String) {
         val manager = cloudQuotaManager ?: return
-        runCatching { manager.syncWithServer() }
-            .onFailure { Napier.w("Failed to refresh quota") }
+        runCatchingUnlessCancelled { manager.syncWithServer() }
+            .onFailure { Napier.w("Failed to refresh quota: ${it::class.simpleName}") }
     }
 
     /**

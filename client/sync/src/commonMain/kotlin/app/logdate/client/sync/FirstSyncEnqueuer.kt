@@ -21,7 +21,7 @@ internal class FirstSyncEnqueuer(
             entityTypes.filter { entityType ->
                 !firstSyncEnqueueStore.hasEnqueued(entityType) && syncMetadataService.getLastSyncTime(entityType) == null
             }
-        runCatching {
+        runCatchingUnlessCancelled {
             if (EntityType.JOURNAL in neverSynced) {
                 val journals = journalRepository.allJournalsObserved.first()
                 journals.forEach { journal ->

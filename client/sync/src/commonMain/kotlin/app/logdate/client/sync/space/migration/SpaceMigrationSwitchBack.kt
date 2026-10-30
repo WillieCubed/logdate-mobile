@@ -2,6 +2,7 @@ package app.logdate.client.sync.space.migration
 
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.metadata.UploadScope
+import app.logdate.client.sync.runCatchingUnlessCancelled
 import app.logdate.client.sync.space.SPACE_CHECKPOINT
 import app.logdate.shared.model.sync.SpaceMigrationErrorCodes
 import app.logdate.shared.model.sync.SpaceMigrationPhase
@@ -118,7 +119,7 @@ internal class SpaceMigrationSwitchBack(
     }
 
     private suspend fun releaseQuietly(migrationId: String) {
-        runCatching { server("release") { env.deps.api.release(it, migrationId) } }
+        runCatchingUnlessCancelled { server("release") { env.deps.api.release(it, migrationId) } }
     }
 
     private suspend fun <T> server(

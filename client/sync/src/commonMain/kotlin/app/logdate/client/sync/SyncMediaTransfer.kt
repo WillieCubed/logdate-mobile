@@ -93,7 +93,7 @@ internal class SyncMediaTransfer(
         draft: EditorDraft,
         reusable: (String) -> Boolean = { true },
     ): Result<EditorDraft> =
-        runCatching {
+        runCatchingUnlessCancelled {
             draft.copy(
                 blocks =
                     draft.blocks.map { block ->
@@ -148,7 +148,7 @@ internal class SyncMediaTransfer(
         journal: Journal,
         reusable: (String) -> Boolean = { true },
     ): Result<Journal> =
-        runCatching {
+        runCatchingUnlessCancelled {
             journal.copy(
                 coverImageUri = uploadDraftAsset(accessToken, journal.id, journal.id, JOURNAL_COVER_KIND, journal.coverImageUri, reusable),
             )
@@ -359,10 +359,10 @@ internal class SyncMediaTransfer(
         }
 
         val media =
-            runCatching { mediaManager.openMedia(mediaRef) }
+            runCatchingUnlessCancelled { mediaManager.openMedia(mediaRef) }
                 .getOrElse { error -> return unreadableMedia(mediaRef, error) }
 
-        return runCatching {
+        return runCatchingUnlessCancelled {
             val upload = cloudMediaDataSource.uploadMedia(accessToken, note.uid, media)
             upload.exceptionOrNull()?.let { error ->
                 // The file is read while the request is sent, so it can vanish after it was opened.
@@ -396,7 +396,7 @@ internal class SyncMediaTransfer(
     ): Result<JournalNote> {
         throwIfDeviceBlocked(error)
         val stillOnDisk =
-            runCatching { mediaManager.exists(mediaRef) }.getOrElse {
+            runCatchingUnlessCancelled { mediaManager.exists(mediaRef) }.getOrElse {
                 throwIfDeviceBlocked(it)
                 false
             }
