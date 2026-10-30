@@ -21,6 +21,7 @@ import app.logdate.client.sensor.battery.AndroidBatteryInfoProvider
 import app.logdate.client.sensor.battery.BatteryInfoProvider
 import app.logdate.client.sensor.network.AndroidNetworkSaverModeProvider
 import app.logdate.client.sync.DefaultSyncManager
+import app.logdate.client.sync.KeyValueSyncRouteStore
 import app.logdate.client.sync.RecentCaptureFilter
 import app.logdate.client.sync.RoomSyncTransactionManager
 import app.logdate.client.sync.SyncProfile
@@ -206,6 +207,7 @@ private fun Scope.watchCloudEngine(): DefaultSyncManager {
         serverAccounts = get(),
         identityRecoveryNeededStore = KeyValueIdentityRecoveryNeededStore(storage),
         unreadableCloudRecordStore = KeyValueUnreadableCloudRecordStore(storage),
+        syncRouteStore = KeyValueSyncRouteStore(storage),
         downloadInbox = get(WatchCloud),
         momentSyncConfig = get(WatchCloud),
         deviceSessionRevocationListener = DeviceSessionRevocationListener { get<app.logdate.wear.sync.v2.removal.WatchDataWiper>().wipe() },
