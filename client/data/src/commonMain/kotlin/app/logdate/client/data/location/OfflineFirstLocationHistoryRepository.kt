@@ -13,6 +13,7 @@ import app.logdate.client.repository.location.LocationHistoryItem
 import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.location.LocationLogRecord
 import app.logdate.client.sync.SyncTransactionManager
+import app.logdate.client.util.runCatchingUnlessCancelled
 import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
@@ -111,7 +112,7 @@ class OfflineFirstLocationHistoryRepository(
         )
 
     override suspend fun logLocation(record: LocationLogRecord): Result<Unit> =
-        try {
+        runCatchingUnlessCancelled {
             val entity =
                 LocationLogEntity(
                     sampleId = record.sampleId,
@@ -137,9 +138,6 @@ class OfflineFirstLocationHistoryRepository(
                     timeZoneId = record.timeZoneId,
                 )
             locationHistoryDao.addLocationLog(entity)
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
         }
 
     override suspend fun restoreLocationForArchive(
@@ -147,7 +145,7 @@ class OfflineFirstLocationHistoryRepository(
         scope: JournalMergeScope?,
         recoveryId: String,
     ): Result<Unit> =
-        runCatching {
+        runCatchingUnlessCancelled {
             transactionManager.withTransaction {
                 check(currentRecoveryScope() == scope) { "Location recovery account changed" }
                 if (scope != null && recoveryReceipts.contains(scope, "LOCATION", recoveryId, record.sampleId)) return@withTransaction
@@ -162,23 +160,18 @@ class OfflineFirstLocationHistoryRepository(
         deviceId: String,
         timestamp: Instant,
     ): Result<Unit> =
-        try {
+        runCatchingUnlessCancelled {
             locationHistoryDao.deleteLocationById(userId, deviceId, timestamp)
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
         }
 
     override suspend fun deleteLocationsBetween(
         startTime: Instant,
         endTime: Instant,
     ): Result<Unit> =
-        try {
+        runCatchingUnlessCancelled {
             locationHistoryDao.deleteLogsWithinRange(startTime, endTime)
             activityDao?.deleteBetween(startTime, endTime)
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
+            Unit
         }
 
     override suspend fun getLocationCount(): Int = locationHistoryDao.getLocationCount()

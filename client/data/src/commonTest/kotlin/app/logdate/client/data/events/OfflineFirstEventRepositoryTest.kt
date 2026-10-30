@@ -4,11 +4,14 @@ import app.logdate.client.data.fakes.FakeEventDao
 import app.logdate.client.data.fakes.FakeEventNoteLinkDao
 import app.logdate.client.data.fakes.RecordingMediaClaimFence
 import app.logdate.client.database.entities.EventEntity
+import app.logdate.client.media.storage.MediaClaimFence
 import app.logdate.shared.model.Event
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -41,6 +44,23 @@ class OfflineFirstEventRepositoryTest {
 
             assertTrue(result.isSuccess)
             assertEquals(1, fence.claims)
+        }
+
+    @Test
+    fun `a cancelled event write is not reported as a failed write`() =
+        runTest {
+            val cancelledFence =
+                object : MediaClaimFence {
+                    override suspend fun <T> withClaim(block: suspend () -> T): T = throw CancellationException("caller left")
+
+                    override suspend fun <T> withExclusiveReclamation(block: suspend () -> T): T = block()
+                }
+            val repository = OfflineFirstEventRepository(FakeEventDao(), FakeEventNoteLinkDao(), mediaClaimFence = cancelledFence)
+            val event = Event(title = "Trip", startTime = Instant.fromEpochSeconds(1_000_000))
+
+            assertFailsWith<CancellationException> { repository.createEvent(event) }
+            assertFailsWith<CancellationException> { repository.updateEvent(event) }
+            assertFailsWith<CancellationException> { repository.deleteEvent(event.id) }
         }
 
     /**

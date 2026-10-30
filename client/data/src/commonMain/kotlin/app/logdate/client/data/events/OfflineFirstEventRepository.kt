@@ -6,6 +6,7 @@ import app.logdate.client.database.entities.EventNoteLinkEntity
 import app.logdate.client.media.storage.MediaClaimFence
 import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.util.platformIODispatcher
+import app.logdate.client.util.runCatchingUnlessCancelled
 import app.logdate.shared.model.Event
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
@@ -61,21 +62,21 @@ class OfflineFirstEventRepository(
 
     override suspend fun createEvent(event: Event): Result<Unit> =
         withContext(dispatcher) {
-            runCatching {
+            runCatchingUnlessCancelled {
                 mediaClaimFence.withClaim { eventDao.insert(event.toEntity()) }
             }.onFailure { error -> Napier.e("Failed to create event ${event.id}", error) }
         }
 
     override suspend fun updateEvent(event: Event): Result<Unit> =
         withContext(dispatcher) {
-            runCatching {
+            runCatchingUnlessCancelled {
                 mediaClaimFence.withClaim { eventDao.update(event.copy(lastUpdated = Clock.System.now()).toEntity()) }
             }.onFailure { error -> Napier.e("Failed to update event ${event.id}", error) }
         }
 
     override suspend fun deleteEvent(eventId: Uuid): Result<Unit> =
         withContext(dispatcher) {
-            runCatching {
+            runCatchingUnlessCancelled {
                 mediaClaimFence.withClaim { eventDao.softDelete(eventId, Clock.System.now().toEpochMilliseconds()) }
             }.onFailure { error -> Napier.e("Failed to delete event $eventId", error) }
         }
@@ -97,7 +98,7 @@ class OfflineFirstEventRepository(
         noteId: Uuid,
     ): Result<Unit> =
         withContext(dispatcher) {
-            runCatching {
+            runCatchingUnlessCancelled {
                 eventNoteLinkDao.insert(
                     EventNoteLinkEntity(
                         eventId = eventId,
@@ -112,7 +113,7 @@ class OfflineFirstEventRepository(
         noteId: Uuid,
     ): Result<Unit> =
         withContext(dispatcher) {
-            runCatching {
+            runCatchingUnlessCancelled {
                 eventNoteLinkDao.delete(eventId, noteId)
             }.onFailure { error -> Napier.e("Failed to unlink note $noteId from event $eventId", error) }
         }
