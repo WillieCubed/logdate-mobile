@@ -36,6 +36,7 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.LocalDate
@@ -59,7 +60,7 @@ class OfflineFirstJournalNotesRepository(
     private val transactionManager: SyncTransactionManager = PassthroughSyncTransactionManager,
     private val syncManagerProvider: () -> SyncManager = { NoOpSyncManager },
     private val syncMetadataService: SyncMetadataService,
-    private val syncScope: CoroutineScope = CoroutineScope(Dispatchers.Default),
+    private val syncScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val transcriptionRepository: TranscriptionRepository? = null,
     private val mediaReferences: StoredMediaReferences = StoredMediaReferences.Unchanged,
     private val recoveryReceipts: ArchiveRecoveryReceipts = ArchiveRecoveryReceipts.None,
