@@ -107,6 +107,6 @@ private suspend fun <T> LogDateCloudApiClient.momentRequest(
     } catch (failure: CloudApiException) {
         Result.failure(failure)
     } catch (failure: Exception) {
-        Napier.e("Failed to sync marked moments")
-        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to sync marked moments"))
+        Napier.e("Failed to sync marked moments: ${failure::class.simpleName}")
+        Result.failure(CloudApiException("NETWORK_ERROR", "Failed to sync marked moments", cause = failure))
     }

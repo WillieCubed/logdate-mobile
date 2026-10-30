@@ -35,8 +35,8 @@ internal suspend fun <T> withSyncTransactionCompletion(
             cleanup()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
-            Napier.w("Committed recovery cleanup remains pending")
+        } catch (error: Exception) {
+            Napier.w("Committed recovery cleanup remains pending: ${error::class.simpleName}")
         }
     }
     return result

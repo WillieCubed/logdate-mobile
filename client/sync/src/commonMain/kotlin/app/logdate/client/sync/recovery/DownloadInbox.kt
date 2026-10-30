@@ -13,6 +13,7 @@ import app.logdate.shared.model.diagnostics.DiagnosticReason
 import app.logdate.shared.model.diagnostics.SyncDiagnosticEvent
 import app.logdate.shared.model.sync.ContentChange
 import app.logdate.shared.model.sync.DraftChange
+import io.github.aakira.napier.Napier
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.uuid.Uuid
@@ -85,7 +86,8 @@ class DownloadInbox(
             diagnosticSource().takeIf { source ->
                 source != null && source.scope.ownerId == selected.owner && source.scope.serverOrigin == selected.origin
             }
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            Napier.w("Download diagnostics have no source: ${error::class.simpleName}")
             null
         }
 
@@ -95,8 +97,9 @@ class DownloadInbox(
     ) {
         try {
             diagnostics(event, source)
-        } catch (_: Exception) {
+        } catch (error: Exception) {
             // Observability must not change the outcome of a durable operation.
+            Napier.w("A download diagnostic could not be recorded: ${error::class.simpleName}")
         }
     }
 

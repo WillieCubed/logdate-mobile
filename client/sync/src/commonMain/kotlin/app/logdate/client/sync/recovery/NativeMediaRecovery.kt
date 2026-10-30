@@ -20,6 +20,7 @@ import app.logdate.shared.model.SerializableCameraBlock
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableVideoBlock
 import app.logdate.shared.model.diagnostics.DiagnosticReason
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlin.uuid.Uuid
@@ -91,7 +92,8 @@ internal class NativeMediaRecovery(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                Napier.e("Media recovery failed: ${error::class.simpleName}")
                 inbox.failed(type, row.entityId, DiagnosticReason.LOCAL_STORAGE.name, row.version, scope)
             }
         }
@@ -163,7 +165,8 @@ internal class NativeMediaRecovery(
             persistDraftHydration(id, original, draftScope, updated, mappings, result, row, type, scope)
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            Napier.e("Draft media hydration failed: ${error::class.simpleName}")
             inbox.failed(type, row.entityId, DiagnosticReason.LOCAL_STORAGE.name, row.version, scope)
         }
     }

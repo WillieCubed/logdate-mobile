@@ -119,8 +119,8 @@ internal class SyncDownloadEngine(
                 val page =
                     strategy.fetchChanges(accessToken, cursor).getOrElse { fetchError ->
                         if (fetchError is CancellationException) throw fetchError
-                        errors.add(SyncError(SyncErrorType.SERVER_ERROR, "Failed to fetch remote changes"))
-                        Napier.e("Failed to fetch remote changes")
+                        errors.add(SyncError(SyncErrorType.SERVER_ERROR, "Failed to fetch remote changes", cause = fetchError))
+                        Napier.e("Failed to fetch remote changes: ${fetchError::class.simpleName}")
                         return SyncResult(
                             success = false,
                             downloadedItems = totalDownloaded,
@@ -353,9 +353,10 @@ internal class SyncDownloadEngine(
                                     SyncError(
                                         SyncErrorType.UNKNOWN_ERROR,
                                         "Failed to apply remote change",
+                                        cause = e,
                                     ),
                                 )
-                                Napier.e("Failed to apply remote change")
+                                Napier.e("Failed to apply remote change: ${e::class.simpleName}")
                             }
                         }
 

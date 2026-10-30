@@ -313,8 +313,8 @@ internal class DraftDownloader(
             throwIfDeviceBlocked(e)
             if (e is CancellationException || isScopeChanged(downloadScope)) throw e
             page.failedIds += remoteDraft.id.toString() to remoteDraft.serverVersion
-            tally.errors.add(SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to apply remote draft"))
-            Napier.e("Failed to apply draft change for")
+            tally.errors.add(SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to apply remote draft", cause = e))
+            Napier.e("Failed to apply a remote draft: ${e::class.simpleName}")
         }
     }
 
@@ -396,8 +396,8 @@ internal class DraftDownloader(
             throwIfDeviceBlocked(e)
             if (e is CancellationException || isScopeChanged(downloadScope)) throw e
             page.failedIds += draftId.toString() to (page.result.deletionVersions[draftId] ?: 0L)
-            tally.errors.add(SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to delete remote draft"))
-            Napier.e("Failed to delete draft")
+            tally.errors.add(SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to delete remote draft", cause = e))
+            Napier.e("Failed to delete a remote draft: ${e::class.simpleName}")
         }
     }
 

@@ -23,6 +23,7 @@ import app.logdate.client.sync.space.SpaceStagedRecords
 import app.logdate.client.sync.space.SpaceSync
 import app.logdate.client.sync.space.spaceFetchError
 import app.logdate.shared.model.diagnostics.DiagnosticReason
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -109,9 +110,10 @@ internal class MomentDownloader(
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (error: Exception) {
             staged.settleFailed(id)
-            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "A marked moment could not be saved")
+            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "A marked moment could not be saved", cause = error)
+            Napier.e("A marked moment could not be saved: ${error::class.simpleName}")
         }
     }
 
@@ -131,9 +133,10 @@ internal class MomentDownloader(
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (error: Exception) {
             staged.settleFailed(id)
-            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "A marked moment could not be deleted")
+            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "A marked moment could not be deleted", cause = error)
+            Napier.e("A marked moment could not be deleted: ${error::class.simpleName}")
         }
     }
 
@@ -254,10 +257,11 @@ internal class MomentDownloader(
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (error: Exception) {
             ensureScope(selected, request)
             inbox.failed(TYPE, id.toString(), DiagnosticReason.LOCAL_STORAGE.name, version, selected)
-            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "A marked moment could not be saved")
+            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "A marked moment could not be saved", cause = error)
+            Napier.e("A saved marked moment could not be applied: ${error::class.simpleName}")
         }
     }
 

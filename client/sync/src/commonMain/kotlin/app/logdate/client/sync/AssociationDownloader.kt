@@ -172,8 +172,8 @@ internal class AssociationDownloader(
         } catch (error: Exception) {
             throwIfDeviceBlocked(error)
             staged.settleFailed(key)
-            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to apply remote relationship")
-            Napier.e("Failed to apply remote relationship")
+            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to apply remote relationship", cause = error)
+            Napier.e("Failed to apply remote relationship: ${error::class.simpleName}")
         }
     }
 
@@ -213,8 +213,8 @@ internal class AssociationDownloader(
         } catch (error: Exception) {
             throwIfDeviceBlocked(error)
             staged.settleFailed(key)
-            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to remove remote relationship")
-            Napier.e("Failed to remove remote relationship")
+            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to remove remote relationship", cause = error)
+            Napier.e("Failed to remove remote relationship: ${error::class.simpleName}")
         }
     }
 
@@ -307,8 +307,8 @@ internal class AssociationDownloader(
                     source = context.capturedSource,
                 )
             }
-            context.tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to apply remote relationship")
-            Napier.e("Failed to apply remote relationship")
+            context.tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to apply remote relationship", cause = error)
+            Napier.e("Failed to apply remote relationship: ${error::class.simpleName}")
         }
     }
 

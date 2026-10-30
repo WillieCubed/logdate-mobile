@@ -11,6 +11,7 @@ import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.space.SpaceMediaReference
 import app.logdate.shared.model.diagnostics.DiagnosticReason
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlin.uuid.Uuid
 
@@ -79,7 +80,8 @@ internal class SyncJournalCoverRecovery(
             throw cancelled
         } catch (failure: DraftMediaFailure) {
             inbox.failed("MEDIA_JOURNAL", row.entityId, failure.reason.name, row.version, scope)
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            Napier.e("Journal cover recovery failed: ${error::class.simpleName}")
             inbox.failed("MEDIA_JOURNAL", row.entityId, DiagnosticReason.LOCAL_STORAGE.name, row.version, scope)
         }
     }

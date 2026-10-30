@@ -178,9 +178,9 @@ class SpaceMediaDataSource(
                 } catch (missing: IdentityKeyNotFoundException) {
                     SystemFileSystem.delete(plain, mustExist = false)
                     return Result.failure(missing)
-                } catch (_: Exception) {
+                } catch (error: Exception) {
                     SystemFileSystem.delete(plain, mustExist = false)
-                    return Result.failure(MediaDecryptionException())
+                    return Result.failure(MediaDecryptionException(error))
                 }
             return Result.success(DownloadedMediaFile(named.contentId, named.contentId.toString(), named.mimeType, plain, size))
         } catch (error: Throwable) {

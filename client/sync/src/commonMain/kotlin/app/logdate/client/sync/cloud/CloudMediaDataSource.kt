@@ -301,8 +301,8 @@ class DefaultCloudMediaDataSource(
                             throw cancelled
                         } catch (missing: IdentityKeyNotFoundException) {
                             throw missing
-                        } catch (_: Exception) {
-                            throw MediaDecryptionException()
+                        } catch (error: Exception) {
+                            throw MediaDecryptionException(error)
                         }
                     Result.success(
                         MediaFile(
@@ -376,7 +376,9 @@ internal class SizeCheckedSource(
         }
 }
 
-class MediaDecryptionException : Exception("MEDIA_DECRYPTION_FAILED")
+class MediaDecryptionException(
+    cause: Throwable? = null,
+) : Exception("MEDIA_DECRYPTION_FAILED", cause)
 
 /** Downloaded media isn't the file its reference names: its content identifier doesn't match. */
 class MediaIntegrityException(

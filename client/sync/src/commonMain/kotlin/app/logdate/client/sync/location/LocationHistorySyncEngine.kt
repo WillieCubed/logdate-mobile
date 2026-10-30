@@ -19,6 +19,7 @@ import app.logdate.client.sync.space.mappers.HistoryScope
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.config.PinnedLogDateConfigRepository
 import app.logdate.shared.model.sync.LocationHistoryUpload
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 
@@ -261,9 +262,17 @@ class LocationHistorySyncEngine(
                     else -> SyncErrorType.UNKNOWN_ERROR
                 }
             // Do not include ciphertext or decoded records in error messages or logs.
+            Napier.e("Location history could not sync: ${error::class.simpleName}")
             SyncResult(
                 success = false,
-                errors = listOf(SyncError(type, "Location history could not sync. Retry after checking your account and connection.")),
+                errors =
+                    listOf(
+                        SyncError(
+                            type,
+                            "Location history could not sync. Retry after checking your account and connection.",
+                            cause = error,
+                        ),
+                    ),
             )
         }
     }
