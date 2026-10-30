@@ -27,6 +27,7 @@ import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
@@ -47,7 +48,7 @@ class OfflineFirstJournalRepository(
     private val syncManagerProvider: () -> SyncManager = { NoOpSyncManager },
     private val syncMetadataService: SyncMetadataService,
     private val dispatcher: CoroutineDispatcher = platformIODispatcher,
-    private val externalScope: CoroutineScope = CoroutineScope(dispatcher),
+    private val externalScope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher),
     private val database: LogDateDatabase? = null,
     private val currentScope: suspend () -> JournalMergeScope = { JournalMergeScope("", "") },
     private val mergeTransactionManager: SyncTransactionManager? = null,
