@@ -8,6 +8,7 @@ def run_managed_pair(
     recovery_assets=None,
     fixture_control=None,
     expected_android_origin=None,
+    resource_owner=None,
 ):
     h.validate_native_arguments(options.native_arguments)
     if options.mode != "transfer" and options.native_arguments:
@@ -29,6 +30,13 @@ def run_managed_pair(
     budget = h.acceptance_budget(len(options.after_transfer), mode=options.mode)
     output = options.output.resolve()
     output.mkdir(mode=0o700, exist_ok=options.mode == "manual-account")
+    observer = (
+        h.RESOURCES["start_resource_observer"](output)
+        if resource_owner is not None
+        else None
+    )
+    if observer is not None:
+        resource_owner.append(observer)
     nonce = str(h.uuid.uuid4())
     sdk = options.sdk.resolve()
     adb = str(sdk / "platform-tools/adb")
@@ -86,40 +94,29 @@ def run_managed_pair(
         raise RuntimeError(
             "The managed SDK facade cannot override sdk.dir in local.properties"
         )
-    capability = h.command(str(sdk / "emulator/emulator"), "-help-no-snapshot-load")
-    if b"snapshot" not in capability.stdout + capability.stderr:
-        raise RuntimeError(
-            "The installed emulator must support cold boots of managed instances"
-        )
+    h.PREPARATION["require_cold_boot_capability"](h, sdk)
+    boot_deadline = h.PREPARATION["prepare_managed_device"](
+        h, sdk, output, avd, nonce, device_name, package, budget, observer=observer
+    )
     managed_sdk = h.EMULATOR["create_managed_sdk"](
-        sdk, output / "managed-sdk", avd, nonce
+        sdk, output / "managed-sdk", avd, nonce, purpose="drivers"
     )
     h.verify_managed_emulator(managed_sdk, output)
     env = h.managed_environment(managed_sdk, h.os.environ, package)
     env["LOGDATE_NATIVE_ACCEPTANCE_TIMEOUT_SECONDS"] = str(budget["native"])
     initial_processes = h.command("ps", "-axo", "pid,args").stdout.decode().splitlines()
     capacity = h.TARGET["managed_device_capacity"](initial_processes)
-    args = [
-        "./gradlew",
-        f":tools:native-restore-driver:{group}GroupDebugAndroidTest",
-        *h.pinned_install_arguments(initial_app, initial_probe),
-        f"-Pandroid.testInstrumentationRunnerArguments.class={h.DRIVER_CASE}",
-        "-Pandroid.testInstrumentationRunnerArguments.nativeManagedTransport=true",
-        f"-Pandroid.testInstrumentationRunnerArguments.nativeManagedNonce={nonce}",
-        f"-Pandroid.testInstrumentationRunnerArguments.nativeAppSha256={hashes[0]}",
-        f"-Pandroid.testInstrumentationRunnerArguments.nativeProbeSha256={hashes[1]}",
-        f"-Pandroid.testInstrumentationRunnerArguments.nativeManagedLifetimeMillis={budget['driverMillis']}",
-        f"-Pandroid.experimental.testOptions.managedDevices.maxConcurrentDevices={capacity}",
-        "-Pandroid.experimental.androidTest.numManagedDeviceShards=2",
-        "-Pandroid.experimental.androidTest.builtin_test_platform=false",
-        "-Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader",
-        # AGP retains SDK environment properties in daemon-static state.
-        # A fresh single-use daemon cannot reuse a deleted generation's SDK.
-        "--no-daemon",
-        "--no-configuration-cache",
-        "--max-workers=2",
-        "--console=plain",
-    ]
+    args = h.PREPARATION["driver_arguments"](
+        h,
+        group,
+        device_name,
+        initial_app,
+        initial_probe,
+        nonce,
+        hashes,
+        budget,
+        capacity,
+    )
     existing = {
         int(line.split(None, 1)[0])
         for line in initial_processes
@@ -133,8 +130,8 @@ def run_managed_pair(
     )
     results_started_ns = h.time.time_ns()
     with (output / "gradle.log").open("wb") as log:
-        process = h.subprocess.Popen(
-            args, cwd=h.ROOT, env=env, stdout=log, stderr=h.subprocess.STDOUT
+        process = h.PREPARATION["start_driver_generation"](
+            h, args, env, log, boot_deadline
         )
         # Retain this handle even if boot observation times out; never launch a replacement
         # while Gradle can still own the same test generation.
@@ -144,6 +141,7 @@ def run_managed_pair(
             "phase": "discovering",
             "targets": {},
             "gradle": {"pid": process.pid},
+            "bootDeadline": boot_deadline,
         }
         h.save(output / "active-process.json", custody)
         accepted = False
@@ -323,7 +321,7 @@ def run_managed_pair(
                     process_lines,
                     managed_sdk,
                 ):
-                    h.shutil.rmtree(managed_sdk)
+                    h.PREPARATION["remove_retired_facades"](h, managed_sdk, output)
             except Exception as failure:
                 if primary is None:
                     primary = failure
@@ -374,7 +372,7 @@ def discover_managed_pair(
     custody,
     observed_managed_pids,
 ):
-    deadline = None
+    deadline = custody.get("bootDeadline")
     launch_deadline = h.time.monotonic() + max(1200, budget["boot"] * 2)
     while len(custody["targets"]) < 2:
         if process.poll() is not None:
@@ -472,6 +470,7 @@ def discover_managed_pair(
                 raise RuntimeError(
                     "The managed endpoint does not match its QEMU process"
                 )
+            h.PREPARATION["require_boot_budget"](h, deadline)
             custody["targets"][serial] = {
                 **candidate,
                 "driverPid": receipt["pid"],
@@ -481,7 +480,8 @@ def discover_managed_pair(
             }
             h.TARGET["require_binding"](custody, serial)
         h.save(output / "active-process.json", custody)
-        h.time.sleep(0.5)
+        if len(custody["targets"]) < 2:
+            h.time.sleep(0.5)
     targets = custody["targets"]
     if len(candidates) != 2 or {binding["pid"] for binding in targets.values()} != set(
         candidates
@@ -497,3 +497,4 @@ def discover_managed_pair(
         )
     for serial in targets:
         h.TARGET["require_binding"](custody, serial)
+    h.PREPARATION["require_boot_budget"](h, deadline)

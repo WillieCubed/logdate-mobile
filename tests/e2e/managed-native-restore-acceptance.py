@@ -19,9 +19,16 @@ import time
 import uuid
 import xml.etree.ElementTree as ET
 
+# These modules are exported through the live dependency facade to extracted helpers.
+__all__ = ["base64", "hashlib", "platform", "shlex", "uuid"]
+
 ROOT = Path(__file__).resolve().parents[2]
 TARGET = runpy.run_path(str(Path(__file__).with_name("managed-native-target.py")))
 EMULATOR = runpy.run_path(str(Path(__file__).with_name("managed-native-emulator.py")))
+PREPARATION = runpy.run_path(
+    str(Path(__file__).with_name("managed-native-preparation.py"))
+)
+RESOURCES = runpy.run_path(str(Path(__file__).with_name("managed-native-resources.py")))
 DRIVER = TARGET["DRIVER"]
 DRIVER_CASE = "app.logdate.tools.restoredriver.NativeRestoreDriverTest"
 FOLLOWUPS = {
@@ -383,13 +390,33 @@ def verify_pinned_packages(sdk, app, probe, package, *, execute=None):
 def run_managed_pair(
     options, *, recovery_assets=None, fixture_control=None, expected_android_origin=None
 ):
-    return _managed_helpers["run_managed_pair"](
-        _managed_dependencies,
-        options,
-        recovery_assets=recovery_assets,
-        fixture_control=fixture_control,
-        expected_android_origin=expected_android_origin,
-    )
+    observers = []
+    try:
+        return _managed_helpers["run_managed_pair"](
+            _managed_dependencies,
+            options,
+            recovery_assets=recovery_assets,
+            fixture_control=fixture_control,
+            expected_android_origin=expected_android_origin,
+            resource_owner=observers,
+        )
+    finally:
+        primary = sys.exc_info()[1]
+        for observer in observers:
+            diagnostic = None
+            try:
+                if not observer.close():
+                    diagnostic = "Native resource collector exceeded its bounded join"
+            except Exception as failure:
+                diagnostic = (
+                    "Native resource collector cleanup failed: "
+                    + type(failure).__name__
+                )
+            if diagnostic:
+                if primary is not None:
+                    add_failure_note(primary, diagnostic)
+                else:
+                    print(diagnostic, file=sys.stderr)
 
 
 def run(options):
