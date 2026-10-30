@@ -11,14 +11,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asSkiaBitmap
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.client.datastore.EntryStartMode
@@ -34,8 +40,11 @@ import app.logdate.ui.foldable.FoldablePosture
 import app.logdate.ui.foldable.provideFoldableLayoutInfo
 import app.logdate.ui.theme.LogDateTheme
 import kotlinx.coroutines.runBlocking
+import org.jetbrains.skia.Image
 import org.junit.Test
+import java.io.File
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
@@ -76,10 +85,12 @@ class LoadedDraftRevealTest {
             val bounds = memory.getUnclippedBoundsInRoot()
             val dock = onNodeWithTag("entry_add_memory").getUnclippedBoundsInRoot()
             val header = onNodeWithTag("test_header").getUnclippedBoundsInRoot()
+            val heading = onNodeWithText("Now").getUnclippedBoundsInRoot()
             assertTrue(
-                bounds.top.value in (header.bottom.value + 32f)..(header.bottom.value + 34f),
-                "Reveal must align current beginning near the measured header, not the document end: $bounds / $header",
+                heading.top.value in (header.bottom.value + 32f)..(header.bottom.value + 34f),
+                "Reveal must keep the heading below measured chrome: $heading / $header",
             )
+            assertTrue(bounds.top >= heading.bottom + 12.dp, "The heading and first memory stay together")
             assertTrue(bounds.top.value + 120f <= dock.top.value, "Current draft must be visible above Add to entry: $bounds / $dock")
             onAllNodesWithTag("editor_text_input").onFirst().assertIsNotFocused()
             assertEquals(0, focuses)
@@ -154,6 +165,8 @@ class LoadedDraftRevealTest {
             val header = onNodeWithTag("test_header").getUnclippedBoundsInRoot()
             val memory = onNodeWithTag("memory_block_${block.id}").getUnclippedBoundsInRoot()
             val dock = onNodeWithTag("entry_add_memory").getUnclippedBoundsInRoot()
+            val heading = onNodeWithText("Now").getUnclippedBoundsInRoot()
+            assertTrue(heading.top.value >= header.bottom.value + 16f, "Heading must also clear taller chrome: $heading / $header")
             assertTrue(memory.top.value >= header.bottom.value + 16f, "Reveal must use actual header geometry: $memory / $header")
             assertTrue(memory.top.value + 120f <= dock.top.value)
             onAllNodesWithTag("editor_text_input").onFirst().assertIsNotFocused()
@@ -224,11 +237,66 @@ class LoadedDraftRevealTest {
             val memory = onNodeWithTag("memory_block_${block.id}").getUnclippedBoundsInRoot()
             val header = onNodeWithTag("test_header").getUnclippedBoundsInRoot()
             val dock = onNodeWithTag("entry_add_memory").getUnclippedBoundsInRoot()
+            val heading = onNodeWithText("Now").getUnclippedBoundsInRoot()
+            assertTrue(heading.top.value >= header.bottom.value + 16f, "Landscape heading must clear chrome: $heading / $header")
             assertTrue(memory.top.value >= header.bottom.value + 16f)
             assertTrue(memory.top.value + 120f <= dock.top.value)
             assertTrue((memory.bottom - memory.top).value > 500f, "Long writing must keep its real document height")
             onAllNodesWithTag("editor_text_input").onFirst().assertIsNotFocused()
         }
+
+    @Test
+    fun phoneRevealsHeadingAndMemoryTogether() = verifyHeadingReveal(360, 800)
+
+    @Test
+    fun foldableSizedWindowRevealsHeadingAndMemoryTogether() = verifyHeadingReveal(1000, 800)
+
+    @Test
+    fun landscapeTabletRevealsHeadingAndMemoryTogether() = verifyHeadingReveal(1280, 800)
+
+    @Test
+    fun largeTextRevealsTheMeasuredHeadingWithoutFocusingInput() = verifyHeadingReveal(360, 800, fontScale = 2f)
+
+    private fun verifyHeadingReveal(
+        width: Int,
+        height: Int,
+        fontScale: Float = 1f,
+    ) = runDesktopComposeUiTest(width = width, height = height) {
+        val block = TextBlockUiState(content = "Retained draft stays beneath Now")
+        val request = EditorDraftReveal(block.id, Uuid.random())
+        var editor by mutableStateOf(
+            EditorState(
+                blocks = listOf(block) + (1..6).map { TextBlockUiState(content = "Following retained memory $it") },
+                pendingDraftReveal = request,
+            ),
+        )
+        val page = EntryPageOverviewState(false)
+        var focuses = 0
+        setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
+                document(editor, page, { focuses++ }, actualHeader = true) {
+                    editor = editor.copy(pendingDraftReveal = null)
+                    true
+                }
+            }
+        }
+        waitForIdle()
+        val heading = onNodeWithText("Now").getUnclippedBoundsInRoot()
+        val header = onNodeWithTag("entry_mode_overview").getUnclippedBoundsInRoot()
+        val memory = onNodeWithTag("memory_block_${block.id}").getUnclippedBoundsInRoot()
+        val dock = onNodeWithTag("entry_add_memory").getUnclippedBoundsInRoot()
+        assertTrue(heading.top.value >= header.bottom.value + 16f, "Heading is hidden: $heading / $header")
+        assertTrue(memory.top >= heading.bottom + 12.dp)
+        assertTrue(memory.top.value + 120f <= dock.top.value, "First memory must also remain visible")
+        onAllNodesWithTag("editor_text_input").onFirst().assertIsNotFocused()
+        assertEquals(0, focuses)
+        assertNull(editor.expandedBlockId)
+        assertEquals(block, editor.blocks.first())
+        assertFalse(editor.isRecordingAudio)
+        val output = File("build/reports/editor-draft-reveal/${width}x$height-font$fontScale.png")
+        output.parentFile.mkdirs()
+        output.writeBytes(requireNotNull(Image.makeFromBitmap(onRoot().captureToImage().asSkiaBitmap()).encodeToData()).bytes)
+    }
 
     @Test
     fun aNewLoadOfTheSameBlockConsumesItsOwnRequestWithoutRemountingTheInput() =
@@ -262,6 +330,7 @@ class LoadedDraftRevealTest {
         onFocus: () -> Unit,
         earlierCount: Int = 12,
         headerHeight: Dp = 56.dp,
+        actualHeader: Boolean = false,
         cancel: () -> Unit = {},
         consume: (EditorDraftReveal) -> Boolean,
     ) {
@@ -288,7 +357,26 @@ class LoadedDraftRevealTest {
                         {},
                         {},
                         safeInsets = WindowInsets(top = 24, bottom = 24),
-                        header = { Box(Modifier.fillMaxWidth().height(headerHeight).testTag("test_header")) },
+                        header = {
+                            if (actualHeader) {
+                                EntryJournalHeader(
+                                    journal = null,
+                                    journalSelected = false,
+                                    availableJournals = emptyList(),
+                                    onSelectJournal = null,
+                                    onJournalSelection = {},
+                                    onExit = {},
+                                    onSave = {},
+                                    saveEnabled = true,
+                                    saveInProgress = false,
+                                    onShowDrafts = null,
+                                    draftCount = 0,
+                                    floating = true,
+                                )
+                            } else {
+                                Box(Modifier.fillMaxWidth().height(headerHeight).testTag("test_header"))
+                            }
+                        },
                     ) {
                         EntryPageOverview(
                             ui,
