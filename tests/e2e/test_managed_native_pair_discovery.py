@@ -45,6 +45,7 @@ class DiscoveryFixture:
         }
         self.h = SimpleNamespace(
             TARGET=target,
+            PREPARATION=ENTRY["PREPARATION"],
             EMULATOR={
                 "owned_managed_candidates": lambda directory, selected, nonce: selected
             },
@@ -275,6 +276,45 @@ class ManagedPairDiscoveryTest(unittest.TestCase):
             f.run()
         self.assertEqual([], f.operations)
         self.assertEqual({101, 202, 303}, f.observed)
+
+    def test_preparation_boot_deadline_cannot_restart_for_the_driver_phase(self):
+        f = DiscoveryFixture([{p: candidate(p) for p in (101, 202, 303)}])
+        f.custody["bootDeadline"] = 0.25
+        with self.assertRaisesRegex(RuntimeError, "boot observation expired"):
+            f.run(budget=5)
+        self.assertLessEqual(f.now, 0.25)
+        self.assertEqual({}, f.custody["targets"])
+
+    def test_a_late_second_receipt_cannot_admit_a_target_after_the_deadline(self):
+        f = DiscoveryFixture([{p: candidate(p) for p in (101, 202)}])
+        f.custody["bootDeadline"] = 0.25
+        original = f.receipt
+
+        def delayed(*args):
+            result = original(*args)
+            if args[-1]["pid"] == 202:
+                f.now = 1
+            return result
+
+        f.h.observe_driver_receipt = delayed
+        with self.assertRaisesRegex(RuntimeError, "boot"):
+            f.run(budget=5)
+        self.assertNotIn("emulator-5556", f.custody["targets"])
+
+    def test_final_binding_checks_cannot_finish_after_the_deadline(self):
+        f = DiscoveryFixture([{p: candidate(p) for p in (101, 202)}])
+        f.custody["bootDeadline"] = 0.25
+        original = f.binding
+
+        def delayed(custody, serial):
+            result = original(custody, serial)
+            if len(custody["targets"]) == 2:
+                f.now = 1
+            return result
+
+        f.h.TARGET["require_binding"] = delayed
+        with self.assertRaisesRegex(RuntimeError, "boot"):
+            f.run(budget=5)
 
     def test_root_api_keeps_live_caller_overrides_after_extraction(self):
         function = ENTRY["run_managed_pair"]
