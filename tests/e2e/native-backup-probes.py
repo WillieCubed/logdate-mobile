@@ -73,8 +73,7 @@ def probe(
     if missing_media_path:
         arguments.extend(("-e", "expectedMissingMediaPath", missing_media_path))
     arguments.append(h.RUNNER)
-    result = h.adb(serial, *arguments, timeout=h.INSTRUMENTATION_TIMEOUT_SECONDS)
-    h.private_file(output, result)
+    result = h.run_backup_probe(serial, output, *arguments)
     if not h.instrumentation_passed(result):
         failure = RuntimeError(f"native {mode} probe failed; inspect {output}")
         try:
@@ -204,8 +203,9 @@ def verify_restarted_content(
 
 
 def privacy_probe(h, serial, mode, output):
-    result = h.adb(
+    result = h.run_backup_probe(
         serial,
+        output,
         "shell",
         "am",
         "instrument",
@@ -218,9 +218,7 @@ def privacy_probe(h, serial, mode, output):
         "restorePrivacyMode",
         mode,
         h.RUNNER,
-        timeout=h.INSTRUMENTATION_TIMEOUT_SECONDS,
     )
-    h.private_file(output, result)
     if not h.instrumentation_passed(result):
         failure = RuntimeError(f"native privacy {mode} probe failed; inspect {output}")
         for suffix in ("png", "xml"):
@@ -378,13 +376,7 @@ def archive_probe(h, serial, mode, output, fixture=None, fixture_label="transfer
     if fixture:
         arguments.extend(("-e", "archiveRecoveryFixture", fixture))
     arguments.append(h.RUNNER)
-    result = h.adb(
-        serial,
-        "shell",
-        shlex.join(arguments),
-        timeout=h.INSTRUMENTATION_TIMEOUT_SECONDS,
-    )
-    h.private_file(output, result)
+    result = h.run_backup_probe(serial, output, "shell", shlex.join(arguments))
     if not h.instrumentation_passed(result):
         raise RuntimeError(f"archive {mode} probe failed; inspect {output}")
 
