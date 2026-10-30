@@ -165,7 +165,12 @@ class NativeTransportSafety:
 
     def test_d2d_transport_requires_registration_selection_and_initialization(self):
         transport = D2D.D2D_TRANSPORT.encode()
-        responses = [b"  " + transport, b"selected", b"initialized", b"* " + transport]
+        responses = [
+            b"  " + transport,
+            b"selected",
+            b"Initialization result: 0",
+            b"* " + transport,
+        ]
         with (
             patch.object(D2D.HARNESS, "adb", side_effect=responses) as adb,
             patch.object(D2D.HARNESS.time, "sleep"),

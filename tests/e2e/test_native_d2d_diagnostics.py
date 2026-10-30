@@ -194,12 +194,100 @@ class D2dDiagnosticsTest(unittest.TestCase):
                 b"* " + transport,
             ]
             with patch.object(D2D.HARNESS, "adb", side_effect=responses):
-                D2D.select_d2d_transport("emulator-5582", attempts=1, output=output)
+                with self.assertRaises(RuntimeError):
+                    D2D.select_d2d_transport("emulator-5582", attempts=1, output=output)
             self.assertTrue((output / "d2d-init-1.log").is_file())
             self.assertEqual(
                 (output / "d2d-init-1.log").read_bytes(),
                 b"Initialization result: Transport error",
             )
+
+    def test_selected_route_cannot_accept_failed_or_ambiguous_initialization(self):
+        invalid = [
+            b"Initialization result: -1000",
+            b"",
+            b"Initialization result: Transport error",
+            b"Initialization result: 0\nInitialization result: -1000",
+            b"Initialization result: 0\nInitialization result: 0",
+            b"Initialization result: 0junk",
+        ]
+        for result in invalid:
+            with (
+                self.subTest(result=result),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                output = Path(temporary)
+                with (
+                    patch.object(
+                        D2D.HARNESS,
+                        "adb",
+                        side_effect=[D2D.D2D_TRANSPORT.encode(), b"selected", result],
+                    ),
+                    patch.object(
+                        D2D, "selected_transport", return_value=D2D.D2D_TRANSPORT
+                    ),
+                ):
+                    with self.assertRaises(RuntimeError):
+                        D2D.select_d2d_transport(
+                            "emulator-5582", attempts=1, output=output
+                        )
+                self.assertEqual(result, (output / "d2d-init-1.log").read_bytes())
+
+    def test_existing_attempt_limit_waits_for_success_without_retrying_backup(self):
+        initialized = iter(
+            [b"Initialization result: -1000", b"Initialization result: 0"]
+        )
+        commands = []
+
+        def adb(serial, *arguments, timeout):
+            self.assertEqual("emulator-5582", serial)
+            self.assertEqual(60, timeout)
+            commands.append(arguments)
+            if arguments[:3] == ("shell", "bmgr", "init"):
+                return next(initialized)
+            return D2D.D2D_TRANSPORT.encode()
+
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            with (
+                patch.object(D2D.HARNESS, "adb", side_effect=adb),
+                patch.object(D2D.HARNESS.time, "sleep") as pause,
+                patch.object(
+                    D2D, "selected_transport", return_value=D2D.D2D_TRANSPORT
+                ) as selected,
+            ):
+                D2D.select_d2d_transport("emulator-5582", attempts=2, output=output)
+            self.assertEqual(
+                2, sum(args[:3] == ("shell", "bmgr", "init") for args in commands)
+            )
+            self.assertFalse(any("backupnow" in args for args in commands))
+            pause.assert_called_once_with(1)
+            selected.assert_called_once()
+            self.assertEqual(
+                b"Initialization result: -1000",
+                (output / "d2d-init-1.log").read_bytes(),
+            )
+            self.assertEqual(
+                b"Initialization result: 0", (output / "d2d-init-2.log").read_bytes()
+            )
+
+    def test_successful_initialization_still_requires_selected_route(self):
+        with (
+            patch.object(
+                D2D.HARNESS,
+                "adb",
+                side_effect=[
+                    D2D.D2D_TRANSPORT.encode(),
+                    b"selected",
+                    b"Initialization result: 0",
+                ],
+            ),
+            patch.object(
+                D2D, "selected_transport", return_value=D2D.GMS_BACKUP_TRANSPORT
+            ),
+        ):
+            with self.assertRaises(RuntimeError):
+                D2D.select_d2d_transport("emulator-5582", attempts=1)
 
     def test_failure_diagnostics_capture_transport_and_system_log(self):
         with (
