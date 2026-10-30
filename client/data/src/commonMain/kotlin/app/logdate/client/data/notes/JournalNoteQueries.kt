@@ -13,6 +13,7 @@ import app.logdate.client.database.entities.MediaCaptionEntity
 import app.logdate.client.database.entities.TextNoteEntity
 import app.logdate.client.database.entities.VideoNoteEntity
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.NoteCounts
 import app.logdate.client.repository.journals.NotePlace
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -333,6 +334,11 @@ internal class JournalNoteQueries(
             }
         }?.let { return it }
         return null
+    }
+
+    suspend fun countNotes(): NoteCounts {
+        val media = imageNoteDao.countNotes() + audioNoteDao.countNotes() + videoNoteDao.countNotes()
+        return NoteCounts(total = textNoteDao.countNotes() + media, withMedia = media)
     }
 
     suspend fun getNotesByIds(noteIds: Set<Uuid>): Map<Uuid, JournalNote> =

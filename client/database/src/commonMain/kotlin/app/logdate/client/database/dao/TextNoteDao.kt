@@ -122,4 +122,7 @@ interface TextNoteDao {
      */
     @Query("SELECT * FROM text_notes WHERE content = :content ORDER BY created DESC")
     suspend fun getTextNotesByContent(content: String): List<TextNoteEntity>
+
+    @Query("SELECT COUNT(*) FROM text_notes")
+    suspend fun countNotes(): Int
 }

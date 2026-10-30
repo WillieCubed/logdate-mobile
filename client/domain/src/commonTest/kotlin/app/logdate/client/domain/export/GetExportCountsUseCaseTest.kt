@@ -3,10 +3,12 @@ package app.logdate.client.domain.export
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.NoteCounts
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
@@ -67,6 +69,22 @@ class GetExportCountsUseCaseTest {
             assertEquals(4, counts.noteCount, "Should count 4 notes")
             assertEquals(1, counts.draftCount, "Should count 1 draft")
             assertEquals(3, counts.mediaCount, "Should count 3 media items (image, audio, video)")
+        }
+
+    @Test
+    fun `note totals come from counting instead of loading every note`() =
+        runTest {
+            val counting =
+                object : JournalNotesRepository by mockNotesRepository {
+                    override val allNotesObserved: Flow<List<JournalNote>> = flow { error("Export counts must not load every note") }
+
+                    override suspend fun countNotes() = NoteCounts(total = 1_200, withMedia = 300)
+                }
+
+            val counts = GetExportCountsUseCase(mockJournalRepository, counting)()
+
+            assertEquals(1_200, counts.noteCount)
+            assertEquals(300, counts.mediaCount)
         }
 
     @Test

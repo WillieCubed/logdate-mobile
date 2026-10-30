@@ -264,6 +264,20 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
+    fun `notes are counted without reading them`() =
+        runTest {
+            textNoteDao.addNote(createTestTextNote().toEntity())
+            textNoteDao.addNote(createTestTextNote().toEntity())
+            imageNoteDao.addNote(createTestImageNote().toEntity())
+
+            val counts = repository.countNotes()
+
+            assertEquals(3, counts.total)
+            assertEquals(1, counts.withMedia)
+            assertEquals(0, textNoteDao.wholeTableReads)
+        }
+
+    @Test
     fun `one note is observed without reading every note`() =
         runTest {
             val note = createTestTextNote().copy(content = "Draft thought")

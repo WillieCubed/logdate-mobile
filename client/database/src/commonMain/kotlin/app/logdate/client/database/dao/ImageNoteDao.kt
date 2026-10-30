@@ -157,4 +157,7 @@ interface ImageNoteDao {
         previous: String,
         contentUri: String,
     )
+
+    @Query("SELECT COUNT(*) FROM image_notes")
+    suspend fun countNotes(): Int
 }

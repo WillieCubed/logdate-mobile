@@ -1,6 +1,5 @@
 package app.logdate.client.domain.export
 
-import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import kotlinx.coroutines.flow.first
@@ -26,23 +25,13 @@ class GetExportCountsUseCase(
 ) {
     suspend operator fun invoke(): ExportCounts {
         val journals = journalRepository.allJournalsObserved.first()
-        val notes = journalNotesRepository.allNotesObserved.first()
+        val notes = journalNotesRepository.countNotes()
         val drafts = journalRepository.getAllDrafts()
-        val notesWithMedia =
-            notes.count { note ->
-                when (note) {
-                    is JournalNote.Image -> true
-                    is JournalNote.Audio -> true
-                    is JournalNote.Video -> true
-                    else -> false
-                }
-            }
-
         return ExportCounts(
             journalCount = journals.size,
-            noteCount = notes.size,
+            noteCount = notes.total,
             draftCount = drafts.size,
-            mediaCount = notesWithMedia,
+            mediaCount = notes.withMedia,
         )
     }
 }

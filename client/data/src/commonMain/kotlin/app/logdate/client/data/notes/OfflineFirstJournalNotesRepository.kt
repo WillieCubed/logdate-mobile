@@ -20,6 +20,7 @@ import app.logdate.client.repository.journals.ExportableJournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.NoteCounts
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.repository.transcription.TranscriptionRepository
@@ -146,6 +147,8 @@ class OfflineFirstJournalNotesRepository(
     }
 
     override suspend fun getNoteById(noteId: Uuid): JournalNote? = queries.getNoteById(noteId)
+
+    override suspend fun countNotes(): NoteCounts = queries.countNotes()
 
     override suspend fun getNotesByIds(noteIds: Set<Uuid>): Map<Uuid, JournalNote> = queries.getNotesByIds(noteIds)
 
