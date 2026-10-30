@@ -11,7 +11,9 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.withCapturedDuring
 import app.logdate.client.repository.location.LocationCaptureSource
+import app.logdate.client.util.runCatchingUnlessCancelled
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -59,7 +61,10 @@ class AddNoteUseCase(
         editBase: EntryEditBase? = null,
     ) = coroutineScope {
         val shouldTrackLocation =
-            captureCurrentLocation && runCatching { settingsRepository.getSettings().autoTrackForJournalEntries }.getOrDefault(true)
+            captureCurrentLocation &&
+                runCatchingUnlessCancelled { settingsRepository.getSettings().autoTrackForJournalEntries }
+                    .onFailure { Napier.w("Location settings are unreadable; logging the entry location by default", it) }
+                    .getOrDefault(true)
         // A note written about another time (a visit, a mark) is not stamped with what is happening now.
         val activity = if (captureCurrentLocation) captureActivity.now() else null
         val noteJobs =
@@ -76,34 +81,12 @@ class AddNoteUseCase(
                                 repository.persistEditorNote(note, editBase)
                             }
 
-                        // Associate with journals if any are specified
-                        if (journalIds.isNotEmpty()) {
-                            // Link note to all specified journals
-                            journalIds.forEach { journalId ->
-                                try {
-                                    journalContentRepository.addContentToJournal(note.uid, journalId)
-                                } catch (e: Exception) {
-                                    // Continue with other journals even if one fails
-                                }
-                            }
-                        }
+                        val failedLinks = linkToJournals(note.uid, journalIds)
 
-                        // Log current location when note is created
-                        if (shouldTrackLocation && !updated && note.uid != editBase?.copyNoteId) {
-                            try {
-                                logLocationUseCase() // For activity timeline
-                                // For location history with automatic retry
-                                logCurrentLocationUseCase(
-                                    LogCurrentLocationUseCase.LocationLogRequest.LogLocation(
-                                        captureSource = LocationCaptureSource.JOURNAL_ENTRY,
-                                    ),
-                                )
-                            } catch (e: Exception) {
-                                // Location logging shouldn't fail note creation
-                                // LogCurrentLocationUseCase handles retries automatically
-                                Napier.w("Failed to log location when creating note", e)
-                            }
-                        }
+                        if (shouldTrackLocation && !updated && note.uid != editBase?.copyNoteId) logEntryLocation()
+                        failedLinks
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
                     } catch (e: Exception) {
                         Napier.e("Failed to create note ${note.uid}", e)
                         throw e // Rethrow to properly handle failure
@@ -111,21 +94,80 @@ class AddNoteUseCase(
                 }
             }
 
-        try {
-            noteJobs.awaitAll()
-
-            // Process attachments after notes are created
-            attachments.forEach { uri ->
-                try {
-                    mediaManager.addToDefaultCollection(uri)
-                } catch (e: Exception) {
-                    Napier.e("Failed to add attachment to collection: $uri", e)
-                    // Continue with other attachments even if one fails
-                }
+        val failedLinks =
+            try {
+                noteJobs.awaitAll().flatten()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (e: Exception) {
+                Napier.e("Error in AddNoteUseCase", e)
+                throw e
             }
+
+        // Process attachments after notes are created
+        attachments.forEach { uri ->
+            try {
+                mediaManager.addToDefaultCollection(uri)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (e: Exception) {
+                Napier.e("Failed to add attachment to collection: $uri", e)
+                // Continue with other attachments even if one fails
+            }
+        }
+        if (failedLinks.isNotEmpty()) throw NoteJournalLinkException(failedLinks)
+    }
+
+    /** Logs where a new entry was written. A failure here never fails the save; logging retries on its own. */
+    private suspend fun logEntryLocation() {
+        try {
+            logLocationUseCase() // For activity timeline
+            logCurrentLocationUseCase(
+                LogCurrentLocationUseCase.LocationLogRequest.LogLocation(
+                    captureSource = LocationCaptureSource.JOURNAL_ENTRY,
+                ),
+            )
+        } catch (cancellation: CancellationException) {
+            throw cancellation
         } catch (e: Exception) {
-            Napier.e("Error in AddNoteUseCase", e)
-            throw e
+            Napier.w("Failed to log location when creating note", e)
         }
     }
+
+    /**
+     * Links [noteId] to every journal in [journalIds], attempting each one even after a failure so a
+     * retry only has to repeat the links that were not saved.
+     */
+    private suspend fun linkToJournals(
+        noteId: Uuid,
+        journalIds: Array<out Uuid>,
+    ): List<FailedJournalLink> =
+        journalIds.mapNotNull { journalId ->
+            runCatchingUnlessCancelled { journalContentRepository.addContentToJournal(noteId, journalId) }
+                .exceptionOrNull()
+                ?.let { cause ->
+                    Napier.e("Failed to add note $noteId to journal $journalId", cause)
+                    FailedJournalLink(noteId, journalId, cause)
+                }
+        }
 }
+
+/** A journal that a saved note could not be added to. */
+data class FailedJournalLink(
+    val noteId: Uuid,
+    val journalId: Uuid,
+    val cause: Throwable,
+)
+
+/**
+ * Thrown when every note was saved but at least one requested journal link was not.
+ *
+ * Saving the same notes again is safe: an unchanged note is not duplicated, and only the
+ * [failedLinks] still need to be added.
+ */
+class NoteJournalLinkException(
+    val failedLinks: List<FailedJournalLink>,
+) : Exception(
+        "The entry was saved but could not be added to ${failedLinks.map { it.journalId }.distinct().size} journal(s)",
+        failedLinks.first().cause,
+    )

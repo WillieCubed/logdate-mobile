@@ -29,6 +29,7 @@ import app.logdate.shared.model.Journal
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
 import app.logdate.shared.model.location.VisitMemoryContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -451,18 +452,14 @@ class AddNoteUseCaseTest {
     }
 
     /**
-     * Tests that the use case correctly handles errors in journal associations.
+     * A journal link that cannot be saved is reported, not hidden.
      *
-     * Requirements:
-     * - The use case MUST be resilient to failures in journal association
-     * - If journal association fails, the note creation MUST still succeed
-     * - Other journal associations MUST continue to be attempted even if some fail
-     * - The use case MUST NOT throw exceptions when journal association fails
+     * The note is still saved and every other requested journal is still linked, so a retry only
+     * needs to repeat the failed links. The failure names the note and journal that were not linked.
      */
     @Test
-    fun `invoke should handle journal association errors gracefully`() =
+    fun `a failed journal link is reported after the note and other links are saved`() =
         runTest {
-            // Given
             val testNote = createTestNote()
             val normalJournalId = Uuid.random()
             val errorJournalId = Uuid.random()
@@ -478,24 +475,44 @@ class AddNoteUseCaseTest {
                     mediaManager = mockMediaManager,
                 )
 
-            // When - should not throw exception even though one journal association fails
-            errorHandlingUseCase(
-                notes = listOf(testNote),
-                journalIds = listOf(normalJournalId, errorJournalId),
-            )
+            val failure =
+                assertFailsWith<NoteJournalLinkException> {
+                    errorHandlingUseCase(
+                        notes = listOf(testNote),
+                        journalIds = listOf(errorJournalId, normalJournalId),
+                    )
+                }
 
-            // Then
-            // Note should still be created
-            assertEquals(1, mockRepository.createdNotes.size)
-            assertEquals(testNote, mockRepository.createdNotes.first())
+            assertEquals(listOf<JournalNote>(testNote), mockRepository.createdNotes.toList())
+            assertEquals(listOf(Pair(testNote.uid, normalJournalId)), mockErrorContentRepo.addedLinks)
+            assertEquals(listOf(testNote.uid to errorJournalId), failure.failedLinks.map { it.noteId to it.journalId })
+            assertEquals("Simulated error associating content ${testNote.uid} with journal $errorJournalId", failure.cause?.message)
+        }
 
-            // Only the successful journal association should be recorded
-            assertEquals(1, mockErrorContentRepo.addedLinks.size)
-            assertEquals(Pair(testNote.uid, normalJournalId), mockErrorContentRepo.addedLinks.first())
+    @Test
+    fun `a cancelled journal link cancels the save instead of being reported as a link failure`() =
+        runTest {
+            val testNote = createTestNote()
+            val cancellingContentRepo =
+                object : JournalContentRepository by MockJournalContentRepository() {
+                    override suspend fun addContentToJournal(
+                        contentId: Uuid,
+                        journalId: Uuid,
+                    ): Unit = throw CancellationException("editor closed")
+                }
+            val cancellingUseCase =
+                AddNoteUseCase(
+                    repository = mockRepository,
+                    journalContentRepository = cancellingContentRepo,
+                    logLocationUseCase = mockLogLocationUseCase.useCase,
+                    logCurrentLocationUseCase = mockLogCurrentLocationUseCase.useCase,
+                    settingsRepository = mockSettingsRepository,
+                    mediaManager = mockMediaManager,
+                )
 
-            // Error should be recorded
-            assertEquals(1, mockErrorContentRepo.errors.size)
-            assertEquals(Pair(testNote.uid, errorJournalId), mockErrorContentRepo.errors.first())
+            assertFailsWith<CancellationException> {
+                cancellingUseCase(notes = listOf(testNote), journalIds = listOf(Uuid.random()))
+            }
         }
 
     private class MockJournalContentRepository : JournalContentRepository {
