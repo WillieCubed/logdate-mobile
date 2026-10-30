@@ -8,7 +8,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -32,9 +31,8 @@ import app.logdate.feature.editor.ui.editor.startReservedAudioCapture
 import app.logdate.feature.editor.ui.layout.EditorBlockCornerRadius
 import app.logdate.feature.editor.ui.layout.LocalEditorCorners
 import app.logdate.ui.audio.AudioContextProcessor
+import app.logdate.ui.audio.rememberAudioContext
 import app.logdate.util.formatDateLocalized
-import io.github.aakira.napier.Napier
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
@@ -260,28 +258,15 @@ fun AudioBlockEditor(
             )
         } else if (existingAudioUri != null) {
             val audioContextProcessor: AudioContextProcessor = koinInject()
-            val waveformAmplitudes by produceState(
-                initialValue = emptyList<Float>(),
-                block.uri,
-                block.duration,
-                block.timestamp,
-                block.location,
-            ) {
-                try {
-                    audioContextProcessor
-                        .processProgressively(
-                            audioUri = existingAudioUri,
-                            durationMs = block.duration,
-                            createdAt = block.timestamp,
-                            latitude = block.location?.latitude,
-                            longitude = block.location?.longitude,
-                        ).collect { value = it.amplitudes }
-                } catch (error: CancellationException) {
-                    throw error
-                } catch (error: Exception) {
-                    Napier.w(error) { "Unable to load the recording waveform" }
-                }
-            }
+            val waveformAmplitudes =
+                rememberAudioContext(
+                    audioUri = existingAudioUri,
+                    durationMs = block.duration,
+                    recordedAt = block.timestamp,
+                    latitude = block.location?.latitude,
+                    longitude = block.location?.longitude,
+                    processor = audioContextProcessor,
+                )?.amplitudes.orEmpty()
             AudioBlockContent(
                 block = block,
                 isExpanded = !inline || selected,
