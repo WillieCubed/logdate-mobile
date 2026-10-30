@@ -1,20 +1,17 @@
 package app.logdate.client.database
 
-import app.logdate.client.device.storage.SecureStorage
+import app.logdate.client.device.storage.DesktopFileCipher
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
 actual val databaseModule: Module =
     module {
         single {
-            val secureStorage = get<SecureStorage>()
-            prepareEncryptedDatabase(secureStorage)
-            val database =
-                getRoomDatabase(
-                    getDatabaseBuilder(),
-                )
+            val vault = desktopDatabaseVault(get<DesktopFileCipher>())
+            vault.unseal()
+            val database = getRoomDatabase(getDatabaseBuilder())
             protectDatabaseFile()
-            scheduleDatabaseEncryption(secureStorage)
+            scheduleDatabaseEncryption(database, vault)
             database
         }
         includes(daosModule)

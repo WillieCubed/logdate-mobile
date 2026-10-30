@@ -9,6 +9,7 @@ import app.logdate.client.device.DesktopAppInfoProvider
 import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.device.identity.DefaultDeviceIdProvider
 import app.logdate.client.device.identity.di.deviceIdentityModule
+import app.logdate.client.device.storage.DesktopFileCipher
 import app.logdate.client.device.storage.DesktopSecureStorage
 import app.logdate.client.device.storage.SecureSessionStorage
 import app.logdate.client.device.storage.SecureStorage
@@ -37,7 +38,9 @@ actual val deviceInstanceModule: Module =
             CoroutineScope(get<Job>() + Dispatchers.Default)
         }
 
-        single<SecureStorage> { DesktopSecureStorage() }
+        single { DesktopSecureStorage() }
+        single<SecureStorage> { get<DesktopSecureStorage>() }
+        single<DesktopFileCipher> { get<DesktopSecureStorage>() }
 
         single {
             SecureSessionStorage(
