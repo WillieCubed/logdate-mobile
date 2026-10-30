@@ -240,16 +240,16 @@ class AndroidSyncManager(
             resumeScheduledSync()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
-            Napier.e("Could not resume sync after network restoration")
+        } catch (error: Exception) {
+            Napier.e("Could not resume sync after network restoration: ${error::class.simpleName}")
         }
     }
 
     override fun sync(startNow: Boolean) {
         if (startNow) {
             scope.launch {
-                runCatching { requestBackup() }
-                    .onFailure { Napier.e("Could not request a manual backup") }
+                runCatchingUnlessCancelled { requestBackup() }
+                    .onFailure { Napier.e("Could not request a manual backup: ${it::class.simpleName}") }
             }
         } else {
             // The auth/policy observer above owns the periodic schedule.
@@ -281,8 +281,8 @@ class AndroidSyncManager(
             defaultSyncManager.releaseUploadBackoff()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
-            Napier.e("Could not release upload backoff for a manual backup")
+        } catch (error: Exception) {
+            Napier.e("Could not release upload backoff for a manual backup: ${error::class.simpleName}")
         }
         return resumeScheduledSync(consent, userInitiated = true)
     }
@@ -307,8 +307,8 @@ class AndroidSyncManager(
                     )
                 } catch (cancelled: CancellationException) {
                     throw cancelled
-                } catch (_: Exception) {
-                    Napier.e("Could not inspect scheduled sync; preserving any active request")
+                } catch (error: Exception) {
+                    Napier.e("Could not inspect scheduled sync; preserving any active request: ${error::class.simpleName}")
                     when {
                         ownerChanged -> ExistingWorkPolicy.REPLACE
                         consent != null -> ExistingWorkPolicy.APPEND_OR_REPLACE
@@ -433,8 +433,8 @@ class AndroidSyncManager(
                 immediateScheduleMutex.withLock { scheduleImmediateSync(syncType).await() }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                Napier.w("Could not persist partial sync request")
+            } catch (error: Exception) {
+                Napier.w("Could not persist partial sync request: ${error::class.simpleName}")
             }
         }
     }

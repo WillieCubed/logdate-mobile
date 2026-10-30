@@ -7,6 +7,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -39,8 +40,13 @@ class SyncDebouncer(
             triggers
                 .debounce(debounceWindow)
                 .collect {
-                    runCatching { action() }
-                        .onFailure { Napier.w("SyncDebouncer action failed") }
+                    try {
+                        action()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        Napier.w("SyncDebouncer action failed: ${failure::class.simpleName}")
+                    }
                 }
         }
     }

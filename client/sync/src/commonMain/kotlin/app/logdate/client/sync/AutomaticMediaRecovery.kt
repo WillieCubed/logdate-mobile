@@ -89,7 +89,7 @@ class AutomaticMediaRecovery(
         }
         val attempt =
             tokens.withFreshToken({ token ->
-                runCatching {
+                runCatchingUnlessCancelled {
                     val candidate = download(token, entityId, draftId, kind, recoverySource)
                     candidate.second?.let { mapping -> retainMapping(mapping, entityId, draftId, kind, unavailableReference, scope) }
                     candidate.first

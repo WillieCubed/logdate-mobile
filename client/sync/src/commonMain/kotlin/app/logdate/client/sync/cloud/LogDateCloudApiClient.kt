@@ -1,6 +1,7 @@
 package app.logdate.client.sync.cloud
 
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.sync.runCatchingUnlessCancelled
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.ApiErrorResponse
 import app.logdate.shared.model.BeginAccountCreationRequest
@@ -305,7 +306,7 @@ class LogDateCloudApiClient(
             throw cancelled
         } catch (error: Exception) {
             Napier.e("Failed to sync journal merge", error)
-            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to sync journal merge"))
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to sync journal merge", cause = error))
         }
 
     /**
@@ -317,8 +318,8 @@ class LogDateCloudApiClient(
     internal suspend fun <T> handleApiError(response: HttpResponse): Result<T> {
         val statusCode = response.status.value
         val errorPayload =
-            runCatching { response.bodyAsText() }
-                .onFailure { Napier.w("Could not read error body for HTTP") }
+            runCatchingUnlessCancelled { response.bodyAsText() }
+                .onFailure { Napier.w("Could not read error body for HTTP: ${it::class.simpleName}") }
                 .getOrDefault("")
         // Response bodies are untrusted and can echo journal content or credentials.
         Napier.w("Sync API request failed: HTTP")

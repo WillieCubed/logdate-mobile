@@ -3,12 +3,14 @@ package app.logdate.client.sync.quota
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.repository.quota.QuotaResult
 import app.logdate.client.repository.quota.RemoteQuotaDataSource
+import app.logdate.client.sync.runCatchingUnlessCancelled
 import app.logdate.shared.model.CloudObjectType
 import app.logdate.shared.model.CloudQuotaManager
 import app.logdate.shared.model.CloudStorageCategoryUsage
 import app.logdate.shared.model.CloudStorageQuota
 import app.logdate.shared.model.QuotaContentType
 import app.logdate.shared.model.QuotaUsage
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 
 /**
@@ -49,7 +52,7 @@ class LogDateCloudQuotaManager(
                     // account's stream is cancelled before this request starts. Local fallback
                     // remains available to callers of getCurrentQuota, but is not presented as
                     // authoritative Cloud usage.
-                    runCatching { syncWithServer() }.getOrNull()?.let { emit(it) }
+                    runCatchingUnlessCancelled { syncWithServer() }.getOrNull()?.let { emit(it) }
                     emitAll(quotaStateFlow.filterNotNull().filter { hasAuthoritativeQuota })
                 }
             }.distinctUntilChanged()
@@ -70,8 +73,10 @@ class LogDateCloudQuotaManager(
         // Try to sync with server first, fall back to local calculation
         return try {
             syncWithServer()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
-            // If server sync fails, use local calculation
+            Napier.w("Quota refresh failed; using the local calculation: ${e::class.simpleName}")
             recalculateQuota()
         }
     }
