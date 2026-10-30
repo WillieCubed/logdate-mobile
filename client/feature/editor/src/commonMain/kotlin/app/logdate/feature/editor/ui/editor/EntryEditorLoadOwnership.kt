@@ -42,10 +42,18 @@ internal fun EntryEditorViewModel.acceptEditorContentLoad(
             return false
         }
         val loaded = replacement(current)
+        val tokens = current.creationInputTokens + loaded.blocks.associate { it.id to Uuid.random() }
+        val reveal =
+            loaded.blocks
+                .firstOrNull()
+                ?.takeIf {
+                    load.request is LoadRequest.Draft && loaded.expandedBlockId == null && !loaded.isRecordingAudio
+                }?.let { EditorDraftReveal(it.id, tokens.getValue(it.id)) }
         val accepted =
             loaded.copy(
                 contentRevision = current.contentRevision + 1,
-                creationInputTokens = current.creationInputTokens + loaded.blocks.associate { it.id to Uuid.random() },
+                creationInputTokens = tokens,
+                pendingDraftReveal = reveal,
                 isLoading = false,
             )
         val previousFinalizers = audioBlockFinalizers.toMap()

@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.handwriting.EntryPageOverviewState
 import app.logdate.feature.editor.ui.handwriting.EntryPageScrollAnchor
+import app.logdate.feature.editor.ui.handwriting.recordDraftReveal
 import app.logdate.feature.editor.ui.layout.EditorBlockMinHeight
 import app.logdate.feature.editor.ui.layout.EntryPageRailMaxWidth
 import app.logdate.feature.editor.ui.layout.LocalEntryContentInsets
@@ -126,10 +127,11 @@ internal fun RetainedEditorDocument(
                                 progress,
                                 approach.onGloballyPositioned { coordinates ->
                                     if (!expanded && progress == 0f && !state.earlierExpanded) {
+                                        state.recordDraftReveal(ui.draftReveal, block.id, coordinates)
                                         val top = coordinates.positionInWindow().y
                                         state.blockPositions[block.id] = top
                                         val anchor = state.focusedAnchor
-                                        if (anchor?.blockId == block.id && anchor.width != viewport.width) {
+                                        if (ui.draftReveal == null && anchor?.blockId == block.id && anchor.width != viewport.width) {
                                             val desired = anchor.top.coerceAtMost(state.viewportTop + viewport.height / 2f)
                                             state.focusedAnchor = anchor.copy(top = desired, width = viewport.width)
                                             scope.launch { state.scroll.scrollTo(state.scroll.value + (top - desired).roundToInt()) }

@@ -131,6 +131,9 @@ class EntryPageOverviewState internal constructor(
     internal var focusedAnchor: EntryPageScrollAnchor? = null
     internal var focusScrollBookmark: Int? = null
     internal val blockPositions = mutableMapOf<Uuid, Float>()
+    internal var draftRevealPlacement by mutableStateOf<DraftRevealPlacement?>(null)
+    internal var headerBottom by mutableStateOf<Float?>(null)
+    internal var dockTop by mutableStateOf<Float?>(null)
 }
 
 @Composable
@@ -172,6 +175,7 @@ internal fun EntryPageOverview(
     SideEffect {
         state.captureDrag = drag@{ delta ->
             if (currentUiState.expandedBlockId != null) return@drag
+            currentUiState.onCancelDraftReveal()
             var remaining = delta
             if (pull != 0f) {
                 val previous = pull
@@ -195,6 +199,7 @@ internal fun EntryPageOverview(
                     available: Offset,
                     source: NestedScrollSource,
                 ): Offset {
+                    if (source == NestedScrollSource.UserInput) currentUiState.onCancelDraftReveal()
                     if (currentUiState.expandedBlockId != null ||
                         state.earlierExpanded ||
                         source != NestedScrollSource.UserInput ||
@@ -259,6 +264,16 @@ internal fun EntryPageOverview(
     ) {
         val viewportWidthPx = constraints.maxWidth
         val viewportHeightPx = constraints.maxHeight
+        revealLoadedDraft(
+            uiState,
+            state,
+            viewportHeightPx,
+            with(LocalDensity.current) { contentTop.roundToPx() },
+            with(LocalDensity.current) {
+                (LocalEntryChromeHeight.current + Spacing.lg + safeInsets.calculateBottomPadding()).roundToPx()
+            },
+            continuity?.let { it.focusedId != null || it.progress.values.any { progress -> progress > 0f } } == true,
+        )
         state.viewportWidth = viewportWidthPx
         val book =
             calculateFoldableSplitLayout(maxWidth, maxHeight, fold.relativeTo(origin), minPaneWidth = 280.dp)
@@ -425,10 +440,11 @@ private fun EntryBlocks(
                 }
             Box(
                 Modifier.fillMaxWidth().onGloballyPositioned { coordinates ->
+                    state.recordDraftReveal(uiState.draftReveal, block.id, coordinates)
                     val top = coordinates.positionInWindow().y
                     state.blockPositions[block.id] = top
                     val anchor = state.focusedAnchor
-                    if (anchor?.blockId == block.id && anchor.width != viewportWidth) {
+                    if (uiState.draftReveal == null && anchor?.blockId == block.id && anchor.width != viewportWidth) {
                         val desiredTop = anchor.top.coerceAtMost(state.viewportTop + viewportHeight / 2f)
                         state.focusedAnchor = anchor.copy(top = desiredTop, width = viewportWidth)
                         scope.launch { state.scroll.scrollTo(state.scroll.value + (top - desiredTop).roundToInt()) }

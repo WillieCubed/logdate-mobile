@@ -22,7 +22,16 @@ import kotlin.uuid.Uuid
  */
 
 internal fun EntryEditorViewModel.setExpandedBlockIdImpl(blockId: Uuid?) {
-    mutableEditorState.update { if (it.audioCaptureStartReservations.isNotEmpty()) it else it.copy(expandedBlockId = blockId) }
+    mutableEditorState.update {
+        if (it.audioCaptureStartReservations.isNotEmpty()) {
+            it
+        } else {
+            it.copy(
+                expandedBlockId = blockId,
+                pendingDraftReveal = if (blockId != null) null else it.pendingDraftReveal,
+            )
+        }
+    }
 }
 
 /**

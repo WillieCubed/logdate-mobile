@@ -57,6 +57,8 @@ import app.logdate.feature.editor.ui.editor.EditorExitReason
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.LocalAudioCaptureStartGate
 import app.logdate.feature.editor.ui.editor.LocalEditorInputTokens
+import app.logdate.feature.editor.ui.editor.cancelDraftReveal
+import app.logdate.feature.editor.ui.editor.consumeDraftReveal
 import app.logdate.feature.editor.ui.editor.delegate.DefaultAudioBlockFinalizer
 import app.logdate.feature.editor.ui.editor.dismissOwnedEditorFocus
 import app.logdate.feature.editor.ui.editor.rememberEditorAutoSave
@@ -149,6 +151,8 @@ fun EntryEditorContent(
                 journalSelectorExpanded = false
                 viewModel.createNewBlock(type, id)
             },
+            onConsumeDraftReveal = { viewModel.consumeDraftReveal(it) },
+            onCancelDraftReveal = { viewModel.cancelDraftReveal() },
             onDeleteBlock = viewModel::removeBlock,
             onUpdateJournalSelection = viewModel::setSelectedJournals,
             onPersistAudioRecordingTarget = viewModel::persistAudioRecordingTarget,

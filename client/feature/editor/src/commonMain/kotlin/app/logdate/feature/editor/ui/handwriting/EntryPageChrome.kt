@@ -33,6 +33,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -202,6 +204,7 @@ internal fun EntryPageChrome(
                     .align(
                         Alignment.TopStart,
                     ).windowInsetsPadding(safeInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                    .onGloballyPositioned { overview.headerBottom = it.positionInWindow().y + it.size.height }
                     .semantics {
                         isTraversalGroup = true
                         traversalIndex = 0f
@@ -263,6 +266,7 @@ internal fun EntryPageChrome(
                         .width(barWidth)
                         .height(chromeHeight * dockProgress)
                         .padding(horizontal = Spacing.lg)
+                        .onGloballyPositioned { overview.dockTop = if (dockProgress > 0f) it.positionInWindow().y else null }
                         .captureBarPullGestures(overview, enabled = routeReady && !focused && !overview.earlierExpanded)
                         .then(
                             if (showModes && routeReady && modeProgress >= 0.99f && overview.browsingProgress == 0f) {

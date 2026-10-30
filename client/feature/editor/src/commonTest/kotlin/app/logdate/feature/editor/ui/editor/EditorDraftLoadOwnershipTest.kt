@@ -283,6 +283,7 @@ class EditorDraftLoadOwnershipTest {
             assertEquals(mapOf(block.id to token), viewModel.mutableEditorState.value.creationInputTokens)
             assertEquals(listOf(block), viewModel.mutableEditorState.value.blocks)
             assertNull(viewModel.activeLoadRequest)
+            assertNull(viewModel.mutableEditorState.value.pendingDraftReveal)
             entryDraftRepository.getDraftFailure = null
             viewModel.loadDraft(target)
             advanceUntilIdle()
@@ -323,5 +324,102 @@ class EditorDraftLoadOwnershipTest {
                         .single() as TextBlockUiState
                 ).content,
             )
+        }
+
+    @Test
+    fun `accepted draft requests one reveal of its current input without changing focus`() =
+        testScope.runTest {
+            advanceUntilIdle()
+            val note = textNote("Retained current draft")
+            val id = entryDraftRepository.createDraft(listOf(note))
+            viewModel.loadDraft(id)
+            advanceUntilIdle()
+            val loaded = viewModel.mutableEditorState.value
+            val request = assertNotNull(loaded.pendingDraftReveal)
+            assertEquals(note.uid, request.blockId)
+            assertEquals(loaded.creationInputTokens[note.uid], request.inputToken)
+            assertNull(loaded.expandedBlockId)
+            assertFalse(loaded.isRecordingAudio)
+            assertTrue(viewModel.consumeDraftReveal(request))
+            val consumed = viewModel.mutableEditorState.value
+            assertNull(consumed.pendingDraftReveal)
+            assertEquals(loaded.contentRevision, consumed.contentRevision)
+            assertEquals(loaded.blocks, consumed.blocks)
+            assertEquals(loaded.isModified, consumed.isModified)
+            assertFalse(viewModel.consumeDraftReveal(request))
+            viewModel.loadDraft(id)
+            advanceUntilIdle()
+            assertNull(viewModel.mutableEditorState.value.pendingDraftReveal)
+        }
+
+    @Test
+    fun `old reveal cannot consume a newer load and stale input cannot move viewport`() =
+        testScope.runTest {
+            advanceUntilIdle()
+            val first = entryDraftRepository.createDraft(listOf(textNote("First")))
+            val second = entryDraftRepository.createDraft(listOf(textNote("Second")))
+            viewModel.loadDraft(first)
+            advanceUntilIdle()
+            val old = assertNotNull(viewModel.mutableEditorState.value.pendingDraftReveal)
+            viewModel.loadDraft(second)
+            advanceUntilIdle()
+            val current = assertNotNull(viewModel.mutableEditorState.value.pendingDraftReveal)
+            assertFalse(viewModel.consumeDraftReveal(old))
+            assertEquals(current, viewModel.mutableEditorState.value.pendingDraftReveal)
+            viewModel.mutableEditorState.value =
+                viewModel.mutableEditorState.value.copy(
+                    creationInputTokens = mapOf(current.blockId to Uuid.random()),
+                )
+            assertFalse(viewModel.consumeDraftReveal(current))
+            assertNull(viewModel.mutableEditorState.value.pendingDraftReveal)
+        }
+
+    @Test
+    fun `focus entering then leaving before placement permanently cancels the reveal`() =
+        testScope.runTest {
+            advanceUntilIdle()
+            val note = textNote("Selected by the user")
+            val draft = entryDraftRepository.createDraft(listOf(note))
+            viewModel.loadDraft(draft)
+            advanceUntilIdle()
+            val request = assertNotNull(viewModel.mutableEditorState.value.pendingDraftReveal)
+            viewModel.setExpandedBlockId(note.uid)
+            viewModel.setExpandedBlockId(null)
+            assertNull(viewModel.mutableEditorState.value.pendingDraftReveal)
+            assertFalse(viewModel.consumeDraftReveal(request))
+        }
+
+    @Test
+    fun `capture reservation cannot revive a pending reveal after release`() =
+        testScope.runTest {
+            advanceUntilIdle()
+            val block = AudioBlockUiState()
+            val request = EditorDraftReveal(block.id, Uuid.random())
+            viewModel.mutableEditorState.value =
+                EditorState(
+                    blocks = listOf(block),
+                    creationInputTokens = mapOf(block.id to request.inputToken),
+                    pendingDraftReveal = request,
+                )
+            val attempt = assertNotNull(viewModel.claimAudioCaptureStart(block.id))
+            viewModel.releaseAudioCaptureStart(block.id, attempt)
+            assertNull(viewModel.mutableEditorState.value.pendingDraftReveal)
+            assertFalse(viewModel.consumeDraftReveal(request))
+        }
+
+    @Test
+    fun `live user cancellation clears a load before the rendered state exposes it`() =
+        testScope.runTest {
+            advanceUntilIdle()
+            val rendered = viewModel.editorState.value
+            val draft = entryDraftRepository.createDraft(listOf(textNote("New latest input")))
+            viewModel.loadDraft(draft)
+            advanceUntilIdle()
+            assertNull(rendered.pendingDraftReveal)
+            assertNotNull(viewModel.mutableEditorState.value.pendingDraftReveal)
+            val revision = viewModel.mutableEditorState.value.contentRevision
+            viewModel.cancelDraftReveal()
+            assertNull(viewModel.mutableEditorState.value.pendingDraftReveal)
+            assertEquals(revision, viewModel.mutableEditorState.value.contentRevision)
         }
 }
