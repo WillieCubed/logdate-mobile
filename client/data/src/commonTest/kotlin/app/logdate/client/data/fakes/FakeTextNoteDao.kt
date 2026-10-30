@@ -26,6 +26,8 @@ class FakeTextNoteDao : TextNoteDao {
 
     override suspend fun findNoteOneOff(uid: Uuid): TextNoteEntity? = notes[uid]
 
+    override suspend fun countNotes(): Int = notes.size
+
     override suspend fun findNotesByIds(uids: List<Uuid>): List<TextNoteEntity> = uids.mapNotNull { notes[it] }
 
     override fun observeNoteById(uid: Uuid): Flow<TextNoteEntity?> = notesFlow.map { notes -> notes.find { it.uid == uid } }

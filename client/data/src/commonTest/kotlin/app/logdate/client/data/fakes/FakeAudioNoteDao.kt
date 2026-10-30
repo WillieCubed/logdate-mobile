@@ -26,6 +26,8 @@ class FakeAudioNoteDao : AudioNoteDao {
 
     override suspend fun findNoteOneOff(uid: Uuid): AudioNoteEntity? = notes[uid]
 
+    override suspend fun countNotes(): Int = notes.size
+
     override suspend fun findNotesByIds(uids: List<Uuid>): List<AudioNoteEntity> = uids.mapNotNull { notes[it] }
 
     override fun observeNoteById(uid: Uuid): Flow<AudioNoteEntity?> = notesFlow.map { notes -> notes.find { it.uid == uid } }

@@ -148,4 +148,7 @@ interface VideoNoteDao {
         previous: String,
         contentUri: String,
     )
+
+    @Query("SELECT COUNT(*) FROM video_notes")
+    suspend fun countNotes(): Int
 }

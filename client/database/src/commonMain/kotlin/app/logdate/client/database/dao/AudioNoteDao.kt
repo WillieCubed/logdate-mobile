@@ -160,4 +160,7 @@ interface AudioNoteDao {
         previous: String,
         contentUri: String,
     )
+
+    @Query("SELECT COUNT(*) FROM audio_notes")
+    suspend fun countNotes(): Int
 }

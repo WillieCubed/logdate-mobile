@@ -25,6 +25,8 @@ class FakeImageNoteDao : ImageNoteDao {
 
     override suspend fun findNoteOneOff(uid: Uuid): ImageNoteEntity? = notes[uid]
 
+    override suspend fun countNotes(): Int = notes.size
+
     override suspend fun findNotesByIds(uids: List<Uuid>): List<ImageNoteEntity> = uids.mapNotNull { notes[it] }
 
     override fun observeNoteById(uid: Uuid): Flow<ImageNoteEntity?> = notesFlow.map { notes -> notes.find { it.uid == uid } }

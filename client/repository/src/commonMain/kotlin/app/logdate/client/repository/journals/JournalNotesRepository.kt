@@ -22,6 +22,12 @@ import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/** How many notes exist, and how many of them are photos, videos or recordings. */
+data class NoteCounts(
+    val total: Int,
+    val withMedia: Int,
+)
+
 interface JournalNotesRepository {
     val allNotesObserved: Flow<List<JournalNote>>
 
@@ -169,6 +175,13 @@ interface JournalNotesRepository {
      * @return The note if found, null otherwise
      */
     suspend fun getNoteById(noteId: Uuid): JournalNote?
+
+    /** Counts every note and the notes that carry media, without loading them. */
+    suspend fun countNotes(): NoteCounts =
+        allNotesObserved.first().let { notes ->
+            val media = notes.count { it is JournalNote.Image || it is JournalNote.Audio || it is JournalNote.Video }
+            NoteCounts(total = notes.size, withMedia = media)
+        }
 
     /** Fetches several notes at once. IDs without a note are absent from the result. */
     suspend fun getNotesByIds(noteIds: Set<Uuid>): Map<Uuid, JournalNote> =

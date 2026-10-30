@@ -25,6 +25,8 @@ class FakeVideoNoteDao : VideoNoteDao {
 
     override suspend fun findNoteOneOff(uid: Uuid): VideoNoteEntity? = notes[uid]
 
+    override suspend fun countNotes(): Int = notes.size
+
     override suspend fun findNotesByIds(uids: List<Uuid>): List<VideoNoteEntity> = uids.mapNotNull { notes[it] }
 
     override fun observeNoteById(uid: Uuid): Flow<VideoNoteEntity?> = notesFlow.map { notes -> notes.find { it.uid == uid } }
