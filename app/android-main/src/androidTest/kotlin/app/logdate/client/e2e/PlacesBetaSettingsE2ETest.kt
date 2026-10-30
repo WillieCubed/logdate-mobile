@@ -13,8 +13,10 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onLast
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -186,6 +188,7 @@ class PlacesBetaSettingsE2ETest {
                 assertEquals(memory.content, (notes.getNoteById(memory.uid) as JournalNote.Text).content)
                 assertEquals(false, flags.isEnabled(FeatureFlag.HUMAN_LOCATION_HISTORY))
                 assertEquals(originalTracking, tracking.getSettings())
+                capture("places-history-hidden-retained")
 
                 flags.setEnabled(FeatureFlag.PLACES_BETA, true)
                 compose.runOnIdle { pending = LocationTimelineRoute }
@@ -256,9 +259,22 @@ class PlacesBetaSettingsE2ETest {
 
     private fun assertHumanBrowser() {
         awaitText("Your day")
+        // The compact workspace exposes the other section in its menu, not as a second tab.
+        val compact = compose.onAllNodesWithContentDescription("Choose section").fetchSemanticsNodes().isNotEmpty()
+        if (compact) compose.onNodeWithContentDescription("Choose section").performClick()
+        compose.onNodeWithText("Your places").assertIsDisplayed().performClick()
         awaitText("Your places")
-        compose.onNodeWithText("Your day").assertIsDisplayed()
-        compose.onNodeWithText("Your places").assertIsDisplayed()
+        if (compact) compose.onNodeWithContentDescription("Choose section").performClick()
+        compose.onNodeWithText("Your day").assertIsDisplayed().performClick()
+        awaitText("Your day")
+        if (compact) {
+            // Peek shows only the summary; use the real panel controls before querying visits.
+            for (action in listOf("Browse", "Expand")) {
+                if (compose.onAllNodesWithContentDescription(action).fetchSemanticsNodes().isNotEmpty()) {
+                    compose.onNodeWithContentDescription(action).performClick()
+                }
+            }
+        }
     }
 
     private fun showApp() {
