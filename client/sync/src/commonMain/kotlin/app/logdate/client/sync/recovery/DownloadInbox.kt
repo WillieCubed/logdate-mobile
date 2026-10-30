@@ -148,7 +148,7 @@ class DownloadInbox(
                     for (record in rows) {
                         val existing = dao.get(selected.owner, selected.origin, type, record.id)
                         val reconsiderLegacy =
-                            existing?.state == "APPLIED" &&
+                            existing?.state == DownloadInboxState.APPLIED.name &&
                                 existing.version == record.version &&
                                 !record.deleted &&
                                 (existing.payload.isEmpty() || existing.payload == record.payload) &&
@@ -296,12 +296,7 @@ class DownloadInbox(
         reference: String,
         selected: DownloadScope = scope(),
     ) {
-        transactions.withTransaction {
-            check(selected == scope()) { "Download scope changed" }
-            val prior = dao.get(selected.owner, selected.origin, "MEDIA_NOTE", id)
-            if (prior != null && prior.version >= version) return@withTransaction
-            dao.put(waitingRow(selected, "MEDIA_NOTE", WireDownload(id, version, false, SPACE_MEDIA_PREFIX + reference)))
-        }
+        enqueueSpaceMediaRow("MEDIA_NOTE", id, version, SPACE_MEDIA_PREFIX + reference, selected)
     }
 
     /**
@@ -313,12 +308,7 @@ class DownloadInbox(
         version: Long,
         selected: DownloadScope = scope(),
     ) {
-        transactions.withTransaction {
-            check(selected == scope()) { "Download scope changed" }
-            val prior = dao.get(selected.owner, selected.origin, "MEDIA_DRAFT", id)
-            if (prior != null && prior.version >= version) return@withTransaction
-            dao.put(waitingRow(selected, "MEDIA_DRAFT", WireDownload(id, version, false, SPACE_DRAFT_MEDIA_PREFIX)))
-        }
+        enqueueSpaceMediaRow("MEDIA_DRAFT", id, version, SPACE_DRAFT_MEDIA_PREFIX, selected)
     }
 
     /**
@@ -330,11 +320,22 @@ class DownloadInbox(
         version: Long,
         selected: DownloadScope = scope(),
     ) {
+        enqueueSpaceMediaRow("MEDIA_JOURNAL", id, version, SPACE_JOURNAL_MEDIA_PREFIX, selected)
+    }
+
+    /** Queues [id]'s media at [version] unless the inbox already holds that version or a newer one. */
+    private suspend fun enqueueSpaceMediaRow(
+        type: String,
+        id: String,
+        version: Long,
+        payload: String,
+        selected: DownloadScope,
+    ) {
         transactions.withTransaction {
             check(selected == scope()) { "Download scope changed" }
-            val prior = dao.get(selected.owner, selected.origin, "MEDIA_JOURNAL", id)
+            val prior = dao.get(selected.owner, selected.origin, type, id)
             if (prior != null && prior.version >= version) return@withTransaction
-            dao.put(waitingRow(selected, "MEDIA_JOURNAL", WireDownload(id, version, false, SPACE_JOURNAL_MEDIA_PREFIX)))
+            dao.put(waitingRow(selected, type, WireDownload(id, version, false, payload)))
         }
     }
 
@@ -348,7 +349,7 @@ class DownloadInbox(
     ) {
         transactions.withTransaction {
             val row = dao.get(selected.owner, selected.origin, type, id) ?: return@withTransaction
-            if (row.version != version || row.state == "APPLIED") return@withTransaction
+            if (row.version != version || row.state == DownloadInboxState.APPLIED.name) return@withTransaction
             dao.put(row.copy(payload = payload))
         }
     }
@@ -374,7 +375,7 @@ class DownloadInbox(
         if (selected != scope()) return null
         return dao
             .get(selected.owner, selected.origin, type, id)
-            ?.takeIf { it.deleted && it.state == "APPLIED" && it.version > 0 }
+            ?.takeIf { it.deleted && it.state == DownloadInboxState.APPLIED.name && it.version > 0 }
             ?.version
     }
 
