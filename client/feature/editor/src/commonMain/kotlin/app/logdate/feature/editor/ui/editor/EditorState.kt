@@ -46,6 +46,7 @@ class EditorState(
     val audioCaptureStartReservations: Map<Uuid, Uuid> = emptyMap(),
     /** Transient input generation; callbacks from a replaced input mode cannot edit its successor. */
     val creationInputTokens: Map<Uuid, Uuid> = emptyMap(),
+    val pendingDraftReveal: EditorDraftReveal? = null,
     val entryEditBase: EntryEditBase? = null,
     val entryEditConflict: Boolean = false,
     val availableJournals: List<Journal> = emptyList(),
@@ -131,6 +132,7 @@ class EditorState(
         readOnlyBlocks: Map<Uuid, Boolean> = this.readOnlyBlocks,
         audioCaptureStartReservations: Map<Uuid, Uuid> = this.audioCaptureStartReservations,
         creationInputTokens: Map<Uuid, Uuid> = this.creationInputTokens,
+        pendingDraftReveal: EditorDraftReveal? = this.pendingDraftReveal,
         entryEditBase: EntryEditBase? = this.entryEditBase,
         entryEditConflict: Boolean = this.entryEditConflict,
         availableJournals: List<Journal> = this.availableJournals,
@@ -159,6 +161,7 @@ class EditorState(
             readOnlyBlocks = readOnlyBlocks,
             audioCaptureStartReservations = audioCaptureStartReservations,
             creationInputTokens = creationInputTokens,
+            pendingDraftReveal = pendingDraftReveal,
             entryEditBase = entryEditBase,
             entryEditConflict = entryEditConflict,
             availableJournals = availableJournals,
@@ -191,6 +194,7 @@ class EditorState(
         if (readOnlyBlocks != other.readOnlyBlocks) return false
         if (audioCaptureStartReservations != other.audioCaptureStartReservations) return false
         if (creationInputTokens != other.creationInputTokens) return false
+        if (pendingDraftReveal != other.pendingDraftReveal) return false
         if (entryEditBase != other.entryEditBase) return false
         if (entryEditConflict != other.entryEditConflict) return false
         if (availableJournals != other.availableJournals) return false
@@ -224,6 +228,7 @@ class EditorState(
         result = 31 * result + readOnlyBlocks.hashCode()
         result = 31 * result + audioCaptureStartReservations.hashCode()
         result = 31 * result + creationInputTokens.hashCode()
+        result = 31 * result + (pendingDraftReveal?.hashCode() ?: 0)
         result = 31 * result + (entryEditBase?.hashCode() ?: 0)
         result = 31 * result + entryEditConflict.hashCode()
         result = 31 * result + availableJournals.hashCode()

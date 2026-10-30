@@ -71,7 +71,11 @@ private fun MutableStateFlow<EditorState>.claimAudioCaptureStart(
         }
         val block = current.blocks.firstOrNull { it.id == blockId } as? AudioBlockUiState ?: return null
         if (block.captureState != AudioCaptureState.Empty) return null
-        val reserved = current.copy(audioCaptureStartReservations = current.audioCaptureStartReservations + (blockId to token))
+        val reserved =
+            current.copy(
+                audioCaptureStartReservations = current.audioCaptureStartReservations + (blockId to token),
+                pendingDraftReveal = null,
+            )
         if (compareAndSet(current, reserved)) {
             return token
         }

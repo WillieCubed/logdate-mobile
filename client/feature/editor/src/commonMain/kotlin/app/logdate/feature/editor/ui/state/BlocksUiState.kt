@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.feature.editor.ui.editor.BlockType
+import app.logdate.feature.editor.ui.editor.EditorDraftReveal
 import app.logdate.feature.editor.ui.editor.EditorState
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.shared.model.Journal
@@ -32,6 +33,9 @@ class BlocksUiState(
     val allowBlockCreation: Boolean = true,
     val allowHandwritingCreation: Boolean = false,
     val blockPresentations: Map<Uuid, EditorBlockPresentation> = emptyMap(),
+    val draftReveal: EditorDraftReveal? = null,
+    val onConsumeDraftReveal: (EditorDraftReveal) -> Boolean = { false },
+    val onCancelDraftReveal: () -> Unit = {},
 ) {
     val hasContent get() = blocks.any { it.hasContent() }
 }
@@ -48,6 +52,8 @@ fun rememberBlocksUiState(
     onPersistCameraCaptureTarget: suspend (Uuid, String, CapturedMediaType) -> Boolean = { _, _, _ -> false },
     blockPresentations: Map<Uuid, EditorBlockPresentation> = emptyMap(),
     allowHandwritingCreation: Boolean = false,
+    onConsumeDraftReveal: (EditorDraftReveal) -> Boolean = { false },
+    onCancelDraftReveal: () -> Unit = {},
 ): BlocksUiState {
     val hasContent by remember(editorState.blocks) {
         derivedStateOf { editorState.blocks.isNotEmpty() }
@@ -60,9 +66,14 @@ fun rememberBlocksUiState(
         allowHandwritingCreation,
         onPersistAudioRecordingTarget,
         onPersistCameraCaptureTarget,
+        onConsumeDraftReveal,
+        onCancelDraftReveal,
     ) {
         BlocksUiState(
             blocks = editorState.blocks,
+            draftReveal = editorState.pendingDraftReveal,
+            onConsumeDraftReveal = onConsumeDraftReveal,
+            onCancelDraftReveal = onCancelDraftReveal,
             blockPresentations = blockPresentations,
             allowHandwritingCreation = allowHandwritingCreation,
             expandedBlockId = editorState.expandedBlockId,
