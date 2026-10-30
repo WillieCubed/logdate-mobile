@@ -107,7 +107,6 @@ import app.logdate.client.domain.timeline.GetMediaUrisUseCase
 import app.logdate.client.domain.timeline.GetStreamingTimelineUseCase
 import app.logdate.client.domain.timeline.GetTimelineDayUseCase
 import app.logdate.client.domain.timeline.GetTimelinePageUseCase
-import app.logdate.client.domain.timeline.GetTimelineUseCase
 import app.logdate.client.domain.timeline.GroupNotesByDayBoundsUseCase
 import app.logdate.client.domain.timeline.InferMomentsUseCase
 import app.logdate.client.domain.timeline.SummarizeJournalEntriesUseCase
@@ -250,7 +249,6 @@ val domainModule: Module =
             DatastoreDayBoundaryPreferences(get())
         }
         factory { GroupNotesByDayBoundsUseCase(get(), get(), get()) }
-        factory { GetTimelineUseCase(get(), get(), get(), get()) }
         factory {
             GetStreamingTimelineUseCase(
                 get(),

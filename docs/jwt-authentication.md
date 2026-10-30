@@ -12,11 +12,11 @@ every client platform.
 
 ## Token types
 
-| Type | Lifetime | Where it's used | Where it's set |
-|---|---|---|---|
-| **Access** | 1 hour | `Authorization: Bearer <token>` on protected routes | Returned by signup-complete / signin-complete / token-refresh |
-| **Refresh** | 30 days | Body of `POST /api/v1/auth/token/refresh` | Returned alongside access token at signup/signin |
-| **Session** | 15 minutes | Body of `POST /api/v1/auth/signup/passkey/complete` | Returned by `/auth/signup/passkey/begin` |
+| Type        | Lifetime   | Where it's used                                     | Where it's set                                                |
+| ----------- | ---------- | --------------------------------------------------- | ------------------------------------------------------------- |
+| **Access**  | 1 hour     | `Authorization: Bearer <token>` on protected routes | Returned by signup-complete / signin-complete / token-refresh |
+| **Refresh** | 30 days    | Body of `POST /api/v1/auth/token/refresh`           | Returned alongside access token at signup/signin              |
+| **Session** | 15 minutes | Body of `POST /api/v1/auth/signup/passkey/complete` | Returned by `/auth/signup/passkey/begin`                      |
 
 All three are HMAC-SHA256-signed JWTs (`alg: HS256`) with the same payload
 shape:
@@ -146,7 +146,7 @@ and similar JWT libraries. The argument for handcrafting:
   Kotlin in `JwtTokenService`. A library brings transitive dependencies,
   CVE exposure, and a much larger codebase to read when something goes
   wrong.
-- **No multiplatform need**: token *generation* and *validation* only run
+- **No multiplatform need**: token _generation_ and _validation_ only run
   on the JVM (the server). The client never decodes JWT bytes — it
   treats them as opaque. So a Kotlin Multiplatform JWT library buys
   nothing.
@@ -229,14 +229,10 @@ which case sign everyone out fast is exactly the goal.
 ## Client-side storage
 
 `client/datastore/src/commonMain/kotlin/app/logdate/client/datastore/SessionStorage.kt`
-is the multiplatform interface every client uses. There are two
-implementations:
-
-- `DataStoreSessionStorage` (Android default, Desktop) — backed by
-  `androidx.datastore.preferences`. Used everywhere by default.
-- `SecureSessionStorage` (Android optional, iOS) — wraps the platform's
-  encrypted store (Android Keystore-backed `EncryptedSharedPreferences`
-  / iOS Keychain). Used when the device opts into stronger storage.
+is the multiplatform interface every client uses. Every platform binds it
+to `SecureSessionStorage`, which keeps the session in the platform's
+encrypted store (Android Keystore, the iOS Keychain, and the device key on
+desktop).
 
 Sessions are persisted as a `UserSession(accessToken, refreshToken,
 accountId)` serialized record.
@@ -266,10 +262,8 @@ class MyAndroidViewModel(
 }
 ```
 
-`SecureSessionStorage` on Android picks up `EncryptedSharedPreferences`
-under the hood (Android Keystore-backed). If the device hasn't set up
-secure lock-screen credentials, the implementation falls back to
-`DataStoreSessionStorage`.
+`SecureSessionStorage` on Android keeps the session in Keystore-backed
+encrypted storage.
 
 ### iOS — using SessionStorage
 
@@ -333,8 +327,8 @@ pattern.
 
 Sign-out is local-only today: `DefaultPasskeyAccountRepository.signOut`
 clears `SessionStorage`, the platform account manager, and the
-in-memory account state. The refresh token *remains valid on the
-server* until its 30-day expiry — the server contract has no revoke
+in-memory account state. The refresh token _remains valid on the
+server_ until its 30-day expiry — the server contract has no revoke
 endpoint yet. This is a known gap; the launch audit captures the
 trade-offs (per-account refresh-token version vs JTI denylist) and
 neither has been picked yet.
@@ -383,7 +377,7 @@ flow through `AuthMetricsRegistry` in the auth route handlers. See
    `<token>` or `Token <token>`.
 3. Confirm the token hasn't expired:
    `base64url-decode the middle segment, look at exp`. (Decoding to
-   *read* is fine; never trust the decoded payload without verifying
+   _read_ is fine; never trust the decoded payload without verifying
    the signature.)
 
 ### "JWT signature verification failed" in server logs after a deploy
@@ -407,7 +401,7 @@ no server fix.
   prompt sign-in.
 - **Account no longer exists** — `account_id` in the token's `sub`
   doesn't resolve. Verify with `SELECT * FROM accounts WHERE id =
-  '<sub>'` against the database.
+'<sub>'` against the database.
 - **Token was issued by a different signing secret** — see the
   signature-verification troubleshooting above.
 
@@ -447,11 +441,9 @@ validation never need to run anywhere else. The client's
 `SessionStorage` interface is Kotlin Multiplatform, with implementations
 on:
 
-- **Android**: `DataStoreSessionStorage` (default) and
-  `SecureSessionStorage` (Keystore-backed).
+- **Android**: `SecureSessionStorage` (Keystore-backed).
 - **iOS**: `SecureSessionStorage` over the iOS Keychain.
-- **Desktop**: `DataStoreSessionStorage` (Compose Multiplatform pulls
-  in `androidx.datastore.preferences` for desktop).
+- **Desktop**: `SecureSessionStorage` over the desktop device key.
 - **Web** (future): not currently shipping; the `SessionStorage`
   expect-class would need a `web` actual that uses
   `IndexedDB`-with-`SubtleCrypto` or `localStorage` (latter is fine
