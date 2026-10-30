@@ -28,27 +28,18 @@ val MIGRATION_18_19 =
             // Migrate journals table
             migrateJournalsTable(connection)
 
-            // Migrate voice_notes table (if exists)
-            try {
-                migrateVoiceNotesTable(connection)
-            } catch (e: Exception) {
-                // Table might not exist, continue
-            }
-
-            // Migrate video_notes table (if exists)
-            try {
-                migrateVideoNotesTable(connection)
-            } catch (e: Exception) {
-                // Table might not exist, continue
-            }
-
-            // Migrate journal_content_links table (if exists)
-            try {
-                migrateJournalContentLinksTable(connection)
-            } catch (e: Exception) {
-                // Table might not exist, continue
-            }
+            // Some early installs never created these tables. A table that exists must migrate
+            // completely; a copy failure stops the migration rather than dropping its rows.
+            if (connection.hasTable("voice_notes")) migrateVoiceNotesTable(connection)
+            if (connection.hasTable("video_notes")) migrateVideoNotesTable(connection)
+            if (connection.hasTable("journal_content_links")) migrateJournalContentLinksTable(connection)
         }
+
+        private fun SQLiteConnection.hasTable(name: String): Boolean =
+            prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").use { statement ->
+                statement.bindText(1, name)
+                statement.step()
+            }
 
         private fun migrateTextNotesTable(connection: SQLiteConnection) {
             // Create new table with exact Room schema - note column order matches Room's expectation
