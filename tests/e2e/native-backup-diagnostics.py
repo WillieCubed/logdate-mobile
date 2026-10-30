@@ -3,6 +3,8 @@
 import hashlib
 import json
 import re
+import subprocess
+import time
 
 MAX_RECORD = 262144
 RECORD = re.compile(r"files/archive_recovery/records/[a-f0-9-]{36}\.json")
@@ -90,7 +92,53 @@ def record_archive_changes(h, output, before, after):
     )
 
 
+def _bounded_startup_output(raw):
+    if isinstance(raw, str):
+        raw = raw.encode()
+    raw = raw or b""
+    limit = 512 * 1024
+    if len(raw) <= limit:
+        return raw
+    marker = f"\n[diagnostic truncated; original bytes={len(raw)}]\n".encode()
+    head = (limit - len(marker)) // 2
+    return raw[:head] + marker + raw[-(limit - len(marker) - head) :]
+
+
+def run_backup_probe(h, serial, output, *arguments):
+    try:
+        result = h.adb(serial, *arguments, timeout=h.INSTRUMENTATION_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as failure:
+        try:
+            h.private_file(output, _bounded_startup_output(failure.stdout))
+            if failure.stderr is not None:
+                h.private_file(
+                    output.with_suffix(".stderr.log"),
+                    _bounded_startup_output(failure.stderr),
+                )
+            h.private_file(
+                output.with_suffix(".timeout.json"),
+                json.dumps(
+                    {
+                        "timeoutSeconds": failure.timeout,
+                        "stdoutBytes": len(failure.stdout or b""),
+                        "stderrBytes": len(failure.stderr or b""),
+                        "acceptancePassed": False,
+                    }
+                ).encode(),
+            )
+        except Exception as diagnostic:
+            h.add_failure_note(
+                failure,
+                "Partial instrumentation evidence unavailable: "
+                + type(diagnostic).__name__,
+            )
+        raise
+    h.private_file(output, result)
+    return result
+
+
 def capture_backup_failure(h, serial, output, failure):
+    started = time.monotonic()
     try:
         data = h.adb(
             serial,
@@ -111,9 +159,57 @@ def capture_backup_failure(h, serial, output, failure):
             failure, "Backup failure diagnostics unavailable: " + type(error).__name__
         )
 
+    commands = (
+        (".activity.log", ("shell", "dumpsys", "activity", "activities")),
+        (".png", ("exec-out", "screencap", "-p")),
+        (
+            ".startup.log",
+            (
+                "logcat",
+                "-d",
+                "-t",
+                "1000",
+                "-v",
+                "threadtime",
+                "-s",
+                "LogDateAppLaunch:D",
+                "ApplicationStartup:D",
+                "BackupAgent:D",
+                "AndroidRuntime:E",
+            ),
+        ),
+    )
+    for suffix, command in commands:
+        remaining = 20 - (time.monotonic() - started)
+        if remaining <= 0:
+            h.add_failure_note(
+                failure,
+                "Backup startup evidence exhausted the existing 20-second diagnostic budget",
+            )
+            return
+        try:
+            data = h.adb(serial, *command, timeout=remaining)
+            if suffix == ".png":
+                if (
+                    not data.startswith(b"\x89PNG\r\n\x1a\n")
+                    or len(data) > 8 * 1024 * 1024
+                ):
+                    raise ValueError(
+                        "Native backup screen capture unavailable or oversized"
+                    )
+            else:
+                data = _bounded_startup_output(data)
+            h.private_file(output.with_suffix(suffix), data)
+        except Exception as error:
+            h.add_failure_note(
+                failure,
+                "Backup startup " + suffix + " unavailable: " + type(error).__name__,
+            )
+
 
 FUNCTIONS = {
     "capture_archive_records": capture_archive_records,
     "record_archive_changes": record_archive_changes,
     "capture_backup_failure": capture_backup_failure,
+    "run_backup_probe": run_backup_probe,
 }

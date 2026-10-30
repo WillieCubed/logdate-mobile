@@ -239,16 +239,32 @@ class NativeRestoredSettingsE2ETest {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         instrumentation.runOnMainSync { context.startActivity(foregroundIntent) }
         val ready = MainActivity::class.java.getDeclaredField("bootstrapReady").apply { isAccessible = true }
+        var lastActivityReadiness = "No lifecycle readiness poll completed"
         val resumedActivity =
             withTimeoutOrNull(20_000) {
                 var resumed: Activity? = null
                 while (resumed == null) {
                     resumed =
                         withContext(Dispatchers.Main) {
-                            ActivityLifecycleMonitorRegistry
-                                .getInstance()
-                                .getActivitiesInStage(Stage.RESUMED)
-                                .firstOrNull { it is MainActivity && !it.isFinishing && ready.getBoolean(it) }
+                            val monitor = ActivityLifecycleMonitorRegistry.getInstance()
+                            val activities =
+                                Stage.values().flatMap { stage ->
+                                    monitor.getActivitiesInStage(stage).map { stage to it }
+                                }
+                            lastActivityReadiness =
+                                activities
+                                    .joinToString { (stage, activity) ->
+                                        val bootstrap = if (activity is MainActivity) ready.getBoolean(activity).toString() else "n/a"
+                                        "${activity.javaClass.simpleName}@${System.identityHashCode(activity)} " +
+                                            "stage=$stage finishing=${activity.isFinishing} bootstrapReady=$bootstrap"
+                                    }.ifEmpty { "No tracked activities" }
+                            activities
+                                .firstOrNull { (stage, activity) ->
+                                    stage == Stage.RESUMED &&
+                                        activity is MainActivity &&
+                                        !activity.isFinishing &&
+                                        ready.getBoolean(activity)
+                                }?.second
                         }
                     if (resumed == null) delay(50)
                 }
@@ -258,7 +274,11 @@ class NativeRestoredSettingsE2ETest {
             assertNotNull(
                 resumedActivity,
                 "MainActivity did not finish application startup before permission recovery; " +
-                    if (resumedActivity == null) startupDiagnostics() else "ready",
+                    if (resumedActivity == null) {
+                        "activities=$lastActivityReadiness; " + startupDiagnostics()
+                    } else {
+                        "ready"
+                    },
             )
         status("RESTORE_ACTIVITY_READY")
         return readyActivity

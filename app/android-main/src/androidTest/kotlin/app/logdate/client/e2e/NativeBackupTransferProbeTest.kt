@@ -5,7 +5,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.database.encryption.PassphraseBackupStore
-import app.logdate.client.datastore.LogDateConfigDataSource
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.crypto.AndroidIdentityKeyBackupStore
 import app.logdate.client.device.crypto.CryptoManager
@@ -106,8 +105,7 @@ class NativeBackupTransferProbeTest {
             ensureLogDateApplicationStarted(context.applicationContext as android.app.Application)
             nativeTransferPhase("application_started")
             val koin = GlobalContext.get()
-            koin.get<LogDateConfigDataSource>().awaitConfigurationLoaded()
-            nativeTransferPhase("configuration_loaded")
+            trace.awaitConfiguration(koin)
             if (mode == "source-account-session") {
                 val sessions = koin.get<SessionStorage>()
                 assertNull(sessions.getSession(), "Data-only acceptance requires a signed-out synthetic source")

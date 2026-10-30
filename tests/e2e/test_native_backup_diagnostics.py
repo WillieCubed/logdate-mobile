@@ -160,7 +160,10 @@ class NativeBackupDiagnosticsTest(unittest.TestCase):
             evidence = output.with_suffix(".agent.log")
             self.assertEqual(b"framework failure", evidence.read_bytes())
             self.assertEqual(0o600, evidence.stat().st_mode & 0o777)
-            self.assertEqual(20, adb.call_args.kwargs["timeout"])
+            self.assertEqual(20, adb.call_args_list[0].kwargs["timeout"])
+            self.assertTrue(
+                all(0 < call.kwargs["timeout"] <= 20 for call in adb.call_args_list)
+            )
             self.assertNotIn("run-as", adb.call_args.args)
             with patch.object(H, "adb", side_effect=OSError("unavailable")):
                 H.capture_backup_failure("emulator-5554", output, failure)
