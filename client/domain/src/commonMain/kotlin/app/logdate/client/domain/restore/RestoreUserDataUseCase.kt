@@ -5,6 +5,7 @@ import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.domain.export.ExportLocationHistoryItem
 import app.logdate.client.domain.export.ExportMediaManifest
 import app.logdate.client.domain.export.ExportMetadata
+import app.logdate.client.domain.export.ExportNote
 import app.logdate.client.domain.export.ExportPlace
 import app.logdate.client.domain.export.ExportSchemaVersion
 import app.logdate.client.domain.export.ExportStats
@@ -12,12 +13,14 @@ import app.logdate.client.domain.export.LocationHistoryPayload
 import app.logdate.client.domain.export.PlacesPayload
 import app.logdate.client.domain.export.ProfilePayload
 import app.logdate.client.repository.journals.JournalContentRepository
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.mediaRefOrNull
 import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.places.UserPlacesRepository
 import app.logdate.client.repository.profile.ProfileRepository
+import app.logdate.client.sync.SyncTransactionManager
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -32,6 +35,7 @@ class RestoreUserDataUseCase(
     private val locationHistoryRepository: LocationHistoryRepository,
     private val canonicalOwnerProvider: CanonicalOwnerProvider,
     private val deviceIdProvider: DeviceIdProvider,
+    private val transactions: SyncTransactionManager = DirectRestoreTransactions,
 ) {
     private val migrationRunner = ExportMigrationRunner(exportMigrations)
     private val profileRestorer = ProfileRestorer(profileRepository)
@@ -186,13 +190,26 @@ class RestoreUserDataUseCase(
                     decoded.unavailableMedia.forEach(::recordUnavailable)
                 },
             )
+
+        // Reading existing records and importing media happen before the transaction: media import is
+        // file I/O that must not hold the database writer, and batch reads avoid a query per record.
+        val existingJournals = journalRepository.getJournalsByIds(migrated.journals.map { it.id }.toSet())
+        val parsedNotes = migrated.notes.mapNotNull { note -> parseUuid(note.id, warnings)?.let { note to it } }
+        val existingNotes = journalNotesRepository.getNotesByIds(parsedNotes.map { it.second }.toSet())
+        val notePlans =
+            parsedNotes.map { (note, id) ->
+                planNote(note, id, existingNotes[id], mediaResolver, mediaImporter, manifestIndex, mediaRecoveryId)
+            }
         val availableNoteIds = mutableSetOf<Uuid>()
 
-        try {
+        // Every database record is applied in one transaction: a failure or cancellation rolls back
+        // the whole archive instead of leaving part of it. Drafts and the profile live outside the
+        // database and are applied only after the transaction commits.
+        transactions.withTransaction {
             onProgress?.invoke(RestoreProgressPhase.RESTORING_JOURNALS)
             Napier.i("Restore: importing ${migrated.journals.size} journals")
             for (journal in migrated.journals) {
-                val existing = journalRepository.getJournalById(journal.id)
+                val existing = existingJournals[journal.id]
                 val shouldWrite = shouldOverwrite(existing?.lastUpdated, journal.lastUpdated, options.strategy)
                 if (existing == null || shouldWrite) {
                     if (journalRepository.compareAndSetJournalForRestore(existing, journal, journalRecoveryScope, mediaRecoveryId)) {
@@ -201,141 +218,145 @@ class RestoreUserDataUseCase(
                         warnings.add("Kept a journal changed during archive recovery")
                     }
                 } else {
-                    journalRepository.compareAndSetJournalForRestore(
-                        existing,
-                        requireNotNull(existing),
-                        journalRecoveryScope,
-                        mediaRecoveryId,
-                    )
+                    journalRepository.compareAndSetJournalForRestore(existing, existing, journalRecoveryScope, mediaRecoveryId)
                 }
             }
 
             onProgress?.invoke(RestoreProgressPhase.RESTORING_NOTES)
             Napier.i("Restore: importing ${migrated.notes.size} notes")
-            for (note in migrated.notes) {
+            for (plan in notePlans) {
                 check(journalNotesRepository.getNoteRecoveryScope() == noteRecoveryScope) { "Note recovery account changed" }
-                val parsedId = parseUuid(note.id, warnings) ?: continue
-                val existing = journalNotesRepository.getNoteById(parsedId)
-                val source =
-                    note.mediaPath?.takeIf { it.isNotBlank() } ?: if (note.type.lowercase() in setOf("image", "video", "audio")) {
-                        unavailableArchiveReference(note.id)
-                    } else {
-                        null
-                    }
-                var mediaResolution = mediaResolver.resolve(source)
-                val localOriginal = existing?.mediaRefOrNull()
-                if (mediaResolution.unavailableReason != null &&
-                    existing?.type?.name?.lowercase() == note.type.lowercase() &&
-                    localOriginal != null &&
-                    mediaImporter?.isAvailable(localOriginal) == true
-                ) {
-                    mediaResolution = MediaResolution(localOriginal, false, false)
-                }
-                if (mediaResolution.imported) {
+                val existing = plan.existing
+                if (plan.mediaResolution.imported) {
                     mediaImported++
                 }
-                val restored =
-                    note.toJournalNote(
-                        parsedId,
-                        mediaResolution.copy(uri = mediaResolution.retainedReference(note.id, generation = mediaRecoveryId)),
-                    )
+                val restored = plan.restored
                 if (restored == null) {
-                    val normalizedType = note.type.lowercase()
-                    val message =
-                        if (normalizedType == "image" || normalizedType == "video" || normalizedType == "audio") {
-                            val mediaPath = note.mediaPath ?: "unknown"
-                            val status =
-                                if (mediaImporter != null && manifestIndex?.containsKey(mediaPath) == true) {
-                                    "could not be imported (file missing or corrupted)"
-                                } else {
-                                    "not found in archive"
-                                }
-                            "Skipped $normalizedType note (ID: ${note.id}) - media file $status: $mediaPath"
-                        } else {
-                            "Skipped unsupported note type: ${note.type}"
-                        }
-                    Napier.w(message)
-                    warnings.add(message)
-                    if (existing != null) availableNoteIds += parsedId
+                    Napier.w(plan.skipMessage)
+                    warnings.add(plan.skipMessage)
+                    if (existing != null) availableNoteIds += plan.id
                     continue
                 }
 
-                availableNoteIds += parsedId
+                availableNoteIds += plan.id
                 val shouldWrite = shouldOverwrite(existing?.lastUpdated, restored.lastUpdated, options.strategy)
                 if (existing == null || shouldWrite) {
                     val replacement = restored.withExistingCaptureMetadata(existing)
-                    mediaResolution
-                        .unavailableAsset(
-                            note.id,
-                            generation = mediaRecoveryId,
-                            kind = note.type.lowercase(),
-                        )?.let { onPendingMedia?.invoke(it) }
+                    val unavailable = plan.mediaResolution.unavailableAsset(plan.note.id, generation = mediaRecoveryId, kind = plan.kind)
+                    unavailable?.let { onPendingMedia?.invoke(it) }
                     if (journalNotesRepository.compareAndSetNoteForRestore(existing, replacement, noteRecoveryScope, mediaRecoveryId)) {
-                        mediaResolution
-                            .unavailableAsset(
-                                note.id,
-                                generation = mediaRecoveryId,
-                                kind = note.type.lowercase(),
-                            )?.let(::recordUnavailable)
+                        unavailable?.let(::recordUnavailable)
                         notesImported++
                     } else {
                         warnings.add("Kept a note changed during archive recovery")
                     }
                 } else {
-                    journalNotesRepository.compareAndSetNoteForRestore(
-                        existing,
-                        requireNotNull(existing),
-                        noteRecoveryScope,
-                        mediaRecoveryId,
-                    )
+                    journalNotesRepository.compareAndSetNoteForRestore(existing, existing, noteRecoveryScope, mediaRecoveryId)
                 }
             }
 
             onProgress?.invoke(RestoreProgressPhase.RESTORING_LINKS)
             Napier.i("Restore: importing ${journalNotesPayload.journalNotes.size} journal links")
-            for (relation in journalNotesPayload.journalNotes) {
-                val journalId = parseUuid(relation.journalId, warnings) ?: continue
-                val noteId = parseUuid(relation.noteId, warnings) ?: continue
-                if (noteId !in availableNoteIds) {
-                    val message = "Skipped journal link for note $noteId because the note was not restored"
-                    Napier.w(message)
-                    warnings.add(message)
-                    continue
+            val relations =
+                journalNotesPayload.journalNotes.mapNotNull { relation ->
+                    val journalId = parseUuid(relation.journalId, warnings) ?: return@mapNotNull null
+                    val noteId = parseUuid(relation.noteId, warnings) ?: return@mapNotNull null
+                    if (noteId !in availableNoteIds) {
+                        val message = "Skipped journal link for note $noteId because the note was not restored"
+                        Napier.w(message)
+                        warnings.add(message)
+                        return@mapNotNull null
+                    }
+                    noteId to journalId
                 }
-
-                if (journalNotesRepository.getNoteById(noteId) != null &&
+            val linkedNotes = journalNotesRepository.getNotesByIds(relations.map { it.first }.toSet()).keys
+            for ((noteId, journalId) in relations) {
+                if (noteId in linkedNotes &&
                     journalContentRepository.addContentToJournalForRestore(noteId, journalId, noteRecoveryScope, mediaRecoveryId)
                 ) {
                     linksImported++
                 }
             }
 
-            if (options.includeDrafts) {
-                onProgress?.invoke(RestoreProgressPhase.RESTORING_DRAFTS)
-                Napier.i("Restore: importing ${migrated.drafts.size} drafts")
-                draftsImported = draftRestorer.restore(migrated.drafts, options.strategy)
-            }
-
-            profileRestorer.restore(profilePayload?.profile, options, onProgress, noteRecoveryScope, mediaRecoveryId)
             restorePlaces(placesPayload?.places.orEmpty(), noteRecoveryScope, mediaRecoveryId, onProgress)
             restoreLocationHistory(locationHistoryPayload?.locationHistory.orEmpty(), noteRecoveryScope, mediaRecoveryId, onProgress)
-
-            onProgress?.invoke(RestoreProgressPhase.COMPLETED)
-
-            return RestoreResult(
-                metadata = metadata,
-                journalsImported = journalsImported,
-                notesImported = notesImported,
-                draftsImported = draftsImported,
-                journalLinksImported = linksImported,
-                mediaImported = mediaImported,
-                warnings = warnings,
-                integrityMismatches = integrityMismatches,
-                unavailableMedia = unavailableMedia.distinctBy { Triple(it.entityId, it.blockId, it.role) },
-            )
-        } catch (e: Exception) {
-            throw e
         }
+
+        if (options.includeDrafts) {
+            onProgress?.invoke(RestoreProgressPhase.RESTORING_DRAFTS)
+            Napier.i("Restore: importing ${migrated.drafts.size} drafts")
+            draftsImported = draftRestorer.restore(migrated.drafts, options.strategy)
+        }
+
+        profileRestorer.restore(profilePayload?.profile, options, onProgress, noteRecoveryScope, mediaRecoveryId)
+
+        onProgress?.invoke(RestoreProgressPhase.COMPLETED)
+
+        return RestoreResult(
+            metadata = metadata,
+            journalsImported = journalsImported,
+            notesImported = notesImported,
+            draftsImported = draftsImported,
+            journalLinksImported = linksImported,
+            mediaImported = mediaImported,
+            warnings = warnings,
+            integrityMismatches = integrityMismatches,
+            unavailableMedia = unavailableMedia.distinctBy { Triple(it.entityId, it.blockId, it.role) },
+        )
+    }
+
+    /** What restoring one archived note will write, resolved before the database transaction. */
+    private class NotePlan(
+        val note: ExportNote,
+        val id: Uuid,
+        val existing: JournalNote?,
+        val mediaResolution: MediaResolution,
+        val restored: JournalNote?,
+        val skipMessage: String,
+    ) {
+        val kind: String = note.type.lowercase()
+    }
+
+    private suspend fun planNote(
+        note: ExportNote,
+        id: Uuid,
+        existing: JournalNote?,
+        mediaResolver: RestoreMediaResolver,
+        mediaImporter: MediaImporter?,
+        manifestIndex: Map<String, *>?,
+        mediaRecoveryId: String,
+    ): NotePlan {
+        val kind = note.type.lowercase()
+        val isMedia = kind in setOf("image", "video", "audio")
+        val source = note.mediaPath?.takeIf { it.isNotBlank() } ?: if (isMedia) unavailableArchiveReference(note.id) else null
+        var mediaResolution = mediaResolver.resolve(source)
+        val localOriginal = existing?.mediaRefOrNull()
+        if (mediaResolution.unavailableReason != null &&
+            existing?.type?.name?.lowercase() == kind &&
+            localOriginal != null &&
+            mediaImporter?.isAvailable(localOriginal) == true
+        ) {
+            mediaResolution = MediaResolution(localOriginal, false, false)
+        }
+        val restored =
+            note.toJournalNote(
+                id,
+                mediaResolution.copy(uri = mediaResolution.retainedReference(note.id, generation = mediaRecoveryId)),
+            )
+        val skipMessage =
+            if (isMedia) {
+                val mediaPath = note.mediaPath ?: "unknown"
+                val status =
+                    if (mediaImporter != null && manifestIndex?.containsKey(mediaPath) == true) {
+                        "could not be imported (file missing or corrupted)"
+                    } else {
+                        "not found in archive"
+                    }
+                "Skipped $kind note (ID: ${note.id}) - media file $status: $mediaPath"
+            } else {
+                "Skipped unsupported note type: ${note.type}"
+            }
+        return NotePlan(note, id, existing, mediaResolution, restored, skipMessage)
     }
 
     private fun validateArchiveIntegrity(
@@ -417,4 +438,9 @@ class RestoreUserDataUseCase(
         runCatching { Uuid.parse(value) }
             .onFailure { warnings.add("Invalid UUID in restore payload: $value") }
             .getOrNull()
+}
+
+/** Applies restore writes directly, for callers without a database transaction. */
+private object DirectRestoreTransactions : SyncTransactionManager {
+    override suspend fun <T> withTransaction(block: suspend () -> T): T = block()
 }
