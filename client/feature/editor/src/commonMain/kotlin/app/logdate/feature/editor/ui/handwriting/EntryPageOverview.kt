@@ -132,6 +132,7 @@ class EntryPageOverviewState internal constructor(
     internal var focusScrollBookmark: Int? = null
     internal val blockPositions = mutableMapOf<Uuid, Float>()
     internal var draftRevealPlacement by mutableStateOf<DraftRevealPlacement?>(null)
+    internal var draftRevealHeading by mutableStateOf<DraftRevealPlacement?>(null)
     internal var headerBottom by mutableStateOf<Float?>(null)
     internal var dockTop by mutableStateOf<Float?>(null)
 }
@@ -150,6 +151,13 @@ internal fun EntryPageOverview(
     val scroll = state.scroll
     val earlierExpanded = state.earlierExpanded
     val browsing = rememberEarlierDayTransition(state)
+    val headingBounds =
+        Modifier.padding(horizontal = 16.dp).onGloballyPositioned { coordinates ->
+            uiState.draftReveal?.let { request ->
+                state.draftRevealHeading =
+                    DraftRevealPlacement(request, coordinates.positionInWindow().y, coordinates.size.height)
+            }
+        }
     var pull by state::pull
     val threshold = with(LocalDensity.current) { 112.dp.toPx() }
     val armed = kotlin.math.abs(pull) >= threshold
@@ -301,7 +309,7 @@ internal fun EntryPageOverview(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     stringResource(Res.string.entry_page_now),
-                    Modifier.padding(horizontal = 16.dp),
+                    headingBounds,
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -343,7 +351,7 @@ internal fun EntryPageOverview(
                 heading = {
                     Text(
                         stringResource(Res.string.entry_page_now),
-                        Modifier.padding(horizontal = 16.dp),
+                        headingBounds,
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
