@@ -1,6 +1,8 @@
 package app.logdate.client.domain.recommendation
 
 import app.logdate.client.datastore.KeyValueStorage
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -18,16 +20,19 @@ interface PlaceFamiliarityRepository {
     )
 }
 
+/** Stores how often each place was visited. Visits are applied one at a time so concurrent arrivals are all counted. */
 class DefaultPlaceFamiliarityRepository(
     private val keyValueStorage: KeyValueStorage,
 ) : PlaceFamiliarityRepository {
-    override suspend fun get(placeKey: String): PlaceFamiliarityRecord? = loadRecords()[placeKey]
+    private val mutex = Mutex()
+
+    override suspend fun get(placeKey: String): PlaceFamiliarityRecord? = mutex.withLock { loadRecords()[placeKey] }
 
     override suspend fun recordVisit(
         placeKey: String,
         displayName: String?,
         visitedAt: Instant,
-    ) {
+    ) = mutex.withLock {
         val records = loadRecords().toMutableMap()
         val existing = records[placeKey]
         val updated =
@@ -52,11 +57,13 @@ class DefaultPlaceFamiliarityRepository(
                     )
             }
         records[placeKey] = updated
-        keyValueStorage.putString(KEY_PLACE_FAMILIARITY, json.encodeToString(records.values.sortedBy(PlaceFamiliarityRecord::placeKey)))
+        val encoded = json.encodeToString(records.values.sortedBy(PlaceFamiliarityRecord::placeKey))
+        keyValueStorage.putStringOrThrow(KEY_PLACE_FAMILIARITY, encoded)
     }
 
+    /** An unreadable record throws rather than reporting every place as new, so a known place never triggers a novel arrival. */
     private suspend fun loadRecords(): Map<String, PlaceFamiliarityRecord> {
-        val stored = keyValueStorage.getString(KEY_PLACE_FAMILIARITY) ?: return emptyMap()
+        val stored = keyValueStorage.getStringOrThrow(KEY_PLACE_FAMILIARITY) ?: return emptyMap()
         return try {
             val records = json.decodeFromString<List<PlaceFamiliarityRecord>>(stored)
             check(records.all { it.placeKey.isNotBlank() && it.visitCount > 0 }) { "Invalid place familiarity" }
