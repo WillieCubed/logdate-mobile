@@ -9,6 +9,7 @@ import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.location.LocationLogRecord
 import app.logdate.shared.model.Location
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.datetime.LocalDate
@@ -60,6 +61,8 @@ class StandardLocationTracker(
         try {
             val fix = locationProvider.getCurrentFix()
             logLocation(fix.location, fix.observedAt, fix.evidence())
+        } catch (cancellation: CancellationException) {
+            throw cancellation
         } catch (e: Exception) {
             Napier.e("Failed to log current location", e)
             Result.failure(e)
@@ -105,29 +108,12 @@ class StandardLocationTracker(
             val result = locationHistoryRepository.logLocation(record)
 
             if (result.isSuccess) {
-                val historyItem =
-                    LocationHistoryItem(
-                        sampleId = record.sampleId,
-                        userId = ownerId,
-                        deviceId = deviceId,
-                        timestamp = timestamp,
-                        loggedAt = record.loggedAt,
-                        location = location,
-                        confidence = confidence,
-                        isGenuine = isGenuine,
-                        capturePipeline = capturePipeline,
-                        captureSource = captureSource,
-                        accuracyMeters = accuracyMeters,
-                        speedMetersPerSecond = speedMetersPerSecond,
-                        bearingDegrees = bearingDegrees,
-                        isMock = isMock,
-                        activityType = activityType,
-                        timeZoneId = timeZoneId,
-                    )
-                Result.success(historyItem)
+                Result.success(record.toHistoryItem())
             } else {
                 Result.failure(result.exceptionOrNull() ?: Exception("Failed to log location"))
             }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
         } catch (e: Exception) {
             Napier.e("Failed to log location", e)
             Result.failure(e)
@@ -152,8 +138,30 @@ class StandardLocationTracker(
             val startTime = Instant.fromEpochMilliseconds(0) // Beginning of time
             val endTime = Instant.fromEpochMilliseconds(Long.MAX_VALUE) // Far future
             locationHistoryRepository.deleteLocationsBetween(startTime, endTime)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
         } catch (e: Exception) {
             Napier.e("Failed to clear all location history", e)
             Result.failure(e)
         }
 }
+
+private fun LocationLogRecord.toHistoryItem(): LocationHistoryItem =
+    LocationHistoryItem(
+        sampleId = sampleId,
+        userId = userId,
+        deviceId = deviceId,
+        timestamp = timestamp,
+        loggedAt = loggedAt,
+        location = location,
+        confidence = confidence,
+        isGenuine = isGenuine,
+        capturePipeline = capturePipeline,
+        captureSource = captureSource,
+        accuracyMeters = accuracyMeters,
+        speedMetersPerSecond = speedMetersPerSecond,
+        bearingDegrees = bearingDegrees,
+        isMock = isMock,
+        activityType = activityType,
+        timeZoneId = timeZoneId,
+    )
