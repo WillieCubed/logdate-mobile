@@ -43,6 +43,7 @@ import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assume.assumeTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.core.context.GlobalContext
@@ -59,6 +60,9 @@ import kotlin.uuid.Uuid
 /** Owned-emulator registration against the host's local server, independent of Google providers. */
 @RunWith(AndroidJUnit4::class)
 class NativeDeviceEnrollmentProbeTest {
+    @get:Rule
+    internal val trace = NativeTransferProbeTraceRule()
+
     private val koin get() = GlobalContext.get()
     private lateinit var context: Context
     private lateinit var fixture: NativeDeviceEnrollmentCredentials
@@ -68,6 +72,7 @@ class NativeDeviceEnrollmentProbeTest {
     @Test
     fun nativeDeviceEnrollment() =
         runBlocking {
+            trace.bindCurrentProbeThread()
             val arguments = InstrumentationRegistry.getArguments()
             assumeTrue(arguments.getString("nativeDeviceEnrollment") == "true")
             val stage = arguments.getString("nativeDeviceEnrollmentStage")
@@ -79,7 +84,9 @@ class NativeDeviceEnrollmentProbeTest {
             require(context.packageName.endsWith(".debug")) { "Isolated debug application required" }
             fixture = readNativeDeviceEnrollmentCredentials(context)
             if (stage == "destination-enroll" || stage == "replay") awaitValidatedNativeWifi(context)
+            nativeTransferPhase("enrollment_before_application_start")
             ensureLogDateApplicationStarted(context.applicationContext as Application)
+            nativeTransferPhase("enrollment_application_started")
             if (stage == "destination-enroll" || stage == "replay") {
                 startupWorkIds = priorStartupWorkIds(stage == "replay")
             }
@@ -240,20 +247,24 @@ class NativeDeviceEnrollmentProbeTest {
     }
 
     private suspend fun cleanupSession() {
+        nativeTransferPhase("enrollment_cleanup_identity")
         require(receiptFile.isFile) { "Cleanup requires this fixture's enrollment receipt" }
         val receipt = JSONObject(receiptFile.readText())
         val before = identity()
         assertSameIdentity(receipt, before)
         assertEquals(fixture.owner, before.getString("owner"))
         val sessions = koin.get<SessionStorage>()
+        nativeTransferPhase("enrollment_cleanup_session_read")
         if (sessions.hasValidSession()) {
             assertFixtureSession()
             val current = requireNotNull(sessions.getOriginBoundSession()) { "Matching fixture session required" }
+            nativeTransferPhase("enrollment_cleanup_session_clear")
             assertTrue(sessions.clearSessionIfCurrent(current), "Fixture session cleanup must be conditional")
         }
         assertNoSession()
         assertSameIdentity(before, identity())
         assertTrue(File(context.noBackupFilesDir, "native-device-enrollment-fixture.json").isFile)
+        nativeTransferPhase("enrollment_cleanup_finished")
     }
 
     private suspend fun installFixtureSession() {
@@ -264,13 +275,17 @@ class NativeDeviceEnrollmentProbeTest {
     }
 
     private suspend fun selectFixtureServer() {
-        koin.get<LogDateConfigDataSource>().awaitConfigurationLoaded()
+        trace.awaitConfiguration(koin)
         val config = koin.get<LogDateConfigRepository>()
         config.updateBackendUrl(fixture.origin)
+        nativeTransferPhase("enrollment_before_server_discovery")
         val descriptor = awaitNativeEnrollmentServer { koin.get<ServerDiscoveryClient>().discoverServer(fixture.origin) }
+        nativeTransferPhase("enrollment_server_discovered")
         assertEquals(fixture.origin, descriptor.serverOrigin)
         config.updateServerDescriptor(descriptor)
+        nativeTransferPhase("enrollment_before_configuration_persist")
         koin.get<LogDateConfigDataSource>().persistCurrentConfiguration()
+        nativeTransferPhase("enrollment_configuration_persisted")
     }
 
     private fun priorStartupWorkIds(replay: Boolean): Set<String> {
