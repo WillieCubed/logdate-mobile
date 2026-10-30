@@ -26,6 +26,7 @@ import app.logdate.client.repository.journals.JournalMergeScope
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.client.sync.DefaultSyncManager
+import app.logdate.client.sync.InMemorySyncRouteStore
 import app.logdate.client.sync.RoomSyncTransactionManager
 import app.logdate.client.sync.cloud.AssociationSyncResult
 import app.logdate.client.sync.cloud.CloudAssociationDataSource
@@ -39,6 +40,10 @@ import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.crypto.AesGcmMediaPayloadCrypto
 import app.logdate.client.sync.location.LocationHistorySyncEngine
 import app.logdate.client.sync.metadata.DatabaseSyncMetadataService
+import app.logdate.client.sync.metadata.InMemoryFirstSyncEnqueueStore
+import app.logdate.client.sync.metadata.InMemoryIdentityRecoveryNeededStore
+import app.logdate.client.sync.metadata.InMemoryLastSyncErrorStore
+import app.logdate.client.sync.metadata.InMemoryUnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.MediaSyncRef
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
@@ -269,6 +274,11 @@ internal class SpaceDevice(
 
     val manager =
         DefaultSyncManager(
+            lastErrorStore = InMemoryLastSyncErrorStore(),
+            firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+            identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+            unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+            syncRouteStore = InMemorySyncRouteStore(),
             cloudContentDataSource = mockk(relaxed = true),
             cloudJournalDataSource = mockk(relaxed = true),
             cloudAssociationDataSource = NoAssociations,

@@ -28,10 +28,6 @@ import app.logdate.client.sync.location.LocationHistorySyncEngine
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.FirstSyncEnqueueStore
 import app.logdate.client.sync.metadata.IdentityRecoveryNeededStore
-import app.logdate.client.sync.metadata.InMemoryFirstSyncEnqueueStore
-import app.logdate.client.sync.metadata.InMemoryIdentityRecoveryNeededStore
-import app.logdate.client.sync.metadata.InMemoryLastSyncErrorStore
-import app.logdate.client.sync.metadata.InMemoryUnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.LastSyncErrorStore
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.SyncBackoff
@@ -98,8 +94,8 @@ class DefaultSyncManager(
     private val cloudQuotaManager: CloudQuotaManager? = null,
     private val backoff: SyncBackoff = SyncBackoff(),
     private val syncScope: CoroutineScope = backgroundSyncScope(),
-    private val lastErrorStore: LastSyncErrorStore = InMemoryLastSyncErrorStore(),
-    internal val firstSyncEnqueueStore: FirstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+    private val lastErrorStore: LastSyncErrorStore,
+    internal val firstSyncEnqueueStore: FirstSyncEnqueueStore,
     /**
      * Wired on every platform; optional so tests that never exercise identity provisioning can
      * omit it. Without it, [IdentityKeyProvisioner.provision] cannot check whether the account already has
@@ -107,8 +103,8 @@ class DefaultSyncManager(
      * existed.
      */
     private val cloudApiClient: CloudApiClient? = null,
-    internal val identityRecoveryNeededStore: IdentityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
-    internal val unreadableCloudRecordStore: UnreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+    internal val identityRecoveryNeededStore: IdentityRecoveryNeededStore,
+    internal val unreadableCloudRecordStore: UnreadableCloudRecordStore,
     private val locationHistorySyncEngine: LocationHistorySyncEngine? = null,
     internal val downloadInbox: app.logdate.client.sync.recovery.DownloadInbox? = null,
     private val supportsRichDrafts: () -> Boolean = { false },
@@ -133,7 +129,7 @@ class DefaultSyncManager(
     /** Moves an existing journal from legacy storage into its personal space; null never moves one. */
     spaceMigration: SpaceMigrationDependencies? = null,
     /** Which store this device last synced each account through, to notice when the account moves. */
-    internal val syncRouteStore: SyncRouteStore = InMemorySyncRouteStore(),
+    internal val syncRouteStore: SyncRouteStore,
     private val publicationCustody: ManagedMediaPublicationCustody = ManagedMediaPublicationCustody.None,
     val readinessGate: SyncReadinessGate = SyncReadinessGate(),
 ) : SyncManager {

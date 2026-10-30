@@ -48,6 +48,10 @@ import app.logdate.client.sync.crypto.NoOpMediaPayloadCrypto
 import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.client.sync.location.LocationHistorySyncEngine
 import app.logdate.client.sync.metadata.DatabaseSyncMetadataService
+import app.logdate.client.sync.metadata.InMemoryFirstSyncEnqueueStore
+import app.logdate.client.sync.metadata.InMemoryIdentityRecoveryNeededStore
+import app.logdate.client.sync.metadata.InMemoryLastSyncErrorStore
+import app.logdate.client.sync.metadata.InMemoryUnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.client.sync.metadata.UploadScope
 import app.logdate.client.sync.moments.MomentSyncConfig
@@ -296,6 +300,10 @@ internal class MovingDevice(
 
     val manager =
         DefaultSyncManager(
+            lastErrorStore = InMemoryLastSyncErrorStore(),
+            firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+            identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+            unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
             cloudContentDataSource = DefaultCloudContentDataSource(durable, cipher),
             cloudJournalDataSource = DefaultCloudJournalDataSource(durable, cipher),
             cloudAssociationDataSource = DefaultCloudAssociationDataSource(durable),

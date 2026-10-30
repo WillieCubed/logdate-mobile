@@ -23,6 +23,7 @@ import app.logdate.client.repository.moments.MarkState
 import app.logdate.client.repository.moments.MarkedMoment
 import app.logdate.client.repository.moments.atMillisecondPrecision
 import app.logdate.client.sync.DefaultSyncManager
+import app.logdate.client.sync.InMemorySyncRouteStore
 import app.logdate.client.sync.RoomSyncTransactionManager
 import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.cloud.CloudRequestLocation
@@ -37,6 +38,10 @@ import app.logdate.client.sync.crypto.MarkedMomentPayloadCodec
 import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.client.sync.metadata.DatabaseSyncMetadataService
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.InMemoryFirstSyncEnqueueStore
+import app.logdate.client.sync.metadata.InMemoryIdentityRecoveryNeededStore
+import app.logdate.client.sync.metadata.InMemoryLastSyncErrorStore
+import app.logdate.client.sync.metadata.InMemoryUnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.moments.MomentSyncConfig
 import app.logdate.client.sync.recovery.DownloadInbox
@@ -193,6 +198,11 @@ class MarkedMomentRoomDownloadE2ETest {
                     val device = mockk<DeviceIdProvider> { every { getDeviceId() } returns MutableStateFlow(Uuid.random()) }
                     val manager =
                         DefaultSyncManager(
+                            lastErrorStore = InMemoryLastSyncErrorStore(),
+                            firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                            identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                            unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                            syncRouteStore = InMemorySyncRouteStore(),
                             cloudContentDataSource = DefaultCloudContentDataSource(durable, phoneCipher),
                             cloudJournalDataSource = DefaultCloudJournalDataSource(durable, phoneCipher),
                             cloudAssociationDataSource = DefaultCloudAssociationDataSource(durable),

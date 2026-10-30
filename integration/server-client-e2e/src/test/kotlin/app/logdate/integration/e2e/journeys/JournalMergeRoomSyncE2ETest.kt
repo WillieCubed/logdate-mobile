@@ -14,6 +14,7 @@ import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.repository.journals.JournalMergeResult
 import app.logdate.client.repository.journals.JournalMergeScope
 import app.logdate.client.sync.DefaultSyncManager
+import app.logdate.client.sync.InMemorySyncRouteStore
 import app.logdate.client.sync.RoomSyncTransactionManager
 import app.logdate.client.sync.cloud.Association
 import app.logdate.client.sync.cloud.AssociationUploadRequest
@@ -25,6 +26,10 @@ import app.logdate.client.sync.cloud.DeviceId
 import app.logdate.client.sync.cloud.JournalUploadRequest
 import app.logdate.client.sync.metadata.DatabaseSyncMetadataService
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.InMemoryFirstSyncEnqueueStore
+import app.logdate.client.sync.metadata.InMemoryIdentityRecoveryNeededStore
+import app.logdate.client.sync.metadata.InMemoryLastSyncErrorStore
+import app.logdate.client.sync.metadata.InMemoryUnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
@@ -171,6 +176,11 @@ class JournalMergeRoomSyncE2ETest {
                         }
                     val manager =
                         DefaultSyncManager(
+                            lastErrorStore = InMemoryLastSyncErrorStore(),
+                            firstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+                            identityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+                            unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+                            syncRouteStore = InMemorySyncRouteStore(),
                             cloudContentDataSource = mockk(relaxed = true),
                             cloudJournalDataSource = DefaultCloudJournalDataSource(DurableCloudApiClient(transport, inbox)),
                             cloudAssociationDataSource = mockk(relaxed = true),
