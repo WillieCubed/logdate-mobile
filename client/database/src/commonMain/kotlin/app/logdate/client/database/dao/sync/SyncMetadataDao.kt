@@ -58,6 +58,15 @@ interface SyncMetadataDao {
     ): List<PendingUploadEntity>
 
     @Query(
+        "SELECT EXISTS(SELECT 1 FROM pending_uploads WHERE ownerId = :ownerId AND serverOrigin = :serverOrigin AND entityType = :entityType)",
+    )
+    suspend fun hasPendingOfType(
+        ownerId: String,
+        serverOrigin: String,
+        entityType: String,
+    ): Boolean
+
+    @Query(
         "SELECT * FROM pending_uploads WHERE ownerId = '' AND serverOrigin = :serverOrigin AND entityType = :entityType ORDER BY createdAt ASC",
     )
     suspend fun getLegacyPendingByType(
@@ -87,7 +96,7 @@ interface SyncMetadataDao {
         val owner = pending.ownerId
         val origin = pending.serverOrigin
         val type = pending.entityType
-        if (getPendingByType(owner, origin, type).isEmpty()) {
+        if (!hasPendingOfType(owner, origin, type)) {
             getLegacyPendingByType(origin, type).forEach { promotePendingIfAbsent(it.copy(ownerId = owner)) }
         }
         val existing = getPending(owner, origin, type, pending.entityId)
