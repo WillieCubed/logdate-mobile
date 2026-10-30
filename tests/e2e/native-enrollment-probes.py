@@ -3,6 +3,50 @@
 import time
 
 
+def _bounded_partial(raw):
+    raw = raw.encode() if isinstance(raw, str) else raw or b""
+    limit = 512 * 1024
+    if len(raw) <= limit:
+        return raw
+    marker = f"\n[diagnostic truncated; original bytes={len(raw)}]\n".encode()
+    head = (limit - len(marker)) // 2
+    return raw[:head] + marker + raw[-(limit - len(marker) - head) :]
+
+
+def _instrument(h, serial, output, *arguments):
+    try:
+        return h.H["adb"](serial, *arguments)
+    except h.subprocess.TimeoutExpired as failure:
+        try:
+            h.H["private_file"](output, _bounded_partial(failure.stdout))
+            if failure.stderr is not None:
+                h.H["private_file"](
+                    output.with_suffix(".stderr.log"), _bounded_partial(failure.stderr)
+                )
+            h.H["private_file"](
+                output.with_suffix(".timeout.json"),
+                h.json.dumps(
+                    {"timeoutSeconds": failure.timeout, "acceptancePassed": False}
+                ).encode(),
+            )
+        except Exception as diagnostic:
+            h.add_failure_note(
+                failure,
+                "Partial enrollment output unavailable: " + type(diagnostic).__name__,
+            )
+        try:
+            h.capture_failure_diagnostics(
+                serial, output.parent / "failure-diagnostics" / output.stem
+            )
+        except Exception as diagnostic:
+            h.add_failure_note(
+                failure,
+                "Enrollment timeout diagnostics unavailable: "
+                + type(diagnostic).__name__,
+            )
+        raise
+
+
 def checked_emulator(h, serial):
     h.H["emulator_serial"](serial)
     if h.H["adb"](serial, "shell", "getprop", "ro.kernel.qemu").strip() != b"1":
@@ -27,8 +71,10 @@ def bring_fixture_online(h, serial, output=None):
 
 def probe(h, serial, stage, output):
     h.checked_emulator(serial)
-    raw = h.H["adb"](
+    raw = _instrument(
+        h,
         serial,
+        output,
         "shell",
         "am",
         "instrument",
@@ -62,8 +108,10 @@ def probe(h, serial, stage, output):
 
 def retained_draft_probe(h, serial, stage, output):
     h.checked_emulator(serial)
-    raw = h.H["adb"](
+    raw = _instrument(
+        h,
         serial,
+        output,
         "shell",
         "am",
         "instrument",
@@ -110,8 +158,10 @@ def retained_draft_probe(h, serial, stage, output):
 
 def current_draft_probe(h, serial, stage, output):
     h.checked_emulator(serial)
-    raw = h.H["adb"](
+    raw = _instrument(
+        h,
         serial,
+        output,
         "shell",
         "am",
         "instrument",
