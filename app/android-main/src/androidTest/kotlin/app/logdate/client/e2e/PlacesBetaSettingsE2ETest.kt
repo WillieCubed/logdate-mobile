@@ -163,7 +163,8 @@ class PlacesBetaSettingsE2ETest {
                         useUnmergedTree = true,
                     ).performScrollTo()
                     .performClick()
-                compose.onNodeWithText("Visit settings").performScrollTo().assertIsDisplayed()
+                awaitText("Visit details")
+                compose.onNodeWithText("Visit details").performScrollTo().assertIsDisplayed()
                 awaitText(memory.content)
                 compose
                     .onAllNodesWithText(memory.content)
@@ -174,7 +175,7 @@ class PlacesBetaSettingsE2ETest {
 
                 flags.setEnabled(FeatureFlag.PLACES_BETA, false)
                 compose.waitUntil(15_000) { current == HomeRoute }
-                compose.onNodeWithText("Visit settings").assertDoesNotExist()
+                compose.onNodeWithText("Visit details").assertDoesNotExist()
                 compose.onNodeWithText("Your day").assertDoesNotExist()
                 val retained =
                     withTimeout(15_000) {
