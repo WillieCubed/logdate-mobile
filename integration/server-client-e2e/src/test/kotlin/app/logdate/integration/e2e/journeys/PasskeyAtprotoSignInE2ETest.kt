@@ -38,10 +38,10 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
-import java.net.ServerSocket
 import java.net.URI
 import java.security.SecureRandom
 import java.util.Base64
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -396,31 +396,37 @@ class PasskeyAtprotoSignInE2ETest {
 
     /** Runs a stand-in third-party app that serves its OAuth client metadata document over loopback HTTP. */
     private suspend fun <T> withThirdPartyApp(block: suspend (ThirdPartyApp) -> T): T {
-        val port = ServerSocket(0).use { it.localPort }
-        val app =
-            ThirdPartyApp(
-                clientId = "http://localhost:$port/client-metadata.json",
-                redirectUri = "http://localhost:$port/callback",
-            )
-        val metadata =
-            buildJsonObject {
-                put("client_id", app.clientId)
-                put("client_name", "Journal Viewer")
-                put("redirect_uris", Json.parseToJsonElement("""["${app.redirectUri}"]"""))
-                put("grant_types", Json.parseToJsonElement("""["authorization_code","refresh_token"]"""))
-                put("response_types", Json.parseToJsonElement("""["code"]"""))
-                put("scope", "atproto transition:generic")
-                put("token_endpoint_auth_method", "none")
-                put("dpop_bound_access_tokens", true)
-            }.toString()
+        val metadata = AtomicReference<String>()
         val server =
-            embeddedServer(Netty, host = "127.0.0.1", port = port) {
+            embeddedServer(Netty, host = "127.0.0.1", port = 0) {
                 routing {
-                    get("/client-metadata.json") { call.respondText(metadata, ContentType.Application.Json) }
+                    get("/client-metadata.json") { call.respondText(metadata.get(), ContentType.Application.Json) }
                 }
             }
         server.start(wait = false)
         try {
+            val port =
+                server.engine
+                    .resolvedConnectors()
+                    .single()
+                    .port
+            val app =
+                ThirdPartyApp(
+                    clientId = "http://localhost:$port/client-metadata.json",
+                    redirectUri = "http://localhost:$port/callback",
+                )
+            metadata.set(
+                buildJsonObject {
+                    put("client_id", app.clientId)
+                    put("client_name", "Journal Viewer")
+                    put("redirect_uris", Json.parseToJsonElement("""["${app.redirectUri}"]"""))
+                    put("grant_types", Json.parseToJsonElement("""["authorization_code","refresh_token"]"""))
+                    put("response_types", Json.parseToJsonElement("""["code"]"""))
+                    put("scope", "atproto transition:generic")
+                    put("token_endpoint_auth_method", "none")
+                    put("dpop_bound_access_tokens", true)
+                }.toString(),
+            )
             return block(app)
         } finally {
             server.stop(gracePeriodMillis = 100, timeoutMillis = 2_000)
