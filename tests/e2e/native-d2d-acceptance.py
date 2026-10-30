@@ -196,7 +196,12 @@ def select_d2d_transport(serial, attempts=30, output=None):
                     HARNESS.private_file(
                         output / f"d2d-init-{attempt + 1}.log", initialized
                     )
-                if selected_transport(serial) == D2D_TRANSPORT:
+                results = [
+                    line.strip().partition(b":")[2].strip()
+                    for line in initialized.splitlines()
+                    if line.strip().startswith(b"Initialization result:")
+                ]
+                if results == [b"0"] and selected_transport(serial) == D2D_TRANSPORT:
                     return
         except Exception as error:
             if attempt + 1 == attempts:
@@ -206,7 +211,7 @@ def select_d2d_transport(serial, attempts=30, output=None):
         if attempt + 1 < attempts:
             HARNESS.time.sleep(1)
     raise RuntimeError(
-        "Google D2D transport is not available or was not selected; "
+        "Google D2D transport is not available, was not selected, or initialization failed; "
         f"registered={registered!r}, selection={selection!r}"
     )
 
