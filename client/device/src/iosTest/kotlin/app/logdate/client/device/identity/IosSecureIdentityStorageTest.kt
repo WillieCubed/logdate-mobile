@@ -143,7 +143,7 @@ class IosSecureIdentityStorageTest {
     private class FakeKeychainWrapper : KeychainWrapper {
         val values = mutableMapOf<String, String>()
 
-        override fun getString(key: String): String? = values[key]
+        override suspend fun getString(key: String): String? = values[key]
 
         override suspend fun set(
             value: String,

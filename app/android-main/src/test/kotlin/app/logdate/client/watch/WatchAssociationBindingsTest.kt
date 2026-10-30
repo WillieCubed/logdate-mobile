@@ -2,7 +2,6 @@ package app.logdate.client.watch
 
 import app.logdate.client.datastore.KeyValueStorage
 import io.mockk.coEvery
-import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -14,8 +13,8 @@ class WatchAssociationBindingsTest {
         runTest {
             var value: String? = null
             val storage = mockk<KeyValueStorage>()
-            every { storage.getStringSync(any()) } answers { value }
-            coEvery { storage.putString(any(), any()) } coAnswers { value = secondArg() }
+            coEvery { storage.getStringOrThrow(any()) } answers { value }
+            coEvery { storage.putStringOrThrow(any(), any()) } coAnswers { value = secondArg() }
             val bindings = WatchAssociationBindings(storage)
             bindings.bind(WatchAssociationBinding(42, "watch-a", "A"))
             bindings.bind(WatchAssociationBinding(81, "watch-b", "B"))
@@ -31,8 +30,8 @@ class WatchAssociationBindingsTest {
         runTest {
             var value: String? = null
             val storage = mockk<KeyValueStorage>()
-            every { storage.getStringSync(any()) } answers { value }
-            coEvery { storage.putString(any(), any()) } coAnswers { value = secondArg() }
+            coEvery { storage.getStringOrThrow(any()) } answers { value }
+            coEvery { storage.putStringOrThrow(any(), any()) } coAnswers { value = secondArg() }
             val bindings = WatchAssociationBindings(storage)
             bindings.bind(WatchAssociationBinding(42, "watch-a", "A"))
             bindings.bind(WatchAssociationBinding(42, "watch-b", "B"))

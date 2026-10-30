@@ -58,7 +58,7 @@ class IosAccountManagerTest {
         var writeCount = 0
         var removeCount = 0
 
-        override fun getString(key: String): String? {
+        override suspend fun getString(key: String): String? {
             readCount += 1
             return values[key]
         }

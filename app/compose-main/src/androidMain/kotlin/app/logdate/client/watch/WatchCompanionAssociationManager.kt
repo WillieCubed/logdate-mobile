@@ -217,11 +217,12 @@ class AndroidCompanionDeviceClient(
         presence?.registerCurrent()
         val association =
             if (Build.VERSION.SDK_INT >= 33) {
+                val bound = bindings.current().values
                 manager.myAssociations
                     .asSequence()
                     .filter { it.deviceProfile == AssociationRequest.DEVICE_PROFILE_WATCH }
                     .mapNotNull { info ->
-                        val binding = bindings.current().values.singleOrNull { it.associationId == info.id }
+                        val binding = bound.singleOrNull { it.associationId == info.id }
                         binding?.let { info.toSnapshot(it.nodeId) }
                     }.firstOrNull()
             } else {

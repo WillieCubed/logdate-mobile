@@ -31,8 +31,6 @@ internal class CanonicalOwnerTestStorage(
         return true
     }
 
-    override fun getStringSync(key: String): String? = entries[key]
-
     override suspend fun putString(
         key: String,
         value: String,

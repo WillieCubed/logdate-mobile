@@ -23,18 +23,18 @@ class WatchAssociationBindings(
     private val json = Json { ignoreUnknownKeys = true }
     private val serializer = MapSerializer(String.serializer(), WatchAssociationBinding.serializer())
 
-    fun current(): Map<String, WatchAssociationBinding> =
-        storage.getStringSync(KEY)?.let { json.decodeFromString(serializer, it) }.orEmpty()
+    suspend fun current(): Map<String, WatchAssociationBinding> =
+        storage.getStringOrThrow(KEY)?.let { json.decodeFromString(serializer, it) }.orEmpty()
 
     suspend fun bind(binding: WatchAssociationBinding) =
         mutex.withLock {
             val existing = current().filterValues { it.associationId != binding.associationId }
-            storage.putString(KEY, json.encodeToString(serializer, existing + (binding.nodeId to binding)))
+            storage.putStringOrThrow(KEY, json.encodeToString(serializer, existing + (binding.nodeId to binding)))
         }
 
     suspend fun forget(nodeId: String) =
         mutex.withLock {
-            storage.putString(KEY, json.encodeToString(serializer, current() - nodeId))
+            storage.putStringOrThrow(KEY, json.encodeToString(serializer, current() - nodeId))
         }
 
     companion object {

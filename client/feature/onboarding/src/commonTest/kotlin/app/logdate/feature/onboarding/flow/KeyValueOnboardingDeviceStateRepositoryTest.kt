@@ -149,8 +149,6 @@ private class FakeKeyValueStorage : KeyValueStorage {
 
     override suspend fun getString(key: String): String? = stringFlow(key).value
 
-    override fun getStringSync(key: String): String? = stringFlow(key).value
-
     override suspend fun putString(
         key: String,
         value: String,

@@ -442,8 +442,6 @@ class GetHomeRecommendationUseCaseTest {
 
         override suspend fun getString(key: String): String? = store[key] as? String
 
-        override fun getStringSync(key: String): String? = store[key] as? String
-
         override suspend fun getBoolean(
             key: String,
             defaultValue: Boolean,

@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.Flow
  * - Persistent: Data survives app restarts and updates
  * - Type-safe: Basic types are handled correctly
  * - Reactive: Changes can be observed using Flow
+ * - Honest: a write that cannot be saved throws instead of being reported as stored
  */
 interface KeyValueStorage {
     /**
@@ -57,15 +58,6 @@ interface KeyValueStorage {
         key: String,
         value: String,
     ) = putString(key, value)
-
-    /**
-     * Retrieves a string value for the given key synchronously.
-     * This is a convenience method for platforms that don't support coroutines well.
-     *
-     * @param key The key to retrieve the value for
-     * @return The stored string value, or null if not found
-     */
-    fun getStringSync(key: String): String?
 
     /**
      * Stores a string value for the given key.
