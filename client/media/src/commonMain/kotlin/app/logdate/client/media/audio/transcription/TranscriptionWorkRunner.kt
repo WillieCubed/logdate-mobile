@@ -6,7 +6,12 @@ import app.logdate.client.repository.transcription.TranscriptSource
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.transcription.TranscriptionStatus
 import app.logdate.client.repository.transcription.TranscriptionWorkToken
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlin.uuid.Uuid
 
 internal enum class TranscriptionWorkOutcome {
@@ -19,6 +24,8 @@ internal class TranscriptionWorkRunner(
     private val update: suspend (Uuid, String?, TranscriptionStatus, String?) -> Boolean,
     private val transcribe: suspend (String) -> TranscriptionResult,
     private val repository: TranscriptionRepository? = null,
+    private val timeoutMillis: Long = 5 * 60_000L,
+    private val retryAllowed: Boolean = true,
 ) {
     suspend fun run(
         noteId: Uuid,
@@ -28,43 +35,101 @@ internal class TranscriptionWorkRunner(
         return try {
             work = repository?.beginTranscription(noteId, audioUri)
             if (repository != null && work == null) return TranscriptionWorkOutcome.Success
-            if (repository == null && !update(noteId, null, TranscriptionStatus.IN_PROGRESS, null)) return TranscriptionWorkOutcome.Retry
-            when (val result = transcribe(audioUri)) {
+            if (repository == null && !update(noteId, null, TranscriptionStatus.IN_PROGRESS, null)) return retryOutcome()
+            when (val result = withTimeout(timeoutMillis) { transcribe(audioUri) }) {
                 is TranscriptionResult.Success -> {
+                    val final = result.isFinal && !result.isRefining
                     val document =
-                        result.timedTranscript?.toTranscriptDocument(TranscriptDocumentStatus.FINAL, TranscriptSource.LOCAL_REFINEMENT)
-                            ?: TranscriptDocument.fromPlainText(result.text, source = TranscriptSource.LOCAL_REFINEMENT)
-                    finish(noteId, work, document, TranscriptionStatus.COMPLETED)
+                        result.timedTranscript?.toTranscriptDocument(
+                            if (final) TranscriptDocumentStatus.FINAL else TranscriptDocumentStatus.LISTENING,
+                            TranscriptSource.LOCAL_REFINEMENT,
+                        ) ?: TranscriptDocument.fromPlainText(
+                            result.text,
+                            if (final) TranscriptDocumentStatus.FINAL else TranscriptDocumentStatus.LISTENING,
+                            TranscriptSource.LOCAL_REFINEMENT,
+                        )
+                    if (final) finish(noteId, work, document, TranscriptionStatus.COMPLETED) else retry(noteId, work, document)
                 }
                 is TranscriptionResult.Error -> {
                     if (result.reason == TranscriptionFailure.NoSpeechDetected) {
-                        finish(noteId, work, TranscriptDocument(status = TranscriptDocumentStatus.FINAL), TranscriptionStatus.COMPLETED)
+                        val retained = retainedDocument(noteId, TranscriptDocumentStatus.LISTENING)
+                        if (retained.segments.isEmpty()) {
+                            finish(noteId, work, retained.copy(status = TranscriptDocumentStatus.FINAL), TranscriptionStatus.COMPLETED)
+                        } else {
+                            finish(
+                                noteId,
+                                work,
+                                retained.copy(status = TranscriptDocumentStatus.FAILED),
+                                TranscriptionStatus.FAILED,
+                                result.reason,
+                            )
+                        }
                     } else {
                         finish(
                             noteId,
                             work,
-                            TranscriptDocument(status = TranscriptDocumentStatus.FAILED),
+                            retainedDocument(noteId, TranscriptDocumentStatus.FAILED),
                             TranscriptionStatus.FAILED,
                             result.reason,
                         )
                     }
                 }
-                is TranscriptionResult.InProgress, TranscriptionResult.Cancelled -> TranscriptionWorkOutcome.Retry
+                is TranscriptionResult.InProgress, TranscriptionResult.Cancelled -> retry(noteId, work)
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            if (repository != null && work == null) return TranscriptionWorkOutcome.Retry
+        } catch (_: TimeoutCancellationException) {
             runCatching {
                 finish(
                     noteId,
                     work,
-                    TranscriptDocument(status = TranscriptDocumentStatus.FAILED),
+                    retainedDocument(noteId, TranscriptDocumentStatus.FAILED),
+                    TranscriptionStatus.FAILED,
+                    TranscriptionFailure.AudioError,
+                )
+            }.getOrDefault(retryOutcome())
+        } catch (e: CancellationException) {
+            // WorkManager can stop a worker when constraints change. Its durable row must
+            // relinquish active status, while the same token still rejects obsolete work.
+            withContext(NonCancellable) { runCatching { retry(noteId, work) } }
+            throw e
+        } catch (_: Exception) {
+            if (repository != null && work == null) return retryOutcome()
+            runCatching {
+                finish(
+                    noteId,
+                    work,
+                    retainedDocument(noteId, TranscriptDocumentStatus.FAILED),
                     TranscriptionStatus.FAILED,
                     TranscriptionFailure.Unknown,
                 )
-            }.getOrDefault(TranscriptionWorkOutcome.Retry)
+            }.getOrDefault(retryOutcome())
         }
+    }
+
+    private suspend fun retainedDocument(
+        noteId: Uuid,
+        status: TranscriptDocumentStatus,
+    ): TranscriptDocument {
+        val retained = repository?.getTranscription(noteId)
+        return (retained?.transcriptDocument ?: TranscriptDocument.fromPlainText(retained?.text.orEmpty(), status)).copy(status = status)
+    }
+
+    private suspend fun retry(
+        noteId: Uuid,
+        work: TranscriptionWorkToken?,
+        document: TranscriptDocument? = null,
+    ): TranscriptionWorkOutcome {
+        if (repository != null && work == null) return retryOutcome()
+        if (document == null) return relinquish(noteId, work, TranscriptionFailure.AudioError)
+        val retained = document ?: retainedDocument(noteId, TranscriptDocumentStatus.LISTENING)
+        val outcome =
+            finish(
+                noteId,
+                work,
+                retained.copy(status = if (retryAllowed) TranscriptDocumentStatus.LISTENING else TranscriptDocumentStatus.FAILED),
+                if (retryAllowed) TranscriptionStatus.PENDING else TranscriptionStatus.FAILED,
+                if (retryAllowed) null else TranscriptionFailure.AudioError,
+            )
+        return if (outcome == TranscriptionWorkOutcome.Success) TranscriptionWorkOutcome.Retry else outcome
     }
 
     private suspend fun finish(
@@ -80,12 +145,35 @@ internal class TranscriptionWorkRunner(
             ) {
                 repository.completeTranscription(work, document, status, failure?.toString())
             } else {
-                update(noteId, document.plainText.takeIf { status == TranscriptionStatus.COMPLETED }, status, failure?.toString())
+                update(noteId, document.plainText.takeIf(String::isNotBlank), status, failure?.toString())
             }
         return when {
-            !persisted -> TranscriptionWorkOutcome.Retry
+            !persisted -> relinquish(noteId, work, TranscriptionFailure.PersistenceError)
             status == TranscriptionStatus.FAILED -> TranscriptionWorkOutcome.Failure
             else -> TranscriptionWorkOutcome.Success
         }
+    }
+
+    private fun retryOutcome(): TranscriptionWorkOutcome =
+        if (retryAllowed) TranscriptionWorkOutcome.Retry else TranscriptionWorkOutcome.Failure
+
+    private suspend fun relinquish(
+        noteId: Uuid,
+        work: TranscriptionWorkToken?,
+        reason: TranscriptionFailure,
+    ): TranscriptionWorkOutcome {
+        val changed =
+            if (work != null && repository != null) {
+                if (retryAllowed) repository.deferTranscription(work) else repository.failTranscription(work, reason.toString())
+            } else {
+                update(
+                    noteId,
+                    null,
+                    if (retryAllowed) TranscriptionStatus.PENDING else TranscriptionStatus.FAILED,
+                    if (retryAllowed) null else reason.toString(),
+                )
+            }
+        if (!changed) Napier.e("Could not persist transcription work state; original audio remains available for recovery")
+        return retryOutcome()
     }
 }
