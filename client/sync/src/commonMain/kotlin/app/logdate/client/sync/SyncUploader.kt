@@ -369,11 +369,7 @@ internal class SyncUploader(
                                 )
                             errors.add(
                                 SyncError(
-                                    if ((error as? CloudApiException)?.statusCode == 409) {
-                                        SyncErrorType.CONFLICT_ERROR
-                                    } else {
-                                        SyncErrorType.SERVER_ERROR
-                                    },
+                                    SyncErrorType.SERVER_ERROR,
                                     "Failed to upload content ${note.uid}: ${error.message}",
                                     error,
                                     retryable = !movedToDeadLetter,
