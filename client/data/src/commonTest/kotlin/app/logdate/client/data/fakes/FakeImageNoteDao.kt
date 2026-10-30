@@ -25,6 +25,13 @@ class FakeImageNoteDao : ImageNoteDao {
 
     override suspend fun findNoteOneOff(uid: Uuid): ImageNoteEntity? = notes[uid]
 
+    override suspend fun findNotesByIds(uids: List<Uuid>): List<ImageNoteEntity> = uids.mapNotNull { notes[it] }
+
+    override fun observeNoteById(uid: Uuid): Flow<ImageNoteEntity?> = notesFlow.map { notes -> notes.find { it.uid == uid } }
+
+    override fun observeNotesByIds(uids: List<Uuid>): Flow<List<ImageNoteEntity>> =
+        notesFlow.map { notes -> notes.filter { it.uid in uids }.sortedByDescending { it.created } }
+
     override fun getAllNotes(): Flow<List<ImageNoteEntity>> = notesFlow
 
     override fun observeCreatedTimestamps(): Flow<List<Long>> = notesFlow.map { notes -> notes.map { it.created.toEpochMilliseconds() } }

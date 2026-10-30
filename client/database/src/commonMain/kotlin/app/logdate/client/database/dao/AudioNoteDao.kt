@@ -28,6 +28,15 @@ interface AudioNoteDao {
     @Query("SELECT * FROM audio_notes WHERE uid = :uid")
     suspend fun findNoteOneOff(uid: Uuid): AudioNoteEntity?
 
+    @Query("SELECT * FROM audio_notes WHERE uid IN (:uids)")
+    suspend fun findNotesByIds(uids: List<Uuid>): List<AudioNoteEntity>
+
+    @Query("SELECT * FROM audio_notes WHERE uid = :uid")
+    fun observeNoteById(uid: Uuid): Flow<AudioNoteEntity?>
+
+    @Query("SELECT * FROM audio_notes WHERE uid IN (:uids) ORDER BY created DESC")
+    fun observeNotesByIds(uids: List<Uuid>): Flow<List<AudioNoteEntity>>
+
     /**
      * Returns a flow of all [AudioNoteEntity]s.
      */

@@ -27,6 +27,15 @@ interface VideoNoteDao {
     @Query("SELECT * FROM video_notes WHERE uid = :uid")
     suspend fun findNoteOneOff(uid: Uuid): VideoNoteEntity?
 
+    @Query("SELECT * FROM video_notes WHERE uid IN (:uids)")
+    suspend fun findNotesByIds(uids: List<Uuid>): List<VideoNoteEntity>
+
+    @Query("SELECT * FROM video_notes WHERE uid = :uid")
+    fun observeNoteById(uid: Uuid): Flow<VideoNoteEntity?>
+
+    @Query("SELECT * FROM video_notes WHERE uid IN (:uids) ORDER BY created DESC")
+    fun observeNotesByIds(uids: List<Uuid>): Flow<List<VideoNoteEntity>>
+
     /**
      * Returns a flow of all [VideoNoteEntity]s.
      */

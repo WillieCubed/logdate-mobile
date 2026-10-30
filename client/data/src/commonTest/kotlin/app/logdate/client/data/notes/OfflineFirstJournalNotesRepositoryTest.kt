@@ -182,11 +182,12 @@ class OfflineFirstJournalNotesRepositoryTest {
             journalRepository.addJournal(journal)
             textNoteDao.addNote(textNote.toEntity())
             textNoteDao.addNote(otherNote.toEntity())
+            journalContentDao.addContentToJournal(JournalContentEntityLink(journal.id, textNote.uid))
 
-            // This test is simplified as the current implementation has issues
-            // with journal-note associations
             val notes = repository.observeNotesInJournal(journal.id).first()
-            // The current implementation would need fixing for proper testing
+
+            assertEquals(listOf(textNote.uid), notes.map { it.uid })
+            assertEquals(0, textNoteDao.wholeTableReads, "a journal read every note to find its own")
         }
 
     /**
@@ -243,6 +244,38 @@ class OfflineFirstJournalNotesRepositoryTest {
 
             val secondPage = repository.observeNotesPage(pageSize = 2, offset = 2).first()
             assertEquals(2, secondPage.size)
+        }
+
+    @Test
+    fun `a page reads only the rows that can appear on it`() =
+        runTest {
+            val start = Clock.System.now()
+            val texts = List(4) { createTestTextNote().copy(content = "Text $it", creationTimestamp = start + (it * 2).seconds) }
+            val images = List(4) { createTestImageNote().copy(creationTimestamp = start + (it * 2 + 1).seconds) }
+            texts.forEach { textNoteDao.addNote(it.toEntity()) }
+            images.forEach { imageNoteDao.addNote(it.toEntity()) }
+            val newestFirst = (texts + images).sortedByDescending { it.creationTimestamp }.map { it.uid }
+
+            val page = repository.observeNotesPage(pageSize = 3, offset = 2).first()
+
+            assertEquals(newestFirst.drop(2).take(3), page.map { it.uid })
+            assertEquals(listOf(5), textNoteDao.recentLimits)
+            assertEquals(0, textNoteDao.wholeTableReads)
+        }
+
+    @Test
+    fun `one note is observed without reading every note`() =
+        runTest {
+            val note = createTestTextNote().copy(content = "Draft thought")
+            textNoteDao.addNote(note.toEntity())
+            textNoteDao.addNote(createTestTextNote().toEntity())
+
+            val observed = repository.observeNoteById(note.uid)
+
+            assertEquals("Draft thought", (observed.first() as JournalNote.Text).content)
+            textNoteDao.removeNote(note.uid)
+            assertEquals(null, observed.first())
+            assertEquals(0, textNoteDao.wholeTableReads)
         }
 
     @Test

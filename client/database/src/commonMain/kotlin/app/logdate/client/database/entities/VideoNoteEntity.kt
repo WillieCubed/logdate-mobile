@@ -21,6 +21,7 @@ import kotlin.uuid.Uuid
     indices = [
         Index("place_id"),
         Index("latitude", "longitude"),
+        Index("created"),
     ],
 )
 data class VideoNoteEntity(

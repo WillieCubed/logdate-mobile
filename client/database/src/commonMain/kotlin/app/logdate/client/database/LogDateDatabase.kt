@@ -157,6 +157,7 @@ import app.logdate.client.database.migrations.MIGRATION_55_56
 import app.logdate.client.database.migrations.MIGRATION_56_57
 import app.logdate.client.database.migrations.MIGRATION_57_58
 import app.logdate.client.database.migrations.MIGRATION_58_59
+import app.logdate.client.database.migrations.MIGRATION_59_60
 import app.logdate.client.database.migrations.MIGRATION_5_6
 import app.logdate.client.database.migrations.MIGRATION_6_7
 import app.logdate.client.database.migrations.MIGRATION_7_8
@@ -336,7 +337,7 @@ abstract class LogDateDatabase : RoomDatabase() {
  * The name of the [LogDateDatabase] file.
  */
 internal const val DATABASE_NAME = "logdate"
-internal const val DATABASE_VERSION = 59
+internal const val DATABASE_VERSION = 60
 
 internal expect val roomDatabaseDispatcher: CoroutineDispatcher
 
@@ -367,7 +368,7 @@ fun getRoomDatabase(
 ): LogDateDatabase {
     val configured =
         builder
-            .addMigrations(*databaseMigrations())
+            .addMigrations(*DATABASE_MIGRATIONS)
             .addCallback(FtsTableCallback)
             .setQueryCoroutineContext(dispatcher)
 
@@ -392,7 +393,7 @@ private object FtsTableCallback : Callback() {
     }
 }
 
-private fun databaseMigrations() =
+private val DATABASE_MIGRATIONS =
     arrayOf(
         MIGRATION_1_2,
         MIGRATION_2_3,
@@ -452,4 +453,5 @@ private fun databaseMigrations() =
         MIGRATION_56_57,
         MIGRATION_57_58,
         MIGRATION_58_59,
+        MIGRATION_59_60,
     )

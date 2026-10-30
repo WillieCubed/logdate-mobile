@@ -44,17 +44,8 @@ class OfflineFirstJournalContentRepository(
             links.groupingBy { it.journalId }.eachCount()
         }
 
-    override fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>> {
-        // Use the JournalContentDao to get content IDs associated with this journal
-        return journalContentDao
-            .getContentForJournal(journalId)
-            .combine(journalNotesRepository.allNotesObserved) { contentIds, allNotes ->
-                // Filter notes to only those associated with this journal
-                allNotes.filter { note ->
-                    contentIds.contains(note.uid)
-                }
-            }
-    }
+    override fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>> =
+        journalNotesRepository.observeNotesInJournal(journalId)
 
     override fun observeJournalsForContent(contentId: Uuid): Flow<List<Journal>> {
         // Use the dedicated JournalContentDao to get journal IDs

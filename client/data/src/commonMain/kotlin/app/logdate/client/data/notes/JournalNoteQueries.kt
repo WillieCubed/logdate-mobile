@@ -7,16 +7,22 @@ import app.logdate.client.database.dao.TextNoteDao
 import app.logdate.client.database.dao.VideoNoteDao
 import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.entities.AudioNoteEntity
+import app.logdate.client.database.entities.GenericNoteData
 import app.logdate.client.database.entities.ImageNoteEntity
+import app.logdate.client.database.entities.MediaCaptionEntity
 import app.logdate.client.database.entities.TextNoteEntity
 import app.logdate.client.database.entities.VideoNoteEntity
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NotePlace
 import app.logdate.client.repository.transcription.TranscriptionRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onStart
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -54,14 +60,27 @@ internal class JournalNoteQueries(
                 notes.map { note -> note.withCaption(captionMap) }
             }.withTranscripts(transcriptionRepository)
 
-    fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> {
-        // Get all notes-to-journal mappings for this journal
-        return journalContentDao
+    /** Reads only the notes linked to [journalId]; a journal too large for one query filters the full list. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> =
+        journalContentDao
             .getContentForJournal(journalId)
-            .combine(allNotesObserved) { contentIds, allNotes ->
-                allNotes.filter { note -> contentIds.contains(note.uid) }
+            .distinctUntilChanged()
+            .flatMapLatest { contentIds ->
+                if (contentIds.size > QUERY_BATCH_SIZE) {
+                    val linked = contentIds.toSet()
+                    allNotesObserved.map { notes -> notes.filter { it.uid in linked } }
+                } else {
+                    observeScopedNotes(
+                        observeNoteBuckets(
+                            textFlow = textNoteDao.observeNotesByIds(contentIds),
+                            imageFlow = imageNoteDao.observeNotesByIds(contentIds),
+                            audioFlow = audioNoteDao.observeNotesByIds(contentIds),
+                            videoFlow = videoNoteDao.observeNotesByIds(contentIds),
+                        ),
+                    )
+                }
             }
-    }
 
     suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> =
         journalContentDao
@@ -92,12 +111,24 @@ internal class JournalNoteQueries(
             }.withTranscripts(transcriptionRepository)
     }
 
+    /**
+     * A page across the four note tables. The newest `offset + pageSize` rows of each table always
+     * contain the requested page of their union, so each table reads at most that many rows.
+     */
     fun observeNotesPage(
         pageSize: Int,
         offset: Int,
     ): Flow<List<JournalNote>> {
-        // Since AudioNoteDao and VideoNoteDao don't have getNotesPage, handle pagination in memory.
-        return allNotesObserved.map { notes ->
+        require(pageSize >= 0 && offset >= 0) { "A page needs a non-negative size and offset" }
+        val window = offset + pageSize
+        return observeScopedNotes(
+            observeNoteBuckets(
+                textFlow = textNoteDao.getRecentNotes(window),
+                imageFlow = imageNoteDao.getRecentNotes(window),
+                audioFlow = audioNoteDao.getRecentNotes(window),
+                videoFlow = videoNoteDao.getRecentNotes(window),
+            ),
+        ).map { notes ->
             notes
                 .sortedByDescending { it.creationTimestamp }
                 .drop(offset)
@@ -105,10 +136,64 @@ internal class JournalNoteQueries(
         }
     }
 
-    fun observeNotesStream(pageSize: Int): Flow<List<JournalNote>> =
-        // Use the existing allNotesObserved for real-time updates
-        // This gives us immediate responsiveness since Room already caches data
-        allNotesObserved
+    fun observeNotesStream(pageSize: Int): Flow<List<JournalNote>> = observeNotesPage(pageSize, offset = 0)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeNoteById(noteId: Uuid): Flow<JournalNote?> {
+        val stored =
+            combine(
+                textNoteDao.observeNoteById(noteId),
+                imageNoteDao.observeNoteById(noteId),
+                audioNoteDao.observeNoteById(noteId),
+                videoNoteDao.observeNoteById(noteId),
+                mediaCaptionDao.observeCaption(noteId),
+            ) { text, image, audio, video, caption ->
+                StoredNote(text ?: image ?: audio ?: video, caption?.caption.orEmpty())
+            }.distinctUntilChanged()
+                .mapLatest { it.toNote() }
+        val transcript = transcriptionRepository?.observeTranscription(noteId) ?: return stored.distinctUntilChanged()
+        return stored
+            .combine(transcript) { note, transcription ->
+                if (note is JournalNote.Audio) note.copy(transcript = transcription?.transcriptDocument ?: note.transcript) else note
+            }.distinctUntilChanged()
+    }
+
+    private data class StoredNote(
+        val entity: GenericNoteData?,
+        val caption: String,
+    )
+
+    private suspend fun StoredNote.toNote(): JournalNote? {
+        val place = entity?.referencedPlaceId()?.let { notePlaceResolver.get(it) }
+        return when (entity) {
+            null -> null
+            is TextNoteEntity -> entity.toModel(place)
+            is ImageNoteEntity -> entity.toModel(place, caption)
+            is AudioNoteEntity -> entity.toModel(place, caption)
+            is VideoNoteEntity -> entity.toModel(place, caption)
+            else -> error("Unknown note table for ${entity.uid}")
+        }
+    }
+
+    /** Joins places and captions for exactly the notes in [buckets], instead of every caption stored. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun observeScopedNotes(buckets: Flow<NoteBuckets>): Flow<List<JournalNote>> =
+        notePlaceResolver
+            .observeAll()
+            .combine(buckets) { placeLookup, current -> current to current.toNotes(placeLookup) }
+            .flatMapLatest { (current, notes) ->
+                val captioned = current.mediaIds()
+                if (captioned.isEmpty() || captioned.size > QUERY_BATCH_SIZE) {
+                    mediaCaptionDao.observeAll().map { captions -> notes.withCaptions(captions) }
+                } else {
+                    mediaCaptionDao.observeCaptions(captioned).map { captions -> notes.withCaptions(captions) }
+                }
+            }.withTranscripts(transcriptionRepository)
+
+    private fun List<JournalNote>.withCaptions(captions: List<MediaCaptionEntity>): List<JournalNote> {
+        val captionMap = captions.associate { it.noteId to it.caption }
+        return map { note -> note.withCaption(captionMap) }
+    }
 
     fun observeEntryTimestamps(): Flow<List<Instant>> =
         combine(
@@ -250,6 +335,26 @@ internal class JournalNoteQueries(
         return null
     }
 
+    suspend fun getNotesByIds(noteIds: Set<Uuid>): Map<Uuid, JournalNote> =
+        noteIds
+            .chunked(QUERY_BATCH_SIZE)
+            .flatMap { ids ->
+                val buckets =
+                    NoteBuckets(
+                        textNotes = textNoteDao.findNotesByIds(ids),
+                        imageNotes = imageNoteDao.findNotesByIds(ids),
+                        audioNotes = audioNoteDao.findNotesByIds(ids),
+                        videoNotes = videoNoteDao.findNotesByIds(ids),
+                    )
+                val places =
+                    buckets
+                        .placeIds()
+                        .mapNotNull { placeId -> notePlaceResolver.get(placeId)?.let { placeId to it } }
+                        .toMap()
+                val captions = mediaCaptionDao.getCaptions(ids).associate { it.noteId to it.caption }
+                buckets.toNotes(places).map { note -> note.withCaption(captions).withTranscript(transcriptionRepository) }
+            }.associateBy(JournalNote::uid)
+
     private fun observeNoteBuckets(
         textFlow: Flow<List<TextNoteEntity>>,
         imageFlow: Flow<List<ImageNoteEntity>>,
@@ -276,6 +381,16 @@ internal class JournalNoteQueries(
         val audioNotes: List<AudioNoteEntity>,
         val videoNotes: List<VideoNoteEntity>,
     ) {
+        fun mediaIds(): List<Uuid> = imageNotes.map { it.uid } + audioNotes.map { it.uid } + videoNotes.map { it.uid }
+
+        fun placeIds(): Set<Uuid> =
+            buildSet {
+                textNotes.mapNotNullTo(this) { it.referencedPlaceId() }
+                imageNotes.mapNotNullTo(this) { it.referencedPlaceId() }
+                audioNotes.mapNotNullTo(this) { it.referencedPlaceId() }
+                videoNotes.mapNotNullTo(this) { it.referencedPlaceId() }
+            }
+
         fun toNotes(placeLookup: Map<Uuid, NotePlace>): List<JournalNote> =
             textNotes.map { it.toModel(it.referencedPlaceId()?.let(placeLookup::get)) } +
                 imageNotes.map { it.toModel(it.referencedPlaceId()?.let(placeLookup::get)) } +
@@ -283,3 +398,6 @@ internal class JournalNoteQueries(
                 videoNotes.map { it.toModel(it.referencedPlaceId()?.let(placeLookup::get)) }
     }
 }
+
+/** Stays well under SQLite's bound-parameter limit for `IN (...)` lookups. */
+private const val QUERY_BATCH_SIZE = 500

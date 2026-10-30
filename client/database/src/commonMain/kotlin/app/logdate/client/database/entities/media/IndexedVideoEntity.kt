@@ -18,6 +18,7 @@ import kotlin.uuid.Uuid
     tableName = "indexed_media_videos",
     indices = [
         Index(value = ["uri"], unique = true),
+        Index("timestamp"),
     ],
 )
 data class IndexedVideoEntity(
