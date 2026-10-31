@@ -70,7 +70,7 @@ fun NoteViewerScaffoldContent(
     shared: NoteViewerShared,
     onGoBack: () -> Unit,
     onEdit: (() -> Unit)? = null,
-    onOpenLocationTimeline: () -> Unit = {},
+    onOpenLocationTimeline: (() -> Unit)? = null,
     onNavigateToNote: (Uuid) -> Unit = {},
     onShowAddToJournal: () -> Unit = {},
     onShare: () -> Unit = {},
@@ -300,7 +300,7 @@ private fun NoteViewerToolbar(
 @Composable
 fun NoteViewerContent(
     shared: NoteViewerShared,
-    onOpenLocationTimeline: () -> Unit = {},
+    onOpenLocationTimeline: (() -> Unit)? = null,
     noteContent: @Composable () -> Unit,
 ) {
     Column(
@@ -325,7 +325,7 @@ fun NoteViewerContent(
 @Composable
 private fun NoteLocationCard(
     location: NoteLocation,
-    onOpenLocationTimeline: () -> Unit,
+    onOpenLocationTimeline: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val coordinates = location.coordinates
@@ -352,13 +352,15 @@ private fun NoteLocationCard(
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            FilledTonalIconButton(
-                onClick = onOpenLocationTimeline,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = null,
-                )
+            if (onOpenLocationTimeline != null) {
+                FilledTonalIconButton(
+                    onClick = onOpenLocationTimeline,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = null,
+                    )
+                }
             }
 
             Column(
@@ -383,8 +385,10 @@ private fun NoteLocationCard(
                 }
             }
 
-            FilledTonalButton(onClick = onOpenLocationTimeline) {
-                Text(text = stringResource(Res.string.open_in_locations))
+            if (onOpenLocationTimeline != null) {
+                FilledTonalButton(onClick = onOpenLocationTimeline) {
+                    Text(text = stringResource(Res.string.open_in_locations))
+                }
             }
         }
     }

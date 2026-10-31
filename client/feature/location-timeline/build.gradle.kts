@@ -93,6 +93,9 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
         }
+        val desktopTest by getting {
+            dependencies { implementation(libs.compose.ui.test) }
+        }
         androidMain.dependencies {
             implementation(libs.google.maps.compose)
             implementation(libs.androidx.activity.compose)
