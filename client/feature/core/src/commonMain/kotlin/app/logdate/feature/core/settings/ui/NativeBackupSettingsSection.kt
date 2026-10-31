@@ -30,7 +30,7 @@ import logdate.client.feature.core.generated.resources.native_backup_transfer_ti
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-internal fun NativeBackupSettingsSection(
+fun NativeBackupSettingsSection(
     status: NativeBackupStatus,
     modifier: Modifier = Modifier,
     onRetryRecovery: () -> Unit = {},

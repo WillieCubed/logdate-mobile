@@ -684,6 +684,7 @@ dependencies {
     screenshotTestImplementation(projects.client.domain)
     screenshotTestImplementation(projects.client.data)
     screenshotTestImplementation(projects.client.database)
+    screenshotTestImplementation(projects.client.device)
     screenshotTestImplementation(projects.client.media)
     screenshotTestImplementation(projects.client.sync)
     screenshotTestImplementation(projects.client.location)
